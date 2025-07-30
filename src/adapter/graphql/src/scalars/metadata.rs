@@ -27,25 +27,52 @@ pub struct MetadataBlockExtended {
     pub author: Account,
     pub event: MetadataEvent,
     pub sequence_number: u64,
+    pub encoded: Option<String>,
 }
 
 impl MetadataBlockExtended {
+    pub async fn encode_block(
+        block: &odf::metadata::MetadataBlock,
+        format: MetadataManifestFormat,
+    ) -> Result<String, InternalError> {
+        use odf::metadata::serde::MetadataBlockSerializer;
+
+        match format {
+            MetadataManifestFormat::Yaml => {
+                let ser = odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
+
+                let buffer = ser.write_manifest(block).int_err()?;
+                let content = std::str::from_utf8(&buffer).int_err()?;
+                Ok(content.to_string())
+            }
+        }
+    }
+
     pub async fn new(
         ctx: &Context<'_>,
         block_hash: impl Into<Multihash<'static>>,
         block: odf::metadata::MetadataBlock,
         author: Account,
+        encode_format_maybe: Option<MetadataManifestFormat>,
     ) -> Result<Self, InternalError> {
-        let b: MetadataBlock = MetadataBlock::with_extended_aliases(ctx, block)
-            .await?
-            .into();
+        let odf_block = MetadataBlock::with_extended_aliases(ctx, block).await?;
+
+        let encoded = if let Some(format) = encode_format_maybe {
+            Some(Self::encode_block(&odf_block, format).await?)
+        } else {
+            None
+        };
+
+        let block: MetadataBlock = odf_block.into();
+
         Ok(Self {
             block_hash: block_hash.into(),
-            prev_block_hash: b.prev_block_hash,
-            system_time: b.system_time,
+            prev_block_hash: block.prev_block_hash,
+            system_time: block.system_time,
             author,
-            event: b.event,
-            sequence_number: b.sequence_number,
+            event: block.event,
+            sequence_number: block.sequence_number,
+            encoded,
         })
     }
 }

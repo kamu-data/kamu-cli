@@ -25,6 +25,73 @@ pub struct DatasetMetadata<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+impl<'a> DatasetMetadata<'a> {
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_polling_source(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::SetPollingSource>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let result = metadata_query_service
+            .get_active_polling_source(resolved_dataset)
+            .await
+            .int_err()?;
+
+        Ok(result)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_push_sources(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Vec<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::AddPushSource>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+
+        let result = metadata_query_service
+            .get_active_push_sources(resolved_dataset)
+            .await
+            .int_err()?;
+
+        Ok(result)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_transform(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::SetTransform>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let result = metadata_query_service
+            .get_active_transform(resolved_dataset)
+            .await?;
+
+        Ok(result)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetMetadata<'a> {
@@ -140,27 +207,46 @@ impl<'a> DatasetMetadata<'a> {
     /// Current polling source used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_polling_source, skip_all)]
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+        let source_maybe = self.get_current_polling_source(ctx).await?;
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let source = metadata_query_service
-            .get_active_polling_source(resolved_dataset)
-            .await
-            .int_err()?;
+        Ok(source_maybe.map(|(_hash, block)| block.event.into()))
+    }
 
-        Ok(source.map(|(_hash, block)| block.event.into()))
+    /// Current polling source block used by the root dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_polling_source_block, skip_all)]
+    async fn current_polling_source_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<MetadataBlockExtended>> {
+        let source_maybe = self.get_current_polling_source(ctx).await?;
+
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
+
+        Ok(if let Some((hash, block)) = source_maybe {
+            Some(
+                MetadataBlockExtended::new(
+                    ctx,
+                    hash,
+                    block.into(),
+                    account,
+                    Some(MetadataManifestFormat::Yaml),
+                )
+                .await?,
+            )
+        } else {
+            None
+        })
     }
 
     /// Current push sources used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_push_sources, skip_all)]
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
-
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let mut push_sources: Vec<AddPushSource> = metadata_query_service
-            .get_active_push_sources(resolved_dataset)
-            .await
-            .int_err()?
+        let mut push_sources: Vec<AddPushSource> = self
+            .get_current_push_sources(ctx)
+            .await?
             .into_iter()
             .map(|(_hash, block)| block.event.into())
             .collect();
@@ -168,6 +254,43 @@ impl<'a> DatasetMetadata<'a> {
         push_sources.sort_by(|a, b| a.source_name.cmp(&b.source_name));
 
         Ok(push_sources)
+    }
+
+    /// Current push source blocks used by the root dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_push_source_blocks, skip_all)]
+    async fn current_push_source_blocks(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Vec<MetadataBlockExtended>> {
+        let push_sources = self.get_current_push_sources(ctx).await?;
+
+        let mut result = Vec::new();
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
+
+        for (hash, block) in push_sources {
+            result.push(
+                MetadataBlockExtended::new(
+                    ctx,
+                    hash,
+                    block.into(),
+                    account.clone(),
+                    Some(MetadataManifestFormat::Yaml),
+                )
+                .await?,
+            );
+        }
+
+        result.sort_by(|a, b| match (&a.event, &b.event) {
+            (MetadataEvent::AddPushSource(a_event), MetadataEvent::AddPushSource(b_event)) => {
+                a_event.source_name.cmp(&b_event.source_name)
+            }
+            _ => unreachable!("Expected only AddPushSource type"),
+        });
+
+        Ok(result)
     }
 
     /// Sync statuses of push remotes
@@ -185,14 +308,9 @@ impl<'a> DatasetMetadata<'a> {
     /// Current transformation used by the derivative dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_transform, skip_all)]
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+        let source_maybe = self.get_current_transform(ctx).await?;
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let source = metadata_query_service
-            .get_active_transform(resolved_dataset)
-            .await?;
-
-        if let Some((_hash, block)) = source {
+        if let Some((_hash, block)) = source_maybe {
             Ok(Some(
                 SetTransform::with_extended_aliases(ctx, block.event)
                     .await?
@@ -201,6 +319,35 @@ impl<'a> DatasetMetadata<'a> {
         } else {
             Ok(None)
         }
+    }
+
+    /// Current transformation block used by the derivative dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_transform_block, skip_all)]
+    async fn current_transform_block(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<MetadataBlockExtended>> {
+        let source_maybe = self.get_current_transform(ctx).await?;
+
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
+
+        Ok(if let Some((hash, block)) = source_maybe {
+            Some(
+                MetadataBlockExtended::new(
+                    ctx,
+                    hash,
+                    block.into(),
+                    account,
+                    Some(MetadataManifestFormat::Yaml),
+                )
+                .await?,
+            )
+        } else {
+            None
+        })
     }
 
     /// Current descriptive information about the dataset

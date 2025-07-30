@@ -167,6 +167,49 @@ async fn test_current_set_transform() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_current_set_transform_block() {
+    let harness = DatasetMetadataHarness::new().await;
+
+    let create_root_result = harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                DatasetMetadataHarness::get_dataset_set_transform_block_metadata(
+                    create_derived_result.dataset_handle.id.to_string().as_str(),
+                ),
+            )
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "metadata": {
+                        "currentTransformBlock": {
+                            "__typename": "MetadataBlockExtended",
+                            "event": {
+                                "inputs": [{
+                                    "datasetRef": create_root_result.dataset_handle.id.to_string(),
+                                    "alias": create_root_result.dataset_handle.alias.to_string(),
+                                }],
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct DatasetMetadataHarness {
     base_gql_harness: BaseGQLDatasetHarness,
@@ -264,6 +307,35 @@ impl DatasetMetadataHarness {
                                 inputs {
                                     datasetRef
                                     alias
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<dataset_id>", dataset_id)
+    }
+
+    fn get_dataset_set_transform_block_metadata(dataset_id: &str) -> String {
+        indoc!(
+            r#"
+            query Datasets {
+                datasets {
+                    byId(
+                        datasetId: "<dataset_id>"
+                    ) {
+                        metadata {
+                            currentTransformBlock {
+                                __typename
+                                event {
+                                    ...on SetTransform {
+                                        inputs {
+                                            datasetRef
+                                            alias
+                                        }
+                                    }
                                 }
                             }
                         }
