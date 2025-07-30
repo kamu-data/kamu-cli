@@ -1217,17 +1217,9 @@ type DatasetMetadata {
 	"""
 	currentPollingSource: SetPollingSource
 	"""
-	Current polling source block used by the root dataset
-	"""
-	currentPollingSourceBlock: MetadataBlockExtended
-	"""
 	Current push sources used by the root dataset
 	"""
 	currentPushSources: [AddPushSource!]!
-	"""
-	Current push source blocks used by the root dataset
-	"""
-	currentPushSourceBlocks: [MetadataBlockExtended!]!
 	"""
 	Sync statuses of push remotes
 	"""
@@ -1236,10 +1228,6 @@ type DatasetMetadata {
 	Current transformation used by the derivative dataset
 	"""
 	currentTransform: SetTransform
-	"""
-	Current transformation block used by the derivative dataset
-	"""
-	currentTransformBlock: MetadataBlockExtended
 	"""
 	Current descriptive information about the dataset
 	"""
@@ -1257,6 +1245,7 @@ type DatasetMetadata {
 	Current vocabulary associated with the dataset
 	"""
 	currentVocab: SetVocab
+	extendedBlocksByEventType(eventType: MetadataEventType!): [MetadataBlockExtended!]!
 }
 
 type DatasetMetadataMut {
@@ -2568,6 +2557,22 @@ Represents a transaction that occurred on a dataset.
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
 """
 union MetadataEvent = AddData | ExecuteTransform | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
+
+enum MetadataEventType {
+	ADD_DATA
+	EXECUTE_TRANSFORM
+	SEED
+	SET_POLLING_SOURCE
+	SET_VOCAB
+	SET_ATTACHMENTS
+	SET_INFO
+	SET_LICENSE
+	SET_DATA_SCHEMA
+	SET_TRANSFORM
+	ADD_PUSH_SOURCE
+	DISABLE_PUSH_SOURCE
+	DISABLE_POLLING_SOURCE
+}
 
 enum MetadataManifestFormat {
 	YAML

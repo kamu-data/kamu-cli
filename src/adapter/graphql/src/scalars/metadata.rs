@@ -215,3 +215,22 @@ impl MetadataEvent {
         })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+pub enum MetadataEventType {
+    AddData,
+    ExecuteTransform,
+    Seed,
+    SetPollingSource,
+    SetVocab,
+    SetAttachments,
+    SetInfo,
+    SetLicense,
+    SetDataSchema,
+    SetTransform,
+    AddPushSource,
+    DisablePushSource,
+    DisablePollingSource,
+}
