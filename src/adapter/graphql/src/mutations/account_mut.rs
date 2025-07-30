@@ -21,7 +21,7 @@ pub struct AccountMut {
     account: Account,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AccountMut {
     #[graphql(skip)]

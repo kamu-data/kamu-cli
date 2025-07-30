@@ -21,7 +21,7 @@ pub struct DatasetFlowConfigsMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowConfigsMut<'a> {
     #[graphql(skip)]

@@ -24,9 +24,10 @@ pub struct FlowQueryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl FlowQueryService for FlowQueryServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_all_flows, skip_all)]
     async fn list_all_flows(
         &self,
         pagination: PaginationOpts,
@@ -50,13 +51,15 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?scope_query, ?filters, ?pagination))]
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_scoped_flows, skip_all)]
     async fn list_scoped_flows(
         &self,
         scope_query: FlowScopeQuery,
         filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, InternalError> {
+        tracing::debug!(?scope_query, ?filters, ?pagination, "Listing scoped flows");
+
         let total_count = self
             .flow_event_store
             .get_count_flows_matching_scope_query(&scope_query, &filters)
@@ -76,11 +79,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?scope_query))]
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_scoped_flow_initiators, skip_all)]
     async fn list_scoped_flow_initiators(
         &self,
         scope_query: FlowScopeQuery,
     ) -> Result<FlowInitiatorListing, InternalError> {
+        tracing::debug!(?scope_query, "Listing scoped flow initiators");
+
         Ok(FlowInitiatorListing {
             matched_stream: self
                 .flow_event_store
@@ -88,7 +93,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_filter_flow_scopes_having_flows, skip_all)]
     async fn filter_flow_scopes_having_flows(
         &self,
         scopes: &[FlowScope],
@@ -98,7 +103,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%flow_id))]
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_get_flow skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
         Ok(flow.into())

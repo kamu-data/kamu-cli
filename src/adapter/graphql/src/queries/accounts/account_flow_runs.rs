@@ -28,7 +28,7 @@ pub struct AccountFlowRuns<'a> {
     account: &'a AccountEntity,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountFlowRuns<'a> {
     const DEFAULT_PER_PAGE: usize = 15;

@@ -32,7 +32,7 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
         level = "info",
         name = CreateWebhookSubscriptionUseCaseImpl_execute,
         skip_all,
-        fields(?dataset_id, %target_url, ?event_types, %label)
+        fields(?dataset_id),
     )]
     async fn execute(
         &self,
@@ -42,6 +42,14 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
         label: WebhookSubscriptionLabel,
     ) -> Result<CreateWebhookSubscriptionResult, CreateWebhookSubscriptionError> {
         use super::helpers::*;
+
+        tracing::info!(
+            %target_url,
+            ?event_types,
+            %label,
+            "Initiating creation of webhook subscription",
+        );
+
         validate_webhook_target_url(&target_url)?;
         validate_webhook_event_types(&event_types)?;
         deduplicate_event_types(&mut event_types);

@@ -24,7 +24,7 @@ pub struct Flow {
     description: FlowDescription,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Flow {
     #[graphql(skip)]

@@ -33,7 +33,7 @@ pub struct TracingExtension;
 
 #[async_trait::async_trait]
 impl async_graphql::extensions::Extension for TracingExtension {
-    #[tracing::instrument(level = "info", name = "GQL: request", skip_all)]
+    #[tracing::instrument(level = "info", name = "Gql::request", skip_all)]
     async fn request(
         &self,
         ctx: &ExtensionContext<'_>,

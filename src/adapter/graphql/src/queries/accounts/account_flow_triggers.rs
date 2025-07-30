@@ -20,7 +20,7 @@ pub struct AccountFlowTriggers<'a> {
     account: &'a AccountEntity,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountFlowTriggers<'a> {
     #[graphql(skip)]
