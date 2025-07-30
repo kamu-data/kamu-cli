@@ -31,7 +31,7 @@ pub struct MetadataBlockExtended {
 }
 
 impl MetadataBlockExtended {
-    pub async fn encode_block(
+    pub fn encode_block(
         block: &odf::metadata::MetadataBlock,
         format: MetadataManifestFormat,
     ) -> Result<String, InternalError> {
@@ -58,7 +58,7 @@ impl MetadataBlockExtended {
         let odf_block = MetadataBlock::with_extended_aliases(ctx, block).await?;
 
         let encoded = if let Some(format) = encode_format_maybe {
-            Some(Self::encode_block(&odf_block, format).await?)
+            Some(Self::encode_block(&odf_block, format)?)
         } else {
             None
         };

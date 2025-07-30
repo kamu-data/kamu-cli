@@ -1217,9 +1217,17 @@ type DatasetMetadata {
 	"""
 	currentPollingSource: SetPollingSource
 	"""
+	Current polling source block used by the root dataset
+	"""
+	currentPollingSourceBlock: MetadataBlockExtended
+	"""
 	Current push sources used by the root dataset
 	"""
 	currentPushSources: [AddPushSource!]!
+	"""
+	Current push source blocks used by the root dataset
+	"""
+	currentPushSourceBlocks: [MetadataBlockExtended!]!
 	"""
 	Sync statuses of push remotes
 	"""
@@ -1228,6 +1236,10 @@ type DatasetMetadata {
 	Current transformation used by the derivative dataset
 	"""
 	currentTransform: SetTransform
+	"""
+	Current transformation block used by the derivative dataset
+	"""
+	currentTransformBlock: MetadataBlockExtended
 	"""
 	Current descriptive information about the dataset
 	"""
@@ -2520,6 +2532,7 @@ type MetadataBlockExtended {
 	author: Account!
 	event: MetadataEvent!
 	sequenceNumber: Int!
+	encoded: String
 }
 
 type MetadataChain {
