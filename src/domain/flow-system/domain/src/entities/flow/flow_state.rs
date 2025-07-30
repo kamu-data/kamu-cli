@@ -39,7 +39,10 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
+    /// Flow scheduled for the first time
+    pub first_scheduled_at: Option<DateTime<Utc>>,
     /// Flow scheduled and will be activated at time
+    /// (different than first in case of retries)
     pub scheduled_for_activation_at: Option<DateTime<Utc>>,
     /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
@@ -102,6 +105,7 @@ impl Projection for FlowState {
                     activation_causes: vec![activation_cause],
                     start_condition: None,
                     timing: FlowTimingRecords {
+                        first_scheduled_at: None,
                         scheduled_for_activation_at: None,
                         awaiting_executor_since: None,
                         running_since: None,
@@ -168,6 +172,13 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
+                                    // First time: pick the time of scheduling
+                                    // After that, keep the previous value
+                                    first_scheduled_at: s
+                                        .timing
+                                        .first_scheduled_at
+                                        .or(Some(scheduled_for_activation_at)),
+
                                     scheduled_for_activation_at: Some(scheduled_for_activation_at),
                                     awaiting_executor_since: None,
                                     running_since: None,
@@ -258,6 +269,7 @@ impl Projection for FlowState {
                                     if let Some(next_attempt_at) = next_attempt_at {
                                         Ok(FlowState {
                                             timing: FlowTimingRecords {
+                                                first_scheduled_at: s.timing.first_scheduled_at,
                                                 // Next task will have to be scheduled
                                                 awaiting_executor_since: None,
                                                 // No longer running

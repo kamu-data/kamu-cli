@@ -131,7 +131,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -202,7 +202,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": null,
@@ -278,7 +278,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "RUNNING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -372,7 +372,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "message": "SUCCESS",
                                         },
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -527,7 +527,7 @@ async fn test_trigger_reset_root_dataset_flow() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -758,7 +758,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -864,7 +864,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -984,7 +984,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -1050,7 +1050,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": null,
@@ -1121,7 +1121,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "status": "RUNNING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -1212,7 +1212,7 @@ async fn test_trigger_compaction_root_dataset() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -2734,7 +2734,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -2882,7 +2882,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             }
                                         },
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -3040,7 +3040,7 @@ async fn test_config_snapshot_returned_correctly() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -3252,7 +3252,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "status": "RETRYING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": next_scheduled_at_0.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -3344,7 +3344,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "status": "RETRYING",
                                         "outcome": null,
                                         "timing": {
-                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": next_scheduled_at_1.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -3941,7 +3941,7 @@ impl FlowRunsHarness {
                                             }
                                         }
                                         timing {
-                                            initiatedAt
+                                            firstAttemptScheduledAt
                                             scheduledAt
                                             awaitingExecutorSince
                                             runningSince

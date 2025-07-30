@@ -29,7 +29,10 @@ pub struct FlowTimingRecords {
     /// Initiation time
     pub initiated_at: DateTime<Utc>,
 
-    /// Planned scheduling time
+    /// First scheduling time
+    pub first_attempt_scheduled_at: Option<DateTime<Utc>>,
+
+    /// Planned scheduling time (different than first in case of retries)
     pub scheduled_at: Option<DateTime<Utc>>,
 
     /// Recorded time of last task scheduling

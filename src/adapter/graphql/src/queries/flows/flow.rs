@@ -129,6 +129,7 @@ impl Flow {
     async fn timing(&self) -> FlowTimingRecords {
         FlowTimingRecords {
             initiated_at: self.flow_state.primary_activation_cause().activation_time(),
+            first_attempt_scheduled_at: self.flow_state.timing.first_scheduled_at,
             scheduled_at: self.flow_state.timing.scheduled_for_activation_at,
             awaiting_executor_since: self.flow_state.timing.awaiting_executor_since,
             running_since: self.flow_state.timing.running_since,

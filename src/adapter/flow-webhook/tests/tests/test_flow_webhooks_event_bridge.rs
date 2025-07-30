@@ -341,6 +341,7 @@ impl TestWebhookDeliverySchedulerHarness {
                     )],
                     outcome: None,
                     timing: FlowTimingRecords {
+                        first_scheduled_at: Some(now),
                         scheduled_for_activation_at: Some(now),
                         running_since: None,
                         awaiting_executor_since: None,

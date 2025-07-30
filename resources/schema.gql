@@ -2299,7 +2299,11 @@ type FlowTimingRecords {
 	"""
 	initiatedAt: DateTime!
 	"""
-	Planned scheduling time
+	First scheduling time
+	"""
+	firstAttemptScheduledAt: DateTime
+	"""
+	Planned scheduling time (different than first in case of retries)
 	"""
 	scheduledAt: DateTime
 	"""
