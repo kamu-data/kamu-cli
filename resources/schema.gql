@@ -1966,10 +1966,19 @@ type FlowActivationCauseDatasetUpdate {
 	source: FlowActivationCauseDatasetUpdateSource!
 }
 
-enum FlowActivationCauseDatasetUpdateSource {
-	UPSTREAM_FLOW
-	HTTP_INGEST
-	SMART_PROTOCOL_PUSH
+union FlowActivationCauseDatasetUpdateSource = FlowActivationCauseDatasetUpdateSourceUpstreamFlow | FlowActivationCauseDatasetUpdateSourceHttpIngest | FlowActivationCauseDatasetUpdateSourceSmartProtocolPush
+
+type FlowActivationCauseDatasetUpdateSourceHttpIngest {
+	sourceName: String
+}
+
+type FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
+	accountName: AccountName
+	isForce: Boolean!
+}
+
+type FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+	flowId: FlowID!
 }
 
 type FlowActivationCauseManual {

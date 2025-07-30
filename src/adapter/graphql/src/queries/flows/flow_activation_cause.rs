@@ -65,15 +65,27 @@ impl FlowActivationCause {
                 Self::DatasetUpdate(FlowActivationCauseDatasetUpdate {
                     dataset: Dataset::new_access_checked(account, hdl),
                     source: match update_dataset_details.source {
-                        DatasetUpdateSource::UpstreamFlow { .. } => {
-                            FlowActivationCauseDatasetUpdateSource::UpstreamFlow
+                        DatasetUpdateSource::UpstreamFlow { flow_id, .. } => {
+                            FlowActivationCauseDatasetUpdateSource::UpstreamFlow(
+                                FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+                                    flow_id: FlowID::from(flow_id),
+                                },
+                            )
                         }
-                        DatasetUpdateSource::HttpIngest { .. } => {
-                            FlowActivationCauseDatasetUpdateSource::HttpIngest
+                        DatasetUpdateSource::HttpIngest { source_name } => {
+                            FlowActivationCauseDatasetUpdateSource::HttpIngest(
+                                FlowActivationCauseDatasetUpdateSourceHttpIngest { source_name },
+                            )
                         }
-                        DatasetUpdateSource::SmartProtocolPush { .. } => {
-                            FlowActivationCauseDatasetUpdateSource::SmartProtocolPush
-                        }
+                        DatasetUpdateSource::SmartProtocolPush {
+                            account_name,
+                            is_force,
+                        } => FlowActivationCauseDatasetUpdateSource::SmartProtocolPush(
+                            FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
+                                is_force,
+                                account_name: account_name.map(Into::into),
+                            },
+                        ),
                     },
                 })
             }
@@ -103,11 +115,27 @@ pub(crate) struct FlowActivationCauseDatasetUpdate {
     source: FlowActivationCauseDatasetUpdateSource,
 }
 
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Union, Debug, Clone, Eq, PartialEq)]
 pub(crate) enum FlowActivationCauseDatasetUpdateSource {
-    UpstreamFlow,
-    HttpIngest,
-    SmartProtocolPush,
+    UpstreamFlow(FlowActivationCauseDatasetUpdateSourceUpstreamFlow),
+    HttpIngest(FlowActivationCauseDatasetUpdateSourceHttpIngest),
+    SmartProtocolPush(FlowActivationCauseDatasetUpdateSourceSmartProtocolPush),
+}
+
+#[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+    flow_id: FlowID,
+}
+
+#[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct FlowActivationCauseDatasetUpdateSourceHttpIngest {
+    source_name: Option<String>,
+}
+
+#[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
+    account_name: Option<AccountName<'static>>,
+    is_force: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
