@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- GQL: `dataset_metadata`: Added 3 new methods to get `SetPollingSource`, `SetTransform` and `AddPushSource` extended blocks
+
 ## [0.245.3] - 2025-07-29
 ### Fixed
 - GQL playground is accessible in anonymous mode
