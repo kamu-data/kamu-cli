@@ -11,6 +11,8 @@ use std::sync::LazyLock;
 
 use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType, Value};
 
+use crate::scalars::BigInt;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static MAX_U256: LazyLock<num_bigint::BigInt> = LazyLock::new(|| {
@@ -69,6 +71,14 @@ impl ScalarType for U256 {
 
     fn to_value(&self) -> Value {
         Value::String(self.as_ref().to_string())
+    }
+}
+
+impl From<U256> for BigInt {
+    fn from(value: U256) -> Self {
+        // U256 type is narrower than BigInt, so we can perform conversion without
+        // additional manipulation.
+        BigInt::new(value.into_inner())
     }
 }
 
