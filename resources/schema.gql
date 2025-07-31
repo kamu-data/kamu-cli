@@ -396,11 +396,6 @@ input BatchingInput {
 	maxBatchingInterval: TimeDeltaInput!
 }
 
-"""
-A big integer scalar type.
-"""
-scalar BigInt
-
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -2604,7 +2599,7 @@ type Molecule {
 }
 
 type MoleculeMut {
-	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: BigInt!): CreateProjectResult!
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
 	"""
 	Looks up the project
 	"""
@@ -2635,7 +2630,7 @@ type MoleculeProject {
 	"""
 	Token ID withing the IPNFT contract
 	"""
-	ipnftTokenId: BigInt!
+	ipnftTokenId: U256!
 	"""
 	Project's organizational account
 	"""
@@ -3864,6 +3859,11 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
 	message: String!
 }
+
+"""
+256-bit unsigned number. Can be constructed from string.
+"""
+scalar U256
 
 scalar URL
 
