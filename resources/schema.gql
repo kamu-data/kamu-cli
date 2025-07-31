@@ -396,6 +396,11 @@ input BatchingInput {
 	maxBatchingInterval: TimeDeltaInput!
 }
 
+"""
+A big integer scalar type.
+"""
+scalar BigInt
+
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -2630,7 +2635,7 @@ type MoleculeProject {
 	"""
 	Token ID withing the IPNFT contract
 	"""
-	ipnftTokenId: U256!
+	ipnftTokenId: BigInt!
 	"""
 	Project's organizational account
 	"""
