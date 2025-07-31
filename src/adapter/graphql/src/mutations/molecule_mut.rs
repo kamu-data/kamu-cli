@@ -32,7 +32,7 @@ impl MoleculeMut {
         ipnft_symbol: String,
         ipnft_uid: String,
         ipnft_address: String,
-        ipnft_token_id: BigInt,
+        ipnft_token_id: U256,
     ) -> Result<CreateProjectResult> {
         use datafusion::logical_expr::{col, lit};
 

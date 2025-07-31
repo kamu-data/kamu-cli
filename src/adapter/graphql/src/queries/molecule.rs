@@ -383,7 +383,7 @@ pub struct MoleculeProject {
     pub ipnft_address: String,
 
     /// Token ID withing the IPNFT contract
-    pub ipnft_token_id: BigInt,
+    pub ipnft_token_id: U256,
 
     #[graphql(skip)]
     pub data_room_dataset_id: odf::DatasetID,
@@ -455,9 +455,9 @@ impl MoleculeProject {
             let value = record.remove("ipnft_token_id").unwrap();
 
             if let Some(s) = value.as_str() {
-                BigInt::new(s.parse().unwrap())
+                U256::new(s.parse().unwrap())
             } else if let Some(n) = value.as_number() {
-                BigInt::new(n.to_string().parse().unwrap())
+                U256::new(n.to_string().parse().unwrap())
             } else {
                 panic!("Unexpected value for ipnft_token_id: {value:?}");
             }
