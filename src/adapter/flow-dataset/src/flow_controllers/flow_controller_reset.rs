@@ -11,8 +11,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::{DatasetEntryService, DependencyGraphService};
-use kamu_flow_system::FlowRunService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
@@ -22,7 +20,6 @@ use crate::{
     FLOW_TYPE_DATASET_RESET,
     FlowConfigRuleReset,
     FlowScopeDataset,
-    trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,26 +30,8 @@ use crate::{
     flow_type: FLOW_TYPE_DATASET_RESET,
 })]
 pub struct FlowControllerReset {
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    flow_run_service: Arc<dyn FlowRunService>,
-}
-
-impl FlowControllerReset {
-    fn is_recursive_mode(
-        &self,
-        maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
-    ) -> Result<bool, InternalError> {
-        if let Some(config_snapshot) = maybe_config_snapshot
-            && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
-        {
-            let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;
-            if reset_rule.recursive {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
+    catalog: dill::Catalog,
+    flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
 }
 
 #[async_trait::async_trait]
@@ -75,7 +54,6 @@ impl fs::FlowController for FlowControllerReset {
                 dataset_id,
                 new_head_hash: reset_rule.new_head_hash,
                 old_head_hash: reset_rule.old_head_hash,
-                recursive: reset_rule.recursive,
             }
             .into_logical_plan())
         } else {
@@ -102,41 +80,37 @@ impl fs::FlowController for FlowControllerReset {
             return Ok(());
         }
 
-        // Reset is a breaking operation. So, if it is recursive, we should reset data
-        //  of owned downstream datasets, regardless of whether they have auto-updates
-        // turned on. Datasets of other users will stay unaffected and would
-        // break on next update attempt
-        if self.is_recursive_mode(success_flow_state.config_snapshot.as_ref())? {
-            let dataset_id =
-                FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
+        // Reset is a breaking operation.
+        // Datasets with enabled updates would compact to metadata only.
+        // Other datasets will stay unaffected, but would break on next update attempt
+        let dataset_id = FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
-            let activation_cause =
-                fs::FlowActivationCause::ResourceUpdate(fs::FlowActivationCauseResourceUpdate {
-                    activation_time: finish_time,
-                    changes: fs::ResourceChanges::Breaking,
-                    resource_type: DATASET_RESOURCE_TYPE.to_string(),
-                    details: serde_json::to_value(DatasetResourceUpdateDetails {
-                        dataset_id: dataset_id.clone(),
-                        source: DatasetUpdateSource::UpstreamFlow {
-                            flow_type: success_flow_state.flow_binding.flow_type.clone(),
-                            flow_id: success_flow_state.flow_id,
-                            maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
-                        },
-                        new_head: reset_result.new_head,
-                        old_head_maybe: reset_result.old_head,
-                    })
-                    .int_err()?,
-                });
+        let activation_cause =
+            fs::FlowActivationCause::ResourceUpdate(fs::FlowActivationCauseResourceUpdate {
+                activation_time: finish_time,
+                changes: fs::ResourceChanges::Breaking,
+                resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                details: serde_json::to_value(DatasetResourceUpdateDetails {
+                    dataset_id: dataset_id.clone(),
+                    source: DatasetUpdateSource::UpstreamFlow {
+                        flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                        flow_id: success_flow_state.flow_id,
+                        maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
+                    },
+                    new_head: reset_result.new_head,
+                    old_head_maybe: reset_result.old_head,
+                })
+                .int_err()?,
+            });
 
-            trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(
-                self.dataset_entry_service.as_ref(),
-                self.dependency_graph_service.as_ref(),
-                self.flow_run_service.as_ref(),
-                &dataset_id,
+        self.flow_sensor_dispatcher
+            .dispatch_input_flow_success(
+                &self.catalog,
+                &success_flow_state.flow_binding,
                 activation_cause,
             )
-            .await?;
-        }
+            .await
+            .int_err()?;
 
         Ok(())
     }

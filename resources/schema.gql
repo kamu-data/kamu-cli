@@ -2035,7 +2035,6 @@ input FlowConfigInputResetPropagationModeToSeed {
 input FlowConfigResetInput {
 	mode: FlowConfigInputResetPropagationMode!
 	oldHeadHash: Multihash
-	recursive: Boolean!
 }
 
 union FlowConfigResetPropagationMode = FlowConfigResetPropagationModeCustom | FlowConfigResetPropagationModeToSeed
@@ -2061,7 +2060,6 @@ type FlowConfigRuleIngest {
 type FlowConfigRuleReset {
 	mode: FlowConfigResetPropagationMode!
 	oldHeadHash: Multihash
-	recursive: Boolean!
 }
 
 type FlowConfigSnapshotModified implements FlowEvent {

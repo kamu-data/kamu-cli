@@ -130,7 +130,6 @@ pub struct FlowConfigCompactionModeMetadataOnly {
 pub struct FlowConfigRuleReset {
     pub mode: FlowConfigResetPropagationMode,
     pub old_head_hash: Option<Multihash<'static>>,
-    pub recursive: bool,
 }
 
 #[derive(Union, PartialEq, Eq)]
@@ -161,7 +160,6 @@ impl From<afs::FlowConfigRuleReset> for FlowConfigRuleReset {
         Self {
             mode: propagation_mode,
             old_head_hash: value.old_head_hash.map(Into::into),
-            recursive: value.recursive,
         }
     }
 }
@@ -172,7 +170,6 @@ impl From<afs::FlowConfigRuleReset> for FlowConfigRuleReset {
 pub struct FlowConfigResetInput {
     pub mode: FlowConfigInputResetPropagationMode,
     pub old_head_hash: Option<Multihash<'static>>,
-    pub recursive: bool,
 }
 
 #[derive(OneofObject)]

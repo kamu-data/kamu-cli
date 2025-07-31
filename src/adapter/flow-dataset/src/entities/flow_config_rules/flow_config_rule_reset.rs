@@ -13,7 +13,6 @@ kamu_flow_system::flow_config_struct! {
     pub struct FlowConfigRuleReset {
         pub new_head_hash: Option<odf::Multihash>,
         pub old_head_hash: Option<odf::Multihash>,
-        pub recursive: bool,
     }
     => "ResetRule"
 }

@@ -433,7 +433,6 @@ async fn test_trigger_reset_root_dataset_flow() {
         &create_root_result.dataset_handle.id,
         &root_dataset_blocks[1].0,
         &root_dataset_blocks[0].0,
-        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -551,7 +550,6 @@ async fn test_trigger_reset_root_dataset_flow() {
                                                 "newHeadHash": &root_dataset_blocks[1].0,
                                             },
                                             "oldHeadHash": &root_dataset_blocks[0].0,
-                                            "recursive": false
                                         }
                                     }
                                 ],
@@ -588,7 +586,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         &create_root_result.dataset_handle.id,
         &new_invalid_head,
         &old_invalid_head,
-        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -632,7 +629,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         &create_root_result.dataset_handle.id,
         &root_dataset_blocks[0].0,
         &root_dataset_blocks[1].0,
-        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -4005,7 +4001,6 @@ impl FlowRunsHarness {
                                                     }
                                                 }
                                                 oldHeadHash
-                                                recursive
                                             }
                                             ... on FlowConfigRuleCompaction {
                                                 compactionMode {
@@ -4193,7 +4188,6 @@ impl FlowRunsHarness {
         id: &odf::DatasetID,
         new_head_hash: &odf::Multihash,
         old_head_hash: &odf::Multihash,
-        recursive: bool,
     ) -> String {
         indoc!(
             r#"
@@ -4210,7 +4204,6 @@ impl FlowRunsHarness {
                                             }
                                         },
                                         oldHeadHash: "<old_head_hash>",
-                                        recursive: <recursive>
                                     }
                                 ) {
                                     __typename,
@@ -4254,7 +4247,6 @@ impl FlowRunsHarness {
         .replace("<id>", &id.to_string())
         .replace("<new_head_hash>", &new_head_hash.to_string())
         .replace("<old_head_hash>", &old_head_hash.to_string())
-        .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
     fn trigger_compaction_flow_mutation(id: &odf::DatasetID) -> String {

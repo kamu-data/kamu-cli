@@ -14,9 +14,11 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system as fs;
 
 use crate::{
-    FLOW_TYPE_DATASET_TRANSFORM, /* FlowConfigRuleCompact,
-                                  * FlowConfigRuleReset, */
-    // FLOW_TYPE_DATASET_COMPACT,
+    DatasetResourceUpdateDetails,
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_TRANSFORM,
+    FlowConfigRuleCompact,
+    FlowConfigRuleReset,
     FlowScopeDataset,
 };
 
@@ -91,30 +93,25 @@ impl DerivedDatasetFlowSensor {
         Ok(())
     }
 
-    /*
     async fn run_metadata_only_compaction_flow(
         &self,
         activation_cause: &fs::FlowActivationCause,
         flow_run_service: &dyn fs::FlowRunService,
     ) -> Result<(), InternalError> {
-        let target_flow_binding = fs::FlowBinding::for_dataset(
-            self.flow_scope.dataset_id().unwrap().clone(),
-            FLOW_TYPE_DATASET_COMPACT,
-        );
+        let target_flow_binding =
+            fs::FlowBinding::new(FLOW_TYPE_DATASET_COMPACT, self.flow_scope.clone());
         flow_run_service
             .run_flow_automatically(
                 &target_flow_binding,
                 activation_cause.clone(),
                 None,
                 Some(FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config()),
-                None,
             )
             .await
             .int_err()?;
 
         Ok(())
     }
-    */
 }
 
 #[async_trait::async_trait]
@@ -183,11 +180,11 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
 
         // Depending on what happened to the input dataset,
         // we may need to trigger a specific flow run
-        if let fs::FlowActivationCause::ResourceUpdate(dataset_update) = activation_cause {
+        if let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause {
             // Extract flow run service
             let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
 
-            match dataset_update.changes {
+            match update.changes {
                 // Dataset was normally updated, there is new data available to process
                 fs::ResourceChanges::NewData { .. } => {
                     // Trigger transform flow for the target dataset
@@ -196,9 +193,13 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 }
                 // Note: will not be activated for now
                 fs::ResourceChanges::Breaking => {
-                    /*
+                    // Decode resource update details
+                    let update_dataset_details: DatasetResourceUpdateDetails =
+                        serde_json::from_value(update.details.clone()).int_err()?;
+
                     // Trigger metadata-only compaction
-                    let maybe_config_snapshot = dataset_update.source.maybe_flow_config_snapshot();
+                    let maybe_config_snapshot =
+                        update_dataset_details.source.maybe_flow_config_snapshot();
                     if let Some(config_snapshot) = maybe_config_snapshot {
                         match config_snapshot.rule_type.as_str() {
                             FlowConfigRuleCompact::TYPE_ID => {
@@ -213,15 +214,11 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                                 }
                             }
                             FlowConfigRuleReset::TYPE_ID => {
-                                let reset_rule =
-                                    FlowConfigRuleReset::from_flow_config(config_snapshot)?;
-                                if reset_rule.recursive {
-                                    self.run_metadata_only_compaction_flow(
-                                        activation_cause,
-                                        flow_run_service.as_ref(),
-                                    )
-                                    .await?;
-                                }
+                                self.run_metadata_only_compaction_flow(
+                                    activation_cause,
+                                    flow_run_service.as_ref(),
+                                )
+                                .await?;
                             }
                             _ => {
                                 return Err(InternalError::new(format!(
@@ -231,14 +228,14 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                             }
                         }
                     } else if input_flow_binding.flow_type == FLOW_TYPE_DATASET_COMPACT {
-                        // Trigger transform flow for all downstream datasets ...
+                        // Trigger transform flow for downstream datasets ...
                         //   .. they will all explicitly break, and we need this visibility
                         self.run_metadata_only_compaction_flow(
                             activation_cause,
                             flow_run_service.as_ref(),
                         )
                         .await?;
-                    }*/
+                    }
                 }
             }
         } else {

@@ -12,8 +12,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::CompactionResult;
-use kamu_datasets::{DatasetEntryService, DependencyGraphService};
-use kamu_flow_system::FlowRunService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
@@ -23,7 +21,6 @@ use crate::{
     FLOW_TYPE_DATASET_COMPACT,
     FlowConfigRuleCompact,
     FlowScopeDataset,
-    trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,10 +33,6 @@ use crate::{
 pub struct FlowControllerCompact {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
-    // TODO: try to avoid this
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    flow_run_service: Arc<dyn FlowRunService>,
 }
 
 #[async_trait::async_trait]
@@ -123,33 +116,15 @@ impl fs::FlowController for FlowControllerCompact {
                     },
                 );
 
-                if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
-                    && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
-                {
-                    let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
-                    if compaction_rule.recursive() {
-                        trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(
-                            self.dataset_entry_service.as_ref(),
-                            self.dependency_graph_service.as_ref(),
-                            self.flow_run_service.as_ref(),
-                            &dataset_id,
-                            activation_cause,
-                        )
-                        .await?;
-                    } else {
-                        // Nothing to do here, non-recursive compaction
-                    }
-                } else {
-                    // Trigger transform flows normally via sensors
-                    self.flow_sensor_dispatcher
-                        .dispatch_input_flow_success(
-                            &self.catalog,
-                            &success_flow_state.flow_binding,
-                            activation_cause,
-                        )
-                        .await
-                        .int_err()?;
-                }
+                // Trigger transform flows via sensors
+                self.flow_sensor_dispatcher
+                    .dispatch_input_flow_success(
+                        &self.catalog,
+                        &success_flow_state.flow_binding,
+                        activation_cause,
+                    )
+                    .await
+                    .int_err()?;
 
                 Ok(())
             }

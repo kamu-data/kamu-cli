@@ -259,13 +259,11 @@ impl<'a> DatasetFlowRunsMut<'a> {
             afs::FlowConfigRuleReset {
                 new_head_hash: reset_config_input.new_head_hash().map(Into::into),
                 old_head_hash,
-                recursive: reset_config_input.recursive,
             }
         } else {
             afs::FlowConfigRuleReset {
                 new_head_hash: None,
                 old_head_hash: current_head_hash,
-                recursive: false,
             }
         };
         let maybe_forced_flow_config_rule = Some(reset_config_rule.into_flow_config());
