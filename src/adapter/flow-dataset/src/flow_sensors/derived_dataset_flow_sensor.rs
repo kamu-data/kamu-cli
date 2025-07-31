@@ -14,11 +14,9 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system as fs;
 
 use crate::{
-    DatasetResourceUpdateDetails,
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowConfigRuleCompact,
-    FlowConfigRuleReset,
     FlowScopeDataset,
 };
 
@@ -105,7 +103,7 @@ impl DerivedDatasetFlowSensor {
                 &target_flow_binding,
                 activation_cause.clone(),
                 None,
-                Some(FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config()),
+                Some(FlowConfigRuleCompact::MetadataOnly.into_flow_config()),
             )
             .await
             .int_err()?;
@@ -185,57 +183,21 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
             let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
 
             match update.changes {
-                // Dataset was normally updated, there is new data available to process
+                // Input dataset was normally updated, there is new data available to process
                 fs::ResourceChanges::NewData { .. } => {
                     // Trigger transform flow for the target dataset
                     self.run_transform_flow(activation_cause, flow_run_service.as_ref(), true)
                         .await?;
                 }
-                // Note: will not be activated for now
+                // Input dataset was updated with a breaking change.
+                // With auto-updates only, we can reset data and keep metadata only.
                 fs::ResourceChanges::Breaking => {
-                    // Decode resource update details
-                    let update_dataset_details: DatasetResourceUpdateDetails =
-                        serde_json::from_value(update.details.clone()).int_err()?;
-
                     // Trigger metadata-only compaction
-                    let maybe_config_snapshot =
-                        update_dataset_details.source.maybe_flow_config_snapshot();
-                    if let Some(config_snapshot) = maybe_config_snapshot {
-                        match config_snapshot.rule_type.as_str() {
-                            FlowConfigRuleCompact::TYPE_ID => {
-                                let compaction_rule =
-                                    FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
-                                if compaction_rule.recursive() {
-                                    self.run_metadata_only_compaction_flow(
-                                        activation_cause,
-                                        flow_run_service.as_ref(),
-                                    )
-                                    .await?;
-                                }
-                            }
-                            FlowConfigRuleReset::TYPE_ID => {
-                                self.run_metadata_only_compaction_flow(
-                                    activation_cause,
-                                    flow_run_service.as_ref(),
-                                )
-                                .await?;
-                            }
-                            _ => {
-                                return Err(InternalError::new(format!(
-                                    "Unsupported flow config rule type: {}",
-                                    config_snapshot.rule_type
-                                )));
-                            }
-                        }
-                    } else if input_flow_binding.flow_type == FLOW_TYPE_DATASET_COMPACT {
-                        // Trigger transform flow for downstream datasets ...
-                        //   .. they will all explicitly break, and we need this visibility
-                        self.run_metadata_only_compaction_flow(
-                            activation_cause,
-                            flow_run_service.as_ref(),
-                        )
-                        .await?;
-                    }
+                    self.run_metadata_only_compaction_flow(
+                        activation_cause,
+                        flow_run_service.as_ref(),
+                    )
+                    .await?;
                 }
             }
         } else {

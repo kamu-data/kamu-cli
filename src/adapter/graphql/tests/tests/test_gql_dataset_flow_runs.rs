@@ -2630,7 +2630,6 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         &create_root_result.dataset_handle.id,
         10000,
         1_000_000,
-        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -2755,7 +2754,6 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                                 "__typename": "FlowConfigCompactionModeFull",
                                                 "maxSliceRecords": 10000,
                                                 "maxSliceSize": 1_000_000,
-                                                "recursive": false
                                             }
                                         },
                                     }
@@ -2970,7 +2968,6 @@ async fn test_config_snapshot_returned_correctly() {
         &create_result.dataset_handle.id,
         10000,
         1_000_000,
-        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -3061,7 +3058,6 @@ async fn test_config_snapshot_returned_correctly() {
                                                 "__typename": "FlowConfigCompactionModeFull",
                                                 "maxSliceRecords": 10000,
                                                 "maxSliceSize": 1_000_000,
-                                                "recursive": false
                                             }
                                         },
                                     }
@@ -4008,10 +4004,6 @@ impl FlowRunsHarness {
                                                     ... on FlowConfigCompactionModeFull {
                                                         maxSliceRecords
                                                         maxSliceSize
-                                                        recursive
-                                                    }
-                                                    ... on FlowConfigCompactionModeMetadataOnly {
-                                                        recursive
                                                     }
                                                 }
                                                 __typename
@@ -4297,7 +4289,6 @@ impl FlowRunsHarness {
         id: &odf::DatasetID,
         max_slice_records: u64,
         max_slice_size: u64,
-        recursive: bool,
     ) -> String {
         indoc!(
             r#"
@@ -4311,7 +4302,6 @@ impl FlowRunsHarness {
                                         full: {
                                             maxSliceRecords: <max_slice_records>,
                                             maxSliceSize: <max_slice_size>,
-                                            recursive: <recursive>
                                         }
                                     }
                                 ) {
@@ -4350,7 +4340,6 @@ impl FlowRunsHarness {
         .replace("<id>", &id.to_string())
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
-        .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
     fn cancel_scheduled_tasks_mutation(id: &odf::DatasetID, flow_id: &str) -> String {

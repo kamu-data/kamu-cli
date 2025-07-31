@@ -1342,8 +1342,7 @@ async fn test_manual_trigger_compaction_with_config() {
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
             FlowConfigRuleCompact::Full(
-                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, false)
-                    .unwrap(),
+                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records).unwrap(),
             ),
         )
         .await;
@@ -1457,8 +1456,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
             FlowConfigRuleCompact::Full(
-                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, true)
-                    .unwrap(),
+                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records).unwrap(),
             ),
         )
         .await;
@@ -1686,7 +1684,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
     harness
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::MetadataOnly { recursive: true },
+            FlowConfigRuleCompact::MetadataOnly,
         )
         .await;
 
@@ -2035,7 +2033,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
     harness
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::MetadataOnly { recursive: false },
+            FlowConfigRuleCompact::MetadataOnly,
         )
         .await;
 

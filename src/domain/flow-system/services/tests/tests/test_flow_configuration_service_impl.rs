@@ -45,7 +45,7 @@ async fn test_visibility() {
 
     let foo_compaction_binding = compaction_dataset_binding(&foo_id);
     let foo_compaction_config =
-        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3, false).unwrap())
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3).unwrap())
             .into_flow_config();
 
     harness
@@ -58,7 +58,7 @@ async fn test_visibility() {
 
     let bar_compaction_binding = compaction_dataset_binding(&bar_id);
     let bar_compaction_config =
-        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(3, 4, false).unwrap())
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(3, 4).unwrap())
             .into_flow_config();
 
     harness
@@ -93,7 +93,7 @@ async fn test_modify() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_compaction_binding = compaction_dataset_binding(&foo_id);
     let foo_compaction_config =
-        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(1, 2, false).unwrap())
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(1, 2).unwrap())
             .into_flow_config();
 
     harness
@@ -116,7 +116,7 @@ async fn test_modify() {
 
     // Now make the config with different parameters
     let foo_compaction_config_2 =
-        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3, false).unwrap())
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3).unwrap())
             .into_flow_config();
 
     harness

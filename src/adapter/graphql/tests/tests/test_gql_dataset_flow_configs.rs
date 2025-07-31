@@ -177,10 +177,6 @@ async fn test_crud_compaction_root_dataset() {
                                             ... on FlowConfigCompactionModeFull {
                                                 maxSliceSize
                                                 maxSliceRecords
-                                                recursive
-                                            }
-                                            ... on FlowConfigCompactionModeMetadataOnly {
-                                                recursive
                                             }
                                         }
                                     }
@@ -223,7 +219,6 @@ async fn test_crud_compaction_root_dataset() {
         &create_result.dataset_handle.id,
         1_000_000,
         10000,
-        false,
     );
 
     let res = schema
@@ -252,7 +247,6 @@ async fn test_crud_compaction_root_dataset() {
                                             "__typename": "FlowConfigCompactionModeFull",
                                             "maxSliceSize": 1_000_000,
                                             "maxSliceRecords": 10000,
-                                            "recursive": false
                                         }
                                     },
                                 }
@@ -276,16 +270,10 @@ async fn test_compaction_config_validation() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     for test_case in [
-        (
-            0,
-            1_000_000,
-            false,
-            "Maximum slice size must be a positive number",
-        ),
+        (0, 1_000_000, "Maximum slice size must be a positive number"),
         (
             1_000_000,
             0,
-            false,
             "Maximum slice records must be a positive number",
         ),
     ] {
@@ -293,7 +281,6 @@ async fn test_compaction_config_validation() {
             &create_root_result.dataset_handle.id,
             test_case.0,
             test_case.1,
-            test_case.2,
         );
 
         let response = schema
@@ -312,7 +299,7 @@ async fn test_compaction_config_validation() {
                                 "configs": {
                                     "setCompactionConfig": {
                                         "__typename": "FlowInvalidConfigInputError",
-                                        "message": test_case.3,
+                                        "message": test_case.2,
                                     }
                                 }
                             }
@@ -373,7 +360,6 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         &create_derived_result.dataset_handle.id,
         1000,
         1000,
-        false,
     );
 
     let res = schema
@@ -414,7 +400,6 @@ async fn test_set_metadataonly_compaction_config_for_derivative() {
 
     let mutation_code = FlowConfigHarness::set_config_compaction_metadata_only_mutation(
         &create_derived_result.dataset_handle.id,
-        false,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -442,7 +427,6 @@ async fn test_set_metadataonly_compaction_config_for_derivative() {
                                         "__typename": "FlowConfigRuleCompaction",
                                         "compactionMode": {
                                             "__typename": "FlowConfigCompactionModeMetadataOnly",
-                                            "recursive": false
                                         }
                                     },
                                 }
@@ -603,7 +587,6 @@ impl FlowConfigHarness {
         id: &odf::DatasetID,
         max_slice_size: u64,
         max_slice_records: u64,
-        recursive: bool,
     ) -> String {
         indoc!(
             r#"
@@ -617,7 +600,6 @@ impl FlowConfigHarness {
                                         full: {
                                             maxSliceSize: <max_slice_size>,
                                             maxSliceRecords: <max_slice_records>,
-                                            recursive: <recursive>
                                         }
                                     }
                                 ) {
@@ -637,10 +619,6 @@ impl FlowConfigHarness {
                                                             ... on FlowConfigCompactionModeFull {
                                                                 maxSliceSize
                                                                 maxSliceRecords
-                                                                recursive
-                                                            }
-                                                            ... on FlowConfigCompactionModeMetadataOnly {
-                                                                recursive
                                                             }
                                                         }
                                                     }
@@ -659,13 +637,9 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
-        .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
-    fn set_config_compaction_metadata_only_mutation(
-        id: &odf::DatasetID,
-        recursive: bool,
-    ) -> String {
+    fn set_config_compaction_metadata_only_mutation(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
             mutation {
@@ -676,7 +650,7 @@ impl FlowConfigHarness {
                                 setCompactionConfig (
                                     compactionConfigInput: {
                                         metadataOnly: {
-                                            recursive: <recursive>
+                                            dummy: false,
                                         }
                                     }
                                 ) {
@@ -696,10 +670,6 @@ impl FlowConfigHarness {
                                                             ... on FlowConfigCompactionModeFull {
                                                                 maxSliceSize
                                                                 maxSliceRecords
-                                                                recursive
-                                                            }
-                                                            ... on FlowConfigCompactionModeMetadataOnly {
-                                                                recursive
                                                             }
                                                         }
                                                     }
@@ -716,7 +686,6 @@ impl FlowConfigHarness {
             "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 }
 

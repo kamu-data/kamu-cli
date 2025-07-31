@@ -68,13 +68,13 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::MetadataOnly.into_flow_config(),
         retry_policy: None,
     };
     let event_1_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        rule: FlowConfigRuleCompact::MetadataOnly.into_flow_config(),
         retry_policy: Some(RetryPolicy {
             max_attempts: 3,
             min_delay_seconds: 10,
@@ -101,7 +101,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_2.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::MetadataOnly.into_flow_config(),
         retry_policy: None,
     };
 
@@ -118,7 +118,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        rule: FlowConfigRuleCompact::MetadataOnly.into_flow_config(),
         retry_policy: Some(RetryPolicy {
             max_attempts: 5,
             min_delay_seconds: 3600,
@@ -205,19 +205,19 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::MetadataOnly.into_flow_config(),
         retry_policy: None,
     };
     let event_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        rule: FlowConfigRuleCompact::MetadataOnly.into_flow_config(),
         retry_policy: None,
     };
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::MetadataOnly.into_flow_config(),
         retry_policy: None,
     };
 

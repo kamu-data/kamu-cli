@@ -1995,11 +1995,10 @@ union FlowConfigCompactionMode = FlowConfigCompactionModeFull | FlowConfigCompac
 type FlowConfigCompactionModeFull {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
-	recursive: Boolean!
 }
 
 type FlowConfigCompactionModeMetadataOnly {
-	recursive: Boolean!
+	dummy: Boolean!
 }
 
 input FlowConfigIngestInput {
@@ -2012,11 +2011,10 @@ input FlowConfigIngestInput {
 input FlowConfigInputCompactionFull {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
-	recursive: Boolean!
 }
 
 input FlowConfigInputCompactionMetadataOnly {
-	recursive: Boolean!
+	dummy: Boolean!
 }
 
 input FlowConfigInputResetPropagationMode @oneOf {

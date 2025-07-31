@@ -57,8 +57,7 @@ impl fs::FlowController for FlowControllerCompact {
             let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
             max_slice_size = compaction_rule.max_slice_size();
             max_slice_records = compaction_rule.max_slice_records();
-            keep_metadata_only =
-                matches!(compaction_rule, FlowConfigRuleCompact::MetadataOnly { .. });
+            keep_metadata_only = matches!(compaction_rule, FlowConfigRuleCompact::MetadataOnly);
         }
 
         Ok(ats::LogicalPlanDatasetHardCompact {

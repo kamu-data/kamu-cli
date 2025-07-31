@@ -15,7 +15,7 @@ use thiserror::Error;
 kamu_flow_system::flow_config_enum! {
     pub enum FlowConfigRuleCompact {
         Full(FlowConfigRuleCompactFull),
-        MetadataOnly { recursive: bool },
+        MetadataOnly,
     }
     => "CompactionRule"
 }
@@ -24,14 +24,12 @@ kamu_flow_system::flow_config_enum! {
 pub struct FlowConfigRuleCompactFull {
     max_slice_size: u64,
     max_slice_records: u64,
-    recursive: bool,
 }
 
 impl FlowConfigRuleCompactFull {
     pub fn new_checked(
         max_slice_size: u64,
         max_slice_records: u64,
-        recursive: bool,
     ) -> Result<Self, FlowConfigRuleCompactValidationError> {
         if max_slice_size == 0 {
             return Err(FlowConfigRuleCompactValidationError::MaxSliceSizeNotPositive);
@@ -43,7 +41,6 @@ impl FlowConfigRuleCompactFull {
         Ok(Self {
             max_slice_size,
             max_slice_records,
-            recursive,
         })
     }
 
@@ -55,11 +52,6 @@ impl FlowConfigRuleCompactFull {
     #[inline]
     pub fn max_slice_records(&self) -> u64 {
         self.max_slice_records
-    }
-
-    #[inline]
-    pub fn recursive(&self) -> bool {
-        self.recursive
     }
 }
 
@@ -77,14 +69,6 @@ impl FlowConfigRuleCompact {
         match self {
             Self::Full(compaction_rule) => Some(compaction_rule.max_slice_records()),
             _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn recursive(&self) -> bool {
-        match self {
-            Self::MetadataOnly { recursive } => *recursive,
-            Self::Full(full_compaction_rule) => full_compaction_rule.recursive,
         }
     }
 }
@@ -110,18 +94,18 @@ mod tests {
 
     #[test]
     fn test_valid_compaction_rule() {
-        assert_matches!(FlowConfigRuleCompactFull::new_checked(1, 1, false), Ok(_));
+        assert_matches!(FlowConfigRuleCompactFull::new_checked(1, 1), Ok(_));
         assert_matches!(
-            FlowConfigRuleCompactFull::new_checked(1_000_000, 1_000_000, false),
+            FlowConfigRuleCompactFull::new_checked(1_000_000, 1_000_000),
             Ok(_)
         );
-        assert_matches!(FlowConfigRuleCompactFull::new_checked(1, 20, false), Ok(_));
+        assert_matches!(FlowConfigRuleCompactFull::new_checked(1, 20), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_slice_records() {
         assert_matches!(
-            FlowConfigRuleCompactFull::new_checked(100, 0, false),
+            FlowConfigRuleCompactFull::new_checked(100, 0),
             Err(FlowConfigRuleCompactValidationError::MaxSliceRecordsNotPositive)
         );
     }
@@ -129,7 +113,7 @@ mod tests {
     #[test]
     fn test_non_positive_max_slice_size() {
         assert_matches!(
-            FlowConfigRuleCompactFull::new_checked(0, 100, false),
+            FlowConfigRuleCompactFull::new_checked(0, 100),
             Err(FlowConfigRuleCompactValidationError::MaxSliceSizeNotPositive)
         );
     }
