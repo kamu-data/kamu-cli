@@ -62,7 +62,8 @@ impl SqliteFlowEventStore {
 
         let flow_id: i64 = e.flow_id.try_into().unwrap();
 
-        let scope_data_json = serde_json::to_value(&e.flow_binding.scope).int_err()?;
+        let scope_json = serde_json::to_value(&e.flow_binding.scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
 
         sqlx::query!(
             r#"
@@ -71,7 +72,7 @@ impl SqliteFlowEventStore {
             "#,
             flow_id,
             e.flow_binding.flow_type,
-            scope_data_json,
+            scope_json_str,
             initiator,
         )
         .execute(connection_mut)
@@ -469,7 +470,9 @@ impl FlowEventStore for SqliteFlowEventStore {
         let connection_mut = tr.connection_mut().await?;
 
         let flow_type = flow_binding.flow_type.as_str();
-        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+
+        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
 
         let maybe_flow_id = sqlx::query!(
             r#"
@@ -482,7 +485,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 LIMIT 1
             "#,
             flow_type,
-            scope_data_json,
+            scope_json_str,
         )
         .fetch_optional(connection_mut)
         .await
@@ -500,7 +503,8 @@ impl FlowEventStore for SqliteFlowEventStore {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let flow_scope = serde_json::to_value(flow_scope).int_err()?;
+        let scope_json = serde_json::to_value(flow_scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
 
         let flow_ids = sqlx::query!(
             r#"
@@ -510,7 +514,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     flow_status != 'finished'
                 ORDER BY flow_id DESC
             "#,
-            flow_scope,
+            scope_json_str,
         )
         .map(|row| FlowID::try_from(row.flow_id).unwrap())
         .fetch_all(connection_mut)
@@ -527,8 +531,9 @@ impl FlowEventStore for SqliteFlowEventStore {
         let mut tr = self.transaction.lock().await;
 
         let flow_type = flow_binding.flow_type.as_str();
-        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
-        let scope_data_json_ref = &scope_data_json;
+
+        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
 
         let connection_mut = tr.connection_mut().await?;
         let maybe_attempt_result = sqlx::query_as!(
@@ -548,7 +553,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             ) AS attempt
             "#,
             flow_type,
-            scope_data_json_ref,
+            scope_json_str,
         )
         .map(|event_row| event_row.last_event_time)
         .fetch_optional(connection_mut)
@@ -574,7 +579,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             ) AS success
             "#,
             flow_type,
-            scope_data_json_ref,
+            scope_json_str,
         )
         .map(|event_row| event_row.last_event_time)
         .fetch_optional(connection_mut)
@@ -953,6 +958,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         let scope_json_parts = flow_scopes
             .iter()
             .map(|scope| serde_json::to_value(scope).unwrap())
+            .map(|scope_json| canonical_json::to_string(&scope_json).unwrap())
             .collect::<Vec<_>>();
 
         let query_str = format!(

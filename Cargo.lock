@@ -7896,6 +7896,7 @@ version = "0.245.3"
 dependencies = [
  "async-stream",
  "async-trait",
+ "canonical_json",
  "chrono",
  "database-common",
  "database-common-macros",

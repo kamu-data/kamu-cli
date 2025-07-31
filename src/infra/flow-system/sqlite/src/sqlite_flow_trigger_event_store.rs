@@ -50,7 +50,9 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
         let flow_type = flow_binding.flow_type.to_string();
+
         let scope_json = serde_json::to_value(&flow_binding.scope).unwrap();
+        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -70,7 +72,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
                 ORDER BY event_id ASC
                 "#,
                 flow_type,
-                scope_json,
+                scope_json_str,
                 maybe_from_id,
                 maybe_to_id,
             )
@@ -108,11 +110,12 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
             "#,
         );
 
-        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
 
         query_builder.push_values(events, |mut b, event| {
             b.push_bind(flow_binding.flow_type.as_str());
-            b.push_bind(&scope_data_json);
+            b.push_bind(&scope_json_str);
             b.push_bind(event.typename());
             b.push_bind(event.event_time());
             b.push_bind(serde_json::to_value(event).unwrap());
@@ -215,6 +218,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
         let connection_mut = tr.connection_mut().await?;
 
         let scope_json = serde_json::to_value(flow_scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
 
         let flow_bindings = sqlx::query!(
             r#"
@@ -223,7 +227,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                 WHERE scope_data = $1
                     AND event_type = 'FlowTriggerEventCreated'
             "#,
-            scope_json,
+            scope_json_str,
         )
         .fetch_all(connection_mut)
         .await
@@ -285,7 +289,9 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
 
         let mut query = sqlx::query_scalar(&query_str);
         for scope in scopes {
-            query = query.bind(serde_json::to_value(scope).int_err()?);
+            let scope_json = serde_json::to_value(scope).int_err()?;
+            let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
+            query = query.bind(scope_json_str);
         }
 
         let has_active_triggers: Option<bool> = query.fetch_one(connection_mut).await.int_err()?;
