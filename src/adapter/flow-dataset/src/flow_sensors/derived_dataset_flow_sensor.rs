@@ -13,12 +13,7 @@ use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system as fs;
 
-use crate::{
-    FLOW_TYPE_DATASET_COMPACT,
-    FLOW_TYPE_DATASET_TRANSFORM,
-    FlowConfigRuleCompact,
-    FlowScopeDataset,
-};
+use crate::{FLOW_TYPE_DATASET_RESET_TO_METADATA, FLOW_TYPE_DATASET_TRANSFORM, FlowScopeDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,20 +86,15 @@ impl DerivedDatasetFlowSensor {
         Ok(())
     }
 
-    async fn run_metadata_only_compaction_flow(
+    async fn run_reset_to_metadata_only(
         &self,
         activation_cause: &fs::FlowActivationCause,
         flow_run_service: &dyn fs::FlowRunService,
     ) -> Result<(), InternalError> {
         let target_flow_binding =
-            fs::FlowBinding::new(FLOW_TYPE_DATASET_COMPACT, self.flow_scope.clone());
+            fs::FlowBinding::new(FLOW_TYPE_DATASET_RESET_TO_METADATA, self.flow_scope.clone());
         flow_run_service
-            .run_flow_automatically(
-                &target_flow_binding,
-                activation_cause.clone(),
-                None,
-                Some(FlowConfigRuleCompact::MetadataOnly.into_flow_config()),
-            )
+            .run_flow_automatically(&target_flow_binding, activation_cause.clone(), None, None)
             .await
             .int_err()?;
 
@@ -193,11 +183,8 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 // With auto-updates only, we can reset data and keep metadata only.
                 fs::ResourceChanges::Breaking => {
                     // Trigger metadata-only compaction
-                    self.run_metadata_only_compaction_flow(
-                        activation_cause,
-                        flow_run_service.as_ref(),
-                    )
-                    .await?;
+                    self.run_reset_to_metadata_only(activation_cause, flow_run_service.as_ref())
+                        .await?;
                 }
             }
         } else {

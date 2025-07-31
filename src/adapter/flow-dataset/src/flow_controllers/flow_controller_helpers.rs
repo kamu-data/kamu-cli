@@ -13,6 +13,7 @@ use crate::{
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowScopeDataset,
 };
@@ -53,6 +54,16 @@ pub fn compaction_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBindin
 pub fn reset_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_RESET,
+        FlowScopeDataset::make_scope(dataset_id),
+    )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[inline]
+pub fn reset_to_metadata_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
+    fs::FlowBinding::new(
+        FLOW_TYPE_DATASET_RESET_TO_METADATA,
         FlowScopeDataset::make_scope(dataset_id),
     )
 }

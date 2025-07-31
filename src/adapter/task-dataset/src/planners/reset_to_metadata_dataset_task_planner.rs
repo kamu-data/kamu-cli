@@ -14,25 +14,25 @@ use internal_error::InternalError;
 use kamu_core::{CompactionOptions, CompactionPlanner, DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
-use crate::{LogicalPlanDatasetHardCompact, TaskDefinitionDatasetHardCompact};
+use crate::{LogicalPlanDatasetResetToMetadata, TaskDefinitionDatasetHardCompact};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
 #[dill::meta(TaskDefinitionPlannerMeta {
-    logic_plan_type: LogicalPlanDatasetHardCompact::TYPE_ID,
+    logic_plan_type: LogicalPlanDatasetResetToMetadata::TYPE_ID,
 })]
-pub struct HardCompactDatasetTaskPlanner {
+pub struct ResetToMetadataDatasetTaskPlanner {
     catalog: dill::Catalog,
 }
 
-impl HardCompactDatasetTaskPlanner {
+impl ResetToMetadataDatasetTaskPlanner {
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
-    async fn plan_hard_compaction(
+    async fn plan_reset_to_metadata(
         &self,
-        args: &LogicalPlanDatasetHardCompact,
+        args: &LogicalPlanDatasetResetToMetadata,
     ) -> Result<TaskDefinition, InternalError> {
         let target = dataset_registry
             .get_dataset_by_ref(&args.dataset_id.as_local_ref())
@@ -40,9 +40,9 @@ impl HardCompactDatasetTaskPlanner {
             .int_err()?;
 
         let compaction_options = CompactionOptions {
-            max_slice_size: args.max_slice_size,
-            max_slice_records: args.max_slice_records,
-            keep_metadata_only: false,
+            max_slice_size: None,
+            max_slice_records: None,
+            keep_metadata_only: true,
         };
 
         let compaction_plan = compaction_planner
@@ -62,7 +62,7 @@ impl HardCompactDatasetTaskPlanner {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
+impl TaskDefinitionPlanner for ResetToMetadataDatasetTaskPlanner {
     async fn prepare_task_definition(
         &self,
         _task_id: TaskID,
@@ -70,13 +70,13 @@ impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
     ) -> Result<TaskDefinition, InternalError> {
         assert_eq!(
             logical_plan.plan_type,
-            LogicalPlanDatasetHardCompact::TYPE_ID,
-            "HardCompactDatasetTaskPlanner received an unsupported logical plan type: \
+            LogicalPlanDatasetResetToMetadata::TYPE_ID,
+            "ResetToMetadataDatasetTaskPlanner received an unsupported logical plan type: \
              {logical_plan:?}",
         );
 
-        let compact_plan = LogicalPlanDatasetHardCompact::from_logical_plan(logical_plan)?;
-        self.plan_hard_compaction(&compact_plan).await
+        let reset_plan = LogicalPlanDatasetResetToMetadata::from_logical_plan(logical_plan)?;
+        self.plan_reset_to_metadata(&reset_plan).await
     }
 }
 

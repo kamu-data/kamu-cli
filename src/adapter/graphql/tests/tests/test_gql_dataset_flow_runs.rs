@@ -1248,6 +1248,348 @@ async fn test_trigger_compaction_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_trigger_reset_to_metadata_root_dataset() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
+    })
+    .await;
+
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_reset_to_metadata_flow_mutation(&create_result.dataset_handle.id);
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "triggerResetToMetadataFlow": {
+                                "__typename": "TriggerFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": "0",
+                                    "status": "WAITING",
+                                    "outcome": null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetResetToMetadata",
+                                            "resetToMetadataResult": null,
+                                        },
+                                        "status": "WAITING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": schedule_time.to_rfc3339(),
+                                            "awaitingExecutorSince": null,
+                                            "runningSince": null,
+                                            "lastAttemptFinishedAt": null,
+                                        },
+                                        "taskIds": [],
+                                        "initiator": {
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                        },
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
+                                            "initiator": {
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": null
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetResetToMetadata",
+                                            "resetToMetadataResult": null,
+                                        },
+                                        "status": "WAITING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": schedule_time.to_rfc3339(),
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": null,
+                                            "lastAttemptFinishedAt": null,
+                                        },
+                                        "taskIds": [ "0" ],
+                                        "initiator": {
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                        },
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
+                                            "initiator": {
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                            }
+                                        },
+                                        "startCondition": {
+                                            "__typename": "FlowStartConditionExecutor",
+                                            "taskId": "0",
+                                        },
+                                        "configSnapshot": null
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+        .await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetResetToMetadata",
+                                            "resetToMetadataResult": null,
+                                        },
+                                        "status": "RUNNING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": schedule_time.to_rfc3339(),
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": null,
+                                        },
+                                        "taskIds": [ "0" ],
+                                        "initiator": {
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                        },
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
+                                            "initiator": {
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": null
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+
+    let new_head = odf::Multihash::from_digest_sha3_256(b"new-slice");
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            flow_task_metadata,
+            complete_time,
+            ts::TaskOutcome::Success(
+                TaskResultDatasetResetToMetadata {
+                    compaction_metadata_only_result: CompactionResult::Success {
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: new_head.clone(),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                    },
+                }
+                .into_task_result(),
+            ),
+        )
+        .await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetResetToMetadata",
+                                            "resetToMetadataResult": {
+                                                "originalBlocksCount": 5,
+                                                "resultingBlocksCount": 4,
+                                                "newHead": new_head
+                                            },
+                                        },
+                                        "status": "FINISHED",
+                                        "outcome": {
+                                            "message": "SUCCESS"
+                                        },
+                                        "timing": {
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": schedule_time.to_rfc3339(),
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
+                                        },
+                                        "taskIds": [ "0" ],
+                                        "initiator": {
+                                            "id": harness.logged_account_id().to_string(),
+                                            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                        },
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
+                                            "initiator": {
+                                                "id": harness.logged_account_id().to_string(),
+                                                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": null
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_list_flows_with_filters_and_pagination() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
@@ -2750,11 +3092,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "startCondition": null,
                                         "configSnapshot": {
                                             "__typename": "FlowConfigRuleCompaction",
-                                            "compactionMode": {
-                                                "__typename": "FlowConfigCompactionModeFull",
-                                                "maxSliceRecords": 10000,
-                                                "maxSliceSize": 1_000_000,
-                                            }
+                                            "maxSliceRecords": 10000,
+                                            "maxSliceSize": 1_000_000,
                                         },
                                     }
                                 ],
@@ -3054,11 +3393,8 @@ async fn test_config_snapshot_returned_correctly() {
                                         "startCondition": null,
                                         "configSnapshot": {
                                             "__typename": "FlowConfigRuleCompaction",
-                                            "compactionMode": {
-                                                "__typename": "FlowConfigCompactionModeFull",
-                                                "maxSliceRecords": 10000,
-                                                "maxSliceSize": 1_000_000,
-                                            }
+                                            "maxSliceRecords": 10000,
+                                            "maxSliceSize": 1_000_000,
                                         },
                                     }
                                 ],
@@ -3841,12 +4177,24 @@ impl FlowRunsHarness {
                                             __typename
                                             ... on FlowDescriptionDatasetHardCompaction {
                                                 compactionResult {
-                                                    ... on FlowDescriptionHardCompactionSuccess {
+                                                    ... on FlowDescriptionReorganizationSuccess {
                                                         originalBlocksCount
                                                         resultingBlocksCount
                                                         newHead
                                                     }
-                                                    ... on FlowDescriptionHardCompactionNothingToDo {
+                                                    ... on FlowDescriptionReorganizationNothingToDo {
+                                                        message
+                                                    }
+                                                }
+                                            }
+                                            ... on FlowDescriptionDatasetResetToMetadata {
+                                                resetToMetadataResult {
+                                                    ... on FlowDescriptionReorganizationSuccess {
+                                                        originalBlocksCount
+                                                        resultingBlocksCount
+                                                        newHead
+                                                    }
+                                                    ... on FlowDescriptionReorganizationNothingToDo {
                                                         message
                                                     }
                                                 }
@@ -3999,14 +4347,9 @@ impl FlowRunsHarness {
                                                 oldHeadHash
                                             }
                                             ... on FlowConfigRuleCompaction {
-                                                compactionMode {
-                                                    __typename
-                                                    ... on FlowConfigCompactionModeFull {
-                                                        maxSliceRecords
-                                                        maxSliceSize
-                                                    }
-                                                }
                                                 __typename
+                                                maxSliceRecords
+                                                maxSliceSize
                                             }
                                         }
                                     }
@@ -4299,10 +4642,8 @@ impl FlowRunsHarness {
                             runs {
                                 triggerCompactionFlow (
                                     compactionConfigInput: {
-                                        full: {
-                                            maxSliceRecords: <max_slice_records>,
-                                            maxSliceSize: <max_slice_size>,
-                                        }
+                                        maxSliceRecords: <max_slice_records>,
+                                        maxSliceSize: <max_slice_size>,
                                     }
                                 ) {
                                     __typename,
@@ -4340,6 +4681,50 @@ impl FlowRunsHarness {
         .replace("<id>", &id.to_string())
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
+    }
+
+    fn trigger_reset_to_metadata_flow_mutation(id: &odf::DatasetID) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                triggerResetToMetadataFlow {
+                                    __typename,
+                                    message
+                                    ... on TriggerFlowSuccess {
+                                        flow {
+                                            __typename
+                                            flowId
+                                            status
+                                            outcome {
+                                                ...on FlowSuccessResult {
+                                                    message
+                                                }
+                                                ...on FlowAbortedResult {
+                                                    message
+                                                }
+                                                ...on FlowFailedError {
+                                                    reason {
+                                                        ...on TaskFailureReasonGeneral {
+                                                            message
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
     }
 
     fn cancel_scheduled_tasks_mutation(id: &odf::DatasetID, flow_id: &str) -> String {

@@ -172,13 +172,9 @@ async fn test_crud_compaction_root_dataset() {
                                 rule {
                                     __typename
                                     ... on FlowConfigRuleCompaction {
-                                        compactionMode {
-                                            __typename
-                                            ... on FlowConfigCompactionModeFull {
-                                                maxSliceSize
-                                                maxSliceRecords
-                                            }
-                                        }
+                                        __typename
+                                        maxSliceSize
+                                        maxSliceRecords
                                     }
                                 }
                             }
@@ -215,7 +211,7 @@ async fn test_crud_compaction_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_compaction_full_mutation(
+    let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
         &create_result.dataset_handle.id,
         1_000_000,
         10000,
@@ -243,11 +239,8 @@ async fn test_crud_compaction_root_dataset() {
                                     "__typename": "FlowConfiguration",
                                     "rule": {
                                         "__typename": "FlowConfigRuleCompaction",
-                                        "compactionMode": {
-                                            "__typename": "FlowConfigCompactionModeFull",
-                                            "maxSliceSize": 1_000_000,
-                                            "maxSliceRecords": 10000,
-                                        }
+                                        "maxSliceSize": 1_000_000,
+                                        "maxSliceRecords": 10000,
                                     },
                                 }
                             }
@@ -277,7 +270,7 @@ async fn test_compaction_config_validation() {
             "Maximum slice records must be a positive number",
         ),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_compaction_full_mutation(
+        let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
             &create_root_result.dataset_handle.id,
             test_case.0,
             test_case.1,
@@ -356,7 +349,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_compaction_full_mutation(
+    let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
         &create_derived_result.dataset_handle.id,
         1000,
         1000,
@@ -380,56 +373,6 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                             "setCompactionConfig": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_set_metadataonly_compaction_config_for_derivative() {
-    let harness = FlowConfigHarness::make().await;
-
-    harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
-
-    let mutation_code = FlowConfigHarness::set_config_compaction_metadata_only_mutation(
-        &create_derived_result.dataset_handle.id,
-    );
-
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "configs": {
-                            "setCompactionConfig": {
-                                "__typename": "SetFlowConfigSuccess",
-                                "message": "Success",
-                                "config": {
-                                    "__typename": "FlowConfiguration",
-                                    "rule": {
-                                        "__typename": "FlowConfigRuleCompaction",
-                                        "compactionMode": {
-                                            "__typename": "FlowConfigCompactionModeMetadataOnly",
-                                        }
-                                    },
-                                }
                             }
                         }
                     }
@@ -583,7 +526,7 @@ impl FlowConfigHarness {
         )
     }
 
-    fn set_config_compaction_full_mutation(
+    fn set_config_compaction_mutation(
         id: &odf::DatasetID,
         max_slice_size: u64,
         max_slice_records: u64,
@@ -597,10 +540,8 @@ impl FlowConfigHarness {
                             configs {
                                 setCompactionConfig (
                                     compactionConfigInput: {
-                                        full: {
-                                            maxSliceSize: <max_slice_size>,
-                                            maxSliceRecords: <max_slice_records>,
-                                        }
+                                        maxSliceSize: <max_slice_size>,
+                                        maxSliceRecords: <max_slice_records>,
                                     }
                                 ) {
                                     __typename,
@@ -614,13 +555,8 @@ impl FlowConfigHarness {
                                                 rule {
                                                     __typename
                                                     ... on FlowConfigRuleCompaction {
-                                                        compactionMode {
-                                                            __typename
-                                                            ... on FlowConfigCompactionModeFull {
-                                                                maxSliceSize
-                                                                maxSliceRecords
-                                                            }
-                                                        }
+                                                        maxSliceSize
+                                                        maxSliceRecords
                                                     }
                                                 }
                                             }
@@ -637,55 +573,6 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
-    }
-
-    fn set_config_compaction_metadata_only_mutation(id: &odf::DatasetID) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            configs {
-                                setCompactionConfig (
-                                    compactionConfigInput: {
-                                        metadataOnly: {
-                                            dummy: false,
-                                        }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowConfigSuccess {
-                                        __typename,
-                                        message
-                                        ... on SetFlowConfigSuccess {
-                                            config {
-                                                __typename
-                                                rule {
-                                                    __typename
-                                                    ... on FlowConfigRuleCompaction {
-                                                        compactionMode {
-                                                            __typename
-                                                            ... on FlowConfigCompactionModeFull {
-                                                                maxSliceSize
-                                                                maxSliceRecords
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
     }
 }
 

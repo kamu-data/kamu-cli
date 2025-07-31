@@ -9,8 +9,10 @@
 
 mod logical_plan_dataset_hard_compact;
 mod logical_plan_dataset_reset;
+mod logical_plan_dataset_reset_to_metadata;
 mod logical_plan_dataset_update;
 
 pub use logical_plan_dataset_hard_compact::*;
 pub use logical_plan_dataset_reset::*;
+pub use logical_plan_dataset_reset_to_metadata::*;
 pub use logical_plan_dataset_update::*;

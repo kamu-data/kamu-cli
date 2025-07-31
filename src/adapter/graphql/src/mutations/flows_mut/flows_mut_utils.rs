@@ -94,7 +94,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let maybe_expected_kind = match dataset_flow_type {
         DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => Some(odf::DatasetKind::Root),
         DatasetFlowType::ExecuteTransform => Some(odf::DatasetKind::Derivative),
-        DatasetFlowType::Reset => None,
+        DatasetFlowType::Reset | DatasetFlowType::ResetToMetadata => None,
     };
 
     match maybe_expected_kind {
@@ -139,6 +139,7 @@ pub(crate) async fn ensure_flow_preconditions(
                 }));
             }
         }
+
         DatasetFlowType::ExecuteTransform => {
             let (metadata_query_service, rebac_dataset_registry_facade) = from_catalog_n!(
                 ctx,
@@ -181,7 +182,9 @@ pub(crate) async fn ensure_flow_preconditions(
                 }
             }
         }
-        DatasetFlowType::HardCompaction => (),
+
+        DatasetFlowType::HardCompaction | DatasetFlowType::ResetToMetadata => (),
+
         DatasetFlowType::Reset => {
             if let Some(reset_configuration) = reset_configuration {
                 use odf::dataset::MetadataChainExt as _;

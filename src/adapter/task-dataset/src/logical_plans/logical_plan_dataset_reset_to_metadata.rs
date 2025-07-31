@@ -10,13 +10,11 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_task_system::logical_plan_struct! {
-    /// A task to perform the harc compacting of a dataset
-    pub struct LogicalPlanDatasetHardCompact {
+    /// A task to perform the resetting of a dataset to metadata only nodes
+    pub struct LogicalPlanDatasetResetToMetadata {
         pub dataset_id: odf::DatasetID,
-        pub max_slice_size: Option<u64>,
-        pub max_slice_records: Option<u64>,
     }
-    => "HardCompactDataset"
+    => "ResetDatasetToMetadata"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

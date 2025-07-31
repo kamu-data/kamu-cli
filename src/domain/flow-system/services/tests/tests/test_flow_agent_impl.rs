@@ -14,21 +14,23 @@ use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_adapter_flow_dataset::{
     FlowConfigRuleCompact,
-    FlowConfigRuleCompactFull,
     FlowConfigRuleIngest,
     FlowConfigRuleReset,
     FlowScopeDataset,
     compaction_dataset_binding,
     ingest_dataset_binding,
     reset_dataset_binding,
+    reset_to_metadata_dataset_binding,
     transform_dataset_binding,
 };
 use kamu_adapter_task_dataset::{
     LogicalPlanDatasetHardCompact,
     LogicalPlanDatasetReset,
+    LogicalPlanDatasetResetToMetadata,
     LogicalPlanDatasetUpdate,
     TaskResultDatasetHardCompact,
     TaskResultDatasetReset,
+    TaskResultDatasetResetToMetadata,
     TaskResultDatasetUpdate,
 };
 use kamu_core::{CompactionResult, PullResult, PullResultUpToDate, ResetResult};
@@ -897,7 +899,6 @@ async fn test_manual_trigger_compaction() {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
-                      keep_metadata_only: false,
                     }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
@@ -912,7 +913,6 @@ async fn test_manual_trigger_compaction() {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
-                    keep_metadata_only: false,
                   }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();
@@ -1101,7 +1101,100 @@ async fn test_manual_trigger_reset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
+async fn test_manual_trigger_reset_to_metadata() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    harness.eager_initialization().await;
+
+    let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_agent.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                  // Task 0: "foo" start running at 20ms, finish at 110ms
+                  let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::milliseconds(20),
+                    finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
+                      TaskResultDatasetResetToMetadata {
+                        compaction_metadata_only_result: CompactionResult::Success {
+                          old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                          new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                          new_num_blocks: 3,
+                          old_num_blocks: 7,
+                        },
+                      }.into_task_result())
+                    )),
+                    expected_logical_plan: LogicalPlanDatasetResetToMetadata {
+                      dataset_id: foo_id.clone(),
+                    }.into_logical_plan(),
+                });
+                let task0_handle = task0_driver.run();
+
+                // Manual trigger for "foo" at 10ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                    flow_binding: foo_flow_binding,
+                    run_since_start: Duration::milliseconds(10),
+                    initiator_id: None,
+                    maybe_forced_flow_config_rule: None,
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    // Moment 20ms - manual foo trigger happens here:
+                    //  - flow 0 gets trigger and finishes at 110ms
+                    harness.advance_time(Duration::milliseconds(250)).await;
+                };
+
+                tokio::join!(task0_handle, trigger0_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +10ms:
+              "foo" ResetToMetadata:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+            #2: +20ms:
+              "foo" ResetToMetadata:
+                Flow ID = 0 Running(task=0)
+
+            #3: +110ms:
+              "foo" ResetToMetadata:
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_reset_trigger_keep_metadata_for_derivatives() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -1222,8 +1315,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResultDatasetHardCompact {
-                      compaction_result: CompactionResult::Success {
+                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
+                      compaction_metadata_only_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                         old_num_blocks: 5,
@@ -1232,11 +1325,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                expected_logical_plan: LogicalPlanDatasetResetToMetadata {
                   dataset_id: foo_bar_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
                 }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
@@ -1289,7 +1379,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Waiting Input(foo)
 
           #7: +90ms:
@@ -1297,7 +1387,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Waiting Input(foo) Executor(task=2, since=90ms)
 
           #8: +110ms:
@@ -1305,7 +1395,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Running(task=2)
 
           #9: +180ms:
@@ -1313,7 +1403,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Finished Success
 
           "#
@@ -1341,9 +1431,7 @@ async fn test_manual_trigger_compaction_with_config() {
     harness
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::Full(
-                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records).unwrap(),
-            ),
+            FlowConfigRuleCompact::new_checked(max_slice_size, max_slice_records).unwrap(),
         )
         .await;
 
@@ -1370,7 +1458,6 @@ async fn test_manual_trigger_compaction_with_config() {
                       dataset_id: foo_id.clone(),
                       max_slice_size: Some(max_slice_size),
                       max_slice_records: Some(max_slice_records),
-                      keep_metadata_only: false,
                     }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
@@ -1421,7 +1508,7 @@ async fn test_manual_trigger_compaction_with_config() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivatives() {
+async fn test_hard_compaction_trigger_keep_metadata_for_derivatives() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;
     let harness = FlowHarness::new();
@@ -1455,9 +1542,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
     harness
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::Full(
-                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records).unwrap(),
-            ),
+            FlowConfigRuleCompact::new_checked(max_slice_size, max_slice_records).unwrap(),
         )
         .await;
 
@@ -1535,7 +1620,6 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                   dataset_id: foo_id.clone(),
                   max_slice_size: Some(max_slice_size),
                   max_slice_records: Some(max_slice_records),
-                  keep_metadata_only: false,
                 }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
@@ -1549,8 +1633,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResultDatasetHardCompact {
-                      compaction_result: CompactionResult::Success {
+                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
+                      compaction_metadata_only_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                         old_num_blocks: 8,
@@ -1559,11 +1643,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                expected_logical_plan: LogicalPlanDatasetResetToMetadata {
                   dataset_id: foo_bar_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
                 }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
@@ -1616,7 +1697,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Waiting Input(foo)
 
           #7: +90ms:
@@ -1624,7 +1705,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Waiting Input(foo) Executor(task=2, since=90ms)
 
           #8: +110ms:
@@ -1632,7 +1713,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Running(task=2)
 
           #9: +150ms:
@@ -1640,7 +1721,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               Flow ID = 1 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 2 Finished Success
 
           "#
@@ -1682,13 +1763,6 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
         .await;
 
     harness
-        .set_dataset_flow_compaction_rule(
-            compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::MetadataOnly,
-        )
-        .await;
-
-    harness
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_id),
@@ -1706,7 +1780,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = compaction_dataset_binding(&foo_id);
+    let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1774,8 +1848,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResultDatasetHardCompact {
-                      compaction_result: CompactionResult::Success {
+                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
+                      compaction_metadata_only_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
@@ -1784,11 +1858,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }.into_task_result())
                   )
                 ),
-                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                expected_logical_plan: LogicalPlanDatasetResetToMetadata {
                   dataset_id: foo_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
                 }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
@@ -1802,8 +1873,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResultDatasetHardCompact {
-                      compaction_result: CompactionResult::Success {
+                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
+                      compaction_metadata_only_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                         old_num_blocks: 5,
@@ -1812,11 +1883,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                expected_logical_plan: LogicalPlanDatasetResetToMetadata {
                   dataset_id: foo_bar_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
                 }.into_logical_plan(),
             });
             let task3_handle = task3_driver.run();
@@ -1830,8 +1898,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResultDatasetHardCompact {
-                      compaction_result: CompactionResult::Success {
+                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
+                      compaction_metadata_only_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                         old_num_blocks: 8,
@@ -1840,11 +1908,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                expected_logical_plan: LogicalPlanDatasetResetToMetadata {
                   dataset_id: foo_bar_baz_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
                 }.into_logical_plan(),
             });
             let task4_handle = task4_driver.run();
@@ -1899,7 +1964,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
               Flow ID = 1 Finished Success
 
           #6: +50ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Waiting Manual Executor(task=2, since=50ms)
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
@@ -1907,7 +1972,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
               Flow ID = 1 Finished Success
 
           #7: +50ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Running(task=2)
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
@@ -1915,81 +1980,81 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
               Flow ID = 1 Finished Success
 
           #8: +90ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 3 Waiting Input(foo)
             "foo_bar_baz" ExecuteTransform:
               Flow ID = 1 Finished Success
 
           #9: +90ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 3 Waiting Input(foo) Executor(task=3, since=90ms)
             "foo_bar_baz" ExecuteTransform:
               Flow ID = 1 Finished Success
 
           #10: +110ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 3 Running(task=3)
             "foo_bar_baz" ExecuteTransform:
               Flow ID = 1 Finished Success
 
           #11: +180ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 3 Finished Success
             "foo_bar_baz" ExecuteTransform:
               Flow ID = 1 Finished Success
-            "foo_bar_baz" HardCompaction:
+            "foo_bar_baz" ResetToMetadata:
               Flow ID = 4 Waiting Input(foo_bar)
 
           #12: +180ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 3 Finished Success
             "foo_bar_baz" ExecuteTransform:
               Flow ID = 1 Finished Success
-            "foo_bar_baz" HardCompaction:
+            "foo_bar_baz" ResetToMetadata:
               Flow ID = 4 Waiting Input(foo_bar) Executor(task=4, since=180ms)
 
           #13: +200ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 3 Finished Success
             "foo_bar_baz" ExecuteTransform:
               Flow ID = 1 Finished Success
-            "foo_bar_baz" HardCompaction:
+            "foo_bar_baz" ResetToMetadata:
               Flow ID = 4 Running(task=4)
 
           #14: +240ms:
-            "foo" HardCompaction:
+            "foo" ResetToMetadata:
               Flow ID = 2 Finished Success
             "foo_bar" ExecuteTransform:
               Flow ID = 0 Finished Success
-            "foo_bar" HardCompaction:
+            "foo_bar" ResetToMetadata:
               Flow ID = 3 Finished Success
             "foo_bar_baz" ExecuteTransform:
               Flow ID = 1 Finished Success
-            "foo_bar_baz" HardCompaction:
+            "foo_bar_baz" ResetToMetadata:
               Flow ID = 4 Finished Success
 
           "#
@@ -2030,16 +2095,9 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
         )
         .await;
 
-    harness
-        .set_dataset_flow_compaction_rule(
-            compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::MetadataOnly,
-        )
-        .await;
-
     harness.eager_initialization().await;
 
-    let foo_flow_binding = compaction_dataset_binding(&foo_id);
+    let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -2071,8 +2129,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResultDatasetHardCompact {
-                      compaction_result: CompactionResult::Success {
+                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
+                      compaction_metadata_only_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
@@ -2081,11 +2139,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                     }.into_task_result())
                   )
                 ),
-                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                expected_logical_plan: LogicalPlanDatasetResetToMetadata {
                   dataset_id: foo_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
                 }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
@@ -2106,15 +2161,15 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
             #0: +0ms:
 
             #1: +10ms:
-              "foo" HardCompaction:
+              "foo" ResetToMetadata:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
             #2: +20ms:
-              "foo" HardCompaction:
+              "foo" ResetToMetadata:
                 Flow ID = 0 Running(task=0)
 
             #3: +90ms:
-              "foo" HardCompaction:
+              "foo" ResetToMetadata:
                 Flow ID = 0 Finished Success
 
             "#
@@ -5513,7 +5568,6 @@ async fn test_list_all_flow_initiators() {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
-                      keep_metadata_only: false,
                     }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
@@ -5528,7 +5582,6 @@ async fn test_list_all_flow_initiators() {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
-                    keep_metadata_only: false,
                   }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();
@@ -5659,7 +5712,6 @@ async fn test_list_all_datasets_with_flow() {
                       dataset_id: foo_id.clone(),
                       max_slice_size: None,
                       max_slice_records: None,
-                      keep_metadata_only: false,
                     }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
@@ -5674,7 +5726,6 @@ async fn test_list_all_datasets_with_flow() {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
-                    keep_metadata_only: false,
                   }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();

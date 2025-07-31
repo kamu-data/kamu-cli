@@ -17,6 +17,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowScopeDataset,
 };
@@ -28,6 +29,7 @@ use kamu_adapter_flow_webhook::{
 use kamu_adapter_task_dataset::{
     TaskResultDatasetHardCompact,
     TaskResultDatasetReset,
+    TaskResultDatasetResetToMetadata,
     TaskResultDatasetUpdate,
 };
 use kamu_core::{CompactionResult, PullResultUpToDate};
@@ -78,6 +80,7 @@ pub(crate) enum FlowDescriptionDataset {
     ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
     HardCompaction(FlowDescriptionDatasetHardCompaction),
     Reset(FlowDescriptionDatasetReset),
+    ResetToMetadata(FlowDescriptionDatasetResetToMetadata),
 }
 
 #[derive(SimpleObject)]
@@ -102,12 +105,17 @@ pub(crate) struct FlowDescriptionDatasetExecuteTransform {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetHardCompaction {
-    compaction_result: Option<FlowDescriptionDatasetHardCompactionResult>,
+    compaction_result: Option<FlowDescriptionDatasetReorganizationResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetReset {
     reset_result: Option<FlowDescriptionResetResult>,
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowDescriptionDatasetResetToMetadata {
+    reset_to_metadata_result: Option<FlowDescriptionDatasetReorganizationResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,6 +156,7 @@ impl FlowDescriptionUpdateResult {
                 fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
                     ts::TaskResult::TASK_RESULT_EMPTY
                     | TaskResultDatasetHardCompact::TYPE_ID
+                    | TaskResultDatasetResetToMetadata::TYPE_ID
                     | TaskResultDatasetReset::TYPE_ID => Ok(None),
 
                     TaskResultDatasetUpdate::TYPE_ID => {
@@ -221,13 +230,13 @@ impl FlowDescriptionUpdateResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Debug)]
-enum FlowDescriptionDatasetHardCompactionResult {
-    NothingToDo(FlowDescriptionHardCompactionNothingToDo),
-    Success(FlowDescriptionHardCompactionSuccess),
+enum FlowDescriptionDatasetReorganizationResult {
+    NothingToDo(FlowDescriptionReorganizationNothingToDo),
+    Success(FlowDescriptionReorganizationSuccess),
 }
 
 #[derive(SimpleObject, Debug)]
-struct FlowDescriptionHardCompactionSuccess {
+struct FlowDescriptionReorganizationSuccess {
     original_blocks_count: u64,
     resulting_blocks_count: u64,
     new_head: Multihash<'static>,
@@ -235,18 +244,18 @@ struct FlowDescriptionHardCompactionSuccess {
 
 #[derive(SimpleObject, Debug, Default)]
 #[graphql(complex)]
-pub struct FlowDescriptionHardCompactionNothingToDo {
+pub struct FlowDescriptionReorganizationNothingToDo {
     _dummy: Option<String>,
 }
 
 #[ComplexObject]
-impl FlowDescriptionHardCompactionNothingToDo {
+impl FlowDescriptionReorganizationNothingToDo {
     async fn message(&self) -> String {
         "Nothing to do".to_string()
     }
 }
 
-impl FlowDescriptionDatasetHardCompactionResult {
+impl FlowDescriptionDatasetReorganizationResult {
     fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Result<Option<Self>> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
@@ -254,21 +263,40 @@ impl FlowDescriptionDatasetHardCompactionResult {
                     TaskResultDatasetReset::TYPE_ID | TaskResultDatasetUpdate::TYPE_ID => Ok(None),
 
                     ts::TaskResult::TASK_RESULT_EMPTY => Ok(Some(Self::NothingToDo(
-                        FlowDescriptionHardCompactionNothingToDo::default(),
+                        FlowDescriptionReorganizationNothingToDo::default(),
                     ))),
 
                     TaskResultDatasetHardCompact::TYPE_ID => {
                         let r = TaskResultDatasetHardCompact::from_task_result(result)?;
                         match r.compaction_result {
                             CompactionResult::NothingToDo => Ok(Some(Self::NothingToDo(
-                                FlowDescriptionHardCompactionNothingToDo::default(),
+                                FlowDescriptionReorganizationNothingToDo::default(),
                             ))),
                             CompactionResult::Success {
                                 old_head: _,
                                 ref new_head,
                                 old_num_blocks,
                                 new_num_blocks,
-                            } => Ok(Some(Self::Success(FlowDescriptionHardCompactionSuccess {
+                            } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
+                                original_blocks_count: old_num_blocks as u64,
+                                resulting_blocks_count: new_num_blocks as u64,
+                                new_head: new_head.clone().into(),
+                            }))),
+                        }
+                    }
+
+                    TaskResultDatasetResetToMetadata::TYPE_ID => {
+                        let r = TaskResultDatasetResetToMetadata::from_task_result(result)?;
+                        match r.compaction_metadata_only_result {
+                            CompactionResult::NothingToDo => Ok(Some(Self::NothingToDo(
+                                FlowDescriptionReorganizationNothingToDo::default(),
+                            ))),
+                            CompactionResult::Success {
+                                old_head: _,
+                                ref new_head,
+                                old_num_blocks,
+                                new_num_blocks,
+                            } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
                                 original_blocks_count: old_num_blocks as u64,
                                 resulting_blocks_count: new_num_blocks as u64,
                                 new_head: new_head.clone().into(),
@@ -308,6 +336,7 @@ impl FlowDescriptionResetResult {
                 fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
                     ts::TaskResult::TASK_RESULT_EMPTY
                     | TaskResultDatasetHardCompact::TYPE_ID
+                    | TaskResultDatasetResetToMetadata::TYPE_ID
                     | TaskResultDatasetUpdate::TYPE_ID => Ok(None),
 
                     TaskResultDatasetReset::TYPE_ID => {
@@ -635,7 +664,7 @@ impl FlowDescriptionBuilder {
             FLOW_TYPE_DATASET_COMPACT => {
                 FlowDescriptionDataset::HardCompaction(FlowDescriptionDatasetHardCompaction {
                     compaction_result:
-                        FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
+                        FlowDescriptionDatasetReorganizationResult::from_maybe_flow_outcome(
                             flow_state.outcome.as_ref(),
                         )?,
                 })
@@ -646,6 +675,15 @@ impl FlowDescriptionBuilder {
                     flow_state.outcome.as_ref(),
                 )?,
             }),
+
+            FLOW_TYPE_DATASET_RESET_TO_METADATA => {
+                FlowDescriptionDataset::ResetToMetadata(FlowDescriptionDatasetResetToMetadata {
+                    reset_to_metadata_result:
+                        FlowDescriptionDatasetReorganizationResult::from_maybe_flow_outcome(
+                            flow_state.outcome.as_ref(),
+                        )?,
+                })
+            }
 
             _ => {
                 tracing::error!("Unexpected flow type: {flow_type} for flow state: {flow_state:?}",);

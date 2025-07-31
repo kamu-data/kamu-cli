@@ -145,10 +145,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         compaction_config_input: Option<FlowConfigCompactionInput>,
     ) -> Result<TriggerFlowResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        if matches!(
-            compaction_config_input,
-            Some(FlowConfigCompactionInput::Full(_)) | None
-        ) && let Err(e) =
+        if let Err(e) =
             ensure_flow_applied_to_expected_dataset_kind(resolved_dataset, odf::DatasetKind::Root)
         {
             return Ok(TriggerFlowResult::IncompatibleDatasetKind(e));
@@ -277,6 +274,41 @@ impl<'a> DatasetFlowRunsMut<'a> {
                 logged_account.account_id,
                 maybe_forced_flow_config_rule,
             )
+            .await
+            .int_err()?;
+
+        Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
+            flow: Flow::build_batch(vec![flow_state], ctx)
+                .await?
+                .pop()
+                .unwrap(),
+        }))
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_reset_to_metadata_flow, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn trigger_reset_to_metadata_flow(&self, ctx: &Context<'_>) -> Result<TriggerFlowResult> {
+        // No constraints on dataset kind for reset to metadata flows
+
+        if let Some(e) = ensure_flow_preconditions(
+            ctx,
+            self.dataset_request_state,
+            DatasetFlowType::ResetToMetadata,
+            None,
+        )
+        .await?
+        {
+            return Ok(TriggerFlowResult::PreconditionsNotMet(e));
+        }
+
+        let flow_run_service = from_catalog_n!(ctx, dyn fs::FlowRunService);
+        let logged_account = utils::get_logged_account(ctx);
+
+        let flow_binding =
+            afs::reset_to_metadata_dataset_binding(self.dataset_request_state.dataset_id());
+
+        let flow_state = flow_run_service
+            .run_flow_manually(Utc::now(), &flow_binding, logged_account.account_id, None)
             .await
             .int_err()?;
 

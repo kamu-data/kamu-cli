@@ -7,16 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::CompactionResult;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_task_system::logical_plan_struct! {
-    /// A task to perform the harc compacting of a dataset
-    pub struct LogicalPlanDatasetHardCompact {
-        pub dataset_id: odf::DatasetID,
-        pub max_slice_size: Option<u64>,
-        pub max_slice_records: Option<u64>,
+kamu_task_system::task_result_struct! {
+    pub struct TaskResultDatasetResetToMetadata {
+        pub compaction_metadata_only_result: CompactionResult,
     }
-    => "HardCompactDataset"
+    => "ResetToMetadataDatasetResult"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

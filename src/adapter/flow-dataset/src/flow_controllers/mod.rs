@@ -12,6 +12,7 @@ mod flow_controller_constants;
 mod flow_controller_helpers;
 mod flow_controller_ingest;
 mod flow_controller_reset;
+mod flow_controller_reset_to_metadata;
 mod flow_controller_transform;
 
 pub use flow_controller_compact::*;
@@ -19,4 +20,5 @@ pub use flow_controller_constants::*;
 pub use flow_controller_helpers::*;
 pub use flow_controller_ingest::*;
 pub use flow_controller_reset::*;
+pub use flow_controller_reset_to_metadata::*;
 pub use flow_controller_transform::*;

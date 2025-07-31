@@ -655,12 +655,12 @@ impl FlowTriggerHarness {
                                           __typename
                                           ... on FlowDescriptionDatasetHardCompaction {
                                               compactionResult {
-                                                  ... on FlowDescriptionHardCompactionSuccess {
+                                                  ... on FlowDescriptionReorganizationSuccess {
                                                       originalBlocksCount
                                                       resultingBlocksCount
                                                       newHead
                                                   }
-                                                  ... on FlowDescriptionHardCompactionNothingToDo {
+                                                  ... on FlowDescriptionReorganizationNothingToDo {
                                                       message
                                                   }
                                               }

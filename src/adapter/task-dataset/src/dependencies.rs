@@ -17,6 +17,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<UpdateDatasetTaskPlanner>();
     catalog_builder.add::<HardCompactDatasetTaskPlanner>();
     catalog_builder.add::<ResetDatasetTaskPlanner>();
+    catalog_builder.add::<ResetToMetadataDatasetTaskPlanner>();
 
     catalog_builder.add::<UpdateDatasetTaskRunner>();
     catalog_builder.add::<HardCompactDatasetTaskRunner>();

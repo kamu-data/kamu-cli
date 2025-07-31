@@ -18,8 +18,7 @@ use crate::{
     DATASET_RESOURCE_TYPE,
     DatasetResourceUpdateDetails,
     DatasetUpdateSource,
-    FLOW_TYPE_DATASET_COMPACT,
-    FlowConfigRuleCompact,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FlowScopeDataset,
 };
 
@@ -28,17 +27,17 @@ use crate::{
 #[dill::component]
 #[dill::interface(dyn fs::FlowController)]
 #[dill::meta(fs::FlowControllerMeta {
-    flow_type: FLOW_TYPE_DATASET_COMPACT,
+    flow_type: FLOW_TYPE_DATASET_RESET_TO_METADATA,
 })]
-pub struct FlowControllerCompact {
+pub struct FlowControllerResetToMetadata {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
 }
 
 #[async_trait::async_trait]
-impl fs::FlowController for FlowControllerCompact {
+impl fs::FlowController for FlowControllerResetToMetadata {
     fn flow_type(&self) -> &'static str {
-        FLOW_TYPE_DATASET_COMPACT
+        FLOW_TYPE_DATASET_RESET_TO_METADATA
     }
 
     async fn build_task_logical_plan(
@@ -46,24 +45,7 @@ impl fs::FlowController for FlowControllerCompact {
         flow: &fs::FlowState,
     ) -> Result<ts::LogicalPlan, InternalError> {
         let dataset_id = FlowScopeDataset::new(&flow.flow_binding.scope).dataset_id();
-
-        let mut max_slice_size: Option<u64> = None;
-        let mut max_slice_records: Option<u64> = None;
-
-        if let Some(config_snapshot) = flow.config_snapshot.as_ref()
-            && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
-        {
-            let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
-            max_slice_size = Some(compaction_rule.max_slice_size());
-            max_slice_records = Some(compaction_rule.max_slice_records());
-        }
-
-        Ok(ats::LogicalPlanDatasetHardCompact {
-            dataset_id,
-            max_slice_size,
-            max_slice_records,
-        }
-        .into_logical_plan())
+        Ok(ats::LogicalPlanDatasetResetToMetadata { dataset_id }.into_logical_plan())
     }
 
     async fn propagate_success(
@@ -72,14 +54,14 @@ impl fs::FlowController for FlowControllerCompact {
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let compact_compaction_result =
-            ats::TaskResultDatasetHardCompact::from_task_result(task_result)
+        let reset_to_metadata_only_result =
+            ats::TaskResultDatasetResetToMetadata::from_task_result(task_result)
                 .int_err()?
-                .compaction_result;
+                .compaction_metadata_only_result;
 
-        match compact_compaction_result {
+        match reset_to_metadata_only_result {
             CompactionResult::NothingToDo => {
-                // No compaction was performed, no propagation needed
+                // No changes performed, no propagation needed
                 return Ok(());
             }
             CompactionResult::Success {
@@ -88,6 +70,9 @@ impl fs::FlowController for FlowControllerCompact {
                 old_num_blocks: _,
                 new_num_blocks: _,
             } => {
+                // Reset to metadata is a breaking operation.
+                // Datasets with enabled updates would compact to metadata only.
+                // Other datasets will stay unaffected, but would break on next update attempt
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
@@ -99,8 +84,8 @@ impl fs::FlowController for FlowControllerCompact {
                         details: serde_json::to_value(DatasetResourceUpdateDetails {
                             dataset_id: dataset_id.clone(),
                             source: DatasetUpdateSource::UpstreamFlow {
-                                flow_id: success_flow_state.flow_id,
                                 flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                                flow_id: success_flow_state.flow_id,
                                 maybe_flow_config_snapshot: success_flow_state
                                     .config_snapshot
                                     .clone(),
@@ -112,7 +97,6 @@ impl fs::FlowController for FlowControllerCompact {
                     },
                 );
 
-                // Trigger transform flows via sensors
                 self.flow_sensor_dispatcher
                     .dispatch_input_flow_success(
                         &self.catalog,

@@ -13,5 +13,6 @@ pub const FLOW_TYPE_DATASET_COMPACT: &str = "dev.kamu.flow.dataset.compact";
 pub const FLOW_TYPE_DATASET_INGEST: &str = "dev.kamu.flow.dataset.ingest";
 pub const FLOW_TYPE_DATASET_TRANSFORM: &str = "dev.kamu.flow.dataset.transform";
 pub const FLOW_TYPE_DATASET_RESET: &str = "dev.kamu.flow.dataset.reset";
+pub const FLOW_TYPE_DATASET_RESET_TO_METADATA: &str = "dev.kamu.flow.dataset.reset_to_metadata";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

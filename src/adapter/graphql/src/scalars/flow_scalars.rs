@@ -12,6 +12,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FLOW_TYPE_DATASET_TRANSFORM,
 };
 use kamu_flow_system::{self as fs};
@@ -65,6 +66,7 @@ pub enum DatasetFlowType {
     ExecuteTransform,
     HardCompaction,
     Reset,
+    ResetToMetadata,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,6 +84,7 @@ pub(crate) fn map_dataset_flow_type(dataset_flow_type: DatasetFlowType) -> &'sta
         DatasetFlowType::ExecuteTransform => FLOW_TYPE_DATASET_TRANSFORM,
         DatasetFlowType::HardCompaction => FLOW_TYPE_DATASET_COMPACT,
         DatasetFlowType::Reset => FLOW_TYPE_DATASET_RESET,
+        DatasetFlowType::ResetToMetadata => FLOW_TYPE_DATASET_RESET_TO_METADATA,
     }
 }
 

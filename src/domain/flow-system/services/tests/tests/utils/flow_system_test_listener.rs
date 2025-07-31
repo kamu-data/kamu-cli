@@ -22,6 +22,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowScopeDataset,
 };
@@ -117,6 +118,7 @@ impl FlowSystemTestListener {
             FLOW_TYPE_DATASET_TRANSFORM => "ExecuteTransform",
             FLOW_TYPE_DATASET_COMPACT => "HardCompaction",
             FLOW_TYPE_DATASET_RESET => "Reset",
+            FLOW_TYPE_DATASET_RESET_TO_METADATA => "ResetToMetadata",
             FLOW_TYPE_SYSTEM_GC => "GC",
             _ => "<unknown>",
         }

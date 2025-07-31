@@ -1120,6 +1120,7 @@ type DatasetFlowRunsMut {
 	triggerTransformFlow: TriggerFlowResult!
 	triggerCompactionFlow(compactionConfigInput: FlowConfigCompactionInput): TriggerFlowResult!
 	triggerResetFlow(resetConfigInput: FlowConfigResetInput): TriggerFlowResult!
+	triggerResetToMetadataFlow: TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
@@ -1147,6 +1148,7 @@ enum DatasetFlowType {
 	EXECUTE_TRANSFORM
 	HARD_COMPACTION
 	RESET
+	RESET_TO_METADATA
 }
 
 type DatasetFlows {
@@ -1985,20 +1987,9 @@ type FlowActivationCauseManual {
 	initiator: Account!
 }
 
-input FlowConfigCompactionInput @oneOf {
-	full: FlowConfigInputCompactionFull
-	metadataOnly: FlowConfigInputCompactionMetadataOnly
-}
-
-union FlowConfigCompactionMode = FlowConfigCompactionModeFull | FlowConfigCompactionModeMetadataOnly
-
-type FlowConfigCompactionModeFull {
+input FlowConfigCompactionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
-}
-
-type FlowConfigCompactionModeMetadataOnly {
-	dummy: Boolean!
 }
 
 input FlowConfigIngestInput {
@@ -2006,15 +1997,6 @@ input FlowConfigIngestInput {
 	Flag indicates to ignore cache during ingest step for API calls
 	"""
 	fetchUncacheable: Boolean!
-}
-
-input FlowConfigInputCompactionFull {
-	maxSliceSize: Int!
-	maxSliceRecords: Int!
-}
-
-input FlowConfigInputCompactionMetadataOnly {
-	dummy: Boolean!
 }
 
 input FlowConfigInputResetPropagationMode @oneOf {
@@ -2048,7 +2030,8 @@ type FlowConfigResetPropagationModeToSeed {
 union FlowConfigRule = FlowConfigRuleIngest | FlowConfigRuleCompaction | FlowConfigRuleReset
 
 type FlowConfigRuleCompaction {
-	compactionMode: FlowConfigCompactionMode!
+	maxSliceSize: Int!
+	maxSliceRecords: Int!
 }
 
 type FlowConfigRuleIngest {
@@ -2087,7 +2070,7 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC | FlowDescriptionWebhookDeliver
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionDatasetResetToMetadata | FlowDescriptionSystemGC | FlowDescriptionWebhookDeliver
 
 type FlowDescriptionDatasetExecuteTransform {
 	transformResult: FlowDescriptionUpdateResult
@@ -2095,10 +2078,8 @@ type FlowDescriptionDatasetExecuteTransform {
 }
 
 type FlowDescriptionDatasetHardCompaction {
-	compactionResult: FlowDescriptionDatasetHardCompactionResult
+	compactionResult: FlowDescriptionDatasetReorganizationResult
 }
-
-union FlowDescriptionDatasetHardCompactionResult = FlowDescriptionHardCompactionNothingToDo | FlowDescriptionHardCompactionSuccess
 
 type FlowDescriptionDatasetPollingIngest {
 	ingestResult: FlowDescriptionUpdateResult
@@ -2111,16 +2092,22 @@ type FlowDescriptionDatasetPushIngest {
 	message: String!
 }
 
+union FlowDescriptionDatasetReorganizationResult = FlowDescriptionReorganizationNothingToDo | FlowDescriptionReorganizationSuccess
+
 type FlowDescriptionDatasetReset {
 	resetResult: FlowDescriptionResetResult
 }
 
-type FlowDescriptionHardCompactionNothingToDo {
+type FlowDescriptionDatasetResetToMetadata {
+	resetToMetadataResult: FlowDescriptionDatasetReorganizationResult
+}
+
+type FlowDescriptionReorganizationNothingToDo {
 	dummy: String
 	message: String!
 }
 
-type FlowDescriptionHardCompactionSuccess {
+type FlowDescriptionReorganizationSuccess {
 	originalBlocksCount: Int!
 	resultingBlocksCount: Int!
 	newHead: Multihash!

@@ -86,11 +86,8 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         compaction_config_input: FlowConfigCompactionInput,
     ) -> Result<SetFlowConfigResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        if matches!(compaction_config_input, FlowConfigCompactionInput::Full(_))
-            && let Err(e) = ensure_flow_applied_to_expected_dataset_kind(
-                resolved_dataset,
-                odf::DatasetKind::Root,
-            )
+        if let Err(e) =
+            ensure_flow_applied_to_expected_dataset_kind(resolved_dataset, odf::DatasetKind::Root)
         {
             return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
         }
