@@ -68,5 +68,9 @@ async fn test_parse_ddl_with_reserved_keyword() {
     )
     .await;
 
-    assert_matches!(result, Err(DataFusionError::SQL(ParserError::ParserError(err), _)) if err ==  *"Argument 'key TEXT' is invalid or a reserved keyword");
+    let Err(DataFusionError::SQL(err, _)) = result else {
+        panic!("Expected SQL error, got: {result:?}");
+    };
+
+    assert_matches!(*err, ParserError::ParserError(msg) if msg ==  *"Argument 'key TEXT' is invalid or a reserved keyword");
 }

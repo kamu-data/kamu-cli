@@ -56,6 +56,7 @@ impl Reader for ReaderParquet {
             parquet_pruning: None,
             skip_metadata: None,
             file_sort_order: Vec::new(),
+            file_decryption_properties: None,
         };
 
         let df = self

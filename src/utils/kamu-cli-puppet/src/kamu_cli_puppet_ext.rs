@@ -342,6 +342,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                     skip_metadata: None,
                     schema: None,
                     file_sort_order: Vec::new(),
+                    file_decryption_properties: None,
                 },
             )
             .await

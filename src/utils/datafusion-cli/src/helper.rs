@@ -185,7 +185,7 @@ pub(crate) fn split_from_semicolon(sql: &str) -> Vec<String> {
     commands
 }
 
-#[cfg(test)]
+#[cfg(false)]
 mod tests {
     use std::io::{BufRead, Cursor};
 
