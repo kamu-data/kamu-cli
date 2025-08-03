@@ -33,8 +33,13 @@ async-trait = "0.1"
 arrow = { version = "55", default-features = false }
 arrow-digest = { version = "55", default-features = false }
 arrow-json = { version = "55", default-features = false }
-arrow-schema = { version = "55", default-features = false, features = ["serde"] }
-datafusion = { version = "49", default-features = false, features = ["parquet", "serde"] }
+arrow-schema = { version = "55", default-features = false, features = [
+    "serde",
+] }
+datafusion = { version = "49", default-features = false, features = [
+    "parquet",
+    "serde",
+] }
 digest = "0.10"
 hex = "0.4"
 sha3 = "0.10"
@@ -42,7 +47,8 @@ tracing = { version = "0.1", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 url = "2"
 serde = { version = "1", default-features = false }
-serde_json = { version = "1" }
+serde_json = { version = "1", default-features = false }
+serde_yaml = { version = "0.9", default-features = false }
 
 # Optional
 pretty_assertions = { optional = true, version = "1" }

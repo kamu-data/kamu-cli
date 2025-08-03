@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![allow(clippy::derivable_impls)]
+#![expect(clippy::derivable_impls)]
 
 use std::collections::HashMap;
 use std::fmt::Display;
 
+#[cfg(feature = "arrow")]
+use crate::dtos::data_schema_impl::UnsupportedSchema;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,22 +315,87 @@ impl DataSlice {
 // SetDataSchema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Normalized representation of [`SetDataSchema`] that uses new schema format
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetDataSchemaV2 {
+    /// Defines the logical schema of the data files that follow this event.
+    /// Will become a required field after migration.
+    pub schema: DataSchema,
+}
+
 impl SetDataSchema {
+    pub fn new(schema: DataSchema) -> Self {
+        Self {
+            raw_arrow_schema: None,
+            schema: Some(schema),
+        }
+    }
+
+    // Convert legacy schema into new schema
     #[cfg(feature = "arrow")]
-    pub fn new(schema: &arrow::datatypes::Schema) -> Self {
-        let mut encoder = arrow::ipc::convert::IpcSchemaEncoder::new();
-        let (mut buf, head) = encoder.schema_to_fb(schema).collapse();
-        buf.drain(0..head);
-        Self { schema: buf }
+    pub fn upgrade(self) -> SetDataSchemaV2 {
+        if let Some(schema) = self.schema {
+            SetDataSchemaV2 { schema }
+        } else {
+            let arrow_schema = self.schema_as_arrow(&ToArrowSettings::default()).unwrap();
+
+            // SAFETY: Old version of the event was writing schemas after execution of our
+            // engines which produce the subset of types that we know for certain are
+            // compatible with ODF schema, so unwrapping is safe.
+            let schema = DataSchema::new_from_arrow(&arrow_schema).unwrap();
+
+            // NOTE: Previously Arrow schema was written as it appeared in the output
+            // DataFrame. This included View type encodings. ODF schema makes a decision to
+            // only store logical types, thus we strip all possible encodings.
+            let schema = schema.strip_encoding();
+
+            SetDataSchemaV2 { schema }
+        }
     }
 
     #[cfg(feature = "arrow")]
-    pub fn schema_as_arrow(&self) -> Result<arrow::datatypes::SchemaRef, crate::serde::Error> {
-        let schema_proxy = flatbuffers::root::<arrow::ipc::r#gen::Schema::Schema>(&self.schema)
-            .map_err(crate::serde::Error::serde)?;
-        let schema = arrow::ipc::convert::fb_to_schema(schema_proxy);
-        Ok(arrow::datatypes::SchemaRef::new(schema))
+    #[deprecated(
+        note = "Legacy format is being phased out. All new events of this type must be written \
+                with ODF schema. Arrow schema remains for compatibility with existing datasets, \
+                but will be dropped in the upcoming versions when all datasets migrate to ODF \
+                schema."
+    )]
+    pub fn new_legacy_raw_arrow(schema: &arrow::datatypes::Schema) -> Self {
+        let mut encoder = arrow::ipc::convert::IpcSchemaEncoder::new();
+        let (mut buf, head) = encoder.schema_to_fb(schema).collapse();
+        buf.drain(0..head);
+        Self {
+            raw_arrow_schema: Some(buf),
+            schema: None,
+        }
     }
+
+    #[cfg(feature = "arrow")]
+    pub fn schema_as_arrow(
+        &self,
+        settings: &ToArrowSettings,
+    ) -> Result<arrow::datatypes::Schema, SchemaAsArrowError> {
+        if let Some(raw_arrow_schema) = &self.raw_arrow_schema {
+            assert!(self.schema.is_none());
+
+            let schema_proxy =
+                flatbuffers::root::<arrow::ipc::r#gen::Schema::Schema>(raw_arrow_schema)
+                    .map_err(crate::serde::Error::serde)?;
+            let schema = arrow::ipc::convert::fb_to_schema(schema_proxy);
+            Ok(schema)
+        } else if let Some(schema) = &self.schema {
+            Ok(schema.to_arrow(settings)?)
+        } else {
+            unreachable!("Neither raw or structured schema found")
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub enum SchemaAsArrowError {
+    Serde(#[from] crate::serde::Error),
+    Unsupported(#[from] UnsupportedSchema),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

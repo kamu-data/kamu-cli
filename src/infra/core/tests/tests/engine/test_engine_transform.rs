@@ -890,19 +890,15 @@ async fn test_transform_empty_inputs() {
     let deriv_helper = DatasetDataHelper::new(deriv_stored.dataset.clone());
 
     deriv_helper
-        .assert_latest_set_schema_eq(indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT32 op;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              REQUIRED BYTE_ARRAY country (STRING);
-              OPTIONAL INT32 population;
-            }
-            "#
-        ))
+        .assert_latest_schema_in_meta_eq(&odf::schema::DataSchema::new(vec![
+            odf::schema::DataField::i64("offset").optional(),
+            odf::schema::DataField::i32("op"),
+            odf::schema::DataField::timestamp_millis_utc("system_time"),
+            odf::schema::DataField::timestamp_millis_utc("event_time").optional(),
+            odf::schema::DataField::string("city").optional(),
+            odf::schema::DataField::string("country"),
+            odf::schema::DataField::i32("population").optional(),
+        ]))
         .await;
 
     assert_eq!(deriv_helper.data_slice_count().await, 0);

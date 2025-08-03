@@ -19,7 +19,7 @@ use crate::{PushSourceNotFoundError, ResolvedDataset, WriterSourceEventVisitor};
 pub struct DataWriterMetadataState {
     pub block_ref: odf::BlockRef,
     pub head: odf::Multihash,
-    pub schema: Option<odf::metadata::SetDataSchema>,
+    pub schema: Option<odf::schema::DataSchema>,
     pub source_event: Option<odf::MetadataEvent>,
     pub merge_strategy: odf::metadata::MergeStrategy,
     pub vocab: odf::metadata::DatasetVocabulary,
@@ -131,10 +131,17 @@ impl DataWriterMetadataState {
                 None => (None, None, None),
             }
         };
+
+        let schema = set_data_schema_visitor
+            .into_inner()
+            .into_event()
+            .map(odf::metadata::SetDataSchema::upgrade)
+            .map(|e| e.schema);
+
         Ok(Self {
             block_ref: block_ref.clone(),
             head,
-            schema: set_data_schema_visitor.into_inner().into_event(),
+            schema,
             source_event,
             merge_strategy,
             vocab: set_vocab_visitor
