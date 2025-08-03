@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::parquet::schema::types::Type;
+use internal_error::*;
 use kamu::domain::*;
 
 use super::{CLIError, Command};
@@ -19,10 +20,12 @@ use super::{CLIError, Command};
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum SchemaOutputFormat {
+    ArrowJson,
     Ddl,
+    OdfJson,
+    OdfYaml,
     Parquet,
     ParquetJson,
-    ArrowJson,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,48 +122,46 @@ impl InspectSchemaCommand {
         }
     }
 
-    async fn get_arrow_schema(&self) -> Result<Option<SchemaRef>, CLIError> {
+    async fn get_odf_schema(&self) -> Result<Option<Arc<odf::metadata::DataSchema>>, CLIError> {
         if !self.from_data_file {
             self.query_svc
                 .get_schema(&self.dataset_ref)
                 .await
                 .map_err(Self::query_errors)
         } else {
-            let Some(parquet_schema) = self
-                .query_svc
-                .get_schema_parquet_file(&self.dataset_ref)
-                .await
-                .map_err(Self::query_errors)?
-            else {
-                return Ok(None);
-            };
+            let arrow_schema = Box::pin(self.get_arrow_schema()).await?;
+            Ok(arrow_schema
+                .as_deref()
+                .map(odf::metadata::DataSchema::new_from_arrow)
+                .map(Arc::new))
+        }
+    }
 
-            Ok(Some(
-                odf::utils::schema::convert::parquet_schema_to_arrow_schema(Arc::new(
-                    parquet_schema,
-                )),
-            ))
+    async fn get_arrow_schema(&self) -> Result<Option<SchemaRef>, CLIError> {
+        if !self.from_data_file {
+            let odf_schema = Box::pin(self.get_odf_schema()).await?;
+            Ok(odf_schema.map(|v| Arc::new(v.to_arrow())))
+        } else {
+            let schema = self
+                .query_svc
+                .get_last_data_chunk_schema_arrow(&self.dataset_ref)
+                .await
+                .map_err(Self::query_errors)?;
+
+            Ok(schema)
         }
     }
 
     async fn get_parquet_schema(&self) -> Result<Option<Arc<Type>>, CLIError> {
         if !self.from_data_file {
-            let Some(arrow_schema) = self
-                .query_svc
-                .get_schema(&self.dataset_ref)
-                .await
-                .map_err(Self::query_errors)?
-            else {
-                return Ok(None);
-            };
-
-            Ok(Some(
-                odf::utils::schema::convert::arrow_schema_to_parquet_schema(&arrow_schema),
-            ))
+            let arrow_schema = Box::pin(self.get_arrow_schema()).await?;
+            Ok(arrow_schema
+                .as_deref()
+                .map(odf::utils::schema::convert::arrow_schema_to_parquet_schema))
         } else {
             let schema = self
                 .query_svc
-                .get_schema_parquet_file(&self.dataset_ref)
+                .get_last_data_chunk_schema_parquet(&self.dataset_ref)
                 .await
                 .map_err(Self::query_errors)?;
 
@@ -206,6 +207,24 @@ impl Command for InspectSchemaCommand {
                         &mut std::io::stdout(),
                         schema.as_ref(),
                     )?;
+                } else {
+                    self.print_schema_unavailable();
+                }
+            }
+            Some(SchemaOutputFormat::OdfJson) => {
+                if let Some(schema) = self.get_odf_schema().await? {
+                    let mut serializer = serde_json::Serializer::new(std::io::stdout());
+                    odf::serde::yaml::DataSchemaDef::serialize(&schema, &mut serializer)
+                        .int_err()?;
+                } else {
+                    self.print_schema_unavailable();
+                }
+            }
+            Some(SchemaOutputFormat::OdfYaml) => {
+                if let Some(schema) = self.get_odf_schema().await? {
+                    let mut serializer = serde_yaml::Serializer::new(std::io::stdout());
+                    odf::serde::yaml::DataSchemaDef::serialize(&schema, &mut serializer)
+                        .int_err()?;
                 } else {
                     self.print_schema_unavailable();
                 }

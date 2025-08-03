@@ -466,21 +466,30 @@ pub struct SetDataSchemaBuilder {
 }
 
 impl SetDataSchemaBuilder {
-    #[cfg(feature = "arrow")]
     pub fn new() -> Self {
-        use datafusion::arrow::datatypes::*;
-        let schema = Schema::new(vec![
-            Field::new("city", DataType::Utf8, false),
-            Field::new("population", DataType::Int64, false),
+        let schema = DataSchema::new(vec![
+            DataField::new("city", DataType::String(DataTypeString {})),
+            DataField::new(
+                "population",
+                DataType::Int(DataTypeInt {
+                    bit_width: 64,
+                    signed: true,
+                }),
+            ),
         ]);
         Self {
-            v: SetDataSchema::new(&schema),
+            v: SetDataSchema::new(schema),
         }
     }
 
-    #[cfg(feature = "arrow")]
-    pub fn schema(mut self, schema: &datafusion::arrow::datatypes::Schema) -> Self {
+    pub fn schema(mut self, schema: DataSchema) -> Self {
         self.v = SetDataSchema::new(schema);
+        self
+    }
+
+    #[cfg(feature = "arrow")]
+    pub fn schema_from_arrow(mut self, schema: &datafusion::arrow::datatypes::Schema) -> Self {
+        self.v = SetDataSchema::new(DataSchema::new_from_arrow(schema).strip_encoding());
         self
     }
 

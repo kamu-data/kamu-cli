@@ -259,7 +259,7 @@ impl KamuTable {
             .into_event();
 
         if let Some(set_data_schema) = maybe_set_data_schema {
-            set_data_schema.schema_as_arrow().int_err()
+            set_data_schema.schema_as_arrow().map(Arc::new).int_err()
         } else {
             Ok(Arc::new(Schema::empty()))
         }

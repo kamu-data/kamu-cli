@@ -775,9 +775,8 @@ impl DataWriter for DataWriterDataFusion {
             let new_schema = SchemaRef::new(df.schema().into());
             tracing::info!(schema = ?new_schema, "Final output schema");
 
-            if let Some(prev_schema) = &self.meta.schema {
-                let arrow_schema = prev_schema.schema_as_arrow().int_err()?;
-                Self::validate_output_schema_equivalence(&arrow_schema, &new_schema)?;
+            if let Some(prev_schema) = &self.meta.schema_arrow {
+                Self::validate_output_schema_equivalence(prev_schema, &new_schema)?;
             }
 
             // Write output
@@ -875,10 +874,14 @@ impl DataWriter for DataWriterDataFusion {
 
         // Commit `SetDataSchema` event
         if let Some(new_schema) = staged.new_schema {
+            let set_data_schema = odf::metadata::SetDataSchema::new(
+                odf::metadata::DataSchema::new_from_arrow(&new_schema).strip_encoding(),
+            );
+
             let commit_schema_result = self
                 .target
                 .commit_event(
-                    odf::metadata::SetDataSchema::new(&new_schema).into(),
+                    set_data_schema.clone().into(),
                     odf::dataset::CommitOpts {
                         block_ref: &self.meta.block_ref,
                         system_time: Some(staged.system_time),
@@ -891,7 +894,8 @@ impl DataWriter for DataWriterDataFusion {
 
             // Update state
             self.meta.head = commit_schema_result.new_head;
-            self.meta.schema = Some(odf::metadata::SetDataSchema::new(new_schema.as_ref()));
+            self.meta.schema = Some(set_data_schema);
+            self.meta.schema_arrow = Some(new_schema);
         }
 
         // Commit `AddData` event

@@ -7,12 +7,75 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![allow(clippy::derivable_impls)]
+#![expect(clippy::derivable_impls)]
 
 use std::collections::HashMap;
 use std::fmt::Display;
 
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ExtraAttributes
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ExtraAttributes {
+    pub fn new_from_json(value: serde_json::Value) -> Result<Self, ExtraAttributesInvalidInput> {
+        let serde_json::Value::Object(attributes) = value else {
+            return Err(ExtraAttributesInvalidInput { value });
+        };
+
+        // TODO: Validate the inner format
+
+        Ok(Self { attributes })
+    }
+
+    pub fn get_str(&self, key: &str) -> Option<&str> {
+        match self.attributes.get(key) {
+            Some(serde_json::Value::String(v)) => Some(v.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn get_and_parse<T>(&self, key: &str) -> Result<Option<T>, <T as std::str::FromStr>::Err>
+    where
+        T: std::str::FromStr,
+    {
+        match self.get_str(key) {
+            None => Ok(None),
+            Some(v) => Some(v.parse()).transpose(),
+        }
+    }
+
+    pub fn retain<F>(mut self, fun: F) -> Self
+    where
+        F: FnMut(&String, &mut serde_json::Value) -> bool,
+    {
+        self.attributes.retain(fun);
+        self
+    }
+
+    pub fn map_empty(self) -> Option<Self> {
+        if self.attributes.is_empty() {
+            None
+        } else {
+            Some(self)
+        }
+    }
+}
+
+impl TryFrom<serde_json::Value> for ExtraAttributes {
+    type Error = ExtraAttributesInvalidInput;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        Self::new_from_json(value)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid input for ExtraAttributes: {value}")]
+pub struct ExtraAttributesInvalidInput {
+    value: serde_json::Value,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -313,21 +376,61 @@ impl DataSlice {
 // SetDataSchema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Normalized representation of [`SetDataSchema`] that uses new schema format
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetDataSchemaV2 {
+    /// Defines the logical schema of the data files that follow this event.
+    /// Will become a required field after migration.
+    pub schema: DataSchema,
+}
+
 impl SetDataSchema {
+    pub fn new(schema: DataSchema) -> Self {
+        Self {
+            raw_arrow_schema: None,
+            schema: Some(schema),
+        }
+    }
+
+    // Convert legacy schema into new schema
     #[cfg(feature = "arrow")]
-    pub fn new(schema: &arrow::datatypes::Schema) -> Self {
-        let mut encoder = arrow::ipc::convert::IpcSchemaEncoder::new();
-        let (mut buf, head) = encoder.schema_to_fb(schema).collapse();
-        buf.drain(0..head);
-        Self { schema: buf }
+    pub fn upgrade(self) -> SetDataSchemaV2 {
+        if let Some(schema) = self.schema {
+            SetDataSchemaV2 { schema }
+        } else {
+            let arrow_schema = self.schema_as_arrow().unwrap();
+            SetDataSchemaV2 {
+                schema: DataSchema::new_from_arrow(&arrow_schema),
+            }
+        }
     }
 
     #[cfg(feature = "arrow")]
-    pub fn schema_as_arrow(&self) -> Result<arrow::datatypes::SchemaRef, crate::serde::Error> {
-        let schema_proxy = flatbuffers::root::<arrow::ipc::r#gen::Schema::Schema>(&self.schema)
-            .map_err(crate::serde::Error::serde)?;
-        let schema = arrow::ipc::convert::fb_to_schema(schema_proxy);
-        Ok(arrow::datatypes::SchemaRef::new(schema))
+    pub fn new_legacy_raw_arrow(schema: &arrow::datatypes::Schema) -> Self {
+        let mut encoder = arrow::ipc::convert::IpcSchemaEncoder::new();
+        let (mut buf, head) = encoder.schema_to_fb(schema).collapse();
+        buf.drain(0..head);
+        Self {
+            raw_arrow_schema: Some(buf),
+            schema: None,
+        }
+    }
+
+    #[cfg(feature = "arrow")]
+    pub fn schema_as_arrow(&self) -> Result<arrow::datatypes::Schema, crate::serde::Error> {
+        if let Some(raw_arrow_schema) = &self.raw_arrow_schema {
+            assert!(self.schema.is_none());
+
+            let schema_proxy =
+                flatbuffers::root::<arrow::ipc::r#gen::Schema::Schema>(raw_arrow_schema)
+                    .map_err(crate::serde::Error::serde)?;
+            let schema = arrow::ipc::convert::fb_to_schema(schema_proxy);
+            Ok(schema)
+        } else if let Some(schema) = &self.schema {
+            Ok(schema.to_arrow())
+        } else {
+            unreachable!("Neither raw or structured schema found")
+        }
     }
 }
 

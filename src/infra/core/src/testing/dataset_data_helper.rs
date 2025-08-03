@@ -126,6 +126,7 @@ impl DatasetDataHelper {
             .into_event()
             .unwrap()
             .schema_as_arrow()
+            .map(Arc::new)
             .unwrap()
     }
 

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::TransformRequestInputExt;
@@ -66,8 +68,9 @@ pub async fn build_preliminary_request_ext(
                 .into_event()
                 .as_ref()
                 .map(odf::metadata::SetDataSchema::schema_as_arrow)
-                .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
-                .int_err()?,
+                .transpose() // Option<Result<Schema, E>> -> Result<Option<Schema>, E>
+                .int_err()?
+                .map(Arc::new),
             set_vocab_visitor.into_event(),
             execute_transform_visitor.into_event(),
         )
@@ -196,7 +199,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         prev_offset: query_input.prev_offset,
         new_offset: query_input.new_offset,
         data_slices,
-        schema,
+        schema: Arc::new(schema),
         explicit_watermarks,
     };
 

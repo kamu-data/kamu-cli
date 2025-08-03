@@ -474,6 +474,12 @@ pub enum SchemaFormat {
     #[serde(alias = "arrowjson")]
     #[serde(alias = "arrow-json")]
     ArrowJson,
+    #[serde(alias = "odfjson")]
+    #[serde(alias = "odf-json")]
+    OdfJson,
+    #[serde(alias = "odfyaml")]
+    #[serde(alias = "odf-yaml")]
+    OdfYaml,
     #[serde(alias = "parquet")]
     Parquet,
     #[serde(alias = "parquetjson")]
@@ -483,49 +489,50 @@ pub enum SchemaFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct Schema {
-    schema: datafusion::arrow::datatypes::SchemaRef,
-    format: SchemaFormat,
-}
+// TODO: PERF: Avoid overhead of double serialization
+// While we could hold original schema and format in this type and serialize
+// directly into final json in most cases - the issue comes when implementing
+// Deserialize trait, as we don't know what type of schema the json value
+// actually represents. The correct solution is likely to make this type fully
+// serde symmetric and use the outer `schemaFormat` as the adjacent enum tag.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Schema(serde_json::Value);
 
 impl Schema {
-    pub fn new(schema: datafusion::arrow::datatypes::SchemaRef, format: SchemaFormat) -> Self {
-        Self { schema, format }
-    }
-}
-
-impl serde::Serialize for Schema {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    pub fn new(schema: &odf::metadata::DataSchema, format: SchemaFormat) -> Self {
         use odf::utils::schema::{convert, format};
 
-        match self.format {
-            SchemaFormat::ArrowJson => self.schema.serialize(serializer),
+        let schema = match format {
+            SchemaFormat::ArrowJson => serde_json::to_value(schema.to_arrow()).unwrap(),
+            SchemaFormat::OdfJson => {
+                odf::serde::yaml::DataSchemaDef::serialize(schema, serde_json::value::Serializer)
+                    .unwrap()
+            }
+            SchemaFormat::OdfYaml => {
+                let mut buf = Vec::new();
+                let mut serializer = serde_yaml::Serializer::new(&mut buf);
+                odf::serde::yaml::DataSchemaDef::serialize(schema, &mut serializer).unwrap();
+                serde_json::Value::String(String::from_utf8(buf).unwrap())
+            }
             SchemaFormat::ParquetJson => {
                 let mut buf = Vec::new();
 
-                format::write_schema_parquet_json(
-                    &mut buf,
-                    convert::arrow_schema_to_parquet_schema(&self.schema).as_ref(),
-                )
-                .unwrap();
+                let arrow_schema = schema.to_arrow();
+                let parquet_schema = convert::arrow_schema_to_parquet_schema(&arrow_schema);
 
-                // TODO: PERF: Avoid re-serialization
-                let json: serde_json::Value = serde_json::from_slice(&buf).unwrap();
-                json.serialize(serializer)
+                format::write_schema_parquet_json(&mut buf, &parquet_schema).unwrap();
+
+                serde_json::from_slice(&buf).unwrap()
             }
             SchemaFormat::Parquet => {
-                let mut buf = Vec::new();
-
-                format::write_schema_parquet(
-                    &mut buf,
-                    convert::arrow_schema_to_parquet_schema(&self.schema).as_ref(),
-                )
-                .unwrap();
-
-                serializer.collect_str(&std::str::from_utf8(&buf).unwrap())
+                let arrow_schema = schema.to_arrow();
+                let parquet_schema = convert::arrow_schema_to_parquet_schema(&arrow_schema);
+                let schema_str = format::format_schema_parquet(&parquet_schema);
+                serde_json::Value::String(schema_str)
             }
-        }
+        };
+
+        Self(schema)
     }
 }
 

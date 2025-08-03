@@ -74,6 +74,7 @@ nutype = { version = "0.6", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
+serde_yaml = { version = "0.9", default-features = false }
 sha3 = "0.10"
 tokio = { version = "1", default-features = false, features = [] }
 tracing = "0.1"

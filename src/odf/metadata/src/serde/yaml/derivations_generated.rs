@@ -21,7 +21,7 @@ use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
 use chrono::{DateTime, Utc};
 use serde_with::{serde_as, skip_serializing_none};
 
-use super::formats::{base64, datetime_rfc3339, datetime_rfc3339_opt};
+use super::formats::*;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,6 +196,47 @@ implement_serde_as!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataField
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datafield-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataField")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataFieldDef {
+    pub name: String,
+    #[serde_as(as = "DataTypeDef")]
+    pub r#type: DataType,
+    #[serde_as(as = "Option<ExtraAttributesDef>")]
+    #[serde(default)]
+    pub extra: Option<ExtraAttributes>,
+}
+
+implement_serde_as!(DataField, DataFieldDef, "DataFieldDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataSchema
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataschema-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataSchema")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataSchemaDef {
+    #[serde_as(as = "Vec<DataFieldDef>")]
+    pub fields: Vec<DataField>,
+    #[serde_as(as = "Option<ExtraAttributesDef>")]
+    #[serde(default)]
+    pub extra: Option<ExtraAttributes>,
+}
+
+implement_serde_as!(DataSchema, DataSchemaDef, "DataSchemaDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSlice
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,6 +255,306 @@ pub struct DataSliceDef {
 }
 
 implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataType
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatype-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataType")]
+#[serde(deny_unknown_fields, tag = "kind")]
+pub enum DataTypeDef {
+    #[serde(alias = "binary")]
+    Binary(#[serde_as(as = "DataTypeBinaryDef")] DataTypeBinary),
+    #[serde(alias = "bool")]
+    Bool(#[serde_as(as = "DataTypeBoolDef")] DataTypeBool),
+    #[serde(alias = "date")]
+    Date(#[serde_as(as = "DataTypeDateDef")] DataTypeDate),
+    #[serde(alias = "decimal")]
+    Decimal(#[serde_as(as = "DataTypeDecimalDef")] DataTypeDecimal),
+    #[serde(alias = "duration")]
+    Duration(#[serde_as(as = "DataTypeDurationDef")] DataTypeDuration),
+    #[serde(alias = "float")]
+    Float(#[serde_as(as = "DataTypeFloatDef")] DataTypeFloat),
+    #[serde(alias = "int")]
+    Int(#[serde_as(as = "DataTypeIntDef")] DataTypeInt),
+    #[serde(alias = "list")]
+    List(#[serde_as(as = "DataTypeListDef")] DataTypeList),
+    #[serde(alias = "map")]
+    Map(#[serde_as(as = "DataTypeMapDef")] DataTypeMap),
+    #[serde(alias = "null")]
+    Null(#[serde_as(as = "DataTypeNullDef")] DataTypeNull),
+    #[serde(alias = "option")]
+    Option(#[serde_as(as = "DataTypeOptionDef")] DataTypeOption),
+    #[serde(alias = "struct")]
+    Struct(#[serde_as(as = "DataTypeStructDef")] DataTypeStruct),
+    #[serde(alias = "time")]
+    Time(#[serde_as(as = "DataTypeTimeDef")] DataTypeTime),
+    #[serde(alias = "timestamp")]
+    Timestamp(#[serde_as(as = "DataTypeTimestampDef")] DataTypeTimestamp),
+    #[serde(alias = "string")]
+    String(#[serde_as(as = "DataTypeStringDef")] DataTypeString),
+}
+
+implement_serde_as!(DataType, DataTypeDef, "DataTypeDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeBinary
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebinary-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeBinary")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeBinaryDef {
+    pub fixed_length: Option<u64>,
+}
+
+implement_serde_as!(DataTypeBinary, DataTypeBinaryDef, "DataTypeBinaryDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeBool
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebool-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeBool")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeBoolDef {}
+
+implement_serde_as!(DataTypeBool, DataTypeBoolDef, "DataTypeBoolDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeDate
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedate-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeDate")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeDateDef {
+    #[serde_as(as = "DateUnitDef")]
+    pub unit: DateUnit,
+    pub bit_width: u32,
+}
+
+implement_serde_as!(DataTypeDate, DataTypeDateDef, "DataTypeDateDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeDecimal
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedecimal-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeDecimal")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeDecimalDef {
+    pub precision: u32,
+    pub scale: i32,
+    pub bit_width: u32,
+}
+
+implement_serde_as!(DataTypeDecimal, DataTypeDecimalDef, "DataTypeDecimalDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeDuration
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeduration-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeDuration")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeDurationDef {
+    #[serde_as(as = "TimeUnitDef")]
+    pub unit: TimeUnit,
+}
+
+implement_serde_as!(DataTypeDuration, DataTypeDurationDef, "DataTypeDurationDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeFloat
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeFloat")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeFloatDef {
+    pub bit_width: u32,
+}
+
+implement_serde_as!(DataTypeFloat, DataTypeFloatDef, "DataTypeFloatDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeInt
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeInt")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeIntDef {
+    pub bit_width: u32,
+    pub signed: bool,
+}
+
+implement_serde_as!(DataTypeInt, DataTypeIntDef, "DataTypeIntDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeList
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypelist-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeList")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeListDef {
+    #[serde_as(as = "Box<DataTypeDef>")]
+    pub item_type: Box<DataType>,
+    pub fixed_length: Option<u64>,
+}
+
+implement_serde_as!(DataTypeList, DataTypeListDef, "DataTypeListDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeMap
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypemap-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeMap")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeMapDef {
+    #[serde_as(as = "Box<DataTypeDef>")]
+    pub key_type: Box<DataType>,
+    #[serde_as(as = "Box<DataTypeDef>")]
+    pub value_type: Box<DataType>,
+    pub keys_sorted: Option<bool>,
+}
+
+implement_serde_as!(DataTypeMap, DataTypeMapDef, "DataTypeMapDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeNull
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypenull-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeNull")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeNullDef {}
+
+implement_serde_as!(DataTypeNull, DataTypeNullDef, "DataTypeNullDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeOption
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeoption-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeOption")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeOptionDef {
+    #[serde_as(as = "Box<DataTypeDef>")]
+    pub inner: Box<DataType>,
+}
+
+implement_serde_as!(DataTypeOption, DataTypeOptionDef, "DataTypeOptionDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeString
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestring-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeString")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeStringDef {}
+
+implement_serde_as!(DataTypeString, DataTypeStringDef, "DataTypeStringDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeStruct
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestruct-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeStruct")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeStructDef {
+    #[serde_as(as = "Vec<DataFieldDef>")]
+    pub children: Vec<DataField>,
+}
+
+implement_serde_as!(DataTypeStruct, DataTypeStructDef, "DataTypeStructDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeTime
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetime-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeTime")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeTimeDef {
+    #[serde_as(as = "TimeUnitDef")]
+    pub unit: TimeUnit,
+    pub bit_width: u32,
+}
+
+implement_serde_as!(DataTypeTime, DataTypeTimeDef, "DataTypeTimeDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeTimestamp
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetimestamp-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataTypeTimestamp")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataTypeTimestampDef {
+    #[serde_as(as = "TimeUnitDef")]
+    pub unit: TimeUnit,
+    pub timezone: Option<String>,
+}
+
+implement_serde_as!(
+    DataTypeTimestamp,
+    DataTypeTimestampDef,
+    "DataTypeTimestampDef"
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetKind
@@ -274,6 +615,23 @@ implement_serde_as!(
     DatasetVocabularyDef,
     "DatasetVocabularyDef"
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DateUnit
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dateunit-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DateUnit")]
+#[serde(deny_unknown_fields)]
+pub enum DateUnitDef {
+    #[serde(alias = "day")]
+    Day,
+    #[serde(alias = "millisecond")]
+    Millisecond,
+}
+
+implement_serde_as!(DateUnit, DateUnitDef, "DateUnitDef");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DisablePollingSource
@@ -459,6 +817,22 @@ implement_serde_as!(
     ExecuteTransformInputDef,
     "ExecuteTransformInputDef"
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ExtraAttributes
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExtraAttributes")]
+pub struct ExtraAttributesDef {
+    #[serde(flatten)]
+    pub attributes: serde_json::Map<String, serde_json::Value>,
+}
+
+implement_serde_as!(ExtraAttributes, ExtraAttributesDef, "ExtraAttributesDef");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FetchStep
@@ -1258,8 +1632,12 @@ implement_serde_as!(SetAttachments, SetAttachmentsDef, "SetAttachmentsDef");
 #[serde(remote = "SetDataSchema")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetDataSchemaDef {
-    #[serde(with = "base64")]
-    pub schema: Vec<u8>,
+    #[serde(with = "base64_opt")]
+    #[serde(default)]
+    pub raw_arrow_schema: Option<Vec<u8>>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(SetDataSchema, SetDataSchemaDef, "SetDataSchemaDef");
@@ -1467,6 +1845,27 @@ pub struct TemporalTableDef {
 }
 
 implement_serde_as!(TemporalTable, TemporalTableDef, "TemporalTableDef");
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TimeUnit
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#timeunit-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TimeUnit")]
+#[serde(deny_unknown_fields)]
+pub enum TimeUnitDef {
+    #[serde(alias = "second")]
+    Second,
+    #[serde(alias = "millisecond")]
+    Millisecond,
+    #[serde(alias = "microsecond")]
+    Microsecond,
+    #[serde(alias = "nanosecond")]
+    Nanosecond,
+}
+
+implement_serde_as!(TimeUnit, TimeUnitDef, "TimeUnitDef");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Transform

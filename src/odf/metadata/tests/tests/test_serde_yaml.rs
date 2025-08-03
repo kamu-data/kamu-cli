@@ -15,6 +15,7 @@ use chrono::prelude::*;
 use indoc::indoc;
 use opendatafabric_metadata::serde::yaml::*;
 use opendatafabric_metadata::*;
+use serde_json::json;
 
 #[test]
 fn serde_enum_tagging() {
@@ -128,17 +129,65 @@ fn serde_string_enum_names() {
     );
 }
 
-#[cfg(feature = "arrow")]
 #[test]
 fn serde_set_data_schema() {
-    use arrow::datatypes::*;
+    let expected_schema = DataSchema {
+        fields: vec![
+            DataField {
+                name: "city".to_string(),
+                r#type: DataType::String(DataTypeString {}),
+                extra: Some(
+                    ExtraAttributes::try_from(json!({
+                        "arrow.apache.org/encoding": "view",
+                        "arrow.apache.org/offsetBitWidth": "32",
+                    }))
+                    .unwrap(),
+                ),
+            },
+            DataField {
+                name: "population".to_string(),
+                r#type: DataType::Int(DataTypeInt {
+                    bit_width: 64,
+                    signed: false,
+                }),
+                extra: None,
+            },
+            DataField {
+                name: "census".to_string(),
+                r#type: DataType::Option(DataTypeOption {
+                    inner: Box::new(DataType::String(DataTypeString {})),
+                }),
+                extra: Some(
+                    ExtraAttributes::try_from(json!({
+                        "kamu.dev/logicalType": "multihash",
+                        "kamu.dev/referenceType": "embedded",
+                    }))
+                    .unwrap(),
+                ),
+            },
+            DataField {
+                name: "links".to_string(),
+                r#type: DataType::List(DataTypeList {
+                    item_type: Box::new(DataType::String(DataTypeString {})),
+                    fixed_length: None,
+                }),
+                extra: None,
+            },
+        ],
+        extra: Some(
+            ExtraAttributes::try_from(json!({
+                "kamu.dev/archetype": "table",
+                "kamu.dev/nested": {
+                        "x": "a",
+                        "y": "b",
+                    },
+                }
+            ))
+            .unwrap(),
+        ),
+    };
 
-    let expected_schema = SchemaRef::new(Schema::new(vec![
-        Field::new("a", DataType::Int64, false),
-        Field::new("b", DataType::Boolean, false),
-    ]));
-
-    let event: MetadataEvent = SetDataSchema::new(&expected_schema).into();
+    let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
 
     let expected_block = MetadataBlock {
         sequence_number: 123,
@@ -161,7 +210,114 @@ fn serde_set_data_schema() {
           sequenceNumber: 123
           event:
             kind: SetDataSchema
-            schema: DAAAAAgACAAAAAQACAAAAAQAAAACAAAAQAAAAAQAAADY////GAAAAAwAAAAAAAAGEAAAAAAAAAAEAAQABAAAAAEAAABiAAAAEAAUABAAAAAPAAQAAAAIABAAAAAYAAAAIAAAAAAAAAIcAAAACAAMAAQACwAIAAAAQAAAAAAAAAEAAAAAAQAAAGEAAAA=
+            schema:
+              fields:
+              - name: city
+                type:
+                  kind: String
+                extra:
+                  arrow.apache.org/encoding: view
+                  arrow.apache.org/offsetBitWidth: '32'
+              - name: population
+                type:
+                  kind: Int
+                  bitWidth: 64
+                  signed: false
+              - name: census
+                type:
+                  kind: Option
+                  inner:
+                    kind: String
+                extra:
+                  kamu.dev/logicalType: multihash
+                  kamu.dev/referenceType: embedded
+              - name: links
+                type:
+                  kind: List
+                  itemType:
+                    kind: String
+              extra:
+                kamu.dev/archetype: table
+                kamu.dev/nested:
+                  x: a
+                  y: b
+        "#
+    );
+
+    pretty_assertions::assert_eq!(expected_data, std::str::from_utf8(&actual_data).unwrap());
+
+    let actual_block = YamlMetadataBlockDeserializer
+        .read_manifest(&actual_data)
+        .unwrap();
+
+    assert_eq!(expected_block, actual_block);
+
+    let actual_schema = actual_block
+        .event
+        .as_variant::<SetDataSchema>()
+        .unwrap()
+        .schema
+        .clone()
+        .unwrap();
+
+    assert_eq!(expected_schema, actual_schema);
+
+    #[cfg(feature = "arrow")]
+    {
+        use arrow::datatypes::*;
+
+        let actual_arrow_schema = actual_block
+            .into_typed::<SetDataSchema>()
+            .unwrap()
+            .event
+            .schema_as_arrow()
+            .unwrap();
+
+        let exepcted_arrow_schema = Schema::new(vec![
+            Field::new("city", DataType::Utf8View, false),
+            Field::new("population", DataType::UInt64, false),
+            Field::new("census", DataType::Utf8, true),
+            Field::new("links", DataType::new_list(DataType::Utf8, false), false),
+        ]);
+
+        pretty_assertions::assert_eq!(actual_arrow_schema, exepcted_arrow_schema);
+    }
+}
+
+#[cfg(feature = "arrow")]
+#[test]
+fn serde_set_data_schema_legacy() {
+    use arrow::datatypes::*;
+
+    let expected_schema = Schema::new(vec![
+        Field::new("a", DataType::Int64, false),
+        Field::new("b", DataType::Boolean, false),
+    ]);
+
+    let event: MetadataEvent = SetDataSchema::new_legacy_raw_arrow(&expected_schema).into();
+
+    let expected_block = MetadataBlock {
+        sequence_number: 123,
+        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
+        system_time: Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap(),
+        event,
+    };
+
+    let actual_data = YamlMetadataBlockSerializer
+        .write_manifest(&expected_block)
+        .unwrap();
+
+    let expected_data = indoc!(
+        r#"
+        kind: MetadataBlock
+        version: 2
+        content:
+          systemTime: 2020-01-01T12:00:00Z
+          prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
+          sequenceNumber: 123
+          event:
+            kind: SetDataSchema
+            rawArrowSchema: DAAAAAgACAAAAAQACAAAAAQAAAACAAAAQAAAAAQAAADY////GAAAAAwAAAAAAAAGEAAAAAAAAAAEAAQABAAAAAEAAABiAAAAEAAUABAAAAAPAAQAAAAIABAAAAAYAAAAIAAAAAAAAAIcAAAACAAMAAQACwAIAAAAQAAAAAAAAAEAAAAAAQAAAGEAAAA=
         "#
     );
 

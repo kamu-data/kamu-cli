@@ -207,12 +207,10 @@ pub async fn dataset_metadata_handler(
 
     let (schema, schema_format) = schema_visitor
         .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event)
-        .map(|schema| schema.schema_as_arrow())
-        .transpose()
-        .int_err()?
+        .map(|e| e.upgrade().schema)
         .map(|schema| {
             (
-                query_types::Schema::new(schema, params.schema_format),
+                query_types::Schema::new(&schema, params.schema_format),
                 params.schema_format,
             )
         })
