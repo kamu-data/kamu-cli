@@ -196,7 +196,10 @@ impl CollectionContext for ODataCollectionContext {
             .unwrap();
 
         if let Some(set_schema) = set_data_schema {
-            set_schema.schema_as_arrow().map_err(ODataError::internal)
+            set_schema
+                .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
+                .map_err(ODataError::internal)
+                .map(Arc::new)
         } else {
             Ok(Arc::new(Schema::empty()))
         }

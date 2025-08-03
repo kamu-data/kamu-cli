@@ -922,9 +922,11 @@ type DataSchema {
 }
 
 enum DataSchemaFormat {
+	ARROW_JSON
+	ODF_JSON
+	ODF_YAML
 	PARQUET
 	PARQUET_JSON
-	ARROW_JSON
 }
 
 """
