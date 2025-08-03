@@ -734,6 +734,8 @@
       "SchemaFormat": {
         "enum": [
           "ArrowJson",
+          "OdfJson",
+          "OdfYaml",
           "Parquet",
           "ParquetJson"
         ],

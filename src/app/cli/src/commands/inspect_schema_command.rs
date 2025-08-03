@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::parquet::schema::types::Type;
+use internal_error::*;
 use kamu::domain::*;
 
 use super::{CLIError, Command};
@@ -19,10 +20,12 @@ use super::{CLIError, Command};
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum SchemaOutputFormat {
+    ArrowJson,
     Ddl,
+    OdfJson,
+    OdfYaml,
     Parquet,
     ParquetJson,
-    ArrowJson,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,48 +122,51 @@ impl InspectSchemaCommand {
         }
     }
 
-    async fn get_arrow_schema(&self) -> Result<Option<SchemaRef>, CLIError> {
+    async fn get_odf_schema(&self) -> Result<Option<Arc<odf::schema::DataSchema>>, CLIError> {
         if !self.from_data_file {
             self.query_svc
                 .get_schema(&self.dataset_ref)
                 .await
                 .map_err(Self::query_errors)
         } else {
-            let Some(parquet_schema) = self
-                .query_svc
-                .get_schema_parquet_file(&self.dataset_ref)
-                .await
-                .map_err(Self::query_errors)?
-            else {
+            let Some(arrow_schema) = Box::pin(self.get_arrow_schema()).await? else {
                 return Ok(None);
             };
+            let odf_schema = odf::schema::DataSchema::new_from_arrow(&arrow_schema).int_err()?;
+            Ok(Some(Arc::new(odf_schema)))
+        }
+    }
 
-            Ok(Some(
-                odf::utils::schema::convert::parquet_schema_to_arrow_schema(Arc::new(
-                    parquet_schema,
-                )),
-            ))
+    async fn get_arrow_schema(&self) -> Result<Option<SchemaRef>, CLIError> {
+        if !self.from_data_file {
+            let Some(odf_schema) = Box::pin(self.get_odf_schema()).await? else {
+                return Ok(None);
+            };
+            let arrow_schema = odf_schema
+                .to_arrow(&odf::metadata::ToArrowSettings::default())
+                .int_err()?;
+            Ok(Some(Arc::new(arrow_schema)))
+        } else {
+            let schema = self
+                .query_svc
+                .get_last_data_chunk_schema_arrow(&self.dataset_ref)
+                .await
+                .map_err(Self::query_errors)?;
+
+            Ok(schema)
         }
     }
 
     async fn get_parquet_schema(&self) -> Result<Option<Arc<Type>>, CLIError> {
         if !self.from_data_file {
-            let Some(arrow_schema) = self
-                .query_svc
-                .get_schema(&self.dataset_ref)
-                .await
-                .map_err(Self::query_errors)?
-            else {
-                return Ok(None);
-            };
-
-            Ok(Some(
-                odf::utils::schema::convert::arrow_schema_to_parquet_schema(&arrow_schema),
-            ))
+            let arrow_schema = Box::pin(self.get_arrow_schema()).await?;
+            Ok(arrow_schema
+                .as_deref()
+                .map(odf::utils::schema::convert::arrow_schema_to_parquet_schema))
         } else {
             let schema = self
                 .query_svc
-                .get_schema_parquet_file(&self.dataset_ref)
+                .get_last_data_chunk_schema_parquet(&self.dataset_ref)
                 .await
                 .map_err(Self::query_errors)?;
 
@@ -206,6 +212,28 @@ impl Command for InspectSchemaCommand {
                         &mut std::io::stdout(),
                         schema.as_ref(),
                     )?;
+                } else {
+                    self.print_schema_unavailable();
+                }
+            }
+            Some(SchemaOutputFormat::OdfJson) => {
+                if let Some(schema) = self.get_odf_schema().await? {
+                    odf::utils::schema::format::write_schema_odf_json(
+                        &mut std::io::stdout(),
+                        &schema,
+                    )
+                    .int_err()?;
+                } else {
+                    self.print_schema_unavailable();
+                }
+            }
+            Some(SchemaOutputFormat::OdfYaml) => {
+                if let Some(schema) = self.get_odf_schema().await? {
+                    odf::utils::schema::format::write_schema_odf_yaml(
+                        &mut std::io::stdout(),
+                        &schema,
+                    )
+                    .int_err()?;
                 } else {
                     self.print_schema_unavailable();
                 }

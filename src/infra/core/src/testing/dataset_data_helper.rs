@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::common::DFSchema;
 use datafusion::prelude::*;
 use futures::TryStreamExt;
 use odf::utils::data::DataFrameExt;
@@ -116,16 +115,24 @@ impl DatasetDataHelper {
             .into()
     }
 
+    #[deprecated(
+        note = "Use `get_latest_schema_in_meta` instead that returns ODF schema as specified in \
+                metadata chain"
+    )]
     pub async fn get_latest_data_schema(&self) -> SchemaRef {
-        use odf::dataset::MetadataChainExt;
-        self.dataset
-            .as_metadata_chain()
-            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
+        self.get_last_set_data_schema_block()
             .await
+            .event
+            .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
+            .map(Arc::new)
             .unwrap()
-            .into_event()
-            .unwrap()
-            .schema_as_arrow()
+    }
+
+    pub async fn get_latest_schema_in_meta(&self) -> odf::schema::DataSchema {
+        self.get_last_set_data_schema_block()
+            .await
+            .event
+            .schema
             .unwrap()
     }
 
@@ -142,12 +149,9 @@ impl DatasetDataHelper {
             .unwrap()
     }
 
-    pub async fn assert_latest_set_schema_eq(&self, expected: &str) {
-        let schema = self.get_latest_data_schema().await;
-        let df_schema =
-            DFSchema::from_unqualified_fields(schema.as_ref().clone().fields, Default::default())
-                .unwrap();
-        odf::utils::testing::assert_schema_eq(&df_schema, expected);
+    pub async fn assert_latest_schema_in_meta_eq(&self, expected: &odf::schema::DataSchema) {
+        let schema = self.get_latest_schema_in_meta().await;
+        odf::utils::testing::assert_odf_schema_eq(&schema, expected);
     }
 
     pub async fn assert_last_data_schema_eq(&self, expected: &str) {

@@ -208,9 +208,15 @@ pub async fn query_handler_impl(
         .api_err()?;
 
     let (schema, schema_format) = if body.include.contains(&Include::Schema) {
+        // NOTE: We strip encoding to only leave the logical type
+        let odf_schema = odf::schema::DataSchema::new_from_arrow(df.schema().inner())
+            .int_err()?
+            .strip_encoding();
+
         let schema_format = body.schema_format.unwrap_or_default();
+
         (
-            Some(Schema::new(df.schema().inner().clone(), schema_format)),
+            Some(Schema::new(&odf_schema, schema_format)?),
             Some(schema_format),
         )
     } else {

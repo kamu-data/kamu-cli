@@ -86,11 +86,7 @@ impl SearchServiceLocalIndexer {
             .unwrap_or_default();
 
         let info = info_visitor.into_event().unwrap_or_default();
-        let schema = schema_visitor
-            .into_event()
-            .map(|schema| schema.schema_as_arrow())
-            .transpose()
-            .int_err()?;
+        let schema = schema_visitor.into_event().map(|e| e.upgrade().schema);
 
         let mut chunks = Vec::new();
 
@@ -115,12 +111,7 @@ impl SearchServiceLocalIndexer {
         // Schema
         chunks.push(
             schema
-                .map(|s| {
-                    s.fields
-                        .iter()
-                        .map(|f| f.name().clone())
-                        .collect::<Vec<_>>()
-                })
+                .map(|s| s.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>())
                 .unwrap_or_default()
                 .join(" "),
         );

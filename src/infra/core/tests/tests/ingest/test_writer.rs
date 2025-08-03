@@ -17,8 +17,14 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
 use odf::metadata::testing::MetadataFactory;
+use odf::metadata::{DataField, DataSchema};
 use odf::utils::data::DataFrameExt;
-use odf::utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
+use odf::utils::testing::{
+    assert_arrow_schema_eq,
+    assert_data_eq,
+    assert_odf_schema_eq,
+    assert_schema_eq,
+};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -29,7 +35,7 @@ use time_source::SystemTimeSourceDefault;
 // crate.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
     let mut harness = Harness::new(vec![
@@ -146,8 +152,26 @@ async fn test_data_writer_happy_path() {
 
     // Check schema in block SetDataSchema block
     let (schema_block_hash, schema_block) = harness.get_last_schema_block().await;
+
+    assert_odf_schema_eq(
+        schema_block.event.schema.as_ref().unwrap(),
+        &DataSchema::new(vec![
+            DataField::i64("offset"),
+            DataField::i32("op"),
+            DataField::timestamp_millis_utc("system_time"),
+            DataField::timestamp_millis_utc("event_time").optional(),
+            // NOTE: In SetDataSchema we strip the encoding information, leaving only logical types
+            DataField::string("city").optional(),
+            DataField::i64("population").optional(),
+        ]),
+    );
+
+    // Check the converted Arrow schema
     assert_arrow_schema_eq(
-        &schema_block.event.schema_as_arrow().unwrap(),
+        &schema_block
+            .event
+            .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
+            .unwrap(),
         json!({
             "fields": [{
                 "name": "offset",
@@ -189,7 +213,8 @@ async fn test_data_writer_happy_path() {
                 "nullable": true,
             }, {
                 "name": "city",
-                "data_type": "Utf8View",
+                // NOTE: Not Utf8View due to stripped encoding
+                "data_type": "Utf8",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},

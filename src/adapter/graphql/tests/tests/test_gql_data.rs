@@ -117,7 +117,7 @@ async fn create_test_dataset(
     dataset
         .commit_event(
             MetadataFactory::set_data_schema()
-                .schema(&schema)
+                .schema_from_arrow(&schema)
                 .build()
                 .into(),
             odf::dataset::CommitOpts::default(),

@@ -197,12 +197,31 @@ impl AsciiRenderer {
         )?;
 
         match &block.event {
-            odf::MetadataEvent::SetDataSchema(e @ odf::metadata::SetDataSchema { .. }) => {
-                let schema = e.schema_as_arrow().unwrap();
+            odf::MetadataEvent::SetDataSchema(
+                e @ odf::metadata::SetDataSchema {
+                    raw_arrow_schema: Some(_),
+                    schema: None,
+                },
+            ) => {
+                let schema = e
+                    .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
+                    .unwrap();
                 let schema_str = odf::utils::schema::format::format_schema_arrow(&schema);
 
                 self.render_property(output, 0, "Kind", "SetDataSchema")?;
+                self.render_property(output, 0, "RawArrowSchema", schema_str)?;
+            }
+            odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema {
+                raw_arrow_schema: None,
+                schema: Some(schema),
+            }) => {
+                let schema_str = odf::utils::schema::format::format_schema_odf_yaml(schema);
+
+                self.render_property(output, 0, "Kind", "SetDataSchema")?;
                 self.render_property(output, 0, "Schema", schema_str)?;
+            }
+            odf::MetadataEvent::SetDataSchema(e) => {
+                unreachable!("Invalid event {e:?}")
             }
             odf::MetadataEvent::AddData(odf::metadata::AddData {
                 prev_checkpoint,

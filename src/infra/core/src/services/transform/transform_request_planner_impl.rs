@@ -180,9 +180,10 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 set_data_schema_visitor
                     .into_event()
                     .as_ref()
-                    .map(odf::metadata::SetDataSchema::schema_as_arrow)
+                    .map(|e| e.schema_as_arrow(&odf::metadata::ToArrowSettings::default()))
                     .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
-                    .int_err()?,
+                    .int_err()?
+                    .map(Arc::new),
                 blocks,
                 finished_range,
             )

@@ -137,10 +137,7 @@ impl<'a> DatasetMetadata<'a> {
             .await
             .int_err()?
         {
-            Ok(Option::from(DataSchema::from_arrow_schema(
-                schema.as_ref(),
-                format,
-            )))
+            Ok(Option::from(DataSchema::new(schema, format)))
         } else {
             Ok(None)
         }

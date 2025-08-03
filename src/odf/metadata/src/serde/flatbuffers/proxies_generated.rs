@@ -536,6 +536,300 @@ impl flatbuffers::SimpleToVerifyInSlice for CompressionFormat {}
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
+pub const ENUM_MIN_DATA_TYPE: u8 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_DATA_TYPE: u8 = 24;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_DATA_TYPE: [DataType; 25] = [
+    DataType::NONE,
+    DataType::DataTypeBinary,
+    DataType::DataTypeBool,
+    DataType::DataTypeDate,
+    DataType::DataTypeDecimal,
+    DataType::DataTypeDuration,
+    DataType::DataTypeFloat16,
+    DataType::DataTypeFloat32,
+    DataType::DataTypeFloat64,
+    DataType::DataTypeInt8,
+    DataType::DataTypeInt16,
+    DataType::DataTypeInt32,
+    DataType::DataTypeInt64,
+    DataType::DataTypeUInt8,
+    DataType::DataTypeUInt16,
+    DataType::DataTypeUInt32,
+    DataType::DataTypeUInt64,
+    DataType::DataTypeList,
+    DataType::DataTypeMap,
+    DataType::DataTypeNull,
+    DataType::DataTypeOption,
+    DataType::DataTypeStruct,
+    DataType::DataTypeTime,
+    DataType::DataTypeTimestamp,
+    DataType::DataTypeString,
+];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct DataType(pub u8);
+#[allow(non_upper_case_globals)]
+impl DataType {
+    pub const NONE: Self = Self(0);
+    pub const DataTypeBinary: Self = Self(1);
+    pub const DataTypeBool: Self = Self(2);
+    pub const DataTypeDate: Self = Self(3);
+    pub const DataTypeDecimal: Self = Self(4);
+    pub const DataTypeDuration: Self = Self(5);
+    pub const DataTypeFloat16: Self = Self(6);
+    pub const DataTypeFloat32: Self = Self(7);
+    pub const DataTypeFloat64: Self = Self(8);
+    pub const DataTypeInt8: Self = Self(9);
+    pub const DataTypeInt16: Self = Self(10);
+    pub const DataTypeInt32: Self = Self(11);
+    pub const DataTypeInt64: Self = Self(12);
+    pub const DataTypeUInt8: Self = Self(13);
+    pub const DataTypeUInt16: Self = Self(14);
+    pub const DataTypeUInt32: Self = Self(15);
+    pub const DataTypeUInt64: Self = Self(16);
+    pub const DataTypeList: Self = Self(17);
+    pub const DataTypeMap: Self = Self(18);
+    pub const DataTypeNull: Self = Self(19);
+    pub const DataTypeOption: Self = Self(20);
+    pub const DataTypeStruct: Self = Self(21);
+    pub const DataTypeTime: Self = Self(22);
+    pub const DataTypeTimestamp: Self = Self(23);
+    pub const DataTypeString: Self = Self(24);
+
+    pub const ENUM_MIN: u8 = 0;
+    pub const ENUM_MAX: u8 = 24;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::DataTypeBinary,
+        Self::DataTypeBool,
+        Self::DataTypeDate,
+        Self::DataTypeDecimal,
+        Self::DataTypeDuration,
+        Self::DataTypeFloat16,
+        Self::DataTypeFloat32,
+        Self::DataTypeFloat64,
+        Self::DataTypeInt8,
+        Self::DataTypeInt16,
+        Self::DataTypeInt32,
+        Self::DataTypeInt64,
+        Self::DataTypeUInt8,
+        Self::DataTypeUInt16,
+        Self::DataTypeUInt32,
+        Self::DataTypeUInt64,
+        Self::DataTypeList,
+        Self::DataTypeMap,
+        Self::DataTypeNull,
+        Self::DataTypeOption,
+        Self::DataTypeStruct,
+        Self::DataTypeTime,
+        Self::DataTypeTimestamp,
+        Self::DataTypeString,
+    ];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::NONE => Some("NONE"),
+            Self::DataTypeBinary => Some("DataTypeBinary"),
+            Self::DataTypeBool => Some("DataTypeBool"),
+            Self::DataTypeDate => Some("DataTypeDate"),
+            Self::DataTypeDecimal => Some("DataTypeDecimal"),
+            Self::DataTypeDuration => Some("DataTypeDuration"),
+            Self::DataTypeFloat16 => Some("DataTypeFloat16"),
+            Self::DataTypeFloat32 => Some("DataTypeFloat32"),
+            Self::DataTypeFloat64 => Some("DataTypeFloat64"),
+            Self::DataTypeInt8 => Some("DataTypeInt8"),
+            Self::DataTypeInt16 => Some("DataTypeInt16"),
+            Self::DataTypeInt32 => Some("DataTypeInt32"),
+            Self::DataTypeInt64 => Some("DataTypeInt64"),
+            Self::DataTypeUInt8 => Some("DataTypeUInt8"),
+            Self::DataTypeUInt16 => Some("DataTypeUInt16"),
+            Self::DataTypeUInt32 => Some("DataTypeUInt32"),
+            Self::DataTypeUInt64 => Some("DataTypeUInt64"),
+            Self::DataTypeList => Some("DataTypeList"),
+            Self::DataTypeMap => Some("DataTypeMap"),
+            Self::DataTypeNull => Some("DataTypeNull"),
+            Self::DataTypeOption => Some("DataTypeOption"),
+            Self::DataTypeStruct => Some("DataTypeStruct"),
+            Self::DataTypeTime => Some("DataTypeTime"),
+            Self::DataTypeTimestamp => Some("DataTypeTimestamp"),
+            Self::DataTypeString => Some("DataTypeString"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for DataType {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for DataType {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for DataType {
+    type Output = DataType;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+    }
+}
+
+impl flatbuffers::EndianScalar for DataType {
+    type Scalar = u8;
+    #[inline]
+    fn to_little_endian(self) -> u8 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: u8) -> Self {
+        let b = u8::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for DataType {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        u8::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for DataType {}
+pub struct DataTypeUnionTableOffset {}
+
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MIN_TIME_UNIT: i16 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_TIME_UNIT: i16 = 3;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_TIME_UNIT: [TimeUnit; 4] = [
+    TimeUnit::Second,
+    TimeUnit::Millisecond,
+    TimeUnit::Microsecond,
+    TimeUnit::Nanosecond,
+];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct TimeUnit(pub i16);
+#[allow(non_upper_case_globals)]
+impl TimeUnit {
+    pub const Second: Self = Self(0);
+    pub const Millisecond: Self = Self(1);
+    pub const Microsecond: Self = Self(2);
+    pub const Nanosecond: Self = Self(3);
+
+    pub const ENUM_MIN: i16 = 0;
+    pub const ENUM_MAX: i16 = 3;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::Second,
+        Self::Millisecond,
+        Self::Microsecond,
+        Self::Nanosecond,
+    ];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::Second => Some("Second"),
+            Self::Millisecond => Some("Millisecond"),
+            Self::Microsecond => Some("Microsecond"),
+            Self::Nanosecond => Some("Nanosecond"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for TimeUnit {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for TimeUnit {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = flatbuffers::read_scalar_at::<i16>(buf, loc);
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for TimeUnit {
+    type Output = TimeUnit;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        flatbuffers::emplace_scalar::<i16>(dst, self.0);
+    }
+}
+
+impl flatbuffers::EndianScalar for TimeUnit {
+    type Scalar = i16;
+    #[inline]
+    fn to_little_endian(self) -> i16 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: i16) -> Self {
+        let b = i16::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for TimeUnit {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        i16::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for TimeUnit {}
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
 pub const ENUM_MIN_DATASET_KIND: i32 = 0;
 #[deprecated(
     since = "2.0.0",
@@ -622,6 +916,266 @@ impl<'a> flatbuffers::Verifiable for DatasetKind {
 }
 
 impl flatbuffers::SimpleToVerifyInSlice for DatasetKind {}
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MIN_METADATA_EVENT: u8 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_METADATA_EVENT: u8 = 13;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 14] = [
+    MetadataEvent::NONE,
+    MetadataEvent::AddData,
+    MetadataEvent::ExecuteTransform,
+    MetadataEvent::Seed,
+    MetadataEvent::SetPollingSource,
+    MetadataEvent::SetTransform,
+    MetadataEvent::SetVocab,
+    MetadataEvent::SetAttachments,
+    MetadataEvent::SetInfo,
+    MetadataEvent::SetLicense,
+    MetadataEvent::SetDataSchema,
+    MetadataEvent::AddPushSource,
+    MetadataEvent::DisablePushSource,
+    MetadataEvent::DisablePollingSource,
+];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct MetadataEvent(pub u8);
+#[allow(non_upper_case_globals)]
+impl MetadataEvent {
+    pub const NONE: Self = Self(0);
+    pub const AddData: Self = Self(1);
+    pub const ExecuteTransform: Self = Self(2);
+    pub const Seed: Self = Self(3);
+    pub const SetPollingSource: Self = Self(4);
+    pub const SetTransform: Self = Self(5);
+    pub const SetVocab: Self = Self(6);
+    pub const SetAttachments: Self = Self(7);
+    pub const SetInfo: Self = Self(8);
+    pub const SetLicense: Self = Self(9);
+    pub const SetDataSchema: Self = Self(10);
+    pub const AddPushSource: Self = Self(11);
+    pub const DisablePushSource: Self = Self(12);
+    pub const DisablePollingSource: Self = Self(13);
+
+    pub const ENUM_MIN: u8 = 0;
+    pub const ENUM_MAX: u8 = 13;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::AddData,
+        Self::ExecuteTransform,
+        Self::Seed,
+        Self::SetPollingSource,
+        Self::SetTransform,
+        Self::SetVocab,
+        Self::SetAttachments,
+        Self::SetInfo,
+        Self::SetLicense,
+        Self::SetDataSchema,
+        Self::AddPushSource,
+        Self::DisablePushSource,
+        Self::DisablePollingSource,
+    ];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::NONE => Some("NONE"),
+            Self::AddData => Some("AddData"),
+            Self::ExecuteTransform => Some("ExecuteTransform"),
+            Self::Seed => Some("Seed"),
+            Self::SetPollingSource => Some("SetPollingSource"),
+            Self::SetTransform => Some("SetTransform"),
+            Self::SetVocab => Some("SetVocab"),
+            Self::SetAttachments => Some("SetAttachments"),
+            Self::SetInfo => Some("SetInfo"),
+            Self::SetLicense => Some("SetLicense"),
+            Self::SetDataSchema => Some("SetDataSchema"),
+            Self::AddPushSource => Some("AddPushSource"),
+            Self::DisablePushSource => Some("DisablePushSource"),
+            Self::DisablePollingSource => Some("DisablePollingSource"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for MetadataEvent {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for MetadataEvent {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for MetadataEvent {
+    type Output = MetadataEvent;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+    }
+}
+
+impl flatbuffers::EndianScalar for MetadataEvent {
+    type Scalar = u8;
+    #[inline]
+    fn to_little_endian(self) -> u8 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: u8) -> Self {
+        let b = u8::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for MetadataEvent {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        u8::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for MetadataEvent {}
+pub struct MetadataEventUnionTableOffset {}
+
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MIN_FETCH_STEP: u8 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_FETCH_STEP: u8 = 5;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 6] = [
+    FetchStep::NONE,
+    FetchStep::FetchStepUrl,
+    FetchStep::FetchStepFilesGlob,
+    FetchStep::FetchStepContainer,
+    FetchStep::FetchStepMqtt,
+    FetchStep::FetchStepEthereumLogs,
+];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct FetchStep(pub u8);
+#[allow(non_upper_case_globals)]
+impl FetchStep {
+    pub const NONE: Self = Self(0);
+    pub const FetchStepUrl: Self = Self(1);
+    pub const FetchStepFilesGlob: Self = Self(2);
+    pub const FetchStepContainer: Self = Self(3);
+    pub const FetchStepMqtt: Self = Self(4);
+    pub const FetchStepEthereumLogs: Self = Self(5);
+
+    pub const ENUM_MIN: u8 = 0;
+    pub const ENUM_MAX: u8 = 5;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::FetchStepUrl,
+        Self::FetchStepFilesGlob,
+        Self::FetchStepContainer,
+        Self::FetchStepMqtt,
+        Self::FetchStepEthereumLogs,
+    ];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::NONE => Some("NONE"),
+            Self::FetchStepUrl => Some("FetchStepUrl"),
+            Self::FetchStepFilesGlob => Some("FetchStepFilesGlob"),
+            Self::FetchStepContainer => Some("FetchStepContainer"),
+            Self::FetchStepMqtt => Some("FetchStepMqtt"),
+            Self::FetchStepEthereumLogs => Some("FetchStepEthereumLogs"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for FetchStep {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for FetchStep {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for FetchStep {
+    type Output = FetchStep;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+    }
+}
+
+impl flatbuffers::EndianScalar for FetchStep {
+    type Scalar = u8;
+    #[inline]
+    fn to_little_endian(self) -> u8 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: u8) -> Self {
+        let b = u8::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for FetchStep {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        u8::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for FetchStep {}
+pub struct FetchStepUnionTableOffset {}
+
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
@@ -1013,120 +1567,6 @@ impl flatbuffers::SimpleToVerifyInSlice for MqttQos {}
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MIN_FETCH_STEP: u8 = 0;
-#[deprecated(
-    since = "2.0.0",
-    note = "Use associated constants instead. This will no longer be generated in 2021."
-)]
-pub const ENUM_MAX_FETCH_STEP: u8 = 5;
-#[deprecated(
-    since = "2.0.0",
-    note = "Use associated constants instead. This will no longer be generated in 2021."
-)]
-#[allow(non_camel_case_types)]
-pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 6] = [
-    FetchStep::NONE,
-    FetchStep::FetchStepUrl,
-    FetchStep::FetchStepFilesGlob,
-    FetchStep::FetchStepContainer,
-    FetchStep::FetchStepMqtt,
-    FetchStep::FetchStepEthereumLogs,
-];
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-#[repr(transparent)]
-pub struct FetchStep(pub u8);
-#[allow(non_upper_case_globals)]
-impl FetchStep {
-    pub const NONE: Self = Self(0);
-    pub const FetchStepUrl: Self = Self(1);
-    pub const FetchStepFilesGlob: Self = Self(2);
-    pub const FetchStepContainer: Self = Self(3);
-    pub const FetchStepMqtt: Self = Self(4);
-    pub const FetchStepEthereumLogs: Self = Self(5);
-
-    pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 5;
-    pub const ENUM_VALUES: &'static [Self] = &[
-        Self::NONE,
-        Self::FetchStepUrl,
-        Self::FetchStepFilesGlob,
-        Self::FetchStepContainer,
-        Self::FetchStepMqtt,
-        Self::FetchStepEthereumLogs,
-    ];
-    /// Returns the variant's name or "" if unknown.
-    pub fn variant_name(self) -> Option<&'static str> {
-        match self {
-            Self::NONE => Some("NONE"),
-            Self::FetchStepUrl => Some("FetchStepUrl"),
-            Self::FetchStepFilesGlob => Some("FetchStepFilesGlob"),
-            Self::FetchStepContainer => Some("FetchStepContainer"),
-            Self::FetchStepMqtt => Some("FetchStepMqtt"),
-            Self::FetchStepEthereumLogs => Some("FetchStepEthereumLogs"),
-            _ => None,
-        }
-    }
-}
-impl core::fmt::Debug for FetchStep {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        if let Some(name) = self.variant_name() {
-            f.write_str(name)
-        } else {
-            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
-        }
-    }
-}
-impl<'a> flatbuffers::Follow<'a> for FetchStep {
-    type Inner = Self;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
-        Self(b)
-    }
-}
-
-impl flatbuffers::Push for FetchStep {
-    type Output = FetchStep;
-    #[inline]
-    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
-    }
-}
-
-impl flatbuffers::EndianScalar for FetchStep {
-    type Scalar = u8;
-    #[inline]
-    fn to_little_endian(self) -> u8 {
-        self.0.to_le()
-    }
-    #[inline]
-    #[allow(clippy::wrong_self_convention)]
-    fn from_little_endian(v: u8) -> Self {
-        let b = u8::from_le(v);
-        Self(b)
-    }
-}
-
-impl<'a> flatbuffers::Verifiable for FetchStep {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        u8::run_verifier(v, pos)
-    }
-}
-
-impl flatbuffers::SimpleToVerifyInSlice for FetchStep {}
-pub struct FetchStepUnionTableOffset {}
-
-#[deprecated(
-    since = "2.0.0",
-    note = "Use associated constants instead. This will no longer be generated in 2021."
-)]
 pub const ENUM_MIN_PREP_STEP: u8 = 0;
 #[deprecated(
     since = "2.0.0",
@@ -1221,152 +1661,6 @@ impl<'a> flatbuffers::Verifiable for PrepStep {
 
 impl flatbuffers::SimpleToVerifyInSlice for PrepStep {}
 pub struct PrepStepUnionTableOffset {}
-
-#[deprecated(
-    since = "2.0.0",
-    note = "Use associated constants instead. This will no longer be generated in 2021."
-)]
-pub const ENUM_MIN_METADATA_EVENT: u8 = 0;
-#[deprecated(
-    since = "2.0.0",
-    note = "Use associated constants instead. This will no longer be generated in 2021."
-)]
-pub const ENUM_MAX_METADATA_EVENT: u8 = 13;
-#[deprecated(
-    since = "2.0.0",
-    note = "Use associated constants instead. This will no longer be generated in 2021."
-)]
-#[allow(non_camel_case_types)]
-pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 14] = [
-    MetadataEvent::NONE,
-    MetadataEvent::AddData,
-    MetadataEvent::ExecuteTransform,
-    MetadataEvent::Seed,
-    MetadataEvent::SetPollingSource,
-    MetadataEvent::SetTransform,
-    MetadataEvent::SetVocab,
-    MetadataEvent::SetAttachments,
-    MetadataEvent::SetInfo,
-    MetadataEvent::SetLicense,
-    MetadataEvent::SetDataSchema,
-    MetadataEvent::AddPushSource,
-    MetadataEvent::DisablePushSource,
-    MetadataEvent::DisablePollingSource,
-];
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-#[repr(transparent)]
-pub struct MetadataEvent(pub u8);
-#[allow(non_upper_case_globals)]
-impl MetadataEvent {
-    pub const NONE: Self = Self(0);
-    pub const AddData: Self = Self(1);
-    pub const ExecuteTransform: Self = Self(2);
-    pub const Seed: Self = Self(3);
-    pub const SetPollingSource: Self = Self(4);
-    pub const SetTransform: Self = Self(5);
-    pub const SetVocab: Self = Self(6);
-    pub const SetAttachments: Self = Self(7);
-    pub const SetInfo: Self = Self(8);
-    pub const SetLicense: Self = Self(9);
-    pub const SetDataSchema: Self = Self(10);
-    pub const AddPushSource: Self = Self(11);
-    pub const DisablePushSource: Self = Self(12);
-    pub const DisablePollingSource: Self = Self(13);
-
-    pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 13;
-    pub const ENUM_VALUES: &'static [Self] = &[
-        Self::NONE,
-        Self::AddData,
-        Self::ExecuteTransform,
-        Self::Seed,
-        Self::SetPollingSource,
-        Self::SetTransform,
-        Self::SetVocab,
-        Self::SetAttachments,
-        Self::SetInfo,
-        Self::SetLicense,
-        Self::SetDataSchema,
-        Self::AddPushSource,
-        Self::DisablePushSource,
-        Self::DisablePollingSource,
-    ];
-    /// Returns the variant's name or "" if unknown.
-    pub fn variant_name(self) -> Option<&'static str> {
-        match self {
-            Self::NONE => Some("NONE"),
-            Self::AddData => Some("AddData"),
-            Self::ExecuteTransform => Some("ExecuteTransform"),
-            Self::Seed => Some("Seed"),
-            Self::SetPollingSource => Some("SetPollingSource"),
-            Self::SetTransform => Some("SetTransform"),
-            Self::SetVocab => Some("SetVocab"),
-            Self::SetAttachments => Some("SetAttachments"),
-            Self::SetInfo => Some("SetInfo"),
-            Self::SetLicense => Some("SetLicense"),
-            Self::SetDataSchema => Some("SetDataSchema"),
-            Self::AddPushSource => Some("AddPushSource"),
-            Self::DisablePushSource => Some("DisablePushSource"),
-            Self::DisablePollingSource => Some("DisablePollingSource"),
-            _ => None,
-        }
-    }
-}
-impl core::fmt::Debug for MetadataEvent {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        if let Some(name) = self.variant_name() {
-            f.write_str(name)
-        } else {
-            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
-        }
-    }
-}
-impl<'a> flatbuffers::Follow<'a> for MetadataEvent {
-    type Inner = Self;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
-        Self(b)
-    }
-}
-
-impl flatbuffers::Push for MetadataEvent {
-    type Output = MetadataEvent;
-    #[inline]
-    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
-    }
-}
-
-impl flatbuffers::EndianScalar for MetadataEvent {
-    type Scalar = u8;
-    #[inline]
-    fn to_little_endian(self) -> u8 {
-        self.0.to_le()
-    }
-    #[inline]
-    #[allow(clippy::wrong_self_convention)]
-    fn from_little_endian(v: u8) -> Self {
-        let b = u8::from_le(v);
-        Self(b)
-    }
-}
-
-impl<'a> flatbuffers::Verifiable for MetadataEvent {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        u8::run_verifier(v, pos)
-    }
-}
-
-impl flatbuffers::SimpleToVerifyInSlice for MetadataEvent {}
-pub struct MetadataEventUnionTableOffset {}
 
 #[deprecated(
     since = "2.0.0",
@@ -5913,6 +6207,6519 @@ impl core::fmt::Debug for AttachmentsEmbedded<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("AttachmentsEmbedded");
         ds.field("items", &self.items());
+        ds.finish()
+    }
+}
+pub enum DataTypeBinaryOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeBinary<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeBinary<'a> {
+    type Inner = DataTypeBinary<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeBinary<'a> {
+    pub const VT_FIXED_LENGTH: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeBinary { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeBinaryArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeBinary<'bldr>> {
+        let mut builder = DataTypeBinaryBuilder::new(_fbb);
+        if let Some(x) = args.fixed_length {
+            builder.add_fixed_length(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn fixed_length(&self) -> Option<u64> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<u64>(DataTypeBinary::VT_FIXED_LENGTH, None) }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeBinary<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<u64>("fixed_length", Self::VT_FIXED_LENGTH, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeBinaryArgs {
+    pub fixed_length: Option<u64>,
+}
+impl<'a> Default for DataTypeBinaryArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeBinaryArgs { fixed_length: None }
+    }
+}
+
+pub struct DataTypeBinaryBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeBinaryBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_fixed_length(&mut self, fixed_length: u64) {
+        self.fbb_
+            .push_slot_always::<u64>(DataTypeBinary::VT_FIXED_LENGTH, fixed_length);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeBinaryBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeBinaryBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeBinary<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeBinary<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeBinary");
+        ds.field("fixed_length", &self.fixed_length());
+        ds.finish()
+    }
+}
+pub enum DataTypeBoolOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeBool<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeBool<'a> {
+    type Inner = DataTypeBool<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeBool<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeBool { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeBoolArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeBool<'bldr>> {
+        let mut builder = DataTypeBoolBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeBool<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeBoolArgs {}
+impl<'a> Default for DataTypeBoolArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeBoolArgs {}
+    }
+}
+
+pub struct DataTypeBoolBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeBoolBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeBoolBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeBoolBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeBool<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeBool<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeBool");
+        ds.finish()
+    }
+}
+pub enum DataTypeDateOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeDate<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeDate<'a> {
+    type Inner = DataTypeDate<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeDate<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeDate { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeDateArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeDate<'bldr>> {
+        let mut builder = DataTypeDateBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeDate<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeDateArgs {}
+impl<'a> Default for DataTypeDateArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeDateArgs {}
+    }
+}
+
+pub struct DataTypeDateBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeDateBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeDateBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeDateBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeDate<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeDate<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeDate");
+        ds.finish()
+    }
+}
+pub enum DataTypeDecimalOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeDecimal<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeDecimal<'a> {
+    type Inner = DataTypeDecimal<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeDecimal<'a> {
+    pub const VT_PRECISION: flatbuffers::VOffsetT = 4;
+    pub const VT_SCALE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeDecimal { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeDecimalArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeDecimal<'bldr>> {
+        let mut builder = DataTypeDecimalBuilder::new(_fbb);
+        builder.add_scale(args.scale);
+        builder.add_precision(args.precision);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn precision(&self) -> u32 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u32>(DataTypeDecimal::VT_PRECISION, Some(0))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn scale(&self) -> i32 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<i32>(DataTypeDecimal::VT_SCALE, Some(0))
+                .unwrap()
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeDecimal<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<u32>("precision", Self::VT_PRECISION, false)?
+            .visit_field::<i32>("scale", Self::VT_SCALE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeDecimalArgs {
+    pub precision: u32,
+    pub scale: i32,
+}
+impl<'a> Default for DataTypeDecimalArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeDecimalArgs {
+            precision: 0,
+            scale: 0,
+        }
+    }
+}
+
+pub struct DataTypeDecimalBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeDecimalBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_precision(&mut self, precision: u32) {
+        self.fbb_
+            .push_slot::<u32>(DataTypeDecimal::VT_PRECISION, precision, 0);
+    }
+    #[inline]
+    pub fn add_scale(&mut self, scale: i32) {
+        self.fbb_
+            .push_slot::<i32>(DataTypeDecimal::VT_SCALE, scale, 0);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeDecimalBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeDecimalBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeDecimal<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeDecimal<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeDecimal");
+        ds.field("precision", &self.precision());
+        ds.field("scale", &self.scale());
+        ds.finish()
+    }
+}
+pub enum DataTypeDurationOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeDuration<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeDuration<'a> {
+    type Inner = DataTypeDuration<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeDuration<'a> {
+    pub const VT_UNIT: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeDuration { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeDurationArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeDuration<'bldr>> {
+        let mut builder = DataTypeDurationBuilder::new(_fbb);
+        builder.add_unit(args.unit);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn unit(&self) -> TimeUnit {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<TimeUnit>(DataTypeDuration::VT_UNIT, Some(TimeUnit::Second))
+                .unwrap()
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeDuration<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<TimeUnit>("unit", Self::VT_UNIT, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeDurationArgs {
+    pub unit: TimeUnit,
+}
+impl<'a> Default for DataTypeDurationArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeDurationArgs {
+            unit: TimeUnit::Second,
+        }
+    }
+}
+
+pub struct DataTypeDurationBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeDurationBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_unit(&mut self, unit: TimeUnit) {
+        self.fbb_
+            .push_slot::<TimeUnit>(DataTypeDuration::VT_UNIT, unit, TimeUnit::Second);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeDurationBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeDurationBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeDuration<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeDuration<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeDuration");
+        ds.field("unit", &self.unit());
+        ds.finish()
+    }
+}
+pub enum DataTypeFloat16Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeFloat16<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeFloat16<'a> {
+    type Inner = DataTypeFloat16<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeFloat16<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeFloat16 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeFloat16Args,
+    ) -> flatbuffers::WIPOffset<DataTypeFloat16<'bldr>> {
+        let mut builder = DataTypeFloat16Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeFloat16<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeFloat16Args {}
+impl<'a> Default for DataTypeFloat16Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeFloat16Args {}
+    }
+}
+
+pub struct DataTypeFloat16Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeFloat16Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeFloat16Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeFloat16Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeFloat16<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeFloat16<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeFloat16");
+        ds.finish()
+    }
+}
+pub enum DataTypeFloat32Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeFloat32<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeFloat32<'a> {
+    type Inner = DataTypeFloat32<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeFloat32<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeFloat32 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeFloat32Args,
+    ) -> flatbuffers::WIPOffset<DataTypeFloat32<'bldr>> {
+        let mut builder = DataTypeFloat32Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeFloat32<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeFloat32Args {}
+impl<'a> Default for DataTypeFloat32Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeFloat32Args {}
+    }
+}
+
+pub struct DataTypeFloat32Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeFloat32Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeFloat32Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeFloat32Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeFloat32<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeFloat32<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeFloat32");
+        ds.finish()
+    }
+}
+pub enum DataTypeFloat64Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeFloat64<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeFloat64<'a> {
+    type Inner = DataTypeFloat64<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeFloat64<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeFloat64 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeFloat64Args,
+    ) -> flatbuffers::WIPOffset<DataTypeFloat64<'bldr>> {
+        let mut builder = DataTypeFloat64Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeFloat64<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeFloat64Args {}
+impl<'a> Default for DataTypeFloat64Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeFloat64Args {}
+    }
+}
+
+pub struct DataTypeFloat64Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeFloat64Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeFloat64Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeFloat64Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeFloat64<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeFloat64<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeFloat64");
+        ds.finish()
+    }
+}
+pub enum DataTypeInt8Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeInt8<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeInt8<'a> {
+    type Inner = DataTypeInt8<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeInt8<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeInt8 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeInt8Args,
+    ) -> flatbuffers::WIPOffset<DataTypeInt8<'bldr>> {
+        let mut builder = DataTypeInt8Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeInt8<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeInt8Args {}
+impl<'a> Default for DataTypeInt8Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeInt8Args {}
+    }
+}
+
+pub struct DataTypeInt8Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeInt8Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeInt8Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeInt8Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeInt8<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeInt8<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeInt8");
+        ds.finish()
+    }
+}
+pub enum DataTypeInt16Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeInt16<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeInt16<'a> {
+    type Inner = DataTypeInt16<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeInt16<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeInt16 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeInt16Args,
+    ) -> flatbuffers::WIPOffset<DataTypeInt16<'bldr>> {
+        let mut builder = DataTypeInt16Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeInt16<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeInt16Args {}
+impl<'a> Default for DataTypeInt16Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeInt16Args {}
+    }
+}
+
+pub struct DataTypeInt16Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeInt16Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeInt16Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeInt16Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeInt16<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeInt16<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeInt16");
+        ds.finish()
+    }
+}
+pub enum DataTypeInt32Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeInt32<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeInt32<'a> {
+    type Inner = DataTypeInt32<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeInt32<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeInt32 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeInt32Args,
+    ) -> flatbuffers::WIPOffset<DataTypeInt32<'bldr>> {
+        let mut builder = DataTypeInt32Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeInt32<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeInt32Args {}
+impl<'a> Default for DataTypeInt32Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeInt32Args {}
+    }
+}
+
+pub struct DataTypeInt32Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeInt32Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeInt32Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeInt32Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeInt32<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeInt32<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeInt32");
+        ds.finish()
+    }
+}
+pub enum DataTypeInt64Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeInt64<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeInt64<'a> {
+    type Inner = DataTypeInt64<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeInt64<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeInt64 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeInt64Args,
+    ) -> flatbuffers::WIPOffset<DataTypeInt64<'bldr>> {
+        let mut builder = DataTypeInt64Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeInt64<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeInt64Args {}
+impl<'a> Default for DataTypeInt64Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeInt64Args {}
+    }
+}
+
+pub struct DataTypeInt64Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeInt64Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeInt64Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeInt64Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeInt64<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeInt64<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeInt64");
+        ds.finish()
+    }
+}
+pub enum DataTypeUInt8Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeUInt8<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeUInt8<'a> {
+    type Inner = DataTypeUInt8<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeUInt8<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeUInt8 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeUInt8Args,
+    ) -> flatbuffers::WIPOffset<DataTypeUInt8<'bldr>> {
+        let mut builder = DataTypeUInt8Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeUInt8<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeUInt8Args {}
+impl<'a> Default for DataTypeUInt8Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeUInt8Args {}
+    }
+}
+
+pub struct DataTypeUInt8Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeUInt8Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeUInt8Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeUInt8Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeUInt8<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeUInt8<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeUInt8");
+        ds.finish()
+    }
+}
+pub enum DataTypeUInt16Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeUInt16<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeUInt16<'a> {
+    type Inner = DataTypeUInt16<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeUInt16<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeUInt16 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeUInt16Args,
+    ) -> flatbuffers::WIPOffset<DataTypeUInt16<'bldr>> {
+        let mut builder = DataTypeUInt16Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeUInt16<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeUInt16Args {}
+impl<'a> Default for DataTypeUInt16Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeUInt16Args {}
+    }
+}
+
+pub struct DataTypeUInt16Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeUInt16Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeUInt16Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeUInt16Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeUInt16<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeUInt16<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeUInt16");
+        ds.finish()
+    }
+}
+pub enum DataTypeUInt32Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeUInt32<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeUInt32<'a> {
+    type Inner = DataTypeUInt32<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeUInt32<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeUInt32 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeUInt32Args,
+    ) -> flatbuffers::WIPOffset<DataTypeUInt32<'bldr>> {
+        let mut builder = DataTypeUInt32Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeUInt32<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeUInt32Args {}
+impl<'a> Default for DataTypeUInt32Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeUInt32Args {}
+    }
+}
+
+pub struct DataTypeUInt32Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeUInt32Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeUInt32Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeUInt32Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeUInt32<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeUInt32<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeUInt32");
+        ds.finish()
+    }
+}
+pub enum DataTypeUInt64Offset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeUInt64<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeUInt64<'a> {
+    type Inner = DataTypeUInt64<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeUInt64<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeUInt64 { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeUInt64Args,
+    ) -> flatbuffers::WIPOffset<DataTypeUInt64<'bldr>> {
+        let mut builder = DataTypeUInt64Builder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeUInt64<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeUInt64Args {}
+impl<'a> Default for DataTypeUInt64Args {
+    #[inline]
+    fn default() -> Self {
+        DataTypeUInt64Args {}
+    }
+}
+
+pub struct DataTypeUInt64Builder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeUInt64Builder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeUInt64Builder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeUInt64Builder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeUInt64<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeUInt64<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeUInt64");
+        ds.finish()
+    }
+}
+pub enum DataTypeListOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeList<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeList<'a> {
+    type Inner = DataTypeList<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeList<'a> {
+    pub const VT_ITEM_TYPE_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_ITEM_TYPE: flatbuffers::VOffsetT = 6;
+    pub const VT_FIXED_LENGTH: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeList { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeListArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeList<'bldr>> {
+        let mut builder = DataTypeListBuilder::new(_fbb);
+        if let Some(x) = args.fixed_length {
+            builder.add_fixed_length(x);
+        }
+        if let Some(x) = args.item_type {
+            builder.add_item_type(x);
+        }
+        builder.add_item_type_type(args.item_type_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn item_type_type(&self) -> DataType {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<DataType>(DataTypeList::VT_ITEM_TYPE_TYPE, Some(DataType::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn item_type(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    DataTypeList::VT_ITEM_TYPE,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn fixed_length(&self) -> Option<u64> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<u64>(DataTypeList::VT_FIXED_LENGTH, None) }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_binary(&self) -> Option<DataTypeBinary<'a>> {
+        if self.item_type_type() == DataType::DataTypeBinary {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBinary::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_bool(&self) -> Option<DataTypeBool<'a>> {
+        if self.item_type_type() == DataType::DataTypeBool {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBool::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_date(&self) -> Option<DataTypeDate<'a>> {
+        if self.item_type_type() == DataType::DataTypeDate {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDate::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_decimal(&self) -> Option<DataTypeDecimal<'a>> {
+        if self.item_type_type() == DataType::DataTypeDecimal {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDecimal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_duration(&self) -> Option<DataTypeDuration<'a>> {
+        if self.item_type_type() == DataType::DataTypeDuration {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDuration::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_float_16(&self) -> Option<DataTypeFloat16<'a>> {
+        if self.item_type_type() == DataType::DataTypeFloat16 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_float_32(&self) -> Option<DataTypeFloat32<'a>> {
+        if self.item_type_type() == DataType::DataTypeFloat32 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_float_64(&self) -> Option<DataTypeFloat64<'a>> {
+        if self.item_type_type() == DataType::DataTypeFloat64 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_int_8(&self) -> Option<DataTypeInt8<'a>> {
+        if self.item_type_type() == DataType::DataTypeInt8 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_int_16(&self) -> Option<DataTypeInt16<'a>> {
+        if self.item_type_type() == DataType::DataTypeInt16 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_int_32(&self) -> Option<DataTypeInt32<'a>> {
+        if self.item_type_type() == DataType::DataTypeInt32 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_int_64(&self) -> Option<DataTypeInt64<'a>> {
+        if self.item_type_type() == DataType::DataTypeInt64 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_uint_8(&self) -> Option<DataTypeUInt8<'a>> {
+        if self.item_type_type() == DataType::DataTypeUInt8 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_uint_16(&self) -> Option<DataTypeUInt16<'a>> {
+        if self.item_type_type() == DataType::DataTypeUInt16 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_uint_32(&self) -> Option<DataTypeUInt32<'a>> {
+        if self.item_type_type() == DataType::DataTypeUInt32 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_uint_64(&self) -> Option<DataTypeUInt64<'a>> {
+        if self.item_type_type() == DataType::DataTypeUInt64 {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_list(&self) -> Option<DataTypeList<'a>> {
+        if self.item_type_type() == DataType::DataTypeList {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeList::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_map(&self) -> Option<DataTypeMap<'a>> {
+        if self.item_type_type() == DataType::DataTypeMap {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeMap::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_null(&self) -> Option<DataTypeNull<'a>> {
+        if self.item_type_type() == DataType::DataTypeNull {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeNull::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_option(&self) -> Option<DataTypeOption<'a>> {
+        if self.item_type_type() == DataType::DataTypeOption {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeOption::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_struct(&self) -> Option<DataTypeStruct<'a>> {
+        if self.item_type_type() == DataType::DataTypeStruct {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeStruct::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_time(&self) -> Option<DataTypeTime<'a>> {
+        if self.item_type_type() == DataType::DataTypeTime {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTime::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_timestamp(&self) -> Option<DataTypeTimestamp<'a>> {
+        if self.item_type_type() == DataType::DataTypeTimestamp {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTimestamp::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn item_type_as_data_type_string(&self) -> Option<DataTypeString<'a>> {
+        if self.item_type_type() == DataType::DataTypeString {
+            self.item_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeString::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeList<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_union::<DataType, _>(
+                "item_type_type",
+                Self::VT_ITEM_TYPE_TYPE,
+                "item_type",
+                Self::VT_ITEM_TYPE,
+                false,
+                |key, v, pos| match key {
+                    DataType::DataTypeBinary => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBinary>>(
+                            "DataType::DataTypeBinary",
+                            pos,
+                        ),
+                    DataType::DataTypeBool => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBool>>(
+                            "DataType::DataTypeBool",
+                            pos,
+                        ),
+                    DataType::DataTypeDate => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDate>>(
+                            "DataType::DataTypeDate",
+                            pos,
+                        ),
+                    DataType::DataTypeDecimal => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDecimal>>(
+                            "DataType::DataTypeDecimal",
+                            pos,
+                        ),
+                    DataType::DataTypeDuration => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDuration>>(
+                            "DataType::DataTypeDuration",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat16>>(
+                            "DataType::DataTypeFloat16",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat32>>(
+                            "DataType::DataTypeFloat32",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat64>>(
+                            "DataType::DataTypeFloat64",
+                            pos,
+                        ),
+                    DataType::DataTypeInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt8>>(
+                            "DataType::DataTypeInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt16>>(
+                            "DataType::DataTypeInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt32>>(
+                            "DataType::DataTypeInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt64>>(
+                            "DataType::DataTypeInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt8>>(
+                            "DataType::DataTypeUInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt16>>(
+                            "DataType::DataTypeUInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt32>>(
+                            "DataType::DataTypeUInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt64>>(
+                            "DataType::DataTypeUInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeList => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeList>>(
+                            "DataType::DataTypeList",
+                            pos,
+                        ),
+                    DataType::DataTypeMap => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeMap>>(
+                            "DataType::DataTypeMap",
+                            pos,
+                        ),
+                    DataType::DataTypeNull => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeNull>>(
+                            "DataType::DataTypeNull",
+                            pos,
+                        ),
+                    DataType::DataTypeOption => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeOption>>(
+                            "DataType::DataTypeOption",
+                            pos,
+                        ),
+                    DataType::DataTypeStruct => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeStruct>>(
+                            "DataType::DataTypeStruct",
+                            pos,
+                        ),
+                    DataType::DataTypeTime => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTime>>(
+                            "DataType::DataTypeTime",
+                            pos,
+                        ),
+                    DataType::DataTypeTimestamp => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTimestamp>>(
+                            "DataType::DataTypeTimestamp",
+                            pos,
+                        ),
+                    DataType::DataTypeString => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeString>>(
+                            "DataType::DataTypeString",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .visit_field::<u64>("fixed_length", Self::VT_FIXED_LENGTH, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeListArgs {
+    pub item_type_type: DataType,
+    pub item_type: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub fixed_length: Option<u64>,
+}
+impl<'a> Default for DataTypeListArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeListArgs {
+            item_type_type: DataType::NONE,
+            item_type: None,
+            fixed_length: None,
+        }
+    }
+}
+
+pub struct DataTypeListBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeListBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_item_type_type(&mut self, item_type_type: DataType) {
+        self.fbb_.push_slot::<DataType>(
+            DataTypeList::VT_ITEM_TYPE_TYPE,
+            item_type_type,
+            DataType::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_item_type(
+        &mut self,
+        item_type: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataTypeList::VT_ITEM_TYPE, item_type);
+    }
+    #[inline]
+    pub fn add_fixed_length(&mut self, fixed_length: u64) {
+        self.fbb_
+            .push_slot_always::<u64>(DataTypeList::VT_FIXED_LENGTH, fixed_length);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeListBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeListBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeList<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeList<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeList");
+        ds.field("item_type_type", &self.item_type_type());
+        match self.item_type_type() {
+            DataType::DataTypeBinary => {
+                if let Some(x) = self.item_type_as_data_type_binary() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeBool => {
+                if let Some(x) = self.item_type_as_data_type_bool() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDate => {
+                if let Some(x) = self.item_type_as_data_type_date() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDecimal => {
+                if let Some(x) = self.item_type_as_data_type_decimal() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDuration => {
+                if let Some(x) = self.item_type_as_data_type_duration() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat16 => {
+                if let Some(x) = self.item_type_as_data_type_float_16() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat32 => {
+                if let Some(x) = self.item_type_as_data_type_float_32() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat64 => {
+                if let Some(x) = self.item_type_as_data_type_float_64() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt8 => {
+                if let Some(x) = self.item_type_as_data_type_int_8() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt16 => {
+                if let Some(x) = self.item_type_as_data_type_int_16() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt32 => {
+                if let Some(x) = self.item_type_as_data_type_int_32() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt64 => {
+                if let Some(x) = self.item_type_as_data_type_int_64() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt8 => {
+                if let Some(x) = self.item_type_as_data_type_uint_8() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt16 => {
+                if let Some(x) = self.item_type_as_data_type_uint_16() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt32 => {
+                if let Some(x) = self.item_type_as_data_type_uint_32() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt64 => {
+                if let Some(x) = self.item_type_as_data_type_uint_64() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeList => {
+                if let Some(x) = self.item_type_as_data_type_list() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeMap => {
+                if let Some(x) = self.item_type_as_data_type_map() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeNull => {
+                if let Some(x) = self.item_type_as_data_type_null() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeOption => {
+                if let Some(x) = self.item_type_as_data_type_option() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeStruct => {
+                if let Some(x) = self.item_type_as_data_type_struct() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTime => {
+                if let Some(x) = self.item_type_as_data_type_time() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTimestamp => {
+                if let Some(x) = self.item_type_as_data_type_timestamp() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeString => {
+                if let Some(x) = self.item_type_as_data_type_string() {
+                    ds.field("item_type", &x)
+                } else {
+                    ds.field(
+                        "item_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("item_type", &x)
+            }
+        };
+        ds.field("fixed_length", &self.fixed_length());
+        ds.finish()
+    }
+}
+pub enum DataTypeMapOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeMap<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeMap<'a> {
+    type Inner = DataTypeMap<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeMap<'a> {
+    pub const VT_KEY_TYPE_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_KEY_TYPE: flatbuffers::VOffsetT = 6;
+    pub const VT_VALUE_TYPE_TYPE: flatbuffers::VOffsetT = 8;
+    pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 10;
+    pub const VT_KEYS_SORTED: flatbuffers::VOffsetT = 12;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeMap { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeMapArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeMap<'bldr>> {
+        let mut builder = DataTypeMapBuilder::new(_fbb);
+        if let Some(x) = args.value_type {
+            builder.add_value_type(x);
+        }
+        if let Some(x) = args.key_type {
+            builder.add_key_type(x);
+        }
+        if let Some(x) = args.keys_sorted {
+            builder.add_keys_sorted(x);
+        }
+        builder.add_value_type_type(args.value_type_type);
+        builder.add_key_type_type(args.key_type_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn key_type_type(&self) -> DataType {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<DataType>(DataTypeMap::VT_KEY_TYPE_TYPE, Some(DataType::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn key_type(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    DataTypeMap::VT_KEY_TYPE,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn value_type_type(&self) -> DataType {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<DataType>(DataTypeMap::VT_VALUE_TYPE_TYPE, Some(DataType::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn value_type(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    DataTypeMap::VT_VALUE_TYPE,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn keys_sorted(&self) -> Option<bool> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<bool>(DataTypeMap::VT_KEYS_SORTED, None) }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_binary(&self) -> Option<DataTypeBinary<'a>> {
+        if self.key_type_type() == DataType::DataTypeBinary {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBinary::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_bool(&self) -> Option<DataTypeBool<'a>> {
+        if self.key_type_type() == DataType::DataTypeBool {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBool::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_date(&self) -> Option<DataTypeDate<'a>> {
+        if self.key_type_type() == DataType::DataTypeDate {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDate::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_decimal(&self) -> Option<DataTypeDecimal<'a>> {
+        if self.key_type_type() == DataType::DataTypeDecimal {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDecimal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_duration(&self) -> Option<DataTypeDuration<'a>> {
+        if self.key_type_type() == DataType::DataTypeDuration {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDuration::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_float_16(&self) -> Option<DataTypeFloat16<'a>> {
+        if self.key_type_type() == DataType::DataTypeFloat16 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_float_32(&self) -> Option<DataTypeFloat32<'a>> {
+        if self.key_type_type() == DataType::DataTypeFloat32 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_float_64(&self) -> Option<DataTypeFloat64<'a>> {
+        if self.key_type_type() == DataType::DataTypeFloat64 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_int_8(&self) -> Option<DataTypeInt8<'a>> {
+        if self.key_type_type() == DataType::DataTypeInt8 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_int_16(&self) -> Option<DataTypeInt16<'a>> {
+        if self.key_type_type() == DataType::DataTypeInt16 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_int_32(&self) -> Option<DataTypeInt32<'a>> {
+        if self.key_type_type() == DataType::DataTypeInt32 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_int_64(&self) -> Option<DataTypeInt64<'a>> {
+        if self.key_type_type() == DataType::DataTypeInt64 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_uint_8(&self) -> Option<DataTypeUInt8<'a>> {
+        if self.key_type_type() == DataType::DataTypeUInt8 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_uint_16(&self) -> Option<DataTypeUInt16<'a>> {
+        if self.key_type_type() == DataType::DataTypeUInt16 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_uint_32(&self) -> Option<DataTypeUInt32<'a>> {
+        if self.key_type_type() == DataType::DataTypeUInt32 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_uint_64(&self) -> Option<DataTypeUInt64<'a>> {
+        if self.key_type_type() == DataType::DataTypeUInt64 {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_list(&self) -> Option<DataTypeList<'a>> {
+        if self.key_type_type() == DataType::DataTypeList {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeList::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_map(&self) -> Option<DataTypeMap<'a>> {
+        if self.key_type_type() == DataType::DataTypeMap {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeMap::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_null(&self) -> Option<DataTypeNull<'a>> {
+        if self.key_type_type() == DataType::DataTypeNull {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeNull::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_option(&self) -> Option<DataTypeOption<'a>> {
+        if self.key_type_type() == DataType::DataTypeOption {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeOption::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_struct(&self) -> Option<DataTypeStruct<'a>> {
+        if self.key_type_type() == DataType::DataTypeStruct {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeStruct::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_time(&self) -> Option<DataTypeTime<'a>> {
+        if self.key_type_type() == DataType::DataTypeTime {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTime::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_timestamp(&self) -> Option<DataTypeTimestamp<'a>> {
+        if self.key_type_type() == DataType::DataTypeTimestamp {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTimestamp::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn key_type_as_data_type_string(&self) -> Option<DataTypeString<'a>> {
+        if self.key_type_type() == DataType::DataTypeString {
+            self.key_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeString::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_binary(&self) -> Option<DataTypeBinary<'a>> {
+        if self.value_type_type() == DataType::DataTypeBinary {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBinary::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_bool(&self) -> Option<DataTypeBool<'a>> {
+        if self.value_type_type() == DataType::DataTypeBool {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBool::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_date(&self) -> Option<DataTypeDate<'a>> {
+        if self.value_type_type() == DataType::DataTypeDate {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDate::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_decimal(&self) -> Option<DataTypeDecimal<'a>> {
+        if self.value_type_type() == DataType::DataTypeDecimal {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDecimal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_duration(&self) -> Option<DataTypeDuration<'a>> {
+        if self.value_type_type() == DataType::DataTypeDuration {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDuration::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_float_16(&self) -> Option<DataTypeFloat16<'a>> {
+        if self.value_type_type() == DataType::DataTypeFloat16 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_float_32(&self) -> Option<DataTypeFloat32<'a>> {
+        if self.value_type_type() == DataType::DataTypeFloat32 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_float_64(&self) -> Option<DataTypeFloat64<'a>> {
+        if self.value_type_type() == DataType::DataTypeFloat64 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_int_8(&self) -> Option<DataTypeInt8<'a>> {
+        if self.value_type_type() == DataType::DataTypeInt8 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_int_16(&self) -> Option<DataTypeInt16<'a>> {
+        if self.value_type_type() == DataType::DataTypeInt16 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_int_32(&self) -> Option<DataTypeInt32<'a>> {
+        if self.value_type_type() == DataType::DataTypeInt32 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_int_64(&self) -> Option<DataTypeInt64<'a>> {
+        if self.value_type_type() == DataType::DataTypeInt64 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_uint_8(&self) -> Option<DataTypeUInt8<'a>> {
+        if self.value_type_type() == DataType::DataTypeUInt8 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_uint_16(&self) -> Option<DataTypeUInt16<'a>> {
+        if self.value_type_type() == DataType::DataTypeUInt16 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_uint_32(&self) -> Option<DataTypeUInt32<'a>> {
+        if self.value_type_type() == DataType::DataTypeUInt32 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_uint_64(&self) -> Option<DataTypeUInt64<'a>> {
+        if self.value_type_type() == DataType::DataTypeUInt64 {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_list(&self) -> Option<DataTypeList<'a>> {
+        if self.value_type_type() == DataType::DataTypeList {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeList::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_map(&self) -> Option<DataTypeMap<'a>> {
+        if self.value_type_type() == DataType::DataTypeMap {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeMap::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_null(&self) -> Option<DataTypeNull<'a>> {
+        if self.value_type_type() == DataType::DataTypeNull {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeNull::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_option(&self) -> Option<DataTypeOption<'a>> {
+        if self.value_type_type() == DataType::DataTypeOption {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeOption::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_struct(&self) -> Option<DataTypeStruct<'a>> {
+        if self.value_type_type() == DataType::DataTypeStruct {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeStruct::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_time(&self) -> Option<DataTypeTime<'a>> {
+        if self.value_type_type() == DataType::DataTypeTime {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTime::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_timestamp(&self) -> Option<DataTypeTimestamp<'a>> {
+        if self.value_type_type() == DataType::DataTypeTimestamp {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTimestamp::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_type_as_data_type_string(&self) -> Option<DataTypeString<'a>> {
+        if self.value_type_type() == DataType::DataTypeString {
+            self.value_type().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeString::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeMap<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_union::<DataType, _>(
+                "key_type_type",
+                Self::VT_KEY_TYPE_TYPE,
+                "key_type",
+                Self::VT_KEY_TYPE,
+                false,
+                |key, v, pos| match key {
+                    DataType::DataTypeBinary => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBinary>>(
+                            "DataType::DataTypeBinary",
+                            pos,
+                        ),
+                    DataType::DataTypeBool => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBool>>(
+                            "DataType::DataTypeBool",
+                            pos,
+                        ),
+                    DataType::DataTypeDate => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDate>>(
+                            "DataType::DataTypeDate",
+                            pos,
+                        ),
+                    DataType::DataTypeDecimal => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDecimal>>(
+                            "DataType::DataTypeDecimal",
+                            pos,
+                        ),
+                    DataType::DataTypeDuration => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDuration>>(
+                            "DataType::DataTypeDuration",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat16>>(
+                            "DataType::DataTypeFloat16",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat32>>(
+                            "DataType::DataTypeFloat32",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat64>>(
+                            "DataType::DataTypeFloat64",
+                            pos,
+                        ),
+                    DataType::DataTypeInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt8>>(
+                            "DataType::DataTypeInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt16>>(
+                            "DataType::DataTypeInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt32>>(
+                            "DataType::DataTypeInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt64>>(
+                            "DataType::DataTypeInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt8>>(
+                            "DataType::DataTypeUInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt16>>(
+                            "DataType::DataTypeUInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt32>>(
+                            "DataType::DataTypeUInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt64>>(
+                            "DataType::DataTypeUInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeList => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeList>>(
+                            "DataType::DataTypeList",
+                            pos,
+                        ),
+                    DataType::DataTypeMap => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeMap>>(
+                            "DataType::DataTypeMap",
+                            pos,
+                        ),
+                    DataType::DataTypeNull => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeNull>>(
+                            "DataType::DataTypeNull",
+                            pos,
+                        ),
+                    DataType::DataTypeOption => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeOption>>(
+                            "DataType::DataTypeOption",
+                            pos,
+                        ),
+                    DataType::DataTypeStruct => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeStruct>>(
+                            "DataType::DataTypeStruct",
+                            pos,
+                        ),
+                    DataType::DataTypeTime => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTime>>(
+                            "DataType::DataTypeTime",
+                            pos,
+                        ),
+                    DataType::DataTypeTimestamp => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTimestamp>>(
+                            "DataType::DataTypeTimestamp",
+                            pos,
+                        ),
+                    DataType::DataTypeString => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeString>>(
+                            "DataType::DataTypeString",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .visit_union::<DataType, _>(
+                "value_type_type",
+                Self::VT_VALUE_TYPE_TYPE,
+                "value_type",
+                Self::VT_VALUE_TYPE,
+                false,
+                |key, v, pos| match key {
+                    DataType::DataTypeBinary => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBinary>>(
+                            "DataType::DataTypeBinary",
+                            pos,
+                        ),
+                    DataType::DataTypeBool => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBool>>(
+                            "DataType::DataTypeBool",
+                            pos,
+                        ),
+                    DataType::DataTypeDate => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDate>>(
+                            "DataType::DataTypeDate",
+                            pos,
+                        ),
+                    DataType::DataTypeDecimal => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDecimal>>(
+                            "DataType::DataTypeDecimal",
+                            pos,
+                        ),
+                    DataType::DataTypeDuration => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDuration>>(
+                            "DataType::DataTypeDuration",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat16>>(
+                            "DataType::DataTypeFloat16",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat32>>(
+                            "DataType::DataTypeFloat32",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat64>>(
+                            "DataType::DataTypeFloat64",
+                            pos,
+                        ),
+                    DataType::DataTypeInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt8>>(
+                            "DataType::DataTypeInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt16>>(
+                            "DataType::DataTypeInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt32>>(
+                            "DataType::DataTypeInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt64>>(
+                            "DataType::DataTypeInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt8>>(
+                            "DataType::DataTypeUInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt16>>(
+                            "DataType::DataTypeUInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt32>>(
+                            "DataType::DataTypeUInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt64>>(
+                            "DataType::DataTypeUInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeList => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeList>>(
+                            "DataType::DataTypeList",
+                            pos,
+                        ),
+                    DataType::DataTypeMap => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeMap>>(
+                            "DataType::DataTypeMap",
+                            pos,
+                        ),
+                    DataType::DataTypeNull => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeNull>>(
+                            "DataType::DataTypeNull",
+                            pos,
+                        ),
+                    DataType::DataTypeOption => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeOption>>(
+                            "DataType::DataTypeOption",
+                            pos,
+                        ),
+                    DataType::DataTypeStruct => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeStruct>>(
+                            "DataType::DataTypeStruct",
+                            pos,
+                        ),
+                    DataType::DataTypeTime => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTime>>(
+                            "DataType::DataTypeTime",
+                            pos,
+                        ),
+                    DataType::DataTypeTimestamp => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTimestamp>>(
+                            "DataType::DataTypeTimestamp",
+                            pos,
+                        ),
+                    DataType::DataTypeString => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeString>>(
+                            "DataType::DataTypeString",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .visit_field::<bool>("keys_sorted", Self::VT_KEYS_SORTED, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeMapArgs {
+    pub key_type_type: DataType,
+    pub key_type: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub value_type_type: DataType,
+    pub value_type: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub keys_sorted: Option<bool>,
+}
+impl<'a> Default for DataTypeMapArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeMapArgs {
+            key_type_type: DataType::NONE,
+            key_type: None,
+            value_type_type: DataType::NONE,
+            value_type: None,
+            keys_sorted: None,
+        }
+    }
+}
+
+pub struct DataTypeMapBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeMapBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_key_type_type(&mut self, key_type_type: DataType) {
+        self.fbb_.push_slot::<DataType>(
+            DataTypeMap::VT_KEY_TYPE_TYPE,
+            key_type_type,
+            DataType::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_key_type(&mut self, key_type: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataTypeMap::VT_KEY_TYPE, key_type);
+    }
+    #[inline]
+    pub fn add_value_type_type(&mut self, value_type_type: DataType) {
+        self.fbb_.push_slot::<DataType>(
+            DataTypeMap::VT_VALUE_TYPE_TYPE,
+            value_type_type,
+            DataType::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_value_type(
+        &mut self,
+        value_type: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataTypeMap::VT_VALUE_TYPE, value_type);
+    }
+    #[inline]
+    pub fn add_keys_sorted(&mut self, keys_sorted: bool) {
+        self.fbb_
+            .push_slot_always::<bool>(DataTypeMap::VT_KEYS_SORTED, keys_sorted);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeMapBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeMapBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeMap<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeMap<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeMap");
+        ds.field("key_type_type", &self.key_type_type());
+        match self.key_type_type() {
+            DataType::DataTypeBinary => {
+                if let Some(x) = self.key_type_as_data_type_binary() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeBool => {
+                if let Some(x) = self.key_type_as_data_type_bool() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDate => {
+                if let Some(x) = self.key_type_as_data_type_date() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDecimal => {
+                if let Some(x) = self.key_type_as_data_type_decimal() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDuration => {
+                if let Some(x) = self.key_type_as_data_type_duration() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat16 => {
+                if let Some(x) = self.key_type_as_data_type_float_16() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat32 => {
+                if let Some(x) = self.key_type_as_data_type_float_32() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat64 => {
+                if let Some(x) = self.key_type_as_data_type_float_64() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt8 => {
+                if let Some(x) = self.key_type_as_data_type_int_8() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt16 => {
+                if let Some(x) = self.key_type_as_data_type_int_16() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt32 => {
+                if let Some(x) = self.key_type_as_data_type_int_32() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt64 => {
+                if let Some(x) = self.key_type_as_data_type_int_64() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt8 => {
+                if let Some(x) = self.key_type_as_data_type_uint_8() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt16 => {
+                if let Some(x) = self.key_type_as_data_type_uint_16() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt32 => {
+                if let Some(x) = self.key_type_as_data_type_uint_32() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt64 => {
+                if let Some(x) = self.key_type_as_data_type_uint_64() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeList => {
+                if let Some(x) = self.key_type_as_data_type_list() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeMap => {
+                if let Some(x) = self.key_type_as_data_type_map() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeNull => {
+                if let Some(x) = self.key_type_as_data_type_null() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeOption => {
+                if let Some(x) = self.key_type_as_data_type_option() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeStruct => {
+                if let Some(x) = self.key_type_as_data_type_struct() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTime => {
+                if let Some(x) = self.key_type_as_data_type_time() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTimestamp => {
+                if let Some(x) = self.key_type_as_data_type_timestamp() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeString => {
+                if let Some(x) = self.key_type_as_data_type_string() {
+                    ds.field("key_type", &x)
+                } else {
+                    ds.field(
+                        "key_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("key_type", &x)
+            }
+        };
+        ds.field("value_type_type", &self.value_type_type());
+        match self.value_type_type() {
+            DataType::DataTypeBinary => {
+                if let Some(x) = self.value_type_as_data_type_binary() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeBool => {
+                if let Some(x) = self.value_type_as_data_type_bool() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDate => {
+                if let Some(x) = self.value_type_as_data_type_date() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDecimal => {
+                if let Some(x) = self.value_type_as_data_type_decimal() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDuration => {
+                if let Some(x) = self.value_type_as_data_type_duration() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat16 => {
+                if let Some(x) = self.value_type_as_data_type_float_16() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat32 => {
+                if let Some(x) = self.value_type_as_data_type_float_32() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat64 => {
+                if let Some(x) = self.value_type_as_data_type_float_64() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt8 => {
+                if let Some(x) = self.value_type_as_data_type_int_8() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt16 => {
+                if let Some(x) = self.value_type_as_data_type_int_16() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt32 => {
+                if let Some(x) = self.value_type_as_data_type_int_32() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt64 => {
+                if let Some(x) = self.value_type_as_data_type_int_64() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt8 => {
+                if let Some(x) = self.value_type_as_data_type_uint_8() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt16 => {
+                if let Some(x) = self.value_type_as_data_type_uint_16() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt32 => {
+                if let Some(x) = self.value_type_as_data_type_uint_32() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt64 => {
+                if let Some(x) = self.value_type_as_data_type_uint_64() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeList => {
+                if let Some(x) = self.value_type_as_data_type_list() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeMap => {
+                if let Some(x) = self.value_type_as_data_type_map() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeNull => {
+                if let Some(x) = self.value_type_as_data_type_null() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeOption => {
+                if let Some(x) = self.value_type_as_data_type_option() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeStruct => {
+                if let Some(x) = self.value_type_as_data_type_struct() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTime => {
+                if let Some(x) = self.value_type_as_data_type_time() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTimestamp => {
+                if let Some(x) = self.value_type_as_data_type_timestamp() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeString => {
+                if let Some(x) = self.value_type_as_data_type_string() {
+                    ds.field("value_type", &x)
+                } else {
+                    ds.field(
+                        "value_type",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("value_type", &x)
+            }
+        };
+        ds.field("keys_sorted", &self.keys_sorted());
+        ds.finish()
+    }
+}
+pub enum DataTypeNullOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeNull<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeNull<'a> {
+    type Inner = DataTypeNull<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeNull<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeNull { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeNullArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeNull<'bldr>> {
+        let mut builder = DataTypeNullBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeNull<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeNullArgs {}
+impl<'a> Default for DataTypeNullArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeNullArgs {}
+    }
+}
+
+pub struct DataTypeNullBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeNullBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeNullBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeNullBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeNull<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeNull<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeNull");
+        ds.finish()
+    }
+}
+pub enum DataTypeOptionOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeOption<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeOption<'a> {
+    type Inner = DataTypeOption<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeOption<'a> {
+    pub const VT_INNER_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_INNER: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeOption { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeOptionArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeOption<'bldr>> {
+        let mut builder = DataTypeOptionBuilder::new(_fbb);
+        if let Some(x) = args.inner {
+            builder.add_inner(x);
+        }
+        builder.add_inner_type(args.inner_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn inner_type(&self) -> DataType {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<DataType>(DataTypeOption::VT_INNER_TYPE, Some(DataType::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn inner(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    DataTypeOption::VT_INNER,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_binary(&self) -> Option<DataTypeBinary<'a>> {
+        if self.inner_type() == DataType::DataTypeBinary {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBinary::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_bool(&self) -> Option<DataTypeBool<'a>> {
+        if self.inner_type() == DataType::DataTypeBool {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBool::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_date(&self) -> Option<DataTypeDate<'a>> {
+        if self.inner_type() == DataType::DataTypeDate {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDate::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_decimal(&self) -> Option<DataTypeDecimal<'a>> {
+        if self.inner_type() == DataType::DataTypeDecimal {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDecimal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_duration(&self) -> Option<DataTypeDuration<'a>> {
+        if self.inner_type() == DataType::DataTypeDuration {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDuration::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_float_16(&self) -> Option<DataTypeFloat16<'a>> {
+        if self.inner_type() == DataType::DataTypeFloat16 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_float_32(&self) -> Option<DataTypeFloat32<'a>> {
+        if self.inner_type() == DataType::DataTypeFloat32 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_float_64(&self) -> Option<DataTypeFloat64<'a>> {
+        if self.inner_type() == DataType::DataTypeFloat64 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_int_8(&self) -> Option<DataTypeInt8<'a>> {
+        if self.inner_type() == DataType::DataTypeInt8 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_int_16(&self) -> Option<DataTypeInt16<'a>> {
+        if self.inner_type() == DataType::DataTypeInt16 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_int_32(&self) -> Option<DataTypeInt32<'a>> {
+        if self.inner_type() == DataType::DataTypeInt32 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_int_64(&self) -> Option<DataTypeInt64<'a>> {
+        if self.inner_type() == DataType::DataTypeInt64 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_uint_8(&self) -> Option<DataTypeUInt8<'a>> {
+        if self.inner_type() == DataType::DataTypeUInt8 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_uint_16(&self) -> Option<DataTypeUInt16<'a>> {
+        if self.inner_type() == DataType::DataTypeUInt16 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_uint_32(&self) -> Option<DataTypeUInt32<'a>> {
+        if self.inner_type() == DataType::DataTypeUInt32 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_uint_64(&self) -> Option<DataTypeUInt64<'a>> {
+        if self.inner_type() == DataType::DataTypeUInt64 {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_list(&self) -> Option<DataTypeList<'a>> {
+        if self.inner_type() == DataType::DataTypeList {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeList::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_map(&self) -> Option<DataTypeMap<'a>> {
+        if self.inner_type() == DataType::DataTypeMap {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeMap::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_null(&self) -> Option<DataTypeNull<'a>> {
+        if self.inner_type() == DataType::DataTypeNull {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeNull::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_option(&self) -> Option<DataTypeOption<'a>> {
+        if self.inner_type() == DataType::DataTypeOption {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeOption::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_struct(&self) -> Option<DataTypeStruct<'a>> {
+        if self.inner_type() == DataType::DataTypeStruct {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeStruct::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_time(&self) -> Option<DataTypeTime<'a>> {
+        if self.inner_type() == DataType::DataTypeTime {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTime::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_timestamp(&self) -> Option<DataTypeTimestamp<'a>> {
+        if self.inner_type() == DataType::DataTypeTimestamp {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTimestamp::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn inner_as_data_type_string(&self) -> Option<DataTypeString<'a>> {
+        if self.inner_type() == DataType::DataTypeString {
+            self.inner().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeString::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeOption<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_union::<DataType, _>(
+                "inner_type",
+                Self::VT_INNER_TYPE,
+                "inner",
+                Self::VT_INNER,
+                false,
+                |key, v, pos| match key {
+                    DataType::DataTypeBinary => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBinary>>(
+                            "DataType::DataTypeBinary",
+                            pos,
+                        ),
+                    DataType::DataTypeBool => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBool>>(
+                            "DataType::DataTypeBool",
+                            pos,
+                        ),
+                    DataType::DataTypeDate => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDate>>(
+                            "DataType::DataTypeDate",
+                            pos,
+                        ),
+                    DataType::DataTypeDecimal => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDecimal>>(
+                            "DataType::DataTypeDecimal",
+                            pos,
+                        ),
+                    DataType::DataTypeDuration => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDuration>>(
+                            "DataType::DataTypeDuration",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat16>>(
+                            "DataType::DataTypeFloat16",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat32>>(
+                            "DataType::DataTypeFloat32",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat64>>(
+                            "DataType::DataTypeFloat64",
+                            pos,
+                        ),
+                    DataType::DataTypeInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt8>>(
+                            "DataType::DataTypeInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt16>>(
+                            "DataType::DataTypeInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt32>>(
+                            "DataType::DataTypeInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt64>>(
+                            "DataType::DataTypeInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt8>>(
+                            "DataType::DataTypeUInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt16>>(
+                            "DataType::DataTypeUInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt32>>(
+                            "DataType::DataTypeUInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt64>>(
+                            "DataType::DataTypeUInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeList => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeList>>(
+                            "DataType::DataTypeList",
+                            pos,
+                        ),
+                    DataType::DataTypeMap => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeMap>>(
+                            "DataType::DataTypeMap",
+                            pos,
+                        ),
+                    DataType::DataTypeNull => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeNull>>(
+                            "DataType::DataTypeNull",
+                            pos,
+                        ),
+                    DataType::DataTypeOption => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeOption>>(
+                            "DataType::DataTypeOption",
+                            pos,
+                        ),
+                    DataType::DataTypeStruct => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeStruct>>(
+                            "DataType::DataTypeStruct",
+                            pos,
+                        ),
+                    DataType::DataTypeTime => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTime>>(
+                            "DataType::DataTypeTime",
+                            pos,
+                        ),
+                    DataType::DataTypeTimestamp => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTimestamp>>(
+                            "DataType::DataTypeTimestamp",
+                            pos,
+                        ),
+                    DataType::DataTypeString => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeString>>(
+                            "DataType::DataTypeString",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeOptionArgs {
+    pub inner_type: DataType,
+    pub inner: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+}
+impl<'a> Default for DataTypeOptionArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeOptionArgs {
+            inner_type: DataType::NONE,
+            inner: None,
+        }
+    }
+}
+
+pub struct DataTypeOptionBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeOptionBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_inner_type(&mut self, inner_type: DataType) {
+        self.fbb_
+            .push_slot::<DataType>(DataTypeOption::VT_INNER_TYPE, inner_type, DataType::NONE);
+    }
+    #[inline]
+    pub fn add_inner(&mut self, inner: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataTypeOption::VT_INNER, inner);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeOptionBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeOptionBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeOption<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeOption<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeOption");
+        ds.field("inner_type", &self.inner_type());
+        match self.inner_type() {
+            DataType::DataTypeBinary => {
+                if let Some(x) = self.inner_as_data_type_binary() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeBool => {
+                if let Some(x) = self.inner_as_data_type_bool() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDate => {
+                if let Some(x) = self.inner_as_data_type_date() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDecimal => {
+                if let Some(x) = self.inner_as_data_type_decimal() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDuration => {
+                if let Some(x) = self.inner_as_data_type_duration() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat16 => {
+                if let Some(x) = self.inner_as_data_type_float_16() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat32 => {
+                if let Some(x) = self.inner_as_data_type_float_32() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat64 => {
+                if let Some(x) = self.inner_as_data_type_float_64() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt8 => {
+                if let Some(x) = self.inner_as_data_type_int_8() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt16 => {
+                if let Some(x) = self.inner_as_data_type_int_16() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt32 => {
+                if let Some(x) = self.inner_as_data_type_int_32() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt64 => {
+                if let Some(x) = self.inner_as_data_type_int_64() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt8 => {
+                if let Some(x) = self.inner_as_data_type_uint_8() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt16 => {
+                if let Some(x) = self.inner_as_data_type_uint_16() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt32 => {
+                if let Some(x) = self.inner_as_data_type_uint_32() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt64 => {
+                if let Some(x) = self.inner_as_data_type_uint_64() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeList => {
+                if let Some(x) = self.inner_as_data_type_list() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeMap => {
+                if let Some(x) = self.inner_as_data_type_map() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeNull => {
+                if let Some(x) = self.inner_as_data_type_null() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeOption => {
+                if let Some(x) = self.inner_as_data_type_option() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeStruct => {
+                if let Some(x) = self.inner_as_data_type_struct() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTime => {
+                if let Some(x) = self.inner_as_data_type_time() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTimestamp => {
+                if let Some(x) = self.inner_as_data_type_timestamp() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeString => {
+                if let Some(x) = self.inner_as_data_type_string() {
+                    ds.field("inner", &x)
+                } else {
+                    ds.field(
+                        "inner",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("inner", &x)
+            }
+        };
+        ds.finish()
+    }
+}
+pub enum DataTypeStructOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeStruct<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeStruct<'a> {
+    type Inner = DataTypeStruct<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeStruct<'a> {
+    pub const VT_FIELDS: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeStruct { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeStructArgs<'args>,
+    ) -> flatbuffers::WIPOffset<DataTypeStruct<'bldr>> {
+        let mut builder = DataTypeStructBuilder::new(_fbb);
+        if let Some(x) = args.fields {
+            builder.add_fields(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn fields(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<DataField<'a>>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<DataField>>,
+            >>(DataTypeStruct::VT_FIELDS, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeStruct<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<DataField>>,
+            >>("fields", Self::VT_FIELDS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeStructArgs<'a> {
+    pub fields: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<DataField<'a>>>,
+        >,
+    >,
+}
+impl<'a> Default for DataTypeStructArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        DataTypeStructArgs { fields: None }
+    }
+}
+
+pub struct DataTypeStructBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeStructBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_fields(
+        &mut self,
+        fields: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<DataField<'b>>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataTypeStruct::VT_FIELDS, fields);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeStructBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeStructBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeStruct<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeStruct<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeStruct");
+        ds.field("fields", &self.fields());
+        ds.finish()
+    }
+}
+pub enum DataTypeTimeOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeTime<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeTime<'a> {
+    type Inner = DataTypeTime<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeTime<'a> {
+    pub const VT_UNIT: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeTime { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeTimeArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeTime<'bldr>> {
+        let mut builder = DataTypeTimeBuilder::new(_fbb);
+        builder.add_unit(args.unit);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn unit(&self) -> TimeUnit {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<TimeUnit>(DataTypeTime::VT_UNIT, Some(TimeUnit::Second))
+                .unwrap()
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeTime<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<TimeUnit>("unit", Self::VT_UNIT, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeTimeArgs {
+    pub unit: TimeUnit,
+}
+impl<'a> Default for DataTypeTimeArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeTimeArgs {
+            unit: TimeUnit::Second,
+        }
+    }
+}
+
+pub struct DataTypeTimeBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeTimeBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_unit(&mut self, unit: TimeUnit) {
+        self.fbb_
+            .push_slot::<TimeUnit>(DataTypeTime::VT_UNIT, unit, TimeUnit::Second);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeTimeBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeTimeBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeTime<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeTime<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeTime");
+        ds.field("unit", &self.unit());
+        ds.finish()
+    }
+}
+pub enum DataTypeTimestampOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeTimestamp<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeTimestamp<'a> {
+    type Inner = DataTypeTimestamp<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeTimestamp<'a> {
+    pub const VT_UNIT: flatbuffers::VOffsetT = 4;
+    pub const VT_TIMEZONE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeTimestamp { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataTypeTimestampArgs<'args>,
+    ) -> flatbuffers::WIPOffset<DataTypeTimestamp<'bldr>> {
+        let mut builder = DataTypeTimestampBuilder::new(_fbb);
+        if let Some(x) = args.timezone {
+            builder.add_timezone(x);
+        }
+        builder.add_unit(args.unit);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn unit(&self) -> TimeUnit {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<TimeUnit>(DataTypeTimestamp::VT_UNIT, Some(TimeUnit::Second))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn timezone(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(DataTypeTimestamp::VT_TIMEZONE, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeTimestamp<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<TimeUnit>("unit", Self::VT_UNIT, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "timezone",
+                Self::VT_TIMEZONE,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataTypeTimestampArgs<'a> {
+    pub unit: TimeUnit,
+    pub timezone: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for DataTypeTimestampArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        DataTypeTimestampArgs {
+            unit: TimeUnit::Second,
+            timezone: None,
+        }
+    }
+}
+
+pub struct DataTypeTimestampBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeTimestampBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_unit(&mut self, unit: TimeUnit) {
+        self.fbb_
+            .push_slot::<TimeUnit>(DataTypeTimestamp::VT_UNIT, unit, TimeUnit::Second);
+    }
+    #[inline]
+    pub fn add_timezone(&mut self, timezone: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            DataTypeTimestamp::VT_TIMEZONE,
+            timezone,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeTimestampBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeTimestampBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeTimestamp<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeTimestamp<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeTimestamp");
+        ds.field("unit", &self.unit());
+        ds.field("timezone", &self.timezone());
+        ds.finish()
+    }
+}
+pub enum DataTypeStringOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataTypeString<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataTypeString<'a> {
+    type Inner = DataTypeString<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataTypeString<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataTypeString { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args DataTypeStringArgs,
+    ) -> flatbuffers::WIPOffset<DataTypeString<'bldr>> {
+        let mut builder = DataTypeStringBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for DataTypeString<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct DataTypeStringArgs {}
+impl<'a> Default for DataTypeStringArgs {
+    #[inline]
+    fn default() -> Self {
+        DataTypeStringArgs {}
+    }
+}
+
+pub struct DataTypeStringBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeStringBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataTypeStringBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataTypeStringBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataTypeString<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataTypeString<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataTypeString");
+        ds.finish()
+    }
+}
+pub enum ExtraAttributesOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct ExtraAttributes<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ExtraAttributes<'a> {
+    type Inner = ExtraAttributes<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> ExtraAttributes<'a> {
+    pub const VT_ATTRIBUTES: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        ExtraAttributes { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args ExtraAttributesArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ExtraAttributes<'bldr>> {
+        let mut builder = ExtraAttributesBuilder::new(_fbb);
+        if let Some(x) = args.attributes {
+            builder.add_attributes(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn attributes(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ExtraAttributes::VT_ATTRIBUTES, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for ExtraAttributes<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "attributes",
+                Self::VT_ATTRIBUTES,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct ExtraAttributesArgs<'a> {
+    pub attributes: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for ExtraAttributesArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        ExtraAttributesArgs { attributes: None }
+    }
+}
+
+pub struct ExtraAttributesBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ExtraAttributesBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_attributes(&mut self, attributes: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExtraAttributes::VT_ATTRIBUTES,
+            attributes,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> ExtraAttributesBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        ExtraAttributesBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<ExtraAttributes<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for ExtraAttributes<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("ExtraAttributes");
+        ds.field("attributes", &self.attributes());
+        ds.finish()
+    }
+}
+pub enum DataFieldOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataField<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataField<'a> {
+    type Inner = DataField<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataField<'a> {
+    pub const VT_NAME: flatbuffers::VOffsetT = 4;
+    pub const VT_TYPE_TYPE: flatbuffers::VOffsetT = 6;
+    pub const VT_TYPE_: flatbuffers::VOffsetT = 8;
+    pub const VT_EXTRA: flatbuffers::VOffsetT = 10;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataField { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataFieldArgs<'args>,
+    ) -> flatbuffers::WIPOffset<DataField<'bldr>> {
+        let mut builder = DataFieldBuilder::new(_fbb);
+        if let Some(x) = args.extra {
+            builder.add_extra(x);
+        }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
+        }
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        builder.add_type_type(args.type_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(DataField::VT_NAME, None)
+        }
+    }
+    #[inline]
+    pub fn type_type(&self) -> DataType {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<DataType>(DataField::VT_TYPE_TYPE, Some(DataType::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    DataField::VT_TYPE_,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn extra(&self) -> Option<ExtraAttributes<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ExtraAttributes>>(DataField::VT_EXTRA, None)
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_binary(&self) -> Option<DataTypeBinary<'a>> {
+        if self.type_type() == DataType::DataTypeBinary {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBinary::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_bool(&self) -> Option<DataTypeBool<'a>> {
+        if self.type_type() == DataType::DataTypeBool {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeBool::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_date(&self) -> Option<DataTypeDate<'a>> {
+        if self.type_type() == DataType::DataTypeDate {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDate::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_decimal(&self) -> Option<DataTypeDecimal<'a>> {
+        if self.type_type() == DataType::DataTypeDecimal {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDecimal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_duration(&self) -> Option<DataTypeDuration<'a>> {
+        if self.type_type() == DataType::DataTypeDuration {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeDuration::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_float_16(&self) -> Option<DataTypeFloat16<'a>> {
+        if self.type_type() == DataType::DataTypeFloat16 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_float_32(&self) -> Option<DataTypeFloat32<'a>> {
+        if self.type_type() == DataType::DataTypeFloat32 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_float_64(&self) -> Option<DataTypeFloat64<'a>> {
+        if self.type_type() == DataType::DataTypeFloat64 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeFloat64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_int_8(&self) -> Option<DataTypeInt8<'a>> {
+        if self.type_type() == DataType::DataTypeInt8 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_int_16(&self) -> Option<DataTypeInt16<'a>> {
+        if self.type_type() == DataType::DataTypeInt16 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_int_32(&self) -> Option<DataTypeInt32<'a>> {
+        if self.type_type() == DataType::DataTypeInt32 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_int_64(&self) -> Option<DataTypeInt64<'a>> {
+        if self.type_type() == DataType::DataTypeInt64 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_uint_8(&self) -> Option<DataTypeUInt8<'a>> {
+        if self.type_type() == DataType::DataTypeUInt8 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt8::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_uint_16(&self) -> Option<DataTypeUInt16<'a>> {
+        if self.type_type() == DataType::DataTypeUInt16 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt16::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_uint_32(&self) -> Option<DataTypeUInt32<'a>> {
+        if self.type_type() == DataType::DataTypeUInt32 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt32::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_uint_64(&self) -> Option<DataTypeUInt64<'a>> {
+        if self.type_type() == DataType::DataTypeUInt64 {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeUInt64::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_list(&self) -> Option<DataTypeList<'a>> {
+        if self.type_type() == DataType::DataTypeList {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeList::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_map(&self) -> Option<DataTypeMap<'a>> {
+        if self.type_type() == DataType::DataTypeMap {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeMap::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_null(&self) -> Option<DataTypeNull<'a>> {
+        if self.type_type() == DataType::DataTypeNull {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeNull::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_option(&self) -> Option<DataTypeOption<'a>> {
+        if self.type_type() == DataType::DataTypeOption {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeOption::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_struct(&self) -> Option<DataTypeStruct<'a>> {
+        if self.type_type() == DataType::DataTypeStruct {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeStruct::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_time(&self) -> Option<DataTypeTime<'a>> {
+        if self.type_type() == DataType::DataTypeTime {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTime::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_timestamp(&self) -> Option<DataTypeTimestamp<'a>> {
+        if self.type_type() == DataType::DataTypeTimestamp {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeTimestamp::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn type__as_data_type_string(&self) -> Option<DataTypeString<'a>> {
+        if self.type_type() == DataType::DataTypeString {
+            self.type_().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { DataTypeString::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataField<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .visit_union::<DataType, _>(
+                "type_type",
+                Self::VT_TYPE_TYPE,
+                "type_",
+                Self::VT_TYPE_,
+                false,
+                |key, v, pos| match key {
+                    DataType::DataTypeBinary => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBinary>>(
+                            "DataType::DataTypeBinary",
+                            pos,
+                        ),
+                    DataType::DataTypeBool => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeBool>>(
+                            "DataType::DataTypeBool",
+                            pos,
+                        ),
+                    DataType::DataTypeDate => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDate>>(
+                            "DataType::DataTypeDate",
+                            pos,
+                        ),
+                    DataType::DataTypeDecimal => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDecimal>>(
+                            "DataType::DataTypeDecimal",
+                            pos,
+                        ),
+                    DataType::DataTypeDuration => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeDuration>>(
+                            "DataType::DataTypeDuration",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat16>>(
+                            "DataType::DataTypeFloat16",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat32>>(
+                            "DataType::DataTypeFloat32",
+                            pos,
+                        ),
+                    DataType::DataTypeFloat64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeFloat64>>(
+                            "DataType::DataTypeFloat64",
+                            pos,
+                        ),
+                    DataType::DataTypeInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt8>>(
+                            "DataType::DataTypeInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt16>>(
+                            "DataType::DataTypeInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt32>>(
+                            "DataType::DataTypeInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeInt64>>(
+                            "DataType::DataTypeInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt8 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt8>>(
+                            "DataType::DataTypeUInt8",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt16 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt16>>(
+                            "DataType::DataTypeUInt16",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt32 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt32>>(
+                            "DataType::DataTypeUInt32",
+                            pos,
+                        ),
+                    DataType::DataTypeUInt64 => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeUInt64>>(
+                            "DataType::DataTypeUInt64",
+                            pos,
+                        ),
+                    DataType::DataTypeList => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeList>>(
+                            "DataType::DataTypeList",
+                            pos,
+                        ),
+                    DataType::DataTypeMap => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeMap>>(
+                            "DataType::DataTypeMap",
+                            pos,
+                        ),
+                    DataType::DataTypeNull => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeNull>>(
+                            "DataType::DataTypeNull",
+                            pos,
+                        ),
+                    DataType::DataTypeOption => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeOption>>(
+                            "DataType::DataTypeOption",
+                            pos,
+                        ),
+                    DataType::DataTypeStruct => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeStruct>>(
+                            "DataType::DataTypeStruct",
+                            pos,
+                        ),
+                    DataType::DataTypeTime => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTime>>(
+                            "DataType::DataTypeTime",
+                            pos,
+                        ),
+                    DataType::DataTypeTimestamp => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeTimestamp>>(
+                            "DataType::DataTypeTimestamp",
+                            pos,
+                        ),
+                    DataType::DataTypeString => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<DataTypeString>>(
+                            "DataType::DataTypeString",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<ExtraAttributes>>(
+                "extra",
+                Self::VT_EXTRA,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataFieldArgs<'a> {
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub type_type: DataType,
+    pub type_: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub extra: Option<flatbuffers::WIPOffset<ExtraAttributes<'a>>>,
+}
+impl<'a> Default for DataFieldArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        DataFieldArgs {
+            name: None,
+            type_type: DataType::NONE,
+            type_: None,
+            extra: None,
+        }
+    }
+}
+
+pub struct DataFieldBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataFieldBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataField::VT_NAME, name);
+    }
+    #[inline]
+    pub fn add_type_type(&mut self, type_type: DataType) {
+        self.fbb_
+            .push_slot::<DataType>(DataField::VT_TYPE_TYPE, type_type, DataType::NONE);
+    }
+    #[inline]
+    pub fn add_type_(&mut self, type_: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataField::VT_TYPE_, type_);
+    }
+    #[inline]
+    pub fn add_extra(&mut self, extra: flatbuffers::WIPOffset<ExtraAttributes<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ExtraAttributes>>(
+                DataField::VT_EXTRA,
+                extra,
+            );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> DataFieldBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataFieldBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataField<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataField<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataField");
+        ds.field("name", &self.name());
+        ds.field("type_type", &self.type_type());
+        match self.type_type() {
+            DataType::DataTypeBinary => {
+                if let Some(x) = self.type__as_data_type_binary() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeBool => {
+                if let Some(x) = self.type__as_data_type_bool() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDate => {
+                if let Some(x) = self.type__as_data_type_date() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDecimal => {
+                if let Some(x) = self.type__as_data_type_decimal() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeDuration => {
+                if let Some(x) = self.type__as_data_type_duration() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat16 => {
+                if let Some(x) = self.type__as_data_type_float_16() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat32 => {
+                if let Some(x) = self.type__as_data_type_float_32() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeFloat64 => {
+                if let Some(x) = self.type__as_data_type_float_64() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt8 => {
+                if let Some(x) = self.type__as_data_type_int_8() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt16 => {
+                if let Some(x) = self.type__as_data_type_int_16() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt32 => {
+                if let Some(x) = self.type__as_data_type_int_32() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeInt64 => {
+                if let Some(x) = self.type__as_data_type_int_64() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt8 => {
+                if let Some(x) = self.type__as_data_type_uint_8() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt16 => {
+                if let Some(x) = self.type__as_data_type_uint_16() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt32 => {
+                if let Some(x) = self.type__as_data_type_uint_32() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeUInt64 => {
+                if let Some(x) = self.type__as_data_type_uint_64() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeList => {
+                if let Some(x) = self.type__as_data_type_list() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeMap => {
+                if let Some(x) = self.type__as_data_type_map() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeNull => {
+                if let Some(x) = self.type__as_data_type_null() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeOption => {
+                if let Some(x) = self.type__as_data_type_option() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeStruct => {
+                if let Some(x) = self.type__as_data_type_struct() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTime => {
+                if let Some(x) = self.type__as_data_type_time() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeTimestamp => {
+                if let Some(x) = self.type__as_data_type_timestamp() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DataType::DataTypeString => {
+                if let Some(x) = self.type__as_data_type_string() {
+                    ds.field("type_", &x)
+                } else {
+                    ds.field(
+                        "type_",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("type_", &x)
+            }
+        };
+        ds.field("extra", &self.extra());
+        ds.finish()
+    }
+}
+pub enum DataSchemaOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct DataSchema<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for DataSchema<'a> {
+    type Inner = DataSchema<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> DataSchema<'a> {
+    pub const VT_FIELDS: flatbuffers::VOffsetT = 4;
+    pub const VT_EXTRA: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        DataSchema { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args DataSchemaArgs<'args>,
+    ) -> flatbuffers::WIPOffset<DataSchema<'bldr>> {
+        let mut builder = DataSchemaBuilder::new(_fbb);
+        if let Some(x) = args.extra {
+            builder.add_extra(x);
+        }
+        if let Some(x) = args.fields {
+            builder.add_fields(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn fields(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<DataField<'a>>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<DataField>>,
+            >>(DataSchema::VT_FIELDS, None)
+        }
+    }
+    #[inline]
+    pub fn extra(&self) -> Option<ExtraAttributes<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ExtraAttributes>>(DataSchema::VT_EXTRA, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for DataSchema<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<DataField>>,
+            >>("fields", Self::VT_FIELDS, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<ExtraAttributes>>(
+                "extra",
+                Self::VT_EXTRA,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct DataSchemaArgs<'a> {
+    pub fields: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<DataField<'a>>>,
+        >,
+    >,
+    pub extra: Option<flatbuffers::WIPOffset<ExtraAttributes<'a>>>,
+}
+impl<'a> Default for DataSchemaArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        DataSchemaArgs {
+            fields: None,
+            extra: None,
+        }
+    }
+}
+
+pub struct DataSchemaBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataSchemaBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_fields(
+        &mut self,
+        fields: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<DataField<'b>>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(DataSchema::VT_FIELDS, fields);
+    }
+    #[inline]
+    pub fn add_extra(&mut self, extra: flatbuffers::WIPOffset<ExtraAttributes<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ExtraAttributes>>(
+                DataSchema::VT_EXTRA,
+                extra,
+            );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> DataSchemaBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        DataSchemaBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<DataSchema<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for DataSchema<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("DataSchema");
+        ds.field("fields", &self.fields());
+        ds.field("extra", &self.extra());
         ds.finish()
     }
 }
@@ -11070,7 +17877,8 @@ impl<'a> flatbuffers::Follow<'a> for SetDataSchema<'a> {
 }
 
 impl<'a> SetDataSchema<'a> {
-    pub const VT_SCHEMA: flatbuffers::VOffsetT = 4;
+    pub const VT_RAW_ARROW_SCHEMA: flatbuffers::VOffsetT = 4;
+    pub const VT_SCHEMA: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -11085,20 +17893,33 @@ impl<'a> SetDataSchema<'a> {
         if let Some(x) = args.schema {
             builder.add_schema(x);
         }
+        if let Some(x) = args.raw_arrow_schema {
+            builder.add_raw_arrow_schema(x);
+        }
         builder.finish()
     }
 
     #[inline]
-    pub fn schema(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+    pub fn raw_arrow_schema(&self) -> Option<flatbuffers::Vector<'a, u8>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SetDataSchema::VT_SCHEMA,
+                    SetDataSchema::VT_RAW_ARROW_SCHEMA,
                     None,
                 )
+        }
+    }
+    #[inline]
+    pub fn schema(&self) -> Option<DataSchema<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<DataSchema>>(SetDataSchema::VT_SCHEMA, None)
         }
     }
 }
@@ -11112,6 +17933,11 @@ impl flatbuffers::Verifiable for SetDataSchema<'_> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
             .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "raw_arrow_schema",
+                Self::VT_RAW_ARROW_SCHEMA,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<DataSchema>>(
                 "schema",
                 Self::VT_SCHEMA,
                 false,
@@ -11121,12 +17947,16 @@ impl flatbuffers::Verifiable for SetDataSchema<'_> {
     }
 }
 pub struct SetDataSchemaArgs<'a> {
-    pub schema: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub raw_arrow_schema: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub schema: Option<flatbuffers::WIPOffset<DataSchema<'a>>>,
 }
 impl<'a> Default for SetDataSchemaArgs<'a> {
     #[inline]
     fn default() -> Self {
-        SetDataSchemaArgs { schema: None }
+        SetDataSchemaArgs {
+            raw_arrow_schema: None,
+            schema: None,
+        }
     }
 }
 
@@ -11136,9 +17966,22 @@ pub struct SetDataSchemaBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
 }
 impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> SetDataSchemaBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_schema(&mut self, schema: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+    pub fn add_raw_arrow_schema(
+        &mut self,
+        raw_arrow_schema: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            SetDataSchema::VT_RAW_ARROW_SCHEMA,
+            raw_arrow_schema,
+        );
+    }
+    #[inline]
+    pub fn add_schema(&mut self, schema: flatbuffers::WIPOffset<DataSchema<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(SetDataSchema::VT_SCHEMA, schema);
+            .push_slot_always::<flatbuffers::WIPOffset<DataSchema>>(
+                SetDataSchema::VT_SCHEMA,
+                schema,
+            );
     }
     #[inline]
     pub fn new(
@@ -11160,6 +18003,7 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> SetDataSchemaBuilder<'a, 'b, A>
 impl core::fmt::Debug for SetDataSchema<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("SetDataSchema");
+        ds.field("raw_arrow_schema", &self.raw_arrow_schema());
         ds.field("schema", &self.schema());
         ds.finish()
     }

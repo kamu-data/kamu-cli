@@ -8,9 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod constants;
+mod data_encoding;
+mod data_schema_impl;
 mod dtos_extra;
 mod dtos_generated;
+mod extra_attributes_impl;
 mod operation_type;
 
+pub use data_encoding::*;
+pub use data_schema_impl::*;
 pub use dtos_generated::*;
 pub use operation_type::*;

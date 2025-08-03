@@ -288,6 +288,73 @@ impl Into<odf::CompressionFormat> for fb::CompressionFormat {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataField
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datafield-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataField {
+    type OffsetT = WIPOffset<fb::DataField<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let name_offset = { fb.create_string(&self.name) };
+        let r#type_offset = { self.r#type.serialize(fb) };
+        let extra_offset = self.extra.as_ref().map(|v| v.serialize(fb));
+        let mut builder = fb::DataFieldBuilder::new(fb);
+        builder.add_name(name_offset);
+        builder.add_type_type(type_offset.0);
+        builder.add_type_(type_offset.1);
+        extra_offset.map(|off| builder.add_extra(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataField<'fb>> for odf::DataField {
+    fn deserialize(proxy: fb::DataField<'fb>) -> Self {
+        odf::DataField {
+            name: proxy.name().map(|v| v.to_owned()).unwrap(),
+            r#type: proxy
+                .type_()
+                .map(|v| odf::DataType::deserialize(v, proxy.r#type_type()))
+                .unwrap(),
+            extra: proxy.extra().map(|v| odf::ExtraAttributes::deserialize(v)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataSchema
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataschema-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataSchema {
+    type OffsetT = WIPOffset<fb::DataSchema<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let fields_offset = {
+            let offsets: Vec<_> = self.fields.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        };
+        let extra_offset = self.extra.as_ref().map(|v| v.serialize(fb));
+        let mut builder = fb::DataSchemaBuilder::new(fb);
+        builder.add_fields(fields_offset);
+        extra_offset.map(|off| builder.add_extra(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataSchema<'fb>> for odf::DataSchema {
+    fn deserialize(proxy: fb::DataSchema<'fb>) -> Self {
+        odf::DataSchema {
+            fields: proxy
+                .fields()
+                .map(|v| v.iter().map(|i| odf::DataField::deserialize(i)).collect())
+                .unwrap(),
+            extra: proxy.extra().map(|v| odf::ExtraAttributes::deserialize(v)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSlice
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -325,6 +392,781 @@ impl<'fb> FlatbuffersDeserializable<fb::DataSlice<'fb>> for odf::DataSlice {
                 .unwrap(),
             size: proxy.size(),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataType
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatype-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersEnumSerializable<'fb, fb::DataType> for odf::DataType {
+    fn serialize(
+        &self,
+        fb: &mut FlatBufferBuilder<'fb>,
+    ) -> (fb::DataType, WIPOffset<UnionWIPOffset>) {
+        match self {
+            odf::DataType::Binary(v) => (
+                fb::DataType::DataTypeBinary,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Bool(v) => {
+                (fb::DataType::DataTypeBool, v.serialize(fb).as_union_value())
+            }
+            odf::DataType::Date(v) => {
+                (fb::DataType::DataTypeDate, v.serialize(fb).as_union_value())
+            }
+            odf::DataType::Decimal(v) => (
+                fb::DataType::DataTypeDecimal,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Duration(v) => (
+                fb::DataType::DataTypeDuration,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Float16(v) => (
+                fb::DataType::DataTypeFloat16,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Float32(v) => (
+                fb::DataType::DataTypeFloat32,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Float64(v) => (
+                fb::DataType::DataTypeFloat64,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Int8(v) => {
+                (fb::DataType::DataTypeInt8, v.serialize(fb).as_union_value())
+            }
+            odf::DataType::Int16(v) => (
+                fb::DataType::DataTypeInt16,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Int32(v) => (
+                fb::DataType::DataTypeInt32,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Int64(v) => (
+                fb::DataType::DataTypeInt64,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::UInt8(v) => (
+                fb::DataType::DataTypeUInt8,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::UInt16(v) => (
+                fb::DataType::DataTypeUInt16,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::UInt32(v) => (
+                fb::DataType::DataTypeUInt32,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::UInt64(v) => (
+                fb::DataType::DataTypeUInt64,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::List(v) => {
+                (fb::DataType::DataTypeList, v.serialize(fb).as_union_value())
+            }
+            odf::DataType::Map(v) => (fb::DataType::DataTypeMap, v.serialize(fb).as_union_value()),
+            odf::DataType::Null(v) => {
+                (fb::DataType::DataTypeNull, v.serialize(fb).as_union_value())
+            }
+            odf::DataType::Option(v) => (
+                fb::DataType::DataTypeOption,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Struct(v) => (
+                fb::DataType::DataTypeStruct,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::Time(v) => {
+                (fb::DataType::DataTypeTime, v.serialize(fb).as_union_value())
+            }
+            odf::DataType::Timestamp(v) => (
+                fb::DataType::DataTypeTimestamp,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::DataType::String(v) => (
+                fb::DataType::DataTypeString,
+                v.serialize(fb).as_union_value(),
+            ),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::DataType> for odf::DataType {
+    fn deserialize(table: flatbuffers::Table<'fb>, t: fb::DataType) -> Self {
+        match t {
+            fb::DataType::DataTypeBinary => {
+                odf::DataType::Binary(odf::DataTypeBinary::deserialize(unsafe {
+                    fb::DataTypeBinary::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeBool => {
+                odf::DataType::Bool(odf::DataTypeBool::deserialize(unsafe {
+                    fb::DataTypeBool::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeDate => {
+                odf::DataType::Date(odf::DataTypeDate::deserialize(unsafe {
+                    fb::DataTypeDate::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeDecimal => {
+                odf::DataType::Decimal(odf::DataTypeDecimal::deserialize(unsafe {
+                    fb::DataTypeDecimal::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeDuration => {
+                odf::DataType::Duration(odf::DataTypeDuration::deserialize(unsafe {
+                    fb::DataTypeDuration::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeFloat16 => {
+                odf::DataType::Float16(odf::DataTypeFloat16::deserialize(unsafe {
+                    fb::DataTypeFloat16::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeFloat32 => {
+                odf::DataType::Float32(odf::DataTypeFloat32::deserialize(unsafe {
+                    fb::DataTypeFloat32::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeFloat64 => {
+                odf::DataType::Float64(odf::DataTypeFloat64::deserialize(unsafe {
+                    fb::DataTypeFloat64::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeInt8 => {
+                odf::DataType::Int8(odf::DataTypeInt8::deserialize(unsafe {
+                    fb::DataTypeInt8::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeInt16 => {
+                odf::DataType::Int16(odf::DataTypeInt16::deserialize(unsafe {
+                    fb::DataTypeInt16::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeInt32 => {
+                odf::DataType::Int32(odf::DataTypeInt32::deserialize(unsafe {
+                    fb::DataTypeInt32::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeInt64 => {
+                odf::DataType::Int64(odf::DataTypeInt64::deserialize(unsafe {
+                    fb::DataTypeInt64::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeUInt8 => {
+                odf::DataType::UInt8(odf::DataTypeUInt8::deserialize(unsafe {
+                    fb::DataTypeUInt8::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeUInt16 => {
+                odf::DataType::UInt16(odf::DataTypeUInt16::deserialize(unsafe {
+                    fb::DataTypeUInt16::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeUInt32 => {
+                odf::DataType::UInt32(odf::DataTypeUInt32::deserialize(unsafe {
+                    fb::DataTypeUInt32::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeUInt64 => {
+                odf::DataType::UInt64(odf::DataTypeUInt64::deserialize(unsafe {
+                    fb::DataTypeUInt64::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeList => {
+                odf::DataType::List(odf::DataTypeList::deserialize(unsafe {
+                    fb::DataTypeList::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeMap => {
+                odf::DataType::Map(odf::DataTypeMap::deserialize(unsafe {
+                    fb::DataTypeMap::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeNull => {
+                odf::DataType::Null(odf::DataTypeNull::deserialize(unsafe {
+                    fb::DataTypeNull::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeOption => {
+                odf::DataType::Option(odf::DataTypeOption::deserialize(unsafe {
+                    fb::DataTypeOption::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeStruct => {
+                odf::DataType::Struct(odf::DataTypeStruct::deserialize(unsafe {
+                    fb::DataTypeStruct::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeTime => {
+                odf::DataType::Time(odf::DataTypeTime::deserialize(unsafe {
+                    fb::DataTypeTime::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeTimestamp => {
+                odf::DataType::Timestamp(odf::DataTypeTimestamp::deserialize(unsafe {
+                    fb::DataTypeTimestamp::init_from_table(table)
+                }))
+            }
+            fb::DataType::DataTypeString => {
+                odf::DataType::String(odf::DataTypeString::deserialize(unsafe {
+                    fb::DataTypeString::init_from_table(table)
+                }))
+            }
+            _ => panic!("Invalid enum value: {}", t.0),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeBinary
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebinary-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeBinary {
+    type OffsetT = WIPOffset<fb::DataTypeBinary<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeBinaryBuilder::new(fb);
+        self.fixed_length.map(|v| builder.add_fixed_length(v));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeBinary<'fb>> for odf::DataTypeBinary {
+    fn deserialize(proxy: fb::DataTypeBinary<'fb>) -> Self {
+        odf::DataTypeBinary {
+            fixed_length: proxy.fixed_length().map(|v| v),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeBool
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebool-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeBool {
+    type OffsetT = WIPOffset<fb::DataTypeBool<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeBoolBuilder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeBool<'fb>> for odf::DataTypeBool {
+    fn deserialize(proxy: fb::DataTypeBool<'fb>) -> Self {
+        odf::DataTypeBool {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeDate
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedate-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeDate {
+    type OffsetT = WIPOffset<fb::DataTypeDate<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeDateBuilder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeDate<'fb>> for odf::DataTypeDate {
+    fn deserialize(proxy: fb::DataTypeDate<'fb>) -> Self {
+        odf::DataTypeDate {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeDecimal
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedecimal-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeDecimal {
+    type OffsetT = WIPOffset<fb::DataTypeDecimal<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeDecimalBuilder::new(fb);
+        builder.add_precision(self.precision);
+        builder.add_scale(self.scale);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeDecimal<'fb>> for odf::DataTypeDecimal {
+    fn deserialize(proxy: fb::DataTypeDecimal<'fb>) -> Self {
+        odf::DataTypeDecimal {
+            precision: proxy.precision(),
+            scale: proxy.scale(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeDuration
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeduration-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeDuration {
+    type OffsetT = WIPOffset<fb::DataTypeDuration<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeDurationBuilder::new(fb);
+        builder.add_unit(self.unit.into());
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeDuration<'fb>> for odf::DataTypeDuration {
+    fn deserialize(proxy: fb::DataTypeDuration<'fb>) -> Self {
+        odf::DataTypeDuration {
+            unit: proxy.unit().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeFloat16
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat16-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeFloat16 {
+    type OffsetT = WIPOffset<fb::DataTypeFloat16<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeFloat16Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeFloat16<'fb>> for odf::DataTypeFloat16 {
+    fn deserialize(proxy: fb::DataTypeFloat16<'fb>) -> Self {
+        odf::DataTypeFloat16 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeFloat32
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat32-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeFloat32 {
+    type OffsetT = WIPOffset<fb::DataTypeFloat32<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeFloat32Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeFloat32<'fb>> for odf::DataTypeFloat32 {
+    fn deserialize(proxy: fb::DataTypeFloat32<'fb>) -> Self {
+        odf::DataTypeFloat32 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeFloat64
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat64-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeFloat64 {
+    type OffsetT = WIPOffset<fb::DataTypeFloat64<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeFloat64Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeFloat64<'fb>> for odf::DataTypeFloat64 {
+    fn deserialize(proxy: fb::DataTypeFloat64<'fb>) -> Self {
+        odf::DataTypeFloat64 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeInt16
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint16-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeInt16 {
+    type OffsetT = WIPOffset<fb::DataTypeInt16<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeInt16Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeInt16<'fb>> for odf::DataTypeInt16 {
+    fn deserialize(proxy: fb::DataTypeInt16<'fb>) -> Self {
+        odf::DataTypeInt16 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeInt32
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint32-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeInt32 {
+    type OffsetT = WIPOffset<fb::DataTypeInt32<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeInt32Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeInt32<'fb>> for odf::DataTypeInt32 {
+    fn deserialize(proxy: fb::DataTypeInt32<'fb>) -> Self {
+        odf::DataTypeInt32 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeInt64
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint64-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeInt64 {
+    type OffsetT = WIPOffset<fb::DataTypeInt64<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeInt64Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeInt64<'fb>> for odf::DataTypeInt64 {
+    fn deserialize(proxy: fb::DataTypeInt64<'fb>) -> Self {
+        odf::DataTypeInt64 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeInt8
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint8-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeInt8 {
+    type OffsetT = WIPOffset<fb::DataTypeInt8<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeInt8Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeInt8<'fb>> for odf::DataTypeInt8 {
+    fn deserialize(proxy: fb::DataTypeInt8<'fb>) -> Self {
+        odf::DataTypeInt8 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeList
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypelist-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeList {
+    type OffsetT = WIPOffset<fb::DataTypeList<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let item_type_offset = { self.item_type.serialize(fb) };
+        let mut builder = fb::DataTypeListBuilder::new(fb);
+        builder.add_item_type_type(item_type_offset.0);
+        builder.add_item_type(item_type_offset.1);
+        self.fixed_length.map(|v| builder.add_fixed_length(v));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeList<'fb>> for odf::DataTypeList {
+    fn deserialize(proxy: fb::DataTypeList<'fb>) -> Self {
+        odf::DataTypeList {
+            item_type: proxy
+                .item_type()
+                .map(|v| Box::new(odf::DataType::deserialize(v, proxy.item_type_type())))
+                .unwrap(),
+            fixed_length: proxy.fixed_length().map(|v| v),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeMap
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypemap-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeMap {
+    type OffsetT = WIPOffset<fb::DataTypeMap<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let key_type_offset = { self.key_type.serialize(fb) };
+        let value_type_offset = { self.value_type.serialize(fb) };
+        let mut builder = fb::DataTypeMapBuilder::new(fb);
+        builder.add_key_type_type(key_type_offset.0);
+        builder.add_key_type(key_type_offset.1);
+        builder.add_value_type_type(value_type_offset.0);
+        builder.add_value_type(value_type_offset.1);
+        self.keys_sorted.map(|v| builder.add_keys_sorted(v));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeMap<'fb>> for odf::DataTypeMap {
+    fn deserialize(proxy: fb::DataTypeMap<'fb>) -> Self {
+        odf::DataTypeMap {
+            key_type: proxy
+                .key_type()
+                .map(|v| Box::new(odf::DataType::deserialize(v, proxy.key_type_type())))
+                .unwrap(),
+            value_type: proxy
+                .value_type()
+                .map(|v| Box::new(odf::DataType::deserialize(v, proxy.value_type_type())))
+                .unwrap(),
+            keys_sorted: proxy.keys_sorted().map(|v| v),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeNull
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypenull-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeNull {
+    type OffsetT = WIPOffset<fb::DataTypeNull<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeNullBuilder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeNull<'fb>> for odf::DataTypeNull {
+    fn deserialize(proxy: fb::DataTypeNull<'fb>) -> Self {
+        odf::DataTypeNull {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeOption
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeoption-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeOption {
+    type OffsetT = WIPOffset<fb::DataTypeOption<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let inner_offset = { self.inner.serialize(fb) };
+        let mut builder = fb::DataTypeOptionBuilder::new(fb);
+        builder.add_inner_type(inner_offset.0);
+        builder.add_inner(inner_offset.1);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeOption<'fb>> for odf::DataTypeOption {
+    fn deserialize(proxy: fb::DataTypeOption<'fb>) -> Self {
+        odf::DataTypeOption {
+            inner: proxy
+                .inner()
+                .map(|v| Box::new(odf::DataType::deserialize(v, proxy.inner_type())))
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeString
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestring-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeString {
+    type OffsetT = WIPOffset<fb::DataTypeString<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeStringBuilder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeString<'fb>> for odf::DataTypeString {
+    fn deserialize(proxy: fb::DataTypeString<'fb>) -> Self {
+        odf::DataTypeString {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeStruct
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestruct-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeStruct {
+    type OffsetT = WIPOffset<fb::DataTypeStruct<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let fields_offset = {
+            let offsets: Vec<_> = self.fields.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        };
+        let mut builder = fb::DataTypeStructBuilder::new(fb);
+        builder.add_fields(fields_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeStruct<'fb>> for odf::DataTypeStruct {
+    fn deserialize(proxy: fb::DataTypeStruct<'fb>) -> Self {
+        odf::DataTypeStruct {
+            fields: proxy
+                .fields()
+                .map(|v| v.iter().map(|i| odf::DataField::deserialize(i)).collect())
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeTime
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetime-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeTime {
+    type OffsetT = WIPOffset<fb::DataTypeTime<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeTimeBuilder::new(fb);
+        builder.add_unit(self.unit.into());
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeTime<'fb>> for odf::DataTypeTime {
+    fn deserialize(proxy: fb::DataTypeTime<'fb>) -> Self {
+        odf::DataTypeTime {
+            unit: proxy.unit().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeTimestamp
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetimestamp-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeTimestamp {
+    type OffsetT = WIPOffset<fb::DataTypeTimestamp<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let timezone_offset = self.timezone.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::DataTypeTimestampBuilder::new(fb);
+        builder.add_unit(self.unit.into());
+        timezone_offset.map(|off| builder.add_timezone(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeTimestamp<'fb>> for odf::DataTypeTimestamp {
+    fn deserialize(proxy: fb::DataTypeTimestamp<'fb>) -> Self {
+        odf::DataTypeTimestamp {
+            unit: proxy.unit().into(),
+            timezone: proxy.timezone().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeUInt16
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint16-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeUInt16 {
+    type OffsetT = WIPOffset<fb::DataTypeUInt16<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeUInt16Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeUInt16<'fb>> for odf::DataTypeUInt16 {
+    fn deserialize(proxy: fb::DataTypeUInt16<'fb>) -> Self {
+        odf::DataTypeUInt16 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeUInt32
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint32-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeUInt32 {
+    type OffsetT = WIPOffset<fb::DataTypeUInt32<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeUInt32Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeUInt32<'fb>> for odf::DataTypeUInt32 {
+    fn deserialize(proxy: fb::DataTypeUInt32<'fb>) -> Self {
+        odf::DataTypeUInt32 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeUInt64
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint64-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeUInt64 {
+    type OffsetT = WIPOffset<fb::DataTypeUInt64<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeUInt64Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeUInt64<'fb>> for odf::DataTypeUInt64 {
+    fn deserialize(proxy: fb::DataTypeUInt64<'fb>) -> Self {
+        odf::DataTypeUInt64 {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataTypeUInt8
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint8-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeUInt8 {
+    type OffsetT = WIPOffset<fb::DataTypeUInt8<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::DataTypeUInt8Builder::new(fb);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::DataTypeUInt8<'fb>> for odf::DataTypeUInt8 {
+    fn deserialize(proxy: fb::DataTypeUInt8<'fb>) -> Self {
+        odf::DataTypeUInt8 {}
     }
 }
 
@@ -680,6 +1522,29 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteTransformInput<'fb>> for odf::Exe
             prev_offset: proxy.prev_offset().map(|v| v),
             new_offset: proxy.new_offset().map(|v| v),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ExtraAttributes
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ExtraAttributes {
+    type OffsetT = WIPOffset<fb::ExtraAttributes<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let attributes_offset = fb.create_string(&serde_json::to_string(&self.attributes).unwrap());
+        let mut builder = fb::ExtraAttributesBuilder::new(fb);
+        builder.add_attributes(attributes_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ExtraAttributes<'fb>> for odf::ExtraAttributes {
+    fn deserialize(proxy: fb::ExtraAttributes<'fb>) -> Self {
+        let attributes = serde_json::from_str(proxy.attributes().unwrap()).unwrap();
+        odf::ExtraAttributes { attributes }
     }
 }
 
@@ -2186,9 +3051,14 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetDataSchema {
     type OffsetT = WIPOffset<fb::SetDataSchema<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let schema_offset = { fb.create_vector(&self.schema[..]) };
+        let raw_arrow_schema_offset = self
+            .raw_arrow_schema
+            .as_ref()
+            .map(|v| fb.create_vector(&v[..]));
+        let schema_offset = self.schema.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::SetDataSchemaBuilder::new(fb);
-        builder.add_schema(schema_offset);
+        raw_arrow_schema_offset.map(|off| builder.add_raw_arrow_schema(off));
+        schema_offset.map(|off| builder.add_schema(off));
         builder.finish()
     }
 }
@@ -2196,7 +3066,8 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetDataSchema {
 impl<'fb> FlatbuffersDeserializable<fb::SetDataSchema<'fb>> for odf::SetDataSchema {
     fn deserialize(proxy: fb::SetDataSchema<'fb>) -> Self {
         odf::SetDataSchema {
-            schema: proxy.schema().map(|v| v.bytes().to_vec()).unwrap(),
+            raw_arrow_schema: proxy.raw_arrow_schema().map(|v| v.bytes().to_vec()),
+            schema: proxy.schema().map(|v| odf::DataSchema::deserialize(v)),
         }
     }
 }
@@ -2584,6 +3455,34 @@ impl<'fb> FlatbuffersDeserializable<fb::TemporalTable<'fb>> for odf::TemporalTab
                 .primary_key()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect())
                 .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TimeUnit
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#timeunit-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<odf::TimeUnit> for fb::TimeUnit {
+    fn from(v: odf::TimeUnit) -> Self {
+        match v {
+            odf::TimeUnit::Second => fb::TimeUnit::Second,
+            odf::TimeUnit::Millisecond => fb::TimeUnit::Millisecond,
+            odf::TimeUnit::Microsecond => fb::TimeUnit::Microsecond,
+            odf::TimeUnit::Nanosecond => fb::TimeUnit::Nanosecond,
+        }
+    }
+}
+
+impl Into<odf::TimeUnit> for fb::TimeUnit {
+    fn into(self) -> odf::TimeUnit {
+        match self {
+            fb::TimeUnit::Second => odf::TimeUnit::Second,
+            fb::TimeUnit::Millisecond => odf::TimeUnit::Millisecond,
+            fb::TimeUnit::Microsecond => odf::TimeUnit::Microsecond,
+            fb::TimeUnit::Nanosecond => odf::TimeUnit::Nanosecond,
+            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }
