@@ -12,7 +12,6 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use datafusion::arrow;
 use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
@@ -386,7 +385,7 @@ impl QueryServiceImpl {
     async fn get_schema_impl(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
+    ) -> Result<Option<Arc<odf::schema::DataSchema>>, QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
         use odf::dataset::MetadataChainExt;
@@ -396,64 +395,9 @@ impl QueryServiceImpl {
             .await
             .int_err()?
             .into_event()
-            .map(|e| e.schema_as_arrow())
-            .transpose()
-            .int_err()?;
+            .map(|e| Arc::new(e.upgrade().schema));
 
         Ok(schema)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn get_schema_parquet_impl(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<Type>, QueryError> {
-        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
-
-        // TODO: Update to use SetDataSchema event
-        use odf::dataset::MetadataChainExt;
-        let maybe_last_data_slice_hash = resolved_dataset
-            .as_metadata_chain()
-            .last_data_block_with_new_data()
-            .await
-            .int_err()
-            .map_err(|e| {
-                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
-                e
-            })?
-            .into_event()
-            .and_then(|event| event.new_data)
-            .map(|new_data| new_data.physical_hash);
-
-        match maybe_last_data_slice_hash {
-            Some(last_data_slice_hash) => {
-                // TODO: Avoid boxing url - requires datafusion to fix API
-                let data_url = Box::new(
-                    resolved_dataset
-                        .as_data_repo()
-                        .get_internal_url(&last_data_slice_hash)
-                        .await,
-                );
-
-                let ctx = self
-                    .session_context(QueryOptions {
-                        input_datasets: Some(BTreeMap::new()),
-                    })
-                    .await?;
-
-                let object_store = ctx.runtime_env().object_store(&data_url)?;
-
-                tracing::debug!("QueryService::get_schema_impl: obtained object store");
-
-                let data_path =
-                    object_store::path::Path::from_url_path(data_url.path()).int_err()?;
-
-                let metadata = read_data_slice_metadata(object_store, data_path).await?;
-
-                Ok(Some(metadata.file_metadata().schema().clone()))
-            }
-            None => Ok(None),
-        }
     }
 
     async fn resolve_dataset(
@@ -605,16 +549,108 @@ impl QueryService for QueryServiceImpl {
     async fn get_schema(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
+    ) -> Result<Option<Arc<odf::schema::DataSchema>>, QueryError> {
         self.get_schema_impl(dataset_ref).await
     }
 
-    #[tracing::instrument(level = "info", skip_all, name = QueryServiceImpl_get_schema_parquet_file, fields(%dataset_ref))]
-    async fn get_schema_parquet_file(
+    #[tracing::instrument(level = "info", skip_all, name = QueryServiceImpl_get_last_data_chunk_schema_arrow, fields(%dataset_ref))]
+    async fn get_last_data_chunk_schema_arrow(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<Option<datafusion::arrow::datatypes::SchemaRef>, QueryError> {
+        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
+
+        use odf::dataset::MetadataChainExt;
+        let Some(last_data_slice_hash) = resolved_dataset
+            .as_metadata_chain()
+            .last_data_block_with_new_data()
+            .await
+            .int_err()
+            .map_err(|e| {
+                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
+                e
+            })?
+            .into_event()
+            .and_then(|event| event.new_data)
+            .map(|new_data| new_data.physical_hash)
+        else {
+            return Ok(None);
+        };
+
+        let data_url = resolved_dataset
+            .as_data_repo()
+            .get_internal_url(&last_data_slice_hash)
+            .await;
+
+        let ctx = self
+            .session_context(QueryOptions {
+                input_datasets: Some(BTreeMap::new()),
+            })
+            .await?;
+
+        let df = ctx
+            .read_parquet(
+                data_url.to_string(),
+                ParquetReadOptions {
+                    schema: None,
+                    file_sort_order: Vec::new(),
+                    file_extension: "",
+                    table_partition_cols: Vec::new(),
+                    parquet_pruning: None,
+                    skip_metadata: None,
+                    file_decryption_properties: None,
+                },
+            )
+            .await
+            .int_err()?;
+
+        Ok(Some(df.schema().inner().clone()))
+    }
+
+    #[tracing::instrument(level = "info", skip_all, name = QueryServiceImpl_get_last_data_chunk_schema_parquet, fields(%dataset_ref))]
+    async fn get_last_data_chunk_schema_parquet(
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
-        self.get_schema_parquet_impl(dataset_ref).await
+        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
+
+        use odf::dataset::MetadataChainExt;
+        let Some(last_data_slice_hash) = resolved_dataset
+            .as_metadata_chain()
+            .last_data_block_with_new_data()
+            .await
+            .int_err()
+            .map_err(|e| {
+                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
+                e
+            })?
+            .into_event()
+            .and_then(|event| event.new_data)
+            .map(|new_data| new_data.physical_hash)
+        else {
+            return Ok(None);
+        };
+
+        let data_url = Box::new(
+            resolved_dataset
+                .as_data_repo()
+                .get_internal_url(&last_data_slice_hash)
+                .await,
+        );
+
+        let ctx = self
+            .session_context(QueryOptions {
+                input_datasets: Some(BTreeMap::new()),
+            })
+            .await?;
+
+        let object_store = ctx.runtime_env().object_store(&data_url)?;
+
+        let data_path = object_store::path::Path::from_url_path(data_url.path()).int_err()?;
+
+        let metadata = read_data_slice_metadata(object_store, data_path).await?;
+
+        Ok(Some(metadata.file_metadata().schema().clone()))
     }
 
     #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(%dataset_ref))]
