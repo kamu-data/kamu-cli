@@ -76,7 +76,7 @@ impl DataQueries {
             )
             .int_err()?;
 
-        let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
+        let schema = DataSchema::new_from_data_frame_schema_stripped(df.schema(), schema_format)?;
 
         let record_batches = match df.collect().await {
             Ok(rb) => rb,

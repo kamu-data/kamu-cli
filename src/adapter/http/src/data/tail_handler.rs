@@ -59,15 +59,24 @@ pub async fn dataset_tail_handler(
             QueryError::Internal(e) => e.api_err(),
         })?;
 
-    let schema = params.schema_format.map(|fmt| {
-        Schema::new(
-            match &res.df {
-                None => datafusion::arrow::datatypes::Schema::empty().into(),
-                Some(df) => df.schema().inner().clone(),
-            },
-            fmt,
-        )
-    });
+    let schema = if let Some(schema_format) = params.schema_format {
+        match &res.df {
+            None => Some(Schema::new(
+                &odf::schema::DataSchema::new_empty(),
+                schema_format,
+            )?),
+            Some(df) => {
+                // NOTE: We strip the encoding to only leave logical types
+                let schema_odf = odf::schema::DataSchema::new_from_arrow(df.schema().inner())
+                    .int_err()?
+                    .strip_encoding();
+
+                Some(Schema::new(&schema_odf, schema_format)?)
+            }
+        }
+    } else {
+        None
+    };
 
     let record_batches = match res.df {
         None => Vec::new(),
