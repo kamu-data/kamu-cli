@@ -120,10 +120,13 @@ impl TransformExecutorImpl {
         } else {
             // Set schema upon first transform
             if let Some(new_schema) = response.output_schema {
+                let data_schema =
+                    odf::metadata::DataSchema::new_from_arrow(&new_schema).strip_encoding();
+
                 // TODO: make schema commit atomic with data
                 let commit_schema_result = resolved_dataset
                     .commit_event(
-                        odf::metadata::SetDataSchema::new(&new_schema).into(),
+                        odf::metadata::SetDataSchema::new(data_schema).into(),
                         odf::dataset::CommitOpts {
                             block_ref: &request.block_ref,
                             system_time: Some(request.system_time),

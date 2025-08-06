@@ -18,7 +18,12 @@ use kamu_core::*;
 use kamu_ingest_datafusion::*;
 use odf::metadata::testing::MetadataFactory;
 use odf::utils::data::DataFrameExt;
-use odf::utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
+use odf::utils::testing::{
+    assert_arrow_schema_eq,
+    assert_data_eq,
+    assert_odf_schema_eq,
+    assert_schema_eq,
+};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -29,7 +34,7 @@ use time_source::SystemTimeSourceDefault;
 // crate.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
     let mut harness = Harness::new(vec![
@@ -146,6 +151,65 @@ async fn test_data_writer_happy_path() {
 
     // Check schema in block SetDataSchema block
     let (schema_block_hash, schema_block) = harness.get_last_schema_block().await;
+
+    assert_odf_schema_eq(
+        schema_block.event.schema.as_ref().unwrap(),
+        json!({
+            "fields": [{
+                "name": "offset",
+                "type": {
+                    "kind": "Int",
+                    "bitWidth": 64,
+                    "signed": true,
+                },
+            }, {
+                "name": "op",
+                "type": {
+                    "kind": "Int",
+                    "bitWidth": 32,
+                    "signed": true,
+                },
+            }, {
+                "name": "system_time",
+                "type": {
+                    "kind": "Timestamp",
+                    "unit": "Millisecond",
+                    "timezone": "UTC",
+                },
+            }, {
+                "name": "event_time",
+                "type": {
+                    "kind": "Option",
+                    "inner": {
+                        "kind": "Timestamp",
+                        "unit": "Millisecond",
+                        "timezone": "UTC",
+                    }
+                },
+            }, {
+                // NOTE: In SetDataSchema we strip the encoding information, leaving only logical types
+                "name": "city",
+                "type": {
+                    "kind": "Option",
+                    "inner": {
+                        "kind": "String",
+                    },
+                },
+            }, {
+                "name": "population",
+                "type": {
+                    "kind": "Option",
+                    "inner": {
+                        "kind": "Int",
+                        "bitWidth": 64,
+                        "signed": true,
+                    },
+                },
+            }]
+        }),
+    );
+
+    // Check the converted Arrow schema
     assert_arrow_schema_eq(
         &schema_block.event.schema_as_arrow().unwrap(),
         json!({
@@ -189,7 +253,8 @@ async fn test_data_writer_happy_path() {
                 "nullable": true,
             }, {
                 "name": "city",
-                "data_type": "Utf8View",
+                // NOTE: Not Utf8View due to stripped encoding
+                "data_type": "Utf8",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},

@@ -220,14 +220,126 @@ fn test_serializer_stability() {
 #[cfg(feature = "arrow")]
 #[test]
 fn serde_set_data_schema() {
+    use serde_json::json;
+
+    let expected_schema = DataSchema {
+        fields: vec![
+            DataField {
+                name: "city".to_string(),
+                r#type: DataType::String(DataTypeString {}),
+                extra: Some(
+                    ExtraAttributes::try_from(json!({
+                        "arrow.apache.org/encoding": "view",
+                        "arrow.apache.org/offsetBitWidth": "32",
+                    }))
+                    .unwrap(),
+                ),
+            },
+            DataField {
+                name: "population".to_string(),
+                r#type: DataType::Int(DataTypeInt {
+                    bit_width: 64,
+                    signed: false,
+                }),
+                extra: None,
+            },
+            DataField {
+                name: "census".to_string(),
+                r#type: DataType::Option(DataTypeOption {
+                    inner: Box::new(DataType::String(DataTypeString {})),
+                }),
+                extra: Some(
+                    ExtraAttributes::try_from(json!({
+                        "kamu.dev/logicalType": "multihash",
+                        "kamu.dev/referenceType": "embedded",
+                    }))
+                    .unwrap(),
+                ),
+            },
+            DataField {
+                name: "links".to_string(),
+                r#type: DataType::List(DataTypeList {
+                    item_type: Box::new(DataType::String(DataTypeString {})),
+                    fixed_length: None,
+                }),
+                extra: None,
+            },
+        ],
+        extra: Some(
+            ExtraAttributes::try_from(json!({
+                "kamu.dev/archetype": "table",
+                "kamu.dev/nested": {
+                        "x": "a",
+                        "y": "b",
+                    },
+                }
+            ))
+            .unwrap(),
+        ),
+    };
+
+    let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
+
+    let expected_block = wrap_into_block(event);
+
+    let buffer = FlatbuffersMetadataBlockSerializer
+        .write_manifest(&expected_block)
+        .unwrap();
+
+    let actual_block = FlatbuffersMetadataBlockDeserializer
+        .read_manifest(&buffer)
+        .unwrap();
+
+    assert_eq!(expected_block, actual_block);
+
+    let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+    let hash_expected = "75aae8319bc68d9816a48f55e743ddb30d82879bfe29e2a96328e5d87040a1dc";
+
+    assert_eq!(hash_actual, hash_expected);
+
+    let actual_schema = actual_block
+        .event
+        .as_variant::<SetDataSchema>()
+        .unwrap()
+        .schema
+        .clone()
+        .unwrap();
+
+    assert_eq!(expected_schema, actual_schema);
+
+    #[cfg(feature = "arrow")]
+    {
+        use arrow::datatypes::*;
+
+        let actual_arrow_schema = actual_block
+            .into_typed::<SetDataSchema>()
+            .unwrap()
+            .event
+            .schema_as_arrow()
+            .unwrap();
+
+        let exepcted_arrow_schema = Schema::new(vec![
+            Field::new("city", DataType::Utf8View, false),
+            Field::new("population", DataType::UInt64, false),
+            Field::new("census", DataType::Utf8, true),
+            Field::new("links", DataType::new_list(DataType::Utf8, false), false),
+        ]);
+
+        pretty_assertions::assert_eq!(actual_arrow_schema, exepcted_arrow_schema);
+    }
+}
+
+#[cfg(feature = "arrow")]
+#[test]
+fn serde_set_data_schema_legacy() {
     use arrow::datatypes::*;
 
-    let expected_schema = SchemaRef::new(Schema::new(vec![
+    let expected_schema = Schema::new(vec![
         Field::new("a", DataType::Int64, false),
         Field::new("b", DataType::Boolean, false),
-    ]));
+    ]);
 
-    let event: MetadataEvent = SetDataSchema::new(&expected_schema).into();
+    let event: MetadataEvent = SetDataSchema::new_legacy_raw_arrow(&expected_schema).into();
 
     let expected_block = wrap_into_block(event);
 

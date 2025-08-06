@@ -15,6 +15,27 @@ use crate::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[allow(clippy::needless_pass_by_value)]
+pub fn assert_odf_schema_eq(actual: &odf_metadata::DataSchema, expected: serde_json::Value) {
+    // We first deserialize the expected value and then serialize it into JSON
+    // string to ensure the same order of object properties
+    let expected = expected.to_string();
+    let mut deser = serde_json::Deserializer::from_str(&expected);
+    let expected = odf_metadata::serde::yaml::DataSchemaDef::deserialize(&mut deser).unwrap();
+
+    let mut buf = Vec::with_capacity(1000);
+    let mut ser = serde_json::Serializer::pretty(&mut buf);
+    odf_metadata::serde::yaml::DataSchemaDef::serialize(&expected, &mut ser).unwrap();
+    let expected = String::from_utf8(buf).unwrap();
+
+    let mut buf = Vec::with_capacity(1000);
+    let mut ser = serde_json::Serializer::pretty(&mut buf);
+    odf_metadata::serde::yaml::DataSchemaDef::serialize(actual, &mut ser).unwrap();
+    let actual = String::from_utf8(buf).unwrap();
+
+    assert_eq!(expected, actual);
+}
+
 pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {
     let parquet_schema = crate::schema::convert::dataframe_schema_to_parquet_schema(schema);
     let actual = crate::schema::format::format_schema_parquet(&parquet_schema);

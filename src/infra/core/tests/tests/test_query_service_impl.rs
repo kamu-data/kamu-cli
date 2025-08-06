@@ -84,7 +84,7 @@ async fn create_test_dataset(
         .dataset
         .commit_event(
             MetadataFactory::set_data_schema()
-                .schema(&schema)
+                .schema_from_arrow(&schema)
                 .build()
                 .into(),
             odf::dataset::CommitOpts::default(),
@@ -205,7 +205,7 @@ async fn test_dataset_parquet_schema(catalog: &dill::Catalog, tempdir: &TempDir)
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let schema = query_svc
-        .get_schema_parquet_file(&dataset_ref)
+        .get_last_data_chunk_schema_parquet(&dataset_ref)
         .await
         .unwrap();
     assert!(schema.is_some());
@@ -241,10 +241,10 @@ async fn test_dataset_arrow_schema(catalog: &dill::Catalog, tempdir: &TempDir) {
     let dataset_ref = odf::DatasetRef::from(target.get_alias());
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let schema_ref = query_svc.get_schema(&dataset_ref).await.unwrap().unwrap();
+    let schema = query_svc.get_schema(&dataset_ref).await.unwrap().unwrap();
 
     let mut buf = Vec::new();
-    odf::utils::schema::format::write_schema_arrow_json(&mut buf, schema_ref.as_ref()).unwrap();
+    odf::utils::schema::format::write_schema_arrow_json(&mut buf, &schema.to_arrow()).unwrap();
 
     let schema_content = String::from_utf8(buf).unwrap();
     let data_schema_json =

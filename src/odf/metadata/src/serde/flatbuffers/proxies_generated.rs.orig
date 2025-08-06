@@ -1980,12 +1980,10 @@ impl<'b> flatbuffers::Push for Timestamp {
         );
         dst.copy_from_slice(src);
     }
-
-    // FIXME: https://github.com/kamu-data/kamu-cli/issues/1084
-    // #[inline]
-    // fn alignment() -> flatbuffers::PushAlignment {
-    //     flatbuffers::PushAlignment::new(4)
-    // }
+    #[inline]
+    fn alignment() -> flatbuffers::PushAlignment {
+        flatbuffers::PushAlignment::new(4)
+    }
 }
 
 impl<'a> flatbuffers::Verifiable for Timestamp {

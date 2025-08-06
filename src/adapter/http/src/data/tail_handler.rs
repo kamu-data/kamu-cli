@@ -61,9 +61,11 @@ pub async fn dataset_tail_handler(
 
     let schema = params.schema_format.map(|fmt| {
         Schema::new(
-            match &res.df {
-                None => datafusion::arrow::datatypes::Schema::empty().into(),
-                Some(df) => df.schema().inner().clone(),
+            &match &res.df {
+                None => odf::metadata::DataSchema::new_empty(),
+                Some(df) => {
+                    odf::metadata::DataSchema::new_from_arrow(df.schema().inner()).strip_encoding()
+                }
             },
             fmt,
         )

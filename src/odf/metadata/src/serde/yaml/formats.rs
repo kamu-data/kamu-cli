@@ -27,6 +27,26 @@ pub mod base64 {
     }
 }
 
+pub mod base64_opt {
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(
+        option: &Option<Vec<u8>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match option {
+            None => serializer.serialize_none(),
+            Some(date) => super::base64::serialize(date, serializer),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<Vec<u8>>, D::Error> {
+        super::base64::deserialize(deserializer).map(Some)
+    }
+}
+
 pub mod datetime_rfc3339 {
     use chrono::{DateTime, SecondsFormat, Utc};
     use serde::{Deserialize, Deserializer, Serializer};

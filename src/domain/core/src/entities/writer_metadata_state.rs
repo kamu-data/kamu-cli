@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
+use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
 use crate::{PushSourceNotFoundError, ResolvedDataset, WriterSourceEventVisitor};
@@ -20,6 +23,7 @@ pub struct DataWriterMetadataState {
     pub block_ref: odf::BlockRef,
     pub head: odf::Multihash,
     pub schema: Option<odf::metadata::SetDataSchema>,
+    pub schema_arrow: Option<SchemaRef>,
     pub source_event: Option<odf::MetadataEvent>,
     pub merge_strategy: odf::metadata::MergeStrategy,
     pub vocab: odf::metadata::DatasetVocabulary,
@@ -131,10 +135,17 @@ impl DataWriterMetadataState {
                 None => (None, None, None),
             }
         };
+
+        let set_data_schema = set_data_schema_visitor.into_inner().into_event();
+        let schema_arrow = set_data_schema
+            .as_ref()
+            .map(|v| Arc::new(v.schema_as_arrow().unwrap()));
+
         Ok(Self {
             block_ref: block_ref.clone(),
             head,
-            schema: set_data_schema_visitor.into_inner().into_event(),
+            schema: set_data_schema,
+            schema_arrow,
             source_event,
             merge_strategy,
             vocab: set_vocab_visitor

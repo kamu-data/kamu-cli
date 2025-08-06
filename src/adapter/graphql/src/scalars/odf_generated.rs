@@ -207,6 +207,54 @@ impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datafield-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataField {
+    /// TODO
+    pub name: String,
+    /// Logical type of the field that defines its semantic behavior and value
+    /// ranges
+    pub r#type: DataType,
+    /// ODF extensions
+    pub extra: Option<ExtraAttributes>,
+}
+
+impl From<odf::metadata::DataField> for DataField {
+    fn from(v: odf::metadata::DataField) -> Self {
+        Self {
+            name: v.name.into(),
+            r#type: v.r#type.into(),
+            extra: v.extra.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// This schema is aims to be a human-friendly variant of Arrow. Arrow currently specifies only the [flatbuffer format](https://github.com/apache/arrow/blob/f9301c0ba8a7ed1b0b63275cfdd4c44c26b04675/format/Schema.fbs) which has many legacy to it and is not suited to be defined by humans, so we had to define our own schema format. While inspired by Arrow - this format makes a clear separation between logical data types and encoding (physical layout) of data in the chunks.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataschema-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataSchema {
+    /// Top-level fields (columns) of the schema.
+    pub fields: Vec<DataField>,
+    /// ODF extensions
+    pub extra: Option<ExtraAttributes>,
+}
+
+impl From<odf::metadata::DataSchema> for DataSchema {
+    fn from(v: odf::metadata::DataSchema) -> Self {
+        Self {
+            fields: v.fields.into_iter().map(Into::into).collect(),
+            extra: v.extra.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Describes a slice of data added to a dataset or produced via transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
@@ -229,6 +277,374 @@ impl From<odf::metadata::DataSlice> for DataSlice {
             physical_hash: v.physical_hash.into(),
             offset_interval: v.offset_interval.into(),
             size: v.size.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a logical type of the field. Logical type determines the semantics
+/// and boudaries of a type and how it can be operated on, without a concern
+/// about encoding and physical layout of the data in chunks.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatype-schema
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum DataType {
+    Binary(DataTypeBinary),
+    Bool(DataTypeBool),
+    Date(DataTypeDate),
+    Decimal(DataTypeDecimal),
+    Duration(DataTypeDuration),
+    Float(DataTypeFloat),
+    Int(DataTypeInt),
+    List(DataTypeList),
+    Map(DataTypeMap),
+    Null(DataTypeNull),
+    Option(DataTypeOption),
+    Struct(DataTypeStruct),
+    Time(DataTypeTime),
+    Timestamp(DataTypeTimestamp),
+    String(DataTypeString),
+}
+
+impl From<odf::metadata::DataType> for DataType {
+    fn from(v: odf::metadata::DataType) -> Self {
+        match v {
+            odf::metadata::DataType::Binary(v) => Self::Binary(v.into()),
+            odf::metadata::DataType::Bool(v) => Self::Bool(v.into()),
+            odf::metadata::DataType::Date(v) => Self::Date(v.into()),
+            odf::metadata::DataType::Decimal(v) => Self::Decimal(v.into()),
+            odf::metadata::DataType::Duration(v) => Self::Duration(v.into()),
+            odf::metadata::DataType::Float(v) => Self::Float(v.into()),
+            odf::metadata::DataType::Int(v) => Self::Int(v.into()),
+            odf::metadata::DataType::List(v) => Self::List(v.into()),
+            odf::metadata::DataType::Map(v) => Self::Map(v.into()),
+            odf::metadata::DataType::Null(v) => Self::Null(v.into()),
+            odf::metadata::DataType::Option(v) => Self::Option(v.into()),
+            odf::metadata::DataType::Struct(v) => Self::Struct(v.into()),
+            odf::metadata::DataType::Time(v) => Self::Time(v.into()),
+            odf::metadata::DataType::Timestamp(v) => Self::Timestamp(v.into()),
+            odf::metadata::DataType::String(v) => Self::String(v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebinary-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeBinary {
+    /// Number of bytes per value
+    pub fixed_length: Option<u64>,
+}
+
+impl From<odf::metadata::DataTypeBinary> for DataTypeBinary {
+    fn from(v: odf::metadata::DataTypeBinary) -> Self {
+        Self {
+            fixed_length: v.fixed_length.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebool-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeBool {
+    pub _dummy: Option<String>,
+}
+
+impl From<odf::metadata::DataTypeBool> for DataTypeBool {
+    fn from(v: odf::metadata::DataTypeBool) -> Self {
+        Self { _dummy: None }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedate-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeDate {
+    /// TODO
+    pub unit: DateUnit,
+    /// Number of bits per value. The accepted widths are 32 (for days) and 64
+    /// (for millisecods).
+    pub bit_width: u32,
+}
+
+impl From<odf::metadata::DataTypeDate> for DataTypeDate {
+    fn from(v: odf::metadata::DataTypeDate) -> Self {
+        Self {
+            unit: v.unit.into(),
+            bit_width: v.bit_width.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedecimal-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeDecimal {
+    /// Total number of decimal digits
+    pub precision: u32,
+    /// Number of digits after the decimal point. In certain situations, scale
+    /// could be negative number. For negative scale, it is the number of
+    /// padding 0 to the right of the digits.
+    ///
+    /// For example the number 12300 could be treated as a decimal has precision
+    /// 3 and scale -2.
+    pub scale: i32,
+    /// Number of bits per value. The accepted widths are 32, 64, 128 and 256.
+    /// We use bitWidth for consistency with Int::bitWidth.
+    pub bit_width: u32,
+}
+
+impl From<odf::metadata::DataTypeDecimal> for DataTypeDecimal {
+    fn from(v: odf::metadata::DataTypeDecimal) -> Self {
+        Self {
+            precision: v.precision.into(),
+            scale: v.scale.into(),
+            bit_width: v.bit_width.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeduration-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeDuration {
+    /// TODO
+    pub unit: TimeUnit,
+}
+
+impl From<odf::metadata::DataTypeDuration> for DataTypeDuration {
+    fn from(v: odf::metadata::DataTypeDuration) -> Self {
+        Self {
+            unit: v.unit.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeFloat {
+    /// restricted to 16, 32, and 64
+    pub bit_width: u32,
+}
+
+impl From<odf::metadata::DataTypeFloat> for DataTypeFloat {
+    fn from(v: odf::metadata::DataTypeFloat) -> Self {
+        Self {
+            bit_width: v.bit_width.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeInt {
+    /// restricted to 8, 16, 32, and 64
+    pub bit_width: u32,
+    /// TODO
+    pub signed: bool,
+}
+
+impl From<odf::metadata::DataTypeInt> for DataTypeInt {
+    fn from(v: odf::metadata::DataTypeInt) -> Self {
+        Self {
+            bit_width: v.bit_width.into(),
+            signed: v.signed.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypelist-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeList {
+    /// Data type of list items
+    pub item_type: Box<DataType>,
+    /// Number of list items per value
+    pub fixed_length: Option<u64>,
+}
+
+impl From<odf::metadata::DataTypeList> for DataTypeList {
+    fn from(v: odf::metadata::DataTypeList) -> Self {
+        Self {
+            item_type: Box::new((*v.item_type).into()),
+            fixed_length: v.fixed_length.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A Map is a logical nested type that is represented as `List<entries:
+/// Struct<key: K, value: V>>`
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypemap-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeMap {
+    /// Data type of the map's keys
+    pub key_type: Box<DataType>,
+    /// Data type of the map's values
+    pub value_type: Box<DataType>,
+    /// Set to true if the keys within each value are sorted
+    pub keys_sorted: Option<bool>,
+}
+
+impl From<odf::metadata::DataTypeMap> for DataTypeMap {
+    fn from(v: odf::metadata::DataTypeMap) -> Self {
+        Self {
+            key_type: Box::new((*v.key_type).into()),
+            value_type: Box::new((*v.value_type).into()),
+            keys_sorted: v.keys_sorted.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypenull-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeNull {
+    pub _dummy: Option<String>,
+}
+
+impl From<odf::metadata::DataTypeNull> for DataTypeNull {
+    fn from(v: odf::metadata::DataTypeNull) -> Self {
+        Self { _dummy: None }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents optional (nullable) values
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeoption-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeOption {
+    /// Inner data type
+    pub inner: Box<DataType>,
+}
+
+impl From<odf::metadata::DataTypeOption> for DataTypeOption {
+    fn from(v: odf::metadata::DataTypeOption) -> Self {
+        Self {
+            inner: Box::new((*v.inner).into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A unicode string.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestring-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeString {
+    pub _dummy: Option<String>,
+}
+
+impl From<odf::metadata::DataTypeString> for DataTypeString {
+    fn from(v: odf::metadata::DataTypeString) -> Self {
+        Self { _dummy: None }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestruct-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeStruct {
+    /// TODO
+    pub children: Vec<DataField>,
+}
+
+impl From<odf::metadata::DataTypeStruct> for DataTypeStruct {
+    fn from(v: odf::metadata::DataTypeStruct) -> Self {
+        Self {
+            children: v.children.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetime-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeTime {
+    /// TODO
+    pub unit: TimeUnit,
+    /// Number of bytes per value
+    pub bit_width: u32,
+}
+
+impl From<odf::metadata::DataTypeTime> for DataTypeTime {
+    fn from(v: odf::metadata::DataTypeTime) -> Self {
+        Self {
+            unit: v.unit.into(),
+            bit_width: v.bit_width.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetimestamp-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DataTypeTimestamp {
+    /// TODO
+    pub unit: TimeUnit,
+    /// The timezone is an optional string indicating the name of a timezone
+    /// one of
+    ///
+    /// * As used in the Olson timezone database (the "tz database" or
+    ///   "tzdata"), such as "America/New_York".
+    /// * An absolute timezone offset of the form "+XX:XX" or "-XX:XX", such as
+    ///   "+07:30".
+    ///
+    /// Whether a timezone string is present indicates different semantics about
+    /// the data (see above).
+    pub timezone: Option<String>,
+}
+
+impl From<odf::metadata::DataTypeTimestamp> for DataTypeTimestamp {
+    fn from(v: odf::metadata::DataTypeTimestamp) -> Self {
+        Self {
+            unit: v.unit.into(),
+            timezone: v.timezone.map(Into::into),
         }
     }
 }
@@ -299,20 +715,12 @@ impl From<odf::metadata::DatasetSnapshot> for DatasetSnapshot {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetVocabulary {
     /// Name of the offset column.
-    ///
-    /// Defaults to: "offset"
     pub offset_column: String,
     /// Name of the operation type column.
-    ///
-    /// Defaults to: "op"
     pub operation_type_column: String,
     /// Name of the system time column.
-    ///
-    /// Defaults to: "system_time"
     pub system_time_column: String,
     /// Name of the event time column.
-    ///
-    /// Defaults to: "event_time"
     pub event_time_column: String,
 }
 
@@ -323,6 +731,35 @@ impl From<odf::metadata::DatasetVocabulary> for DatasetVocabulary {
             operation_type_column: v.operation_type_column.into(),
             system_time_column: v.system_time_column.into(),
             event_time_column: v.event_time_column.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dateunit-schema
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DateUnit {
+    Day,
+    Millisecond,
+}
+
+impl From<odf::metadata::DateUnit> for DateUnit {
+    fn from(v: odf::metadata::DateUnit) -> Self {
+        match v {
+            odf::metadata::DateUnit::Day => Self::Day,
+            odf::metadata::DateUnit::Millisecond => Self::Millisecond,
+        }
+    }
+}
+
+impl Into<odf::metadata::DateUnit> for DateUnit {
+    fn into(self) -> odf::metadata::DateUnit {
+        match self {
+            Self::Day => odf::metadata::DateUnit::Day,
+            Self::Millisecond => odf::metadata::DateUnit::Millisecond,
         }
     }
 }
@@ -544,6 +981,52 @@ impl From<odf::metadata::ExecuteTransformInput> for ExecuteTransformInput {
             new_block_hash: v.new_block_hash.map(Into::into),
             prev_offset: v.prev_offset.map(Into::into),
             new_offset: v.new_offset.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for custom key-value extension attributes. Every key must be in
+/// the form of `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully
+/// disambiguate the value in the face of multiple extensions. Values may be any
+/// valid JSON including nested objects.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, Into, PartialEq, Eq))]
+pub struct ExtraAttributes(serde_json::Map<String, serde_json::Value>);
+impl Default for ExtraAttributes {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+impl From<odf::metadata::ExtraAttributes> for ExtraAttributes {
+    fn from(value: odf::metadata::ExtraAttributes) -> Self {
+        Self::new(value.attributes)
+    }
+}
+#[async_graphql::Scalar]
+impl async_graphql::ScalarType for ExtraAttributes {
+    fn parse(gql_value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let async_graphql::Value::Object(gql_map) = &gql_value else {
+            return Err(async_graphql::InputValueError::custom(format!(
+                "Invalid ExtraAttributes value: '{gql_value}'"
+            )));
+        };
+        let json_value = serde_json::to_value(gql_map)?;
+
+        let serde_json::Value::Object(json_map) = json_value else {
+            unreachable!()
+        };
+
+        Ok(Self::new(json_map))
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        match async_graphql::Value::from_json(serde_json::Value::Object(self.as_ref().clone())) {
+            Ok(v) => v,
+            Err(e) => unreachable!("{e}"),
         }
     }
 }
@@ -1593,15 +2076,16 @@ impl From<odf::metadata::SetAttachments> for SetAttachments {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetDataSchema {
-    pub schema: DataSchema,
+    pub schema: crate::prelude::DataSchema,
 }
 
 impl From<odf::metadata::SetDataSchema> for SetDataSchema {
     fn from(v: odf::metadata::SetDataSchema) -> Self {
-        // TODO: Error handling?
-        // TODO: Externalize format decision?
-        let arrow_schema = v.schema_as_arrow().unwrap();
-        let schema = DataSchema::from_arrow_schema(&arrow_schema, DataSchemaFormat::ParquetJson);
+        // TODO: Externalize format decision
+        let schema = crate::prelude::DataSchema::new(
+            std::sync::Arc::new(v.upgrade().schema),
+            DataSchemaFormat::ParquetJson,
+        );
         Self { schema }
     }
 }
@@ -1871,6 +2355,41 @@ impl From<odf::metadata::TemporalTable> for TemporalTable {
         Self {
             name: v.name.into(),
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#timeunit-schema
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeUnit {
+    Second,
+    Millisecond,
+    Microsecond,
+    Nanosecond,
+}
+
+impl From<odf::metadata::TimeUnit> for TimeUnit {
+    fn from(v: odf::metadata::TimeUnit) -> Self {
+        match v {
+            odf::metadata::TimeUnit::Second => Self::Second,
+            odf::metadata::TimeUnit::Millisecond => Self::Millisecond,
+            odf::metadata::TimeUnit::Microsecond => Self::Microsecond,
+            odf::metadata::TimeUnit::Nanosecond => Self::Nanosecond,
+        }
+    }
+}
+
+impl Into<odf::metadata::TimeUnit> for TimeUnit {
+    fn into(self) -> odf::metadata::TimeUnit {
+        match self {
+            Self::Second => odf::metadata::TimeUnit::Second,
+            Self::Millisecond => odf::metadata::TimeUnit::Millisecond,
+            Self::Microsecond => odf::metadata::TimeUnit::Microsecond,
+            Self::Nanosecond => odf::metadata::TimeUnit::Nanosecond,
         }
     }
 }

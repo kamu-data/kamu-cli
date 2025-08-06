@@ -210,7 +210,10 @@ pub async fn query_handler_impl(
     let (schema, schema_format) = if body.include.contains(&Include::Schema) {
         let schema_format = body.schema_format.unwrap_or_default();
         (
-            Some(Schema::new(df.schema().inner().clone(), schema_format)),
+            Some(Schema::new(
+                &odf::metadata::DataSchema::new_from_arrow(df.schema().inner()).strip_encoding(),
+                schema_format,
+            )),
             Some(schema_format),
         )
     } else {

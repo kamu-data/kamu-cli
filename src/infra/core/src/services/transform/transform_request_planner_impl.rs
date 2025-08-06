@@ -194,7 +194,8 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                     .as_ref()
                     .map(odf::metadata::SetDataSchema::schema_as_arrow)
                     .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
-                    .int_err()?,
+                    .int_err()?
+                    .map(Arc::new),
                 blocks,
                 finished_range,
             )
