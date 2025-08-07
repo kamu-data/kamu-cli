@@ -128,7 +128,8 @@ async fn test_current_push_source_blocks() {
         .execute(
             DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 &create_result.dataset_handle.id.to_string(),
-                "ADD_PUSH_SOURCE",
+                &["ADD_PUSH_SOURCE"],
+                None,
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -141,8 +142,8 @@ async fn test_current_push_source_blocks() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "extendedBlocksByEventType": []
-                    }
+                        "metadataProjection": []
+                    },
                 }
             }
         })
@@ -184,7 +185,8 @@ async fn test_current_push_source_blocks() {
         .execute(
             DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 &create_result.dataset_handle.id.to_string(),
-                "ADD_PUSH_SOURCE",
+                &["ADD_PUSH_SOURCE"],
+                None,
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -197,7 +199,7 @@ async fn test_current_push_source_blocks() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "extendedBlocksByEventType": [ {
+                        "metadataProjection": [{
                             "__typename": "MetadataBlockExtended",
                             "event": {
                                 "__typename": "AddPushSource",
@@ -304,7 +306,8 @@ async fn test_current_polling_source_block() {
         .execute(
             DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 create_result.dataset_handle.id.to_string().as_str(),
-                "SET_POLLING_SOURCE",
+                &["SET_POLLING_SOURCE"],
+                None,
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -316,7 +319,7 @@ async fn test_current_polling_source_block() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "extendedBlocksByEventType": [{
+                        "metadataProjection": [{
                             "__typename": "MetadataBlockExtended",
                             "event": {
                                 "__typename": "SetPollingSource",
@@ -384,7 +387,8 @@ async fn test_current_set_transform_block() {
         .execute(
             DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 create_derived_result.dataset_handle.id.to_string().as_str(),
-                "SET_TRANSFORM",
+                &["SET_TRANSFORM"],
+                None,
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -396,7 +400,7 @@ async fn test_current_set_transform_block() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "extendedBlocksByEventType": [{
+                        "metadataProjection": [{
                             "__typename": "MetadataBlockExtended",
                             "event": {
                                 "__typename": "SetTransform",
@@ -404,6 +408,178 @@ async fn test_current_set_transform_block() {
                                     "datasetRef": create_root_result.dataset_handle.id.to_string(),
                                     "alias": create_root_result.dataset_handle.alias.to_string(),
                                 }],
+                            }
+                        }]
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_multiple_metadata_block() {
+    let harness = DatasetMetadataHarness::new().await;
+
+    let create_result = harness.create_root_dataset().await;
+
+    // Add two push sources
+    create_result
+        .dataset
+        .commit_event(
+            MetadataFactory::add_push_source()
+                .source_name("source1")
+                .read(odf::metadata::ReadStepCsv {
+                    schema: Some(vec!["foo STRING".to_string()]),
+                    ..Default::default()
+                })
+                .build()
+                .into(),
+            odf::dataset::CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+    create_result
+        .dataset
+        .commit_event(
+            MetadataFactory::add_push_source()
+                .source_name("source2")
+                .read(odf::metadata::ReadStepNdJson {
+                    schema: Some(vec!["foo STRING".to_string()]),
+                    ..Default::default()
+                })
+                .build()
+                .into(),
+            odf::dataset::CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+                create_result.dataset_handle.id.to_string().as_str(),
+                &["SEED", "ADD_PUSH_SOURCE"],
+                None,
+            )
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "metadata": {
+                        "metadataProjection": [{
+                            "__typename": "MetadataBlockExtended",
+                            "event": {
+                                "__typename": "Seed",
+                                "datasetId": create_result.dataset_handle.id.to_string(),
+                            }
+                        }, {
+                            "__typename": "MetadataBlockExtended",
+                            "event": {
+                                "__typename": "AddPushSource",
+                                "sourceName": "source2",
+                                "read": {
+                                    "__typename": "ReadStepNdJson",
+                                }
+                            }
+                         }, {
+                            "__typename": "MetadataBlockExtended",
+                            "event": {
+                                "__typename": "AddPushSource",
+                                "sourceName": "source1",
+                                "read": {
+                                    "__typename": "ReadStepCsv",
+                                }
+                            }
+                        }]
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_metadata_blocks_in_range() {
+    let harness = DatasetMetadataHarness::new().await;
+
+    let create_result = harness.create_root_dataset().await;
+
+    // Add two push sources
+    create_result
+        .dataset
+        .commit_event(
+            MetadataFactory::add_push_source()
+                .source_name("source1")
+                .read(odf::metadata::ReadStepCsv {
+                    schema: Some(vec!["foo STRING".to_string()]),
+                    ..Default::default()
+                })
+                .build()
+                .into(),
+            odf::dataset::CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+    let last_commit_result = create_result
+        .dataset
+        .commit_event(
+            MetadataFactory::add_push_source()
+                .source_name("source2")
+                .read(odf::metadata::ReadStepNdJson {
+                    schema: Some(vec!["foo STRING".to_string()]),
+                    ..Default::default()
+                })
+                .build()
+                .into(),
+            odf::dataset::CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+                create_result.dataset_handle.id.to_string().as_str(),
+                &["SEED", "ADD_PUSH_SOURCE"],
+                Some(&last_commit_result.old_head.unwrap().to_string()),
+            )
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    // It will return seed and only the first push source
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "metadata": {
+                        "metadataProjection": [{
+                            "__typename": "MetadataBlockExtended",
+                            "event": {
+                                "__typename": "Seed",
+                                "datasetId": create_result.dataset_handle.id.to_string(),
+                            }
+                        }, {
+                            "__typename": "MetadataBlockExtended",
+                            "event": {
+                                "__typename": "AddPushSource",
+                                "sourceName": "source1",
+                                "read": {
+                                    "__typename": "ReadStepCsv",
+                                }
                             }
                         }]
                     }
@@ -578,17 +754,18 @@ impl DatasetMetadataHarness {
 
     fn get_dataset_metadata_blocks_request(
         dataset_id: &str,
-        event_type: &str,
+        event_type: &[&str],
+        head: Option<&str>,
     ) -> async_graphql::Request {
         async_graphql::Request::new(indoc!(
             r#"
-            query ($datasetId: DatasetID!, $eventType: MetadataEventType!) {
+            query ($datasetId: DatasetID!, $eventTypes: [MetadataEventType!], $head: Multihash) {
                 datasets {
                     byId(
                         datasetId: $datasetId
                     ) {
                         metadata {
-                            extendedBlocksByEventType (eventType: $eventType) {
+                            metadataProjection (eventTypes: $eventTypes, head: $head) {
                                 __typename
                                 event {
                                     __typename
@@ -596,6 +773,9 @@ impl DatasetMetadataHarness {
                                         read {
                                             __typename
                                         }
+                                    }
+                                     ... on Seed {
+                                        datasetId
                                     }
                                     ... on SetTransform {
                                         inputs {
@@ -619,7 +799,8 @@ impl DatasetMetadataHarness {
         ))
         .variables(async_graphql::Variables::from_json(json!({
             "datasetId": dataset_id,
-            "eventType": event_type,
+            "eventTypes": event_type,
+            "head": head
         })))
     }
 }

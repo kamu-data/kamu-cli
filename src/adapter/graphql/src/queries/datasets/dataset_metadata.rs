@@ -326,57 +326,55 @@ impl<'a> DatasetMetadata<'a> {
             .map(Into::into))
     }
 
-    #[tracing::instrument(level = "info", name = DatasetMetadata_extended_blocks_by_event_type, skip_all)]
-    async fn extended_blocks_by_event_type(
+    #[tracing::instrument(level = "info", name = DatasetMetadata_metadata_projection, skip_all)]
+    async fn metadata_projection(
         &self,
         ctx: &Context<'_>,
-        event_type: MetadataEventType,
+        event_types: Vec<MetadataEventType>,
+        encoding: Option<MetadataManifestFormat>,
+        head: Option<Multihash<'_>>,
     ) -> Result<Vec<MetadataBlockExtended>> {
         let account =
             Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
                 .await?
                 .expect("Account must exist");
 
-        let block_infos: Vec<(odf::Multihash, odf::metadata::MetadataBlock)> = match event_type {
-            MetadataEventType::SetPollingSource => {
-                let mut blocks = vec![];
-                if let Some((hash, block)) = self.get_current_polling_source(ctx).await? {
-                    blocks.push((hash, block.into()));
-                }
-                blocks
-            }
-            MetadataEventType::AddPushSource => self
-                .get_current_push_sources(ctx)
-                .await?
-                .into_iter()
-                .map(|(hash, block)| (hash, block.into()))
-                .collect(),
-            MetadataEventType::SetTransform => {
-                let mut blocks = vec![];
-                if let Some((hash, block)) = self.get_current_transform(ctx).await? {
-                    blocks.push((hash, block.into()));
-                }
-                blocks
-            }
-            _ => {
-                return Err(GqlError::gql(
-                    "Unsupported metadata event type for extended block retrieval",
-                ));
-            }
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+
+        let mut visitors_list: Vec<MetadataVisitor> =
+            event_types.iter().map(|event| (*event).into()).collect();
+
+        let mut visitors: Vec<
+            &mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>,
+        > = visitors_list
+            .iter_mut()
+            .map(MetadataVisitor::as_visitor)
+            .collect();
+
+        let head_hash = match head {
+            Some(h) => h.into(),
+            None => resolved_dataset
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?,
         };
 
+        resolved_dataset
+            .as_metadata_chain()
+            .accept_by_interval(visitors.as_mut_slice(), Some(&head_hash), None)
+            .await
+            .int_err()?;
+
         let mut result = vec![];
-        for (hash, block) in block_infos {
-            result.push(
-                MetadataBlockExtended::new(
-                    ctx,
-                    hash,
-                    block,
-                    account.clone(),
-                    Some(MetadataManifestFormat::Yaml),
-                )
-                .await?,
-            );
+
+        for visitor in visitors_list {
+            let blocks = visitor.into_boxed_extractor().extract_blocks();
+            for (hash, block) in blocks {
+                let extended_block =
+                    MetadataBlockExtended::new(ctx, hash, block, account.clone(), encoding).await?;
+                result.push(extended_block);
+            }
         }
 
         Ok(result)

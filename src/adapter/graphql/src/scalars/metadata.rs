@@ -11,6 +11,7 @@ use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
 use kamu_core::DatasetRegistry;
+use odf::dataset::MetadataChainVisitor;
 
 use crate::prelude::*;
 use crate::queries::Account;
@@ -220,8 +221,6 @@ impl MetadataEvent {
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MetadataEventType {
-    AddData,
-    ExecuteTransform,
     Seed,
     SetPollingSource,
     SetVocab,
@@ -231,6 +230,82 @@ pub enum MetadataEventType {
     SetDataSchema,
     SetTransform,
     AddPushSource,
-    DisablePushSource,
-    DisablePollingSource,
+}
+
+pub enum MetadataVisitor {
+    SetPollingSource(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetPollingSource>),
+    SetAttachments(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetAttachments>),
+    SetInfo(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetInfo>),
+    SetLicense(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetLicense>),
+    SetDataSchema(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetDataSchema>),
+    SetVocab(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetVocab>),
+    Seed(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::Seed>),
+    SetTransform(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetTransform>),
+    AddPushSources(odf::dataset::SearchAddPushSourcesVisitor),
+}
+
+impl MetadataVisitor {
+    pub fn as_visitor(
+        &mut self,
+    ) -> &mut dyn MetadataChainVisitor<Error = odf::dataset::Infallible> {
+        match self {
+            Self::SetAttachments(v) => v,
+            Self::SetInfo(v) => v,
+            Self::SetLicense(v) => v,
+            Self::SetDataSchema(v) => v,
+            Self::Seed(v) => v,
+            Self::SetVocab(v) => v,
+            Self::SetPollingSource(v) => v,
+            Self::SetTransform(v) => v,
+            Self::AddPushSources(v) => v,
+        }
+    }
+
+    pub fn into_boxed_extractor(self) -> Box<dyn odf::dataset::ExtractBlock> {
+        match self {
+            Self::SetAttachments(v) => Box::new(v),
+            Self::SetInfo(v) => Box::new(v),
+            Self::SetLicense(v) => Box::new(v),
+            Self::SetDataSchema(v) => Box::new(v),
+            Self::Seed(v) => Box::new(v),
+            Self::SetVocab(v) => Box::new(v),
+            Self::SetPollingSource(v) => Box::new(v),
+            Self::SetTransform(v) => Box::new(v),
+            Self::AddPushSources(v) => Box::new(v),
+        }
+    }
+}
+
+impl From<MetadataEventType> for MetadataVisitor {
+    fn from(event_type: MetadataEventType) -> Self {
+        match event_type {
+            MetadataEventType::SetPollingSource => {
+                MetadataVisitor::SetPollingSource(odf::dataset::SearchSetPollingSourceVisitor::new())
+            }
+            MetadataEventType::SetTransform => {
+                MetadataVisitor::SetTransform(odf::dataset::SearchSetTransformVisitor::new())
+            }
+            MetadataEventType::SetAttachments => {
+                MetadataVisitor::SetAttachments(odf::dataset::SearchSetAttachmentsVisitor::new())
+            }
+            MetadataEventType::SetInfo => {
+                MetadataVisitor::SetInfo(odf::dataset::SearchSetInfoVisitor::new())
+            }
+            MetadataEventType::SetLicense => {
+                MetadataVisitor::SetLicense(odf::dataset::SearchSetLicenseVisitor::new())
+            }
+            MetadataEventType::SetDataSchema => {
+                MetadataVisitor::SetDataSchema(odf::dataset::SearchSetDataSchemaVisitor::new())
+            }
+            MetadataEventType::Seed => {
+                MetadataVisitor::Seed(odf::dataset::SearchSeedVisitor::new())
+            }
+            MetadataEventType::SetVocab => {
+                MetadataVisitor::SetVocab(odf::dataset::SearchSetVocabVisitor::new())
+            }
+            MetadataEventType::AddPushSource => {
+                MetadataVisitor::AddPushSources(odf::dataset::SearchAddPushSourcesVisitor::new())
+            }
+        }
+    }
 }

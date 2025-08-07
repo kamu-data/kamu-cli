@@ -13,6 +13,7 @@ use std::marker::PhantomData;
 use internal_error::InternalError;
 use odf_metadata::{
     AddData,
+    AddPushSource,
     AsTypedBlock,
     ExecuteTransform,
     IntoDataStreamBlock,
@@ -35,7 +36,12 @@ use odf_metadata::{
     VariantOf,
 };
 
-use crate::{HashedMetadataBlockRef, MetadataChainVisitor, MetadataVisitorDecision as Decision};
+use crate::{
+    ExtractBlock,
+    HashedMetadataBlockRef,
+    MetadataChainVisitor,
+    MetadataVisitorDecision as Decision,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -209,6 +215,18 @@ where
     }
 }
 
+impl<T> ExtractBlock for SearchSingleTypedBlockVisitor<T>
+where
+    T: VariantOf<MetadataEvent> + Send,
+{
+    fn extract_blocks(self: Box<Self>) -> Vec<(Multihash, MetadataBlock)> {
+        self.into_hashed_block()
+            .map(|(hash, block)| (hash, block.into()))
+            .into_iter()
+            .collect()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum SearchSingleDataBlockVisitorKind {
@@ -279,6 +297,54 @@ impl MetadataChainVisitor for SearchSingleDataBlockVisitor {
         } else {
             Ok(Decision::NextOfType(Flag::DATA_BLOCK))
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchAddPushSourcesVisitor {
+    hashed_blocks: Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>,
+}
+
+impl SearchAddPushSourcesVisitor {
+    pub fn new() -> Self {
+        Self {
+            hashed_blocks: vec![],
+        }
+    }
+
+    pub fn into_hashed_blocks(self) -> Vec<(Multihash, MetadataBlockTyped<AddPushSource>)> {
+        self.hashed_blocks
+    }
+}
+
+impl MetadataChainVisitor for SearchAddPushSourcesVisitor {
+    type Error = Infallible;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::ADD_PUSH_SOURCE)
+    }
+
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let flag = Flag::from(&block.event);
+
+        if flag == Flag::ADD_PUSH_SOURCE {
+            self.hashed_blocks
+                .push((hash.clone(), block.clone().into_typed().unwrap()));
+        }
+
+        Ok(Decision::NextOfType(Flag::ADD_PUSH_SOURCE))
+    }
+}
+
+impl ExtractBlock for SearchAddPushSourcesVisitor {
+    fn extract_blocks(
+        self: Box<Self>,
+    ) -> Vec<(odf_metadata::Multihash, odf_metadata::MetadataBlock)> {
+        self.into_hashed_blocks()
+            .into_iter()
+            .map(|(hash, block)| (hash, block.into()))
+            .collect()
     }
 }
 

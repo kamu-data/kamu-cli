@@ -317,7 +317,7 @@ pub trait MetadataChainExt: MetadataChain {
             None
         };
 
-        // Iterate over blocks until we sasisfy all visitors or reach the tail
+        // Iterate over blocks until we satisfy all visitors or reach the tail
         while let Some((hash, block)) = current_hashed_block
             && merged_decision != MetadataVisitorDecision::Stop
             && tail_hash != Some(&hash)
