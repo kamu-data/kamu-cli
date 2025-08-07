@@ -339,17 +339,48 @@ impl<'a> DatasetMetadata<'a> {
                 .await?
                 .expect("Account must exist");
 
+        let mut attachments_visitor = event_types
+            .contains(&MetadataEventType::SetAttachments)
+            .then(odf::dataset::SearchSetAttachmentsVisitor::new);
+        let mut info_visitor = event_types
+            .contains(&MetadataEventType::SetInfo)
+            .then(odf::dataset::SearchSetInfoVisitor::new);
+        let mut license_visitor = event_types
+            .contains(&MetadataEventType::SetLicense)
+            .then(odf::dataset::SearchSetLicenseVisitor::new);
+        let mut schema_visitor = event_types
+            .contains(&MetadataEventType::SetDataSchema)
+            .then(odf::dataset::SearchSetDataSchemaVisitor::new);
+        let mut seed_visitor = event_types
+            .contains(&MetadataEventType::Seed)
+            .then(odf::dataset::SearchSeedVisitor::new);
+        let mut vocab_visitor = event_types
+            .contains(&MetadataEventType::SetVocab)
+            .then(odf::dataset::SearchSetVocabVisitor::new);
+        let mut polling_source_visitor = event_types
+            .contains(&MetadataEventType::SetPollingSource)
+            .then(odf::dataset::SearchSetPollingSourceVisitor::new);
+        let mut transform_visitor = event_types
+            .contains(&MetadataEventType::SetTransform)
+            .then(odf::dataset::SearchSetTransformVisitor::new);
+        let mut push_sources_visitor = event_types
+            .contains(&MetadataEventType::AddPushSource)
+            .then(odf::dataset::SearchActivePushSourcesVisitor::new);
+
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
-        let mut visitors_list: Vec<MetadataVisitor> =
-            event_types.iter().map(|event| (*event).into()).collect();
-
-        let mut visitors: Vec<
-            &mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>,
-        > = visitors_list
-            .iter_mut()
-            .map(MetadataVisitor::as_visitor)
-            .collect();
+        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>;
+            9] = [
+            &mut attachments_visitor,
+            &mut info_visitor,
+            &mut license_visitor,
+            &mut schema_visitor,
+            &mut seed_visitor,
+            &mut vocab_visitor,
+            &mut polling_source_visitor,
+            &mut transform_visitor,
+            &mut push_sources_visitor,
+        ];
 
         let head_hash = match head {
             Some(h) => h.into(),
@@ -368,12 +399,77 @@ impl<'a> DatasetMetadata<'a> {
 
         let mut result = vec![];
 
-        for visitor in visitors_list {
-            let blocks = visitor.into_boxed_extractor().extract_blocks();
-            for (hash, block) in blocks {
-                let extended_block =
-                    MetadataBlockExtended::new(ctx, hash, block, account.clone(), encoding).await?;
-                result.push(extended_block);
+        // Add all blocks from visitors
+        if let Some(inner) = attachments_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = info_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = license_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = schema_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = seed_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = vocab_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = polling_source_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = transform_visitor
+            && let Some((hash, block)) = inner.into_hashed_block()
+        {
+            result.push(
+                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                    .await?,
+            );
+        }
+        if let Some(inner) = push_sources_visitor {
+            for (hash, block) in inner.into_hashed_blocks() {
+                result.push(
+                    MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
+                        .await?,
+                );
             }
         }
 

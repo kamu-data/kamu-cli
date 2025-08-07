@@ -36,12 +36,7 @@ use odf_metadata::{
     VariantOf,
 };
 
-use crate::{
-    ExtractBlock,
-    HashedMetadataBlockRef,
-    MetadataChainVisitor,
-    MetadataVisitorDecision as Decision,
-};
+use crate::{HashedMetadataBlockRef, MetadataChainVisitor, MetadataVisitorDecision as Decision};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -215,18 +210,6 @@ where
     }
 }
 
-impl<T> ExtractBlock for SearchSingleTypedBlockVisitor<T>
-where
-    T: VariantOf<MetadataEvent> + Send,
-{
-    fn extract_blocks(self: Box<Self>) -> Vec<(Multihash, MetadataBlock)> {
-        self.into_hashed_block()
-            .map(|(hash, block)| (hash, block.into()))
-            .into_iter()
-            .collect()
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum SearchSingleDataBlockVisitorKind {
@@ -302,11 +285,11 @@ impl MetadataChainVisitor for SearchSingleDataBlockVisitor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchAddPushSourcesVisitor {
+pub struct SearchActivePushSourcesVisitor {
     hashed_blocks: Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>,
 }
 
-impl SearchAddPushSourcesVisitor {
+impl SearchActivePushSourcesVisitor {
     pub fn new() -> Self {
         Self {
             hashed_blocks: vec![],
@@ -318,7 +301,7 @@ impl SearchAddPushSourcesVisitor {
     }
 }
 
-impl MetadataChainVisitor for SearchAddPushSourcesVisitor {
+impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
     type Error = Infallible;
 
     fn initial_decision(&self) -> Decision {
@@ -334,17 +317,6 @@ impl MetadataChainVisitor for SearchAddPushSourcesVisitor {
         }
 
         Ok(Decision::NextOfType(Flag::ADD_PUSH_SOURCE))
-    }
-}
-
-impl ExtractBlock for SearchAddPushSourcesVisitor {
-    fn extract_blocks(
-        self: Box<Self>,
-    ) -> Vec<(odf_metadata::Multihash, odf_metadata::MetadataBlock)> {
-        self.into_hashed_blocks()
-            .into_iter()
-            .map(|(hash, block)| (hash, block.into()))
-            .collect()
     }
 }
 

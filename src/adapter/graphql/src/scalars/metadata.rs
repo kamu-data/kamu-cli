@@ -11,7 +11,6 @@ use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
 use kamu_core::DatasetRegistry;
-use odf::dataset::MetadataChainVisitor;
 
 use crate::prelude::*;
 use crate::queries::Account;
@@ -28,27 +27,10 @@ pub struct MetadataBlockExtended {
     pub author: Account,
     pub event: MetadataEvent,
     pub sequence_number: u64,
-    pub encoded: Option<String>,
+    pub encoded: Option<EncodedBlock>,
 }
 
 impl MetadataBlockExtended {
-    pub fn encode_block(
-        block: &odf::metadata::MetadataBlock,
-        format: MetadataManifestFormat,
-    ) -> Result<String, InternalError> {
-        use odf::metadata::serde::MetadataBlockSerializer;
-
-        match format {
-            MetadataManifestFormat::Yaml => {
-                let ser = odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
-
-                let buffer = ser.write_manifest(block).int_err()?;
-                let content = std::str::from_utf8(&buffer).int_err()?;
-                Ok(content.to_string())
-            }
-        }
-    }
-
     pub async fn new(
         ctx: &Context<'_>,
         block_hash: impl Into<Multihash<'static>>,
@@ -59,7 +41,7 @@ impl MetadataBlockExtended {
         let odf_block = MetadataBlock::with_extended_aliases(ctx, block).await?;
 
         let encoded = if let Some(format) = encode_format_maybe {
-            Some(Self::encode_block(&odf_block, format)?)
+            Some(EncodedBlock::new(format, &odf_block)?)
         } else {
             None
         };
@@ -75,6 +57,43 @@ impl MetadataBlockExtended {
             sequence_number: block.sequence_number,
             encoded,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EncodedBlock
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, SimpleObject, PartialEq, Eq)]
+pub struct EncodedBlock {
+    pub encoding: MetadataManifestFormat,
+    pub content: String,
+}
+
+impl EncodedBlock {
+    pub fn new(
+        encoding: MetadataManifestFormat,
+        odf_block: &odf::metadata::MetadataBlock,
+    ) -> Result<Self, InternalError> {
+        let content = Self::encode_block(odf_block, encoding)?;
+        Ok(Self { encoding, content })
+    }
+
+    pub fn encode_block(
+        block: &odf::metadata::MetadataBlock,
+        format: MetadataManifestFormat,
+    ) -> Result<String, InternalError> {
+        use odf::metadata::serde::MetadataBlockSerializer;
+
+        match format {
+            MetadataManifestFormat::Yaml => {
+                let ser = odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
+
+                let buffer = ser.write_manifest(block).int_err()?;
+                let content = std::str::from_utf8(&buffer).int_err()?;
+                Ok(content.to_string())
+            }
+        }
     }
 }
 
@@ -230,82 +249,4 @@ pub enum MetadataEventType {
     SetDataSchema,
     SetTransform,
     AddPushSource,
-}
-
-pub enum MetadataVisitor {
-    SetPollingSource(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetPollingSource>),
-    SetAttachments(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetAttachments>),
-    SetInfo(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetInfo>),
-    SetLicense(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetLicense>),
-    SetDataSchema(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetDataSchema>),
-    SetVocab(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetVocab>),
-    Seed(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::Seed>),
-    SetTransform(odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetTransform>),
-    AddPushSources(odf::dataset::SearchAddPushSourcesVisitor),
-}
-
-impl MetadataVisitor {
-    pub fn as_visitor(
-        &mut self,
-    ) -> &mut dyn MetadataChainVisitor<Error = odf::dataset::Infallible> {
-        match self {
-            Self::SetAttachments(v) => v,
-            Self::SetInfo(v) => v,
-            Self::SetLicense(v) => v,
-            Self::SetDataSchema(v) => v,
-            Self::Seed(v) => v,
-            Self::SetVocab(v) => v,
-            Self::SetPollingSource(v) => v,
-            Self::SetTransform(v) => v,
-            Self::AddPushSources(v) => v,
-        }
-    }
-
-    pub fn into_boxed_extractor(self) -> Box<dyn odf::dataset::ExtractBlock> {
-        match self {
-            Self::SetAttachments(v) => Box::new(v),
-            Self::SetInfo(v) => Box::new(v),
-            Self::SetLicense(v) => Box::new(v),
-            Self::SetDataSchema(v) => Box::new(v),
-            Self::Seed(v) => Box::new(v),
-            Self::SetVocab(v) => Box::new(v),
-            Self::SetPollingSource(v) => Box::new(v),
-            Self::SetTransform(v) => Box::new(v),
-            Self::AddPushSources(v) => Box::new(v),
-        }
-    }
-}
-
-impl From<MetadataEventType> for MetadataVisitor {
-    fn from(event_type: MetadataEventType) -> Self {
-        match event_type {
-            MetadataEventType::SetPollingSource => {
-                MetadataVisitor::SetPollingSource(odf::dataset::SearchSetPollingSourceVisitor::new())
-            }
-            MetadataEventType::SetTransform => {
-                MetadataVisitor::SetTransform(odf::dataset::SearchSetTransformVisitor::new())
-            }
-            MetadataEventType::SetAttachments => {
-                MetadataVisitor::SetAttachments(odf::dataset::SearchSetAttachmentsVisitor::new())
-            }
-            MetadataEventType::SetInfo => {
-                MetadataVisitor::SetInfo(odf::dataset::SearchSetInfoVisitor::new())
-            }
-            MetadataEventType::SetLicense => {
-                MetadataVisitor::SetLicense(odf::dataset::SearchSetLicenseVisitor::new())
-            }
-            MetadataEventType::SetDataSchema => {
-                MetadataVisitor::SetDataSchema(odf::dataset::SearchSetDataSchemaVisitor::new())
-            }
-            MetadataEventType::Seed => {
-                MetadataVisitor::Seed(odf::dataset::SearchSeedVisitor::new())
-            }
-            MetadataEventType::SetVocab => {
-                MetadataVisitor::SetVocab(odf::dataset::SearchSetVocabVisitor::new())
-            }
-            MetadataEventType::AddPushSource => {
-                MetadataVisitor::AddPushSources(odf::dataset::SearchAddPushSourcesVisitor::new())
-            }
-        }
-    }
 }
