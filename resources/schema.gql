@@ -1583,6 +1583,11 @@ type Eip4361AuthNonceResponse {
 
 scalar Email
 
+type EncodedBlock {
+	encoding: MetadataManifestFormat!
+	content: String!
+}
+
 type EngineDesc {
 	"""
 	A short name of the engine, e.g. "Spark", "Flink".
@@ -2521,7 +2526,7 @@ type MetadataBlockExtended {
 	author: Account!
 	event: MetadataEvent!
 	sequenceNumber: Int!
-	encoded: String
+	encoded: EncodedBlock
 }
 
 type MetadataChain {
