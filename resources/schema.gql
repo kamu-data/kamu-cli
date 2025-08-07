@@ -1245,7 +1245,7 @@ type DatasetMetadata {
 	Current vocabulary associated with the dataset
 	"""
 	currentVocab: SetVocab
-	extendedBlocksByEventType(eventType: MetadataEventType!): [MetadataBlockExtended!]!
+	metadataProjection(eventTypes: [MetadataEventType!]!, encoding: MetadataManifestFormat, head: Multihash): [MetadataBlockExtended!]!
 }
 
 type DatasetMetadataMut {
@@ -2559,8 +2559,6 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 union MetadataEvent = AddData | ExecuteTransform | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
 
 enum MetadataEventType {
-	ADD_DATA
-	EXECUTE_TRANSFORM
 	SEED
 	SET_POLLING_SOURCE
 	SET_VOCAB
@@ -2570,8 +2568,6 @@ enum MetadataEventType {
 	SET_DATA_SCHEMA
 	SET_TRANSFORM
 	ADD_PUSH_SOURCE
-	DISABLE_PUSH_SOURCE
-	DISABLE_POLLING_SOURCE
 }
 
 enum MetadataManifestFormat {
