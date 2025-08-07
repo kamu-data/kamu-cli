@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- GQL: `dataset_metadata`: Added 3 new methods to get `SetPollingSource`, `SetTransform` and `AddPushSource` extended blocks
+- GQL: `dataset_metadata`: Added new method `MetadataProjection` to get `[MetadataExtendedBlock]` filtered by types and range
 
 ## [0.245.3] - 2025-07-29
 ### Fixed
