@@ -44,7 +44,6 @@ pub(crate) fn not_found_response() -> axum::response::Response {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[expect(dead_code)]
 pub(crate) fn unauthorized_access_response() -> axum::response::Response {
     error_response(http::status::StatusCode::UNAUTHORIZED)
 }
