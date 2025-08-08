@@ -1245,6 +1245,7 @@ type DatasetMetadata {
 	Current vocabulary associated with the dataset
 	"""
 	currentVocab: SetVocab
+	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
 }
 
 type DatasetMetadataMut {
@@ -1581,6 +1582,11 @@ type Eip4361AuthNonceResponse {
 }
 
 scalar Email
+
+type EncodedBlock {
+	encoding: MetadataManifestFormat!
+	content: String!
+}
 
 type EngineDesc {
 	"""
@@ -2520,6 +2526,7 @@ type MetadataBlockExtended {
 	author: Account!
 	event: MetadataEvent!
 	sequenceNumber: Int!
+	encoded(encoding: MetadataManifestFormat!): EncodedBlock
 }
 
 type MetadataChain {
@@ -2555,6 +2562,18 @@ Represents a transaction that occurred on a dataset.
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
 """
 union MetadataEvent = AddData | ExecuteTransform | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
+
+enum MetadataEventType {
+	SEED
+	SET_POLLING_SOURCE
+	SET_VOCAB
+	SET_ATTACHMENTS
+	SET_INFO
+	SET_LICENSE
+	SET_DATA_SCHEMA
+	SET_TRANSFORM
+	ADD_PUSH_SOURCE
+}
 
 enum MetadataManifestFormat {
 	YAML
