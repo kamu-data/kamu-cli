@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - GQL: `dataset_metadata`: Added new method `MetadataProjection` to get `[MetadataExtendedBlock]` filtered by types and range
+### Fixed
+- Correctly handle empty authentication token error
 
 ## [0.245.3] - 2025-07-29
 ### Fixed

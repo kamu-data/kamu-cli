@@ -136,11 +136,12 @@ where
         let mut inner = self.inner.clone();
 
         Box::pin(async move {
-            let maybe_access_token = request
-                .extract_parts::<Option<BearerHeader>>()
-                .await
-                .unwrap()
-                .map(|th| AccessToken::new(th.token()));
+            let maybe_access_token =
+                if let Ok(access_token) = request.extract_parts::<Option<BearerHeader>>().await {
+                    access_token.map(|th| AccessToken::new(th.token()))
+                } else {
+                    return Ok(unauthorized_access_response());
+                };
 
             let base_catalog = request
                 .extensions()
