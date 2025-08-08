@@ -309,6 +309,7 @@ impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        // TODO: Add support of `DisablePushSource` events
         let flag = Flag::from(&block.event);
 
         if flag == Flag::ADD_PUSH_SOURCE {

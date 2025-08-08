@@ -1245,7 +1245,7 @@ type DatasetMetadata {
 	Current vocabulary associated with the dataset
 	"""
 	currentVocab: SetVocab
-	metadataProjection(eventTypes: [MetadataEventType!]!, encoding: MetadataManifestFormat, head: Multihash): [MetadataBlockExtended!]!
+	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
 }
 
 type DatasetMetadataMut {
@@ -2526,7 +2526,7 @@ type MetadataBlockExtended {
 	author: Account!
 	event: MetadataEvent!
 	sequenceNumber: Int!
-	encoded: EncodedBlock
+	encoded(encoding: MetadataManifestFormat!): EncodedBlock
 }
 
 type MetadataChain {

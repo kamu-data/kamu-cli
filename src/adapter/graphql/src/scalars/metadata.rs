@@ -20,32 +20,29 @@ use crate::queries::Account;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, SimpleObject, PartialEq, Eq)]
+#[graphql(complex)]
 pub struct MetadataBlockExtended {
+    #[graphql(skip)]
+    pub block: odf::metadata::MetadataBlock,
     pub block_hash: Multihash<'static>,
     pub prev_block_hash: Option<Multihash<'static>>,
     pub system_time: DateTime<Utc>,
     pub author: Account,
     pub event: MetadataEvent,
     pub sequence_number: u64,
-    pub encoded: Option<EncodedBlock>,
 }
 
+#[ComplexObject]
 impl MetadataBlockExtended {
+    #[graphql(skip)]
     pub async fn new(
         ctx: &Context<'_>,
         block_hash: impl Into<Multihash<'static>>,
         block: odf::metadata::MetadataBlock,
         author: Account,
-        encode_format_maybe: Option<MetadataManifestFormat>,
     ) -> Result<Self, InternalError> {
         let odf_block = MetadataBlock::with_extended_aliases(ctx, block).await?;
-
-        let encoded = if let Some(format) = encode_format_maybe {
-            Some(EncodedBlock::new(format, &odf_block)?)
-        } else {
-            None
-        };
-
+        let original_block = odf_block.clone();
         let block: MetadataBlock = odf_block.into();
 
         Ok(Self {
@@ -55,8 +52,16 @@ impl MetadataBlockExtended {
             author,
             event: block.event,
             sequence_number: block.sequence_number,
-            encoded,
+            block: original_block,
         })
+    }
+
+    #[expect(clippy::unused_async)]
+    async fn encoded(
+        &self,
+        encoding: MetadataManifestFormat,
+    ) -> Result<Option<EncodedBlock>, InternalError> {
+        Ok(Some(EncodedBlock::new(encoding, &self.block)?))
     }
 }
 
@@ -73,9 +78,9 @@ pub struct EncodedBlock {
 impl EncodedBlock {
     pub fn new(
         encoding: MetadataManifestFormat,
-        odf_block: &odf::metadata::MetadataBlock,
+        block: &odf::metadata::MetadataBlock,
     ) -> Result<Self, InternalError> {
-        let content = Self::encode_block(odf_block, encoding)?;
+        let content = Self::encode_block(block, encoding)?;
         Ok(Self { encoding, content })
     }
 

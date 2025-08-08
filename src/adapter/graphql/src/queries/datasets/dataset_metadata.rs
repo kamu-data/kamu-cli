@@ -20,7 +20,6 @@ use crate::queries::*;
 use crate::scalars::DatasetPushStatuses;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct DatasetMetadata<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
@@ -331,7 +330,6 @@ impl<'a> DatasetMetadata<'a> {
         &self,
         ctx: &Context<'_>,
         event_types: Vec<MetadataEventType>,
-        encoding: Option<MetadataManifestFormat>,
         head: Option<Multihash<'_>>,
     ) -> Result<Vec<MetadataBlockExtended>> {
         let account =
@@ -397,81 +395,48 @@ impl<'a> DatasetMetadata<'a> {
             .await
             .int_err()?;
 
-        let mut result = vec![];
+        let mut maybe_hashed_blocks: Vec<Option<(odf::Multihash, odf::metadata::MetadataBlock)>> = vec![
+            attachments_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            info_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            license_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            schema_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            seed_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            vocab_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            polling_source_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            transform_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+        ];
+        maybe_hashed_blocks.extend(
+            push_sources_visitor
+                .map(odf::dataset::SearchActivePushSourcesVisitor::into_hashed_blocks)
+                .into_iter()
+                .flatten()
+                .map(|(h, b)| Some((h, b.into()))),
+        );
 
-        // Add all blocks from visitors
-        if let Some(inner) = attachments_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = info_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = license_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = schema_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = seed_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = vocab_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = polling_source_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = transform_visitor
-            && let Some((hash, block)) = inner.into_hashed_block()
-        {
-            result.push(
-                MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                    .await?,
-            );
-        }
-        if let Some(inner) = push_sources_visitor {
-            for (hash, block) in inner.into_hashed_blocks() {
-                result.push(
-                    MetadataBlockExtended::new(ctx, hash, block.into(), account.clone(), encoding)
-                        .await?,
-                );
-            }
-        }
+        let futures_iter = maybe_hashed_blocks
+            .into_iter()
+            .flatten() // Skip nones
+            .map(|(hash, block)| async {
+                MetadataBlockExtended::new(ctx, hash, block, account.clone()).await
+            });
+
+        let result = futures::future::try_join_all(futures_iter).await?;
 
         Ok(result)
     }
