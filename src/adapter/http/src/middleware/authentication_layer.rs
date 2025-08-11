@@ -140,7 +140,7 @@ where
                 if let Ok(access_token) = request.extract_parts::<Option<BearerHeader>>().await {
                     access_token.map(|th| AccessToken::new(th.token()))
                 } else {
-                    return Ok(unauthorized_access_response());
+                    return Ok(bad_request_response(Some("Invalid Bearer token header")));
                 };
 
             let base_catalog = request

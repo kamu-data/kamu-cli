@@ -32,40 +32,53 @@ pub(crate) use from_catalog_n;
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn bad_request_response() -> axum::response::Response {
-    error_response(http::status::StatusCode::BAD_REQUEST)
+pub(crate) fn bad_request_response<B>(body_maybe: Option<B>) -> axum::response::Response
+where
+    B: Into<axum::body::Body>,
+{
+    error_response(http::status::StatusCode::BAD_REQUEST, body_maybe)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn not_found_response() -> axum::response::Response {
-    error_response(http::status::StatusCode::NOT_FOUND)
+    error_response::<axum::body::Body>(http::status::StatusCode::NOT_FOUND, None)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn unauthorized_access_response() -> axum::response::Response {
-    error_response(http::status::StatusCode::UNAUTHORIZED)
+#[expect(dead_code)]
+pub(crate) fn unauthorized_access_response<B>(body_maybe: Option<B>) -> axum::response::Response
+where
+    B: Into<axum::body::Body>,
+{
+    error_response(http::status::StatusCode::UNAUTHORIZED, body_maybe)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn forbidden_access_response() -> axum::response::Response {
-    error_response(http::status::StatusCode::FORBIDDEN)
+    error_response::<axum::body::Body>(http::status::StatusCode::FORBIDDEN, None)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn internal_server_error_response() -> axum::response::Response {
-    error_response(http::status::StatusCode::INTERNAL_SERVER_ERROR)
+    error_response::<axum::body::Body>(http::status::StatusCode::INTERNAL_SERVER_ERROR, None)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn error_response(status: http::status::StatusCode) -> axum::response::Response {
+fn error_response<B>(
+    status: http::status::StatusCode,
+    body_maybe: Option<B>,
+) -> axum::response::Response
+where
+    B: Into<axum::body::Body>,
+{
     axum::response::Response::builder()
         .status(status)
-        .body(Default::default())
+        .body(body_maybe.map(Into::into).unwrap_or_default())
         .unwrap()
 }
 

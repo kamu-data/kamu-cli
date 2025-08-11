@@ -113,7 +113,7 @@ async fn test_correct_handle_empty_bearer_token() {
         let client = reqwest::Client::new();
         let response = client.get(test_url).bearer_auth("").send().await.unwrap();
 
-        assert_eq!(http::StatusCode::UNAUTHORIZED, response.status());
+        assert_eq!(http::StatusCode::BAD_REQUEST, response.status());
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
