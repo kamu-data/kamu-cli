@@ -24,7 +24,7 @@ doctest = false
 [features]
 default = []
 
-e2e = ["dep:http-body-util"]
+e2e = []
 
 
 [dependencies]
@@ -56,7 +56,7 @@ base64 = { version = "0.22", default-features = false }
 bytes = "1"
 canonical_json = { version = "0.5.0", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
-datafusion = { version = "48", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = { version = "49", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = { version = "0.14", default-features = false }
 ed25519-dalek = { version = "2", default-features = false, features = [
     "std",
@@ -98,7 +98,7 @@ utoipa = { version = "5", default-features = false, features = [] }
 utoipa-axum = { version = "0.2", default-features = false, features = [] }
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
-http-body-util = { optional = true, version = "0.1" }
+http-body-util = { version = "0.1" }
 
 
 [dev-dependencies]

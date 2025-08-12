@@ -227,12 +227,13 @@ async fn test_read_ndjson_format_timestamp_parse_failed() {
             "#
         ),
         |res| async {
+            let res = res.unwrap().collect().await;
+            let Err(DataFusionError::ArrowError(arrow_error, _)) = res else {
+                panic!("Expected ArrowError, got: {res:?}");
+            };
             assert_matches!(
-                res.unwrap().collect().await,
-                Err(DataFusionError::ArrowError(
-                    ::datafusion::arrow::error::ArrowError::JsonError(_),
-                    _
-                ))
+                *arrow_error,
+                ::datafusion::arrow::error::ArrowError::JsonError(_)
             );
         },
     )

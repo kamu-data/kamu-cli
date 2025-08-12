@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use datafusion::arrow::array::StringArray;
+use datafusion::arrow::array::StringViewArray;
 use datafusion::prelude::{SessionContext, *};
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
@@ -235,7 +235,7 @@ async fn test_read_shapefile_geom() {
             let geom = batch
                 .column(0)
                 .as_any()
-                .downcast_ref::<StringArray>()
+                .downcast_ref::<StringViewArray>()
                 .unwrap()
                 .value(0);
 

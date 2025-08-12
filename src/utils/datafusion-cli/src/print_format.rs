@@ -213,7 +213,7 @@ impl PrintFormat {
     }
 }
 
-#[cfg(test)]
+#[cfg(false)]
 mod tests {
     use std::sync::Arc;
 

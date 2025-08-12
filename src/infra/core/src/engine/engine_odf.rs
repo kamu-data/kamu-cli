@@ -294,6 +294,7 @@ impl Engine for ODFEngine {
                     },
                     column_specific_options: HashMap::new(),
                     key_value_metadata: HashMap::new(),
+                    crypto: datafusion::config::ParquetEncryptionOptions::default(),
                 }),
             )
             .await
