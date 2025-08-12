@@ -393,7 +393,7 @@ scalar Base64Usnp
 
 input BatchingInput {
 	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDeltaInput!
+	maxBatchingInterval: TimeDeltaInput
 }
 
 type BlockRef {
@@ -2327,7 +2327,7 @@ type FlowTrigger {
 
 type FlowTriggerBatchingRule {
 	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDelta!
+	maxBatchingInterval: TimeDelta
 }
 
 input FlowTriggerInput @oneOf {

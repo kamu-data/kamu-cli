@@ -17,8 +17,8 @@ use thiserror::Error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BatchingRule {
     min_records_to_await: u64,
-    #[serde_as(as = "serde_with::DurationMilliSeconds<i64>")]
-    max_batching_interval: Duration,
+    #[serde_as(as = "Option<serde_with::DurationMilliSeconds<i64>>")]
+    max_batching_interval: Option<Duration>,
 }
 
 impl BatchingRule {
@@ -27,22 +27,24 @@ impl BatchingRule {
     pub fn empty() -> Self {
         Self {
             min_records_to_await: 0,
-            max_batching_interval: Duration::seconds(0),
+            max_batching_interval: None,
         }
     }
 
-    pub fn new_checked(
+    pub fn new(
         min_records_to_await: u64,
-        max_batching_interval: Duration,
+        max_batching_interval: Option<Duration>,
     ) -> Result<Self, BatchingRuleValidationError> {
-        let lower_interval_bound = Duration::seconds(0);
-        if lower_interval_bound > max_batching_interval {
-            return Err(BatchingRuleValidationError::MinIntervalNotPositive);
-        }
+        if let Some(max_batching_interval) = max_batching_interval {
+            let lower_interval_bound = Duration::seconds(0);
+            if lower_interval_bound >= max_batching_interval {
+                return Err(BatchingRuleValidationError::MinIntervalNotPositive);
+            }
 
-        let upper_interval_bound = Duration::hours(Self::MAX_BATCHING_INTERVAL_HOURS);
-        if max_batching_interval > upper_interval_bound {
-            return Err(BatchingRuleValidationError::MaxIntervalAboveLimit);
+            let upper_interval_bound = Duration::hours(Self::MAX_BATCHING_INTERVAL_HOURS);
+            if max_batching_interval > upper_interval_bound {
+                return Err(BatchingRuleValidationError::MaxIntervalAboveLimit);
+            }
         }
 
         Ok(Self {
@@ -57,8 +59,8 @@ impl BatchingRule {
     }
 
     #[inline]
-    pub fn max_batching_interval(&self) -> &Duration {
-        &self.max_batching_interval
+    pub fn max_batching_interval(&self) -> Option<Duration> {
+        self.max_batching_interval
     }
 }
 
@@ -88,19 +90,19 @@ mod tests {
 
     #[test]
     fn test_good_batching_rule() {
-        assert_matches!(BatchingRule::new_checked(1, TimeDelta::minutes(15)), Ok(_));
+        assert_matches!(BatchingRule::new(1, Some(TimeDelta::minutes(15))), Ok(_));
         assert_matches!(
-            BatchingRule::new_checked(1_000_000, TimeDelta::hours(3)),
+            BatchingRule::new(1_000_000, Some(TimeDelta::hours(3))),
             Ok(_)
         );
-        assert_matches!(BatchingRule::new_checked(1, TimeDelta::hours(24)), Ok(_));
-        assert_matches!(BatchingRule::new_checked(0, TimeDelta::minutes(0)), Ok(_));
+        assert_matches!(BatchingRule::new(1, Some(TimeDelta::hours(24))), Ok(_));
+        assert_matches!(BatchingRule::new(0, None), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_interval() {
         assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::minutes(-1)),
+            BatchingRule::new(1, Some(TimeDelta::minutes(-1))),
             Err(BatchingRuleValidationError::MinIntervalNotPositive)
         );
     }
@@ -108,9 +110,9 @@ mod tests {
     #[test]
     fn test_too_large_max_interval() {
         assert_matches!(
-            BatchingRule::new_checked(
+            BatchingRule::new(
                 1,
-                TimeDelta::try_hours(24).unwrap() + TimeDelta::nanoseconds(1)
+                Some(TimeDelta::try_hours(24).unwrap() + TimeDelta::nanoseconds(1))
             ),
             Err(BatchingRuleValidationError::MaxIntervalAboveLimit)
         );

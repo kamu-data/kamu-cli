@@ -3047,7 +3047,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::seconds(1)).unwrap()),
+            FlowTriggerRule::Batching(BatchingRule::new(1, Some(Duration::seconds(1))).unwrap()),
         )
         .await;
 
@@ -3450,7 +3450,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&baz_id),
-            FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::hours(24)).unwrap()),
+            FlowTriggerRule::Batching(BatchingRule::new(1, Some(Duration::hours(24))).unwrap()),
         )
         .await;
 
@@ -3970,7 +3970,7 @@ async fn test_batching_condition_records_reached() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(
-                BatchingRule::new_checked(10, Duration::milliseconds(120)).unwrap(),
+                BatchingRule::new(10, Some(Duration::milliseconds(120))).unwrap(),
             ),
         )
         .await;
@@ -4350,7 +4350,7 @@ async fn test_batching_condition_timeout() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(
-                BatchingRule::new_checked(10, Duration::milliseconds(150)).unwrap(),
+                BatchingRule::new(10, Some(Duration::milliseconds(150))).unwrap(),
             ),
         )
         .await;
@@ -4676,7 +4676,7 @@ async fn test_batching_condition_watermark() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(
-                BatchingRule::new_checked(10, Duration::milliseconds(200)).unwrap(),
+                BatchingRule::new(10, Some(Duration::milliseconds(200))).unwrap(),
             ),
         )
         .await;
@@ -5053,7 +5053,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             transform_dataset_binding(&baz_id),
             FlowTriggerRule::Batching(
-                BatchingRule::new_checked(16, Duration::milliseconds(200)).unwrap(),
+                BatchingRule::new(16, Some(Duration::milliseconds(200))).unwrap(),
             ),
         )
         .await;
@@ -6256,7 +6256,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::seconds(10)).unwrap()),
+            FlowTriggerRule::Batching(BatchingRule::new(1, Some(Duration::seconds(10))).unwrap()),
         )
         .await;
 

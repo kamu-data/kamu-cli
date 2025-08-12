@@ -39,14 +39,14 @@ pub enum FlowTriggerScheduleRule {
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTriggerBatchingRule {
     pub min_records_to_await: u64,
-    pub max_batching_interval: TimeDelta,
+    pub max_batching_interval: Option<TimeDelta>,
 }
 
 impl From<BatchingRule> for FlowTriggerBatchingRule {
     fn from(value: BatchingRule) -> Self {
         Self {
             min_records_to_await: value.min_records_to_await(),
-            max_batching_interval: (*value.max_batching_interval()).into(),
+            max_batching_interval: value.max_batching_interval().map(Into::into),
         }
     }
 }
@@ -71,26 +71,26 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject)]
+#[derive(OneofObject, Debug)]
 pub enum FlowTriggerInput {
     Schedule(ScheduleInput),
     Batching(BatchingInput),
 }
 
-#[derive(OneofObject)]
+#[derive(OneofObject, Debug)]
 pub enum ScheduleInput {
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
     Cron5ComponentExpression(String),
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Debug)]
 pub struct BatchingInput {
     pub min_records_to_await: u64,
-    pub max_batching_interval: TimeDeltaInput,
+    pub max_batching_interval: Option<TimeDeltaInput>,
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Debug)]
 pub struct TimeDeltaInput {
     pub every: u32,
     pub unit: TimeUnit,
@@ -178,9 +178,9 @@ impl TryFrom<FlowTriggerInput> for FlowTriggerRule {
                 Ok(FlowTriggerRule::Schedule(schedule_rule))
             }
             FlowTriggerInput::Batching(batching_input) => {
-                let batching_rule = match BatchingRule::new_checked(
+                let batching_rule = match BatchingRule::new(
                     batching_input.min_records_to_await,
-                    batching_input.max_batching_interval.into(),
+                    batching_input.max_batching_interval.map(Into::into),
                 ) {
                     Ok(rule) => rule,
                     Err(e) => {

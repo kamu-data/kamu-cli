@@ -47,6 +47,8 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         paused: bool,
         trigger_input: FlowTriggerInput,
     ) -> Result<SetFlowTriggerResult> {
+        println!("Setting trigger: {:?}", trigger_input);
+
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         }

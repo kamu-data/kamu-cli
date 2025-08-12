@@ -96,7 +96,7 @@ pub struct TimeDelta {
     pub unit: TimeUnit,
 }
 
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Enum, Clone, Copy, PartialEq, Eq)]
 pub enum TimeUnit {
     Minutes,
     Hours,

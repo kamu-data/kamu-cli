@@ -51,9 +51,6 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                         paused: false,
                                         triggerInput: {
                                             batching: {
-                                                maxBatchingInterval: {
-                                                    every: 0, unit: MINUTES
-                                                },
                                                 minRecordsToAwait: 0
                                             }
                                         }
