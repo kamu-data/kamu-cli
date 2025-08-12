@@ -1737,7 +1737,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
 
         let derivative_dataset = kamu_api_server_client.dataset().create_leaderboard().await;
 
-        //2.3 Enable batching trigger for derivative dataset
+        //2.3 Enable reactive trigger for derivative dataset
         kamu_api_server_client
             .graphql_api_call_assert(
                 indoc::indoc!(
@@ -1751,8 +1751,11 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                                         datasetFlowType: $datasetFlowType,
                                         paused: false,
                                         triggerInput: {
-                                            batching: {
-                                                minRecordsToAwait: 0
+                                            reactive: {
+                                                forNewData: {
+                                                    minRecordsToAwait: 0
+                                                },
+                                                forBreakingChange: "NO_ACTION"
                                             }
                                         }
                                     ) {
@@ -1761,7 +1764,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                                         ... on SetFlowTriggerSuccess {
                                             trigger {
                                                 __typename
-                                                batching {
+                                                reactive {
                                                     __typename
                                                 }
                                             }
@@ -1792,8 +1795,8 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                             "message": "Success",
                             "trigger": {
                               "__typename": "FlowTrigger",
-                              "batching": {
-                                "__typename": "FlowTriggerBatchingRule"
+                              "reactive": {
+                                "__typename": "FlowTriggerReactiveRule"
                               }
                             }
                           }

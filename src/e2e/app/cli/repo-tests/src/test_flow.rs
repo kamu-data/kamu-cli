@@ -407,7 +407,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       shiftedFrom
                       __typename
                     }
-                    ... on FlowStartConditionBatching {
+                    ... on FlowStartConditionReactive {
                       activeBatchingRule {
                         minRecordsToAwait
                         maxBatchingInterval {
@@ -419,6 +419,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       batchingDeadline
                       accumulatedRecordsCount
                       watermarkModified
+                      forBreakingChange
                       __typename
                     }
                     ... on FlowStartConditionSchedule {
@@ -1682,7 +1683,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               shiftedFrom
               __typename
             }
-            ... on FlowStartConditionBatching {
+            ... on FlowStartConditionReactive {
               activeBatchingRule {
                 minRecordsToAwait
                 maxBatchingInterval {
@@ -1694,6 +1695,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               batchingDeadline
               accumulatedRecordsCount
               watermarkModified
+              forBreakingChange
               __typename
             }
             ... on FlowStartConditionSchedule {

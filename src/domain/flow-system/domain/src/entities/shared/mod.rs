@@ -11,6 +11,7 @@ mod batching_rule;
 mod flow_binding;
 mod flow_scope;
 mod flow_task_metadata;
+mod reactive_rule;
 mod retry_policy;
 mod schedule;
 
@@ -18,5 +19,6 @@ pub use batching_rule::*;
 pub use flow_binding::*;
 pub use flow_scope::*;
 pub use flow_task_metadata::*;
+pub use reactive_rule::*;
 pub use retry_policy::*;
 pub use schedule::*;

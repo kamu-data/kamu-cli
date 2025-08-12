@@ -141,7 +141,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         paused: bool,
         rule: FlowTriggerRule,
     ) -> Result<FlowTriggerState, SetFlowTriggerError> {
-        println!("Setting trigger core: {:?}", rule);
         tracing::info!(
             flow_binding = ?flow_binding,
             rule = ?rule,

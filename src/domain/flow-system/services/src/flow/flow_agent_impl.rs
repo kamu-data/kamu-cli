@@ -157,12 +157,12 @@ impl FlowAgentImpl {
             let mut state_stream = flow_event_store.get_stream(waiting_flow_ids);
 
             while let Some(flow) = state_stream.try_next().await? {
-                // We need to re-evaluate batching conditions only
-                if let Some(FlowStartCondition::Batching(b)) = &flow.start_condition {
+                // We need to re-evaluate reactive conditions only
+                if let Some(FlowStartCondition::Reactive(b)) = &flow.start_condition {
                     scheduling_helper
                         .trigger_flow_common(
                             &flow.flow_binding,
-                            Some(FlowTriggerRule::Batching(b.active_batching_rule)),
+                            Some(FlowTriggerRule::Reactive(b.active_rule)),
                             FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
                                 activation_time: start_time,
                             }),
@@ -202,7 +202,7 @@ impl FlowAgentImpl {
         // (this i.e. forces all root datasets to be updated earlier than the derived)
         //
         // Thought: maybe we need topological sorting by derived relations as well to
-        // optimize the initial execution order, but batching rules may work just fine
+        // optimize the initial execution order, but reactive rules may work just fine
         for enabled_trigger in schedule_triggers
             .into_iter()
             .chain(non_schedule_triggers.into_iter())

@@ -144,13 +144,13 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         &self,
         flow_binding: &fs::FlowBinding,
         activation_time: DateTime<Utc>,
-        batching_rule: fs::BatchingRule,
+        reactive_rule: fs::ReactiveRule,
     ) -> Result<(), InternalError> {
         let subscription_scope = FlowScopeSubscription::new(&flow_binding.scope);
         if subscription_scope.event_type() == WebhookEventTypeCatalog::dataset_ref_updated() {
             let sensor = Arc::new(DatasetUpdatedWebhookSensor::new(
                 flow_binding.scope.clone(),
-                batching_rule,
+                reactive_rule,
             ));
 
             self.flow_sensor_dispatcher

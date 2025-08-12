@@ -267,10 +267,10 @@ impl std::fmt::Display for FlowSystemTestListener {
                                     (t.shifted_from - initial_time).num_milliseconds()
                                 )?;
                             }
-                            FlowStartCondition::Batching(b) => write!(
+                            FlowStartCondition::Reactive(b) => write!(
                                 f,
                                 " Batching({}, until={}ms)",
-                                b.active_batching_rule.min_records_to_await(),
+                                b.active_rule.for_new_data.min_records_to_await(),
                                 (b.batching_deadline - initial_time).num_milliseconds(),
                             )?,
                             FlowStartCondition::Executor(e) => {

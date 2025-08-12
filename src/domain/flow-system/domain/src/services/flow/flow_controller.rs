@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_task_system as ts;
 
-use crate::{BatchingRule, FlowBinding, FlowState};
+use crate::{FlowBinding, FlowState, ReactiveRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +25,7 @@ pub trait FlowController: Send + Sync {
         &self,
         flow_binding: &FlowBinding,
         _activation_time: DateTime<Utc>,
-        _batching_rule: BatchingRule,
+        _reactive_rule: ReactiveRule,
     ) -> Result<(), InternalError> {
         tracing::error!(
             "{} does not expect regiostering flow sensors, flow_binding: {:?}",

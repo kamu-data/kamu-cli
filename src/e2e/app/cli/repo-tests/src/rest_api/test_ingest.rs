@@ -50,8 +50,11 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                         datasetFlowType: $datasetFlowType,
                                         paused: false,
                                         triggerInput: {
-                                            batching: {
-                                                minRecordsToAwait: 0
+                                            reactive: {
+                                                forNewData: {
+                                                    minRecordsToAwait: 0,
+                                                },
+                                                forBreakingChange: "NO_ACTION"
                                             }
                                         }
                                     ) {
@@ -60,7 +63,7 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                         ... on SetFlowTriggerSuccess {
                                             trigger {
                                                 __typename
-                                                batching {
+                                                reactive {
                                                     __typename
                                                 }
                                             }
@@ -88,8 +91,8 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                             "message": "Success",
                             "trigger": {
                               "__typename": "FlowTrigger",
-                              "batching": {
-                                "__typename": "FlowTriggerBatchingRule"
+                              "reactive": {
+                                "__typename": "FlowTriggerReactiveRule"
                               }
                             }
                           }

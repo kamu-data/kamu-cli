@@ -745,7 +745,7 @@ impl FlowTriggerHarness {
                                       }
                                       startCondition {
                                           __typename
-                                          ... on FlowStartConditionBatching {
+                                          ... on FlowStartConditionReactive {
                                               accumulatedRecordsCount
                                               activeBatchingRule {
                                                   __typename
@@ -756,6 +756,7 @@ impl FlowTriggerHarness {
                                                   }
                                               }
                                               watermarkModified
+                                              forBreakingChange
                                           }
                                           ... on FlowStartConditionThrottling {
                                               intervalSec
@@ -990,7 +991,7 @@ impl FlowTriggerHarness {
                                                     unit
                                                 }
                                             }
-                                            batching {
+                                            reactive {
                                                 __typename
                                             }
                                         }

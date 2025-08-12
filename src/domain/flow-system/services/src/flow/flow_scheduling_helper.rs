@@ -41,12 +41,12 @@ impl FlowSchedulingHelper {
         tracing::trace!(?flow_binding, ?rule, "Activating flow trigger");
 
         match &rule {
-            // Reactive batching action
-            FlowTriggerRule::Batching(batching_rule) => {
+            // Reactive action
+            FlowTriggerRule::Reactive(reactive_rule) => {
                 let flow_controller =
                     get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
                 flow_controller
-                    .register_flow_sensor(flow_binding, activation_time, *batching_rule)
+                    .register_flow_sensor(flow_binding, activation_time, *reactive_rule)
                     .await
                     .int_err()?;
             }
@@ -131,7 +131,7 @@ impl FlowSchedulingHelper {
                 FlowTriggerRule::Schedule(schedule) => {
                     FlowTriggerContext::Scheduled(schedule.clone())
                 }
-                FlowTriggerRule::Batching(batching) => FlowTriggerContext::Batching(*batching),
+                FlowTriggerRule::Reactive(reactive) => FlowTriggerContext::Reactive(*reactive),
             },
         };
 
@@ -152,13 +152,13 @@ impl FlowSchedulingHelper {
                 .int_err()?;
 
                 match trigger_context {
-                    FlowTriggerContext::Batching(batching_rule) => {
+                    FlowTriggerContext::Reactive(reactive_rule) => {
                         // Is this rule still waited?
-                        if matches!(flow.start_condition, Some(FlowStartCondition::Batching(_))) {
-                            self.evaluate_flow_batching_rule(
+                        if matches!(flow.start_condition, Some(FlowStartCondition::Reactive(_))) {
+                            self.evaluate_flow_reactive_rule(
                                 activation_time,
                                 &mut flow,
-                                &batching_rule,
+                                &reactive_rule,
                                 throttling_boundary_time,
                             )
                             .await?;
@@ -168,7 +168,7 @@ impl FlowSchedulingHelper {
                     }
                     FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
                         // Evaluate throttling condition: is new time earlier than planned?
-                        // In case of batching condition and manual trigger,
+                        // In case of reactive condition and manual trigger,
                         // there is no planned time, but otherwise compare
                         if flow.timing.scheduled_for_activation_at.is_none()
                             || flow
@@ -246,12 +246,12 @@ impl FlowSchedulingHelper {
                     .await?;
 
                 match trigger_context {
-                    FlowTriggerContext::Batching(batching_rule) => {
-                        // Don't activate if batching condition not satisfied
-                        self.evaluate_flow_batching_rule(
+                    FlowTriggerContext::Reactive(reactive_rule) => {
+                        // Don't activate if reactive condition not satisfied
+                        self.evaluate_flow_reactive_rule(
                             activation_time,
                             &mut flow,
-                            &batching_rule,
+                            &reactive_rule,
                             throttling_boundary_time,
                         )
                         .await?;
@@ -318,11 +318,11 @@ impl FlowSchedulingHelper {
     }
 
     #[allow(unused_mut)]
-    async fn evaluate_flow_batching_rule(
+    async fn evaluate_flow_reactive_rule(
         &self,
         evaluation_time: DateTime<Utc>,
         flow: &mut Flow,
-        batching_rule: &BatchingRule,
+        reactive_rule: &ReactiveRule,
         throttling_boundary_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         // TODO: it's likely assumed the accumulation is per each input separately, but
@@ -347,6 +347,9 @@ impl FlowSchedulingHelper {
             }
         }
 
+        // Extract batching rule
+        let batching_rule = &reactive_rule.for_new_data;
+
         // The timeout for batching will happen at:
         let primary_activation_time = flow.primary_activation_cause().activation_time();
         let max_batching_interval = batching_rule
@@ -363,15 +366,15 @@ impl FlowSchedulingHelper {
             && (accumulated_records_count >= batching_rule.min_records_to_await()
                 || evaluation_time >= batching_deadline);
 
-        // Set batching condition data, but only during the first rule evaluation.
+        // Set reactive condition data, but only during the first rule evaluation.
         if !matches!(
             flow.start_condition.as_ref(),
-            Some(FlowStartCondition::Batching(_))
+            Some(FlowStartCondition::Reactive(_))
         ) {
             flow.set_relevant_start_condition(
                 self.time_source.now(),
-                FlowStartCondition::Batching(FlowStartConditionBatching {
-                    active_batching_rule: *batching_rule,
+                FlowStartCondition::Reactive(FlowStartConditionReactive {
+                    active_rule: *reactive_rule,
                     batching_deadline,
                 }),
             )
@@ -491,7 +494,7 @@ impl FlowSchedulingHelper {
 enum FlowTriggerContext {
     Unconditional,
     Scheduled(Schedule),
-    Batching(BatchingRule),
+    Reactive(ReactiveRule),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

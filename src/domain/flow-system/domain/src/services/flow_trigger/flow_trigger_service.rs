@@ -80,10 +80,10 @@ pub trait FlowTriggerServiceExt {
         flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, FindFlowTriggerError>;
 
-    async fn try_get_flow_batching_rule(
+    async fn try_get_flow_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<BatchingRule>, FindFlowTriggerError>;
+    ) -> Result<Option<ReactiveRule>, FindFlowTriggerError>;
 }
 
 #[async_trait::async_trait]
@@ -104,16 +104,16 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
         )
     }
 
-    async fn try_get_flow_batching_rule(
+    async fn try_get_flow_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<BatchingRule>, FindFlowTriggerError> {
+    ) -> Result<Option<ReactiveRule>, FindFlowTriggerError> {
         let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
                 && trigger.is_active()
             {
-                trigger.try_get_batching_rule()
+                trigger.try_get_reactive_rule()
             } else {
                 None
             },

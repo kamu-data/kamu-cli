@@ -19,17 +19,17 @@ use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 pub struct DatasetUpdatedWebhookSensor {
     webhook_flow_scope: fs::FlowScope,
     dataset_id: odf::DatasetID,
-    batching_rule: fs::BatchingRule,
+    reactive_rule: fs::ReactiveRule,
 }
 
 impl DatasetUpdatedWebhookSensor {
-    pub fn new(webhook_flow_scope: fs::FlowScope, batching_rule: fs::BatchingRule) -> Self {
+    pub fn new(webhook_flow_scope: fs::FlowScope, reactive_rule: fs::ReactiveRule) -> Self {
         Self {
             dataset_id: FlowScopeSubscription::new(&webhook_flow_scope)
                 .maybe_dataset_id()
                 .unwrap(),
             webhook_flow_scope,
-            batching_rule,
+            reactive_rule,
         }
     }
 }
@@ -81,6 +81,21 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 )));
             }
 
+            // Skip if disabled for breaking changes
+            if matches!(update.changes, fs::ResourceChanges::Breaking) {
+                match self.reactive_rule.for_breaking_change {
+                    fs::BreakingChangeRule::NoAction => {
+                        tracing::warn!(
+                            "Skipping breaking change for dataset {} in flow {}",
+                            self.dataset_id,
+                            input_flow_binding.flow_type
+                        );
+                        return Ok(());
+                    }
+                    fs::BreakingChangeRule::Recover => { /* Allow webhook flow to run */ }
+                }
+            }
+
             // Extract necessary services
             let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
 
@@ -91,7 +106,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 .run_flow_automatically(
                     &target_flow_binding,
                     activation_cause.clone(),
-                    Some(fs::FlowTriggerRule::Batching(self.batching_rule)),
+                    Some(fs::FlowTriggerRule::Reactive(self.reactive_rule)),
                     None,
                 )
                 .await

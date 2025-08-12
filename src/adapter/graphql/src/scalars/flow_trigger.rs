@@ -7,7 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{BatchingRule, FlowTriggerRule, Schedule, ScheduleCron, ScheduleTimeDelta};
+use kamu_flow_system::{
+    BatchingRule,
+    FlowTriggerRule,
+    ReactiveRule,
+    Schedule,
+    ScheduleCron,
+    ScheduleTimeDelta,
+};
 
 use crate::mutations::{FlowInvalidTriggerInputError, FlowTypeIsNotSupported};
 use crate::prelude::*;
@@ -18,7 +25,7 @@ use crate::prelude::*;
 pub struct FlowTrigger {
     pub paused: bool,
     pub schedule: Option<FlowTriggerScheduleRule>,
-    pub batching: Option<FlowTriggerBatchingRule>,
+    pub reactive: Option<FlowTriggerReactiveRule>,
 }
 
 impl From<Schedule> for FlowTriggerScheduleRule {
@@ -34,6 +41,21 @@ impl From<Schedule> for FlowTriggerScheduleRule {
 pub enum FlowTriggerScheduleRule {
     TimeDelta(TimeDelta),
     Cron(Cron5ComponentExpression),
+}
+
+#[derive(SimpleObject, PartialEq, Eq)]
+pub struct FlowTriggerReactiveRule {
+    pub for_new_data: FlowTriggerBatchingRule,
+    pub for_breaking_change: BreakingChangeRule,
+}
+
+impl From<ReactiveRule> for FlowTriggerReactiveRule {
+    fn from(value: ReactiveRule) -> Self {
+        Self {
+            for_new_data: value.for_new_data.into(),
+            for_breaking_change: value.for_breaking_change.into(),
+        }
+    }
 }
 
 #[derive(SimpleObject, PartialEq, Eq)]
@@ -55,7 +77,7 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
     fn from(value: kamu_flow_system::FlowTriggerState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowTriggerRule::Batching(condition) = value.rule {
+            reactive: if let FlowTriggerRule::Reactive(condition) = value.rule {
                 Some(condition.into())
             } else {
                 None
@@ -74,7 +96,7 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerInput {
     Schedule(ScheduleInput),
-    Batching(BatchingInput),
+    Reactive(ReactiveInput),
 }
 
 #[derive(OneofObject, Debug)]
@@ -82,6 +104,12 @@ pub enum ScheduleInput {
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
     Cron5ComponentExpression(String),
+}
+
+#[derive(InputObject, Debug)]
+pub struct ReactiveInput {
+    pub for_new_data: BatchingInput,
+    pub for_breaking_change: BreakingChangeRule,
 }
 
 #[derive(InputObject, Debug)]
@@ -148,7 +176,7 @@ impl FlowTriggerInput {
                     return Ok(());
                 }
             }
-            Self::Batching(_) => {
+            Self::Reactive(_) => {
                 if flow_type == DatasetFlowType::ExecuteTransform {
                     return Ok(());
                 }
@@ -177,10 +205,13 @@ impl TryFrom<FlowTriggerInput> for FlowTriggerRule {
                 };
                 Ok(FlowTriggerRule::Schedule(schedule_rule))
             }
-            FlowTriggerInput::Batching(batching_input) => {
-                let batching_rule = match BatchingRule::new(
-                    batching_input.min_records_to_await,
-                    batching_input.max_batching_interval.map(Into::into),
+            FlowTriggerInput::Reactive(reactive_input) => {
+                let batching_rule = match BatchingRule::try_new(
+                    reactive_input.for_new_data.min_records_to_await,
+                    reactive_input
+                        .for_new_data
+                        .max_batching_interval
+                        .map(Into::into),
                 ) {
                     Ok(rule) => rule,
                     Err(e) => {
@@ -189,7 +220,10 @@ impl TryFrom<FlowTriggerInput> for FlowTriggerRule {
                         });
                     }
                 };
-                Ok(FlowTriggerRule::Batching(batching_rule))
+                Ok(FlowTriggerRule::Reactive(ReactiveRule::new(
+                    batching_rule,
+                    reactive_input.for_breaking_change.into(),
+                )))
             }
         }
     }

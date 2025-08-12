@@ -1238,7 +1238,10 @@ async fn test_reset_trigger_keep_metadata_for_derivatives() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_id),
-            FlowTriggerRule::Batching(BatchingRule::empty()),
+            FlowTriggerRule::Reactive(ReactiveRule {
+                for_new_data: BatchingRule::empty(),
+                for_breaking_change: BreakingChangeRule::Recover,
+            }),
         )
         .await;
 
@@ -1551,7 +1554,10 @@ async fn test_hard_compaction_trigger_keep_metadata_for_derivatives() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_id),
-            FlowTriggerRule::Batching(BatchingRule::empty()),
+            FlowTriggerRule::Reactive(ReactiveRule {
+                for_new_data: BatchingRule::empty(),
+                for_breaking_change: BreakingChangeRule::Recover,
+            }),
         )
         .await;
 
@@ -1766,7 +1772,10 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_id),
-            FlowTriggerRule::Batching(BatchingRule::empty()),
+            FlowTriggerRule::Reactive(ReactiveRule {
+                for_new_data: BatchingRule::empty(),
+                for_breaking_change: BreakingChangeRule::Recover,
+            }),
         )
         .await;
 
@@ -1774,7 +1783,10 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_baz_id),
-            FlowTriggerRule::Batching(BatchingRule::empty()),
+            FlowTriggerRule::Reactive(ReactiveRule {
+                for_new_data: BatchingRule::empty(),
+                for_breaking_change: BreakingChangeRule::Recover,
+            }),
         )
         .await;
 
@@ -3047,7 +3059,10 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(BatchingRule::new(1, Some(Duration::seconds(1))).unwrap()),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_new(1, Some(Duration::seconds(1))).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
         )
         .await;
 
@@ -3450,7 +3465,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&baz_id),
-            FlowTriggerRule::Batching(BatchingRule::new(1, Some(Duration::hours(24))).unwrap()),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_new(1, Some(Duration::hours(24))).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
         )
         .await;
 
@@ -3969,9 +3987,10 @@ async fn test_batching_condition_records_reached() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(
-                BatchingRule::new(10, Some(Duration::milliseconds(120))).unwrap(),
-            ),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_new(10, Some(Duration::milliseconds(120))).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
         )
         .await;
 
@@ -4349,9 +4368,10 @@ async fn test_batching_condition_timeout() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(
-                BatchingRule::new(10, Some(Duration::milliseconds(150))).unwrap(),
-            ),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_new(10, Some(Duration::milliseconds(150))).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
         )
         .await;
 
@@ -4675,9 +4695,10 @@ async fn test_batching_condition_watermark() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(
-                BatchingRule::new(10, Some(Duration::milliseconds(200))).unwrap(),
-            ),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_new(10, Some(Duration::milliseconds(200))).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
         )
         .await;
 
@@ -5052,9 +5073,10 @@ async fn test_batching_condition_with_2_inputs() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&baz_id),
-            FlowTriggerRule::Batching(
-                BatchingRule::new(16, Some(Duration::milliseconds(200))).unwrap(),
-            ),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_new(16, Some(Duration::milliseconds(200))).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
         )
         .await;
 
@@ -6256,7 +6278,10 @@ async fn test_respect_last_success_time_when_activate_configuration() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(BatchingRule::new(1, Some(Duration::seconds(10))).unwrap()),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_new(1, Some(Duration::seconds(10))).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
         )
         .await;
 
@@ -6813,7 +6838,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
         .set_flow_trigger(
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
-            FlowTriggerRule::Batching(BatchingRule::empty()),
+            FlowTriggerRule::Reactive(ReactiveRule::empty()),
         )
         .await;
 

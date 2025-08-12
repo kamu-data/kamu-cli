@@ -20,19 +20,19 @@ use crate::{FLOW_TYPE_DATASET_RESET_TO_METADATA, FLOW_TYPE_DATASET_TRANSFORM, Fl
 pub struct DerivedDatasetFlowSensor {
     flow_scope: fs::FlowScope,
     sensitive_dataset_ids: HashSet<odf::DatasetID>,
-    batching_rule: fs::BatchingRule,
+    reactive_rule: fs::ReactiveRule,
 }
 
 impl DerivedDatasetFlowSensor {
     pub fn new(
         dataset_id: &odf::DatasetID,
         input_dataset_ids: Vec<odf::DatasetID>,
-        batching_rule: fs::BatchingRule,
+        reactive_rule: fs::ReactiveRule,
     ) -> Self {
         Self {
             flow_scope: FlowScopeDataset::make_scope(dataset_id),
             sensitive_dataset_ids: HashSet::from_iter(input_dataset_ids),
-            batching_rule,
+            reactive_rule,
         }
     }
 
@@ -65,7 +65,7 @@ impl DerivedDatasetFlowSensor {
         &self,
         activation_cause: &fs::FlowActivationCause,
         flow_run_service: &dyn fs::FlowRunService,
-        with_batching_rule: bool,
+        with_reactive_rule: bool,
     ) -> Result<(), InternalError> {
         let target_flow_binding =
             fs::FlowBinding::new(FLOW_TYPE_DATASET_TRANSFORM, self.flow_scope.clone());
@@ -73,8 +73,8 @@ impl DerivedDatasetFlowSensor {
             .run_flow_automatically(
                 &target_flow_binding,
                 activation_cause.clone(),
-                if with_batching_rule {
-                    Some(fs::FlowTriggerRule::Batching(self.batching_rule))
+                if with_reactive_rule {
+                    Some(fs::FlowTriggerRule::Reactive(self.reactive_rule))
                 } else {
                     None
                 },
@@ -135,7 +135,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 activation_time,
             });
 
-        // If the flow had ever run, use the batching condition,
+        // If the flow had ever run, use the reactive condition,
         //  otherwise schedule unconditionally
         let flow_run_stats = flow_event_store.get_flow_run_stats(&flow_binding).await?;
         self.run_transform_flow(
@@ -182,9 +182,24 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 // Input dataset was updated with a breaking change.
                 // With auto-updates only, we can reset data and keep metadata only.
                 fs::ResourceChanges::Breaking => {
-                    // Trigger metadata-only compaction
-                    self.run_reset_to_metadata_only(activation_cause, flow_run_service.as_ref())
-                        .await?;
+                    // Trigger metadata-only compaction, if recovery is enabled
+                    match self.reactive_rule.for_breaking_change {
+                        fs::BreakingChangeRule::Recover => {
+                            self.run_reset_to_metadata_only(
+                                activation_cause,
+                                flow_run_service.as_ref(),
+                            )
+                            .await?;
+                        }
+                        fs::BreakingChangeRule::NoAction => {
+                            tracing::warn!(
+                                "Flow sensor {:?} received a breaking change for dataset {}, but \
+                                 recovery is disabled",
+                                self.flow_scope,
+                                input_dataset_id
+                            );
+                        }
+                    }
                 }
             }
         } else {

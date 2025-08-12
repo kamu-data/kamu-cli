@@ -19,7 +19,7 @@ use crate::prelude::*;
 pub(crate) enum FlowStartCondition {
     Schedule(FlowStartConditionSchedule),
     Throttling(FlowStartConditionThrottling),
-    Batching(FlowStartConditionBatching),
+    Reactive(FlowStartConditionReactive),
     Executor(FlowStartConditionExecutor),
 }
 
@@ -33,7 +33,7 @@ impl FlowStartCondition {
                 wake_up_at: s.wake_up_at,
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
-            fs::FlowStartCondition::Batching(b) => {
+            fs::FlowStartCondition::Reactive(b) => {
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();
 
@@ -58,11 +58,12 @@ impl FlowStartCondition {
                 }
 
                 // Finally, present the full picture from condition + computed view results
-                Self::Batching(FlowStartConditionBatching {
-                    active_batching_rule: b.active_batching_rule.into(),
+                Self::Reactive(FlowStartConditionReactive {
+                    active_batching_rule: b.active_rule.for_new_data.into(),
                     batching_deadline: b.batching_deadline,
                     accumulated_records_count: total_increment.num_records,
                     watermark_modified: total_increment.updated_watermark.is_some(),
+                    for_breaking_change: b.active_rule.for_breaking_change.into(),
                 })
             }
             fs::FlowStartCondition::Executor(e) => Self::Executor(FlowStartConditionExecutor {
@@ -95,11 +96,12 @@ impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowStartConditionBatching {
+pub(crate) struct FlowStartConditionReactive {
     pub active_batching_rule: FlowTriggerBatchingRule,
     pub batching_deadline: DateTime<Utc>,
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
+    pub for_breaking_change: BreakingChangeRule,
     // TODO: we can list all applied input flows, if that is interesting for debugging
 }
 

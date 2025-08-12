@@ -4309,7 +4309,7 @@ impl FlowRunsHarness {
                                         }
                                         startCondition {
                                             __typename
-                                            ... on FlowStartConditionBatching {
+                                            ... on FlowStartConditionReactive {
                                                 accumulatedRecordsCount
                                                 activeBatchingRule {
                                                     __typename
@@ -4320,6 +4320,7 @@ impl FlowRunsHarness {
                                                     }
                                                 }
                                                 watermarkModified
+                                                forBreakingChange
                                             }
                                             ... on FlowStartConditionThrottling {
                                                 intervalSec

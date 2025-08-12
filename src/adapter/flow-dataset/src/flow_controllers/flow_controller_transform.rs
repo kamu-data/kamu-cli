@@ -48,7 +48,7 @@ impl fs::FlowController for FlowControllerTransform {
         &self,
         flow_binding: &fs::FlowBinding,
         activation_time: DateTime<Utc>,
-        batching_rule: fs::BatchingRule,
+        reactive_rule: fs::ReactiveRule,
     ) -> Result<(), InternalError> {
         let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
 
@@ -61,7 +61,7 @@ impl fs::FlowController for FlowControllerTransform {
             .await;
 
         let sensor =
-            DerivedDatasetFlowSensor::new(&dataset_id, upstream_dataset_ids, batching_rule);
+            DerivedDatasetFlowSensor::new(&dataset_id, upstream_dataset_ids, reactive_rule);
         self.flow_sensor_dispatcher
             .register_sensor(&self.catalog, activation_time, Arc::new(sensor))
             .await?;

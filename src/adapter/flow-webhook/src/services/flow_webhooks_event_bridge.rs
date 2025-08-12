@@ -75,7 +75,10 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                             self.time_source.now(),
                             flow_binding,
                             false, // Enabled
-                            fs::FlowTriggerRule::Batching(fs::BatchingRule::empty()),
+                            fs::FlowTriggerRule::Reactive(fs::ReactiveRule::new(
+                                fs::BatchingRule::empty(),
+                                fs::BreakingChangeRule::Recover,
+                            )),
                         )
                         .await
                         .int_err()?;
@@ -93,7 +96,10 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                             self.time_source.now(),
                             flow_binding,
                             true, // Paused
-                            fs::FlowTriggerRule::Batching(fs::BatchingRule::empty()),
+                            fs::FlowTriggerRule::Reactive(fs::ReactiveRule::new(
+                                fs::BatchingRule::empty(),
+                                fs::BreakingChangeRule::Recover,
+                            )),
                         )
                         .await
                         .int_err()?;

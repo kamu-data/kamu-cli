@@ -31,7 +31,7 @@ impl BatchingRule {
         }
     }
 
-    pub fn new(
+    pub fn try_new(
         min_records_to_await: u64,
         max_batching_interval: Option<Duration>,
     ) -> Result<Self, BatchingRuleValidationError> {
@@ -90,19 +90,22 @@ mod tests {
 
     #[test]
     fn test_good_batching_rule() {
-        assert_matches!(BatchingRule::new(1, Some(TimeDelta::minutes(15))), Ok(_));
         assert_matches!(
-            BatchingRule::new(1_000_000, Some(TimeDelta::hours(3))),
+            BatchingRule::try_new(1, Some(TimeDelta::minutes(15))),
             Ok(_)
         );
-        assert_matches!(BatchingRule::new(1, Some(TimeDelta::hours(24))), Ok(_));
-        assert_matches!(BatchingRule::new(0, None), Ok(_));
+        assert_matches!(
+            BatchingRule::try_new(1_000_000, Some(TimeDelta::hours(3))),
+            Ok(_)
+        );
+        assert_matches!(BatchingRule::try_new(1, Some(TimeDelta::hours(24))), Ok(_));
+        assert_matches!(BatchingRule::try_new(0, None), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_interval() {
         assert_matches!(
-            BatchingRule::new(1, Some(TimeDelta::minutes(-1))),
+            BatchingRule::try_new(1, Some(TimeDelta::minutes(-1))),
             Err(BatchingRuleValidationError::MinIntervalNotPositive)
         );
     }
@@ -110,7 +113,7 @@ mod tests {
     #[test]
     fn test_too_large_max_interval() {
         assert_matches!(
-            BatchingRule::new(
+            BatchingRule::try_new(
                 1,
                 Some(TimeDelta::try_hours(24).unwrap() + TimeDelta::nanoseconds(1))
             ),

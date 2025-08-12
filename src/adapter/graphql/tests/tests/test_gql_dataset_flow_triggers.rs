@@ -45,8 +45,8 @@ async fn test_crud_time_delta_root_dataset() {
                                         every
                                         unit
                                     }
-                            }
-                                batching {
+                                }
+                                reactive {
                                     __typename
                                 }
                             }
@@ -117,7 +117,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         "every": 1,
                                         "unit": "DAYS"
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -161,7 +161,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         "every": 2,
                                         "unit": "HOURS"
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -267,7 +267,7 @@ async fn test_crud_cron_root_dataset() {
                                         cron5ComponentExpression
                                     }
                                 }
-                                batching {
+                                reactive {
                                     __typename
                                 }
                             }
@@ -336,7 +336,7 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "Cron5ComponentExpression",
                                         "cron5ComponentExpression": "*/2 * * * *",
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -378,7 +378,7 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "Cron5ComponentExpression",
                                         "cron5ComponentExpression": "0 */1 * * *",
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -479,13 +479,16 @@ async fn test_crud_batching_derived_dataset() {
                                 schedule {
                                     __typename
                                 }
-                                batching {
+                                reactive {
                                     __typename
-                                    minRecordsToAwait
-                                    maxBatchingInterval {
-                                        every
-                                        unit
+                                    forNewData {
+                                        minRecordsToAwait
+                                        maxBatchingInterval {
+                                            every
+                                            unit
+                                        }
                                     }
+                                    forBreakingChange
                                 }
                             }
                         }
@@ -521,7 +524,7 @@ async fn test_crud_batching_derived_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_trigger_batching_mutation(
+    let mutation_code = FlowTriggerHarness::set_trigger_reactive_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -551,13 +554,16 @@ async fn test_crud_batching_derived_dataset() {
                                     "__typename": "FlowTrigger",
                                     "paused": false,
                                     "schedule": null,
-                                    "batching": {
-                                        "__typename": "FlowTriggerBatchingRule",
-                                        "minRecordsToAwait": 1,
-                                        "maxBatchingInterval": {
-                                            "every": 30,
-                                            "unit": "MINUTES"
-                                        }
+                                    "reactive": {
+                                        "__typename": "FlowTriggerReactiveRule",
+                                        "forNewData": {
+                                            "minRecordsToAwait": 1,
+                                            "maxBatchingInterval": {
+                                                "every": 30,
+                                                "unit": "MINUTES"
+                                            }
+                                        },
+                                        "forBreakingChange": "NO_ACTION",
                                     },
                                 }
                             }
@@ -572,7 +578,7 @@ async fn test_crud_batching_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_batching_trigger_validation() {
+async fn test_reactive_trigger_validation() {
     let harness = FlowTriggerHarness::make().await;
 
     harness.create_root_dataset().await;
@@ -586,7 +592,7 @@ async fn test_batching_trigger_validation() {
         "HOURS",
         "Maximum interval to await should not exceed 24 hours",
     )] {
-        let mutation_code = FlowTriggerHarness::set_trigger_batching_mutation(
+        let mutation_code = FlowTriggerHarness::set_trigger_reactive_mutation(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
             true,
@@ -710,7 +716,7 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let mutation_set_transform = FlowTriggerHarness::set_trigger_batching_mutation(
+    let mutation_set_transform = FlowTriggerHarness::set_trigger_reactive_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -913,7 +919,7 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowTriggerHarness::set_trigger_batching_mutation(
+    let mutation_code = FlowTriggerHarness::set_trigger_reactive_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
@@ -1177,7 +1183,7 @@ impl FlowTriggerHarness {
                                                     unit
                                                 }
                                             }
-                                            batching {
+                                            reactive {
                                                 __typename
                                             }
                                         }
@@ -1231,7 +1237,7 @@ impl FlowTriggerHarness {
                                                     cron5ComponentExpression
                                                 }
                                             }
-                                            batching {
+                                            reactive {
                                                 __typename
                                             }
                                         }
@@ -1250,7 +1256,7 @@ impl FlowTriggerHarness {
         .replace("<cron_expression>", cron_expression)
     }
 
-    fn set_trigger_batching_mutation(
+    fn set_trigger_reactive_mutation(
         id: &odf::DatasetID,
         dataset_flow_type: &str,
         paused: bool,
@@ -1268,9 +1274,12 @@ impl FlowTriggerHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
                                     triggerInput: {
-                                        batching: {
-                                            minRecordsToAwait: <minRecordsToAwait>,
-                                            maxBatchingInterval: { every: <every>, unit: "<unit>" }
+                                        reactive: {
+                                            forNewData: {
+                                                minRecordsToAwait: <minRecordsToAwait>,
+                                                maxBatchingInterval: { every: <every>, unit: "<unit>" }
+                                            },
+                                            forBreakingChange: "NO_ACTION"
                                         }
                                     }
                                 ) {
@@ -1286,13 +1295,16 @@ impl FlowTriggerHarness {
                                                 schedule {
                                                     __typename
                                                 }
-                                                batching {
+                                                reactive {
                                                     __typename
-                                                    minRecordsToAwait
-                                                    maxBatchingInterval {
-                                                        every
-                                                        unit
+                                                    forNewData {
+                                                        minRecordsToAwait
+                                                        maxBatchingInterval {
+                                                            every
+                                                            unit
+                                                        }
                                                     }
+                                                    forBreakingChange
                                                 }
                                             }
                                         }

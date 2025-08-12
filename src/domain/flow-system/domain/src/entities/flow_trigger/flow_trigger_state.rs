@@ -33,13 +33,13 @@ impl FlowTriggerState {
     pub fn try_get_schedule_rule(self) -> Option<Schedule> {
         match self.rule {
             FlowTriggerRule::Schedule(schedule) => Some(schedule),
-            FlowTriggerRule::Batching(_) => None,
+            FlowTriggerRule::Reactive(_) => None,
         }
     }
 
-    pub fn try_get_batching_rule(self) -> Option<BatchingRule> {
+    pub fn try_get_reactive_rule(self) -> Option<ReactiveRule> {
         match self.rule {
-            FlowTriggerRule::Batching(batching) => Some(batching),
+            FlowTriggerRule::Reactive(reactive) => Some(reactive),
             FlowTriggerRule::Schedule(_) => None,
         }
     }
