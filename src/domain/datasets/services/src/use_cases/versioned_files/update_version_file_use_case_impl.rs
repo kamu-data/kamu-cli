@@ -12,14 +12,15 @@ use std::sync::Arc;
 use dill::{component, interface};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
-    DatasetRegistry,
     FileUploadLimitConfig,
     GetDataOptions,
     PushIngestDataError,
     PushIngestDataUseCase,
     PushIngestError,
     QueryService,
+    auth,
 };
 use kamu_datasets::{
     ContentArgs,
@@ -38,7 +39,7 @@ use kamu_datasets::{
 #[component]
 #[interface(dyn UpdateVersionFileUseCase)]
 pub struct UpdateVersionFileUseCaseImpl {
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     upload_config: Arc<FileUploadLimitConfig>,
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
@@ -111,10 +112,17 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
         extra_data: Option<ExtraDataFields>,
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError> {
         let resolved_dataset = self
-            .dataset_registry
-            .get_dataset_by_handle(dataset_handle)
+            .rebac_dataset_registry_facade
+            .resolve_dataset_by_ref(&dataset_handle.as_local_ref(), auth::DatasetAction::Own)
             .await
-            .clone();
+            .map_err(|e| {
+                use RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::NotFound(e) => UpdateVersionFileUseCaseError::NotFound(e),
+                    E::Access(e) => UpdateVersionFileUseCaseError::Access(e),
+                    e @ E::Internal(_) => UpdateVersionFileUseCaseError::Internal(e.int_err()),
+                }
+            })?;
 
         let entity = if let Some(args) = content_args_maybe {
             let (latest_version, _) = self

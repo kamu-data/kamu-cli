@@ -21,27 +21,28 @@ pub const CONTENT_HASH_COLUMN_NAME: &str = "content_hash";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct ExtraDataFields(serde_json::Value);
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ExtraDataFields(serde_json::Map<String, serde_json::Value>);
 
 impl ExtraDataFields {
-    pub fn new(value: serde_json::Value) -> Self {
+    pub fn new(value: serde_json::Map<String, serde_json::Value>) -> Self {
         Self(value)
     }
 
-    pub fn into_inner(self) -> serde_json::Value {
+    pub fn into_inner(self) -> serde_json::Map<String, serde_json::Value> {
         self.0
     }
 }
 
 impl Default for ExtraDataFields {
     fn default() -> Self {
-        Self::new(serde_json::Value::Object(Default::default()))
+        Self::new(Default::default())
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct VersionedFileEntity {
     /// File version
     pub version: FileVersion,
@@ -84,17 +85,13 @@ impl VersionedFileEntity {
         }
     }
 
-    pub fn to_record_data(self) -> serde_json::Value {
-        let mut record = self.extra_data.into_inner();
-        record[VERSION_COLUMN_NAME] = self.version.into();
-        record[CONTENT_HASH_COLUMN_NAME] = self.content_hash.to_string().into();
-        record[CONTENT_LENGTH_COLUMN_NAME] = self.content_length.into();
-        record[CONTENT_TYPE_COLUMN_NAME] = self.content_type.clone().into();
-        record
-    }
-
     pub fn to_bytes(self) -> bytes::Bytes {
-        let buf = self.to_record_data().to_string().into_bytes();
+        let mut fields = self.extra_data.into_inner();
+        fields[VERSION_COLUMN_NAME] = self.version.into();
+        fields[CONTENT_HASH_COLUMN_NAME] = self.content_hash.to_string().into();
+        fields[CONTENT_LENGTH_COLUMN_NAME] = self.content_length.into();
+        fields[CONTENT_TYPE_COLUMN_NAME] = self.content_type.clone().into();
+        let buf = serde_json::to_string(&fields).unwrap().into_bytes();
         bytes::Bytes::from_owner(buf)
     }
 

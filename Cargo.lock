@@ -4814,14 +4814,10 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "file-utils"
-<<<<<<< HEAD
-version = "0.242.1"
+version = "0.245.2"
 dependencies = [
  "serde",
 ]
-=======
-version = "0.245.2"
->>>>>>> master
 
 [[package]]
 name = "filetime"
@@ -6808,11 +6804,8 @@ dependencies = [
  "kamu-adapter-auth-oso-rebac",
  "kamu-adapter-flow-dataset",
  "kamu-adapter-graphql",
-<<<<<<< HEAD
  "kamu-adapter-http",
-=======
  "kamu-adapter-task-dataset",
->>>>>>> master
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",

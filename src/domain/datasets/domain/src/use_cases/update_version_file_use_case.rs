@@ -62,6 +62,13 @@ pub enum UpdateVersionFileUseCaseError {
     NotFound(#[from] odf::DatasetNotFoundError),
 
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
     TooLarge(#[from] UploadTooLargeError),
 
     #[error(transparent)]
