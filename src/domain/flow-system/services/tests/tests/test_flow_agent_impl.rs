@@ -4608,7 +4608,7 @@ async fn test_batching_condition_timeout() {
 
         // Task 3 is scheduled, but never runs
 
-        // Task 4: "bar" start running at 250ms, finish at 2560ms
+        // Task 4: "bar" start running at 250ms, finish at 260ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
             task_id: TaskID::new(4),
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),

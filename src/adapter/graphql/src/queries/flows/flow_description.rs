@@ -75,12 +75,18 @@ pub(crate) struct FlowDescriptionWebhookDeliver {
 
 #[derive(Union)]
 pub(crate) enum FlowDescriptionDataset {
+    Unknown(FlowDescriptionUnknown),
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
     ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
     HardCompaction(FlowDescriptionDatasetHardCompaction),
     Reset(FlowDescriptionDatasetReset),
     ResetToMetadata(FlowDescriptionDatasetResetToMetadata),
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowDescriptionUnknown {
+    message: String,
 }
 
 #[derive(SimpleObject)]
@@ -657,7 +663,15 @@ impl FlowDescriptionBuilder {
                         },
                     )
                 } else {
-                    panic!("Expected SetTransform event for dataset: {dataset_id}, but found None",);
+                    tracing::warn!(
+                        "Flow {} of type {} has no SetTransformEvent for dataset {}",
+                        flow_state.flow_id,
+                        flow_type,
+                        dataset_id
+                    );
+                    FlowDescriptionDataset::Unknown(FlowDescriptionUnknown {
+                        message: format!("No SetTransformEvent for dataset {}", dataset_id),
+                    })
                 }
             }
 

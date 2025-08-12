@@ -14,7 +14,7 @@ use internal_error::InternalError;
 use kamu_core::{CompactionOptions, CompactionPlanner, DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
-use crate::{LogicalPlanDatasetResetToMetadata, TaskDefinitionDatasetHardCompact};
+use crate::{LogicalPlanDatasetResetToMetadata, TaskDefinitionDatasetResetToMetadata};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,16 +45,16 @@ impl ResetToMetadataDatasetTaskPlanner {
             keep_metadata_only: true,
         };
 
-        let compaction_plan = compaction_planner
+        let compaction_metadata_only_plan = compaction_planner
             .plan_compaction(target.clone(), compaction_options, None)
             .await
             .int_err()?;
 
         target.detach_from_transaction();
 
-        Ok(TaskDefinition::new(TaskDefinitionDatasetHardCompact {
+        Ok(TaskDefinition::new(TaskDefinitionDatasetResetToMetadata {
             target,
-            compaction_plan,
+            compaction_metadata_only_plan,
         }))
     }
 }

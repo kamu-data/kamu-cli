@@ -7,22 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use super::*;
+use kamu_core::{CompactionPlan, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<UpdateDatasetTaskPlanner>();
-    catalog_builder.add::<HardCompactDatasetTaskPlanner>();
-    catalog_builder.add::<ResetDatasetTaskPlanner>();
-    catalog_builder.add::<ResetToMetadataDatasetTaskPlanner>();
-
-    catalog_builder.add::<UpdateDatasetTaskRunner>();
-    catalog_builder.add::<HardCompactDatasetTaskRunner>();
-    catalog_builder.add::<ResetDatasetTaskRunner>();
-    catalog_builder.add::<ResetDatasetToMetadataTaskRunner>();
+kamu_task_system::task_definition_struct! {
+    pub struct TaskDefinitionDatasetResetToMetadata {
+        pub target: ResolvedDataset,
+        pub compaction_metadata_only_plan: CompactionPlan,
+    }
+    => "dev.kamu.tasks.dataset.reset_to_metadata"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
