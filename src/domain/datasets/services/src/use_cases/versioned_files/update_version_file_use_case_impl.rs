@@ -152,7 +152,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
                     )
                     .await
                     .int_err()?;
-            };
+            }
 
             result
         } else {
@@ -162,7 +162,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
                 .unwrap();
 
             // Increment version to match next record value
-            last_entity.version = last_entity.version + 1;
+            last_entity.version += 1;
 
             last_entity
         };

@@ -132,15 +132,14 @@ impl VersionedFileEntity {
                 .as_str()
                 .unwrap(),
         )
-        .unwrap()
-        .into();
+        .unwrap();
 
         Self {
             version,
             content_length,
             content_type,
             content_hash,
-            extra_data: ExtraDataFields::new(record.into()),
+            extra_data: ExtraDataFields::new(record),
         }
     }
 }
