@@ -57,6 +57,7 @@ pub struct VersionedFileEntity {
     pub content_hash: Multihash,
 
     /// Extra data associated with this file version
+    #[serde(flatten)]
     pub extra_data: ExtraDataFields,
 }
 
@@ -86,16 +87,14 @@ impl VersionedFileEntity {
     }
 
     pub fn to_bytes(self) -> bytes::Bytes {
-        let mut fields = self.extra_data.into_inner();
-        fields[VERSION_COLUMN_NAME] = self.version.into();
-        fields[CONTENT_HASH_COLUMN_NAME] = self.content_hash.to_string().into();
-        fields[CONTENT_LENGTH_COLUMN_NAME] = self.content_length.into();
-        fields[CONTENT_TYPE_COLUMN_NAME] = self.content_type.clone().into();
-        let buf = serde_json::to_string(&fields).unwrap().into_bytes();
+        let buf = serde_json::to_string(&self).unwrap().into_bytes();
         bytes::Bytes::from_owner(buf)
     }
 
-    pub fn from_last_record(record: serde_json::Value) -> Self {
+    pub fn from_last_record(
+        record: serde_json::Value,
+        extra_data: Option<ExtraDataFields>,
+    ) -> Self {
         let serde_json::Value::Object(mut record) = record else {
             unreachable!()
         };
@@ -139,7 +138,7 @@ impl VersionedFileEntity {
             content_length,
             content_type,
             content_hash,
-            extra_data: ExtraDataFields::new(record),
+            extra_data: extra_data.unwrap_or(ExtraDataFields::new(record)),
         }
     }
 }

@@ -76,6 +76,7 @@ impl UpdateVersionFileUseCaseImpl {
     async fn get_versioned_file_entity_from_latest_entry(
         &self,
         dataset_ref: &odf::DatasetRef,
+        extra_data: Option<ExtraDataFields>,
     ) -> Result<Option<VersionedFileEntity>, InternalError> {
         // TODO: Consider retractions / corrections
         let query_res = self
@@ -94,6 +95,7 @@ impl UpdateVersionFileUseCaseImpl {
 
         Ok(Some(VersionedFileEntity::from_last_record(
             records.into_iter().next().unwrap(),
+            extra_data,
         )))
     }
 }
@@ -113,7 +115,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(&dataset_handle.as_local_ref(), auth::DatasetAction::Own)
+            .resolve_dataset_by_ref(&dataset_handle.as_local_ref(), auth::DatasetAction::Write)
             .await
             .map_err(|e| {
                 use RebacDatasetRefUnresolvedError as E;
@@ -157,7 +159,10 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
             result
         } else {
             let mut last_entity = self
-                .get_versioned_file_entity_from_latest_entry(&dataset_handle.as_local_ref())
+                .get_versioned_file_entity_from_latest_entry(
+                    &dataset_handle.as_local_ref(),
+                    extra_data,
+                )
                 .await?
                 .unwrap();
 
