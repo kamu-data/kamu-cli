@@ -16,7 +16,7 @@ on:
 env:
   PACKAGE_NAME: kamu-cli
   BINARY_NAME: kamu
-  KAMU_WEB_UI_VERSION: "0.52.1"
+  KAMU_WEB_UI_VERSION: "0.53.0"
 jobs:
   build:
     strategy:
@@ -172,7 +172,7 @@ jobs:
     needs: [ create_release ]
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}

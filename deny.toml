@@ -20,9 +20,8 @@ wildcards = "deny"
 
 deny = [
     ### Crates we shouldn't use ####
-    # Use `md-5` instead, which is part of the RustCrypto ecosystem
-    { name = "md5" },
-    # TODO: We should decide whether to stick with rustls or openssl and deny one of them
+    { name = "md5", reason = "Use `md-5` instead, which is part of the RustCrypto ecosystem" },
+    { name = "native-tls", reason = "We use rustls throughout the project" },
 
     ### Creates we deny multiple versions of ###
     # This is a temporary approach until we deny by default with some exceptions
@@ -42,7 +41,6 @@ deny = [
     { name = "prost", deny-multiple-versions = true },
     { name = "reqwest", deny-multiple-versions = true },
     # { name = "rustls", deny-multiple-versions = true },
-    { name = "native-tls", reason = "We use rustls throughout the project" },
     { name = "sqlx", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
     { name = "tonic", deny-multiple-versions = true },
@@ -56,6 +54,7 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "BSL-1.0",
+    "bzip2-1.0.6",
     "CC0-1.0",
     "CDLA-Permissive-2.0",
     "ISC",
@@ -68,10 +67,6 @@ allow = [
     "Zlib",
 ]
 private = { ignore = true }
-
-[[licenses.exceptions]]
-allow = ["Unicode-DFS-2016"]
-name = "unicode-ident"
 
 
 [[licenses.clarify]]

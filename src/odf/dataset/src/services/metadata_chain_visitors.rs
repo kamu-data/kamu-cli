@@ -13,6 +13,7 @@ use std::marker::PhantomData;
 use internal_error::InternalError;
 use odf_metadata::{
     AddData,
+    AddPushSource,
     AsTypedBlock,
     ExecuteTransform,
     IntoDataStreamBlock,
@@ -279,6 +280,44 @@ impl MetadataChainVisitor for SearchSingleDataBlockVisitor {
         } else {
             Ok(Decision::NextOfType(Flag::DATA_BLOCK))
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchActivePushSourcesVisitor {
+    hashed_blocks: Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>,
+}
+
+impl SearchActivePushSourcesVisitor {
+    pub fn new() -> Self {
+        Self {
+            hashed_blocks: vec![],
+        }
+    }
+
+    pub fn into_hashed_blocks(self) -> Vec<(Multihash, MetadataBlockTyped<AddPushSource>)> {
+        self.hashed_blocks
+    }
+}
+
+impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
+    type Error = Infallible;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::ADD_PUSH_SOURCE)
+    }
+
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        // TODO: Add support of `DisablePushSource` events
+        let flag = Flag::from(&block.event);
+
+        if flag == Flag::ADD_PUSH_SOURCE {
+            self.hashed_blocks
+                .push((hash.clone(), block.clone().into_typed().unwrap()));
+        }
+
+        Ok(Decision::NextOfType(Flag::ADD_PUSH_SOURCE))
     }
 }
 

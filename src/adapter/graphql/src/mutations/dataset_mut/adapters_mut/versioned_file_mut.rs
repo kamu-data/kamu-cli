@@ -98,7 +98,7 @@ impl<'a> VersionedFileMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> VersionedFileMut<'a> {
     #[graphql(skip)]

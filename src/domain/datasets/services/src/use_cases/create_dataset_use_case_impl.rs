@@ -33,13 +33,19 @@ pub struct CreateDatasetUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
-    #[tracing::instrument(level = "info", name = CreateDatasetUseCaseImpl_execute, skip_all, fields(dataset_alias, ?seed_block, ?options))]
+    #[tracing::instrument(level = "info", name = CreateDatasetUseCaseImpl_execute, skip_all, fields(dataset_alias))]
     async fn execute(
         &self,
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        tracing::info!(
+            ?seed_block,
+            ?options,
+            "Initiating creation of dataset from seed block"
+        );
+
         // There must be a logged-in user
         let subject = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(subj) => subj,

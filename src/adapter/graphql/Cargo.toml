@@ -65,7 +65,7 @@ base64 = { version = "0.22", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = "0.4"
 # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-datafusion = { version = "48", default-features = false, features = ["serde"] }
+datafusion = { version = "49", default-features = false, features = ["serde"] }
 dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 humansize = { version = "2", default-features = false }

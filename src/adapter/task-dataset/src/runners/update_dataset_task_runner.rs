@@ -36,12 +36,15 @@ pub struct UpdateDatasetTaskRunner {
     sync_service: Arc<dyn SyncService>,
 }
 
+#[common_macros::method_names_consts]
 impl UpdateDatasetTaskRunner {
-    #[tracing::instrument(level = "debug", skip_all, fields(?task_update))]
+    #[tracing::instrument(name = UpdateDatasetTaskRunner_run_update, level = "debug", skip_all)]
     async fn run_update(
         &self,
         task_update: TaskDefinitionDatasetUpdate,
     ) -> Result<TaskOutcome, InternalError> {
+        tracing::debug!(?task_update, "Running update task");
+
         match task_update.pull_job {
             PullPlanIterationJob::Ingest(ingest_item) => {
                 self.run_ingest_update(ingest_item, task_update.pull_options.ingest_options)
@@ -194,7 +197,7 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_head))]
+    #[tracing::instrument(name = UpdateDatasetTaskRunner_update_dataset_head, level = "debug", skip_all, fields(%dataset_handle, %new_head))]
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn update_dataset_head(
         &self,

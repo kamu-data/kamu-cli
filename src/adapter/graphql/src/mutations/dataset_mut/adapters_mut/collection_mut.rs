@@ -217,7 +217,7 @@ impl<'a> CollectionMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollectionMut<'_> {
     /// Links new entry to this collection
