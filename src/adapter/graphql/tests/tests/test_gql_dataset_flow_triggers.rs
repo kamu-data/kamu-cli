@@ -460,7 +460,7 @@ async fn test_crud_cron_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_crud_batching_derived_dataset() {
+async fn test_crud_reactive_derived_dataset() {
     let harness = FlowTriggerHarness::make().await;
 
     harness.create_root_dataset().await;
@@ -530,6 +530,7 @@ async fn test_crud_batching_derived_dataset() {
         false,
         1,
         (30, "MINUTES"),
+        "NO_ACTION",
     );
 
     let res = schema
@@ -598,6 +599,7 @@ async fn test_reactive_trigger_validation() {
             true,
             test_case.0,
             (test_case.1, test_case.2),
+            "NO_ACTION",
         );
 
         let response = schema
@@ -722,6 +724,7 @@ async fn test_pause_resume_dataset_flows() {
         false,
         1,
         (30, "MINUTES"),
+        "RECOVER",
     );
 
     let res = schema
@@ -925,6 +928,7 @@ async fn test_conditions_not_met_for_flows() {
         false,
         1,
         (30, "MINUTES"),
+        "RECOVER",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -1262,6 +1266,7 @@ impl FlowTriggerHarness {
         paused: bool,
         min_records_to_await: u64,
         max_batching_interval: (u32, &str),
+        for_breaking_change: &str,
     ) -> String {
         indoc!(
             r#"
@@ -1279,7 +1284,7 @@ impl FlowTriggerHarness {
                                                 minRecordsToAwait: <minRecordsToAwait>,
                                                 maxBatchingInterval: { every: <every>, unit: "<unit>" }
                                             },
-                                            forBreakingChange: "NO_ACTION"
+                                            forBreakingChange: "<forBreakingChange>"
                                         }
                                     }
                                 ) {
@@ -1323,6 +1328,7 @@ impl FlowTriggerHarness {
         .replace("<every>", &max_batching_interval.0.to_string())
         .replace("<unit>", max_batching_interval.1)
         .replace("<minRecordsToAwait>", &min_records_to_await.to_string())
+        .replace("<forBreakingChange>", for_breaking_change)
     }
 
     fn quick_flow_trigger_query(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
