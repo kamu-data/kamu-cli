@@ -182,7 +182,7 @@ impl FlowHarness {
     }
 
     pub async fn create_root_dataset(&self, dataset_alias: odf::DatasetAlias) -> odf::DatasetID {
-        let dataset_id = odf::DatasetID::new_generated_ed25519().1;
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(dataset_alias.dataset_name.as_bytes());
         let owner_id = odf::metadata::testing::account_id_by_maybe_name(
             &dataset_alias.account_name,
             DEFAULT_ACCOUNT_NAME_STR,
@@ -222,7 +222,7 @@ impl FlowHarness {
         dataset_alias: odf::DatasetAlias,
         input_ids: Vec<odf::DatasetID>,
     ) -> odf::DatasetID {
-        let dataset_id = odf::DatasetID::new_generated_ed25519().1;
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(dataset_alias.dataset_name.as_bytes());
         let owner_id = odf::metadata::testing::account_id_by_maybe_name(
             &dataset_alias.account_name,
             DEFAULT_ACCOUNT_NAME_STR,
