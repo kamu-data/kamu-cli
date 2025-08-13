@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.245.4] - 2025-08-13
 ### Added
 - GQL: `dataset_metadata`: Added new method `MetadataProjection` to get `[MetadataExtendedBlock]` filtered by types and range
 ### Fixed

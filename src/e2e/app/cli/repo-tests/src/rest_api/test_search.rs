@@ -168,7 +168,7 @@ pub async fn test_search_dataset_by_account_substring(
             ))
             .variables(async_graphql::Variables::from_value(
                 async_graphql::value!({
-                    "query": "e2e",
+                    "query": "e2e-",
                 }),
             )),
         )
