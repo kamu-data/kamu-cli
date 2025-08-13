@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
@@ -47,6 +47,7 @@ pub struct FlowAgentImpl {
     catalog: Catalog,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
+    agent_started: Arc<Mutex<bool>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,7 +84,18 @@ impl FlowAgentImpl {
             catalog,
             time_source,
             agent_config,
+            agent_started: Arc::new(Mutex::new(false)),
         }
+    }
+
+    fn has_agent_started(&self) -> bool {
+        let engine_started = self.agent_started.lock().unwrap();
+        *engine_started
+    }
+
+    fn mark_engine_as_started(&self) {
+        let mut engine_started = self.agent_started.lock().unwrap();
+        *engine_started = true;
     }
 
     #[transactional_method]
@@ -163,9 +175,11 @@ impl FlowAgentImpl {
                         .trigger_flow_common(
                             &flow.flow_binding,
                             Some(FlowTriggerRule::Reactive(b.active_rule)),
-                            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-                                activation_time: start_time,
-                            }),
+                            vec![FlowActivationCause::AutoPolling(
+                                FlowActivationCauseAutoPolling {
+                                    activation_time: start_time,
+                                },
+                            )],
                             None,
                         )
                         .await?;
@@ -398,7 +412,11 @@ impl FlowAgent for FlowAgentImpl {
 impl InitOnStartup for FlowAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         let start_time = self.agent_config.round_time(self.time_source.now())?;
-        self.recover_initial_flows_state(start_time).await
+        self.recover_initial_flows_state(start_time).await?;
+
+        self.mark_engine_as_started();
+
+        Ok(())
     }
 }
 
@@ -597,6 +615,12 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
         message: &FlowTriggerUpdatedMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow configuration message");
+
+        if !self.has_agent_started() {
+            // If the agent is not started yet, we do not process flow trigger updates
+            // as they are only relevant after the agent has started.
+            return Ok(());
+        }
 
         if message.paused {
             let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();

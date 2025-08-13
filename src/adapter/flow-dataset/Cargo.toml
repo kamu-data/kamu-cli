@@ -23,7 +23,7 @@ doctest = false
 
 [features]
 default = []
-testing = []
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -48,6 +48,8 @@ serde_json = { version = "1", default-features = false }
 tracing = "0.1"
 thiserror = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
+
+mockall = { version = "0.13", optional = true }
 
 
 

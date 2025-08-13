@@ -8,4 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod derived_dataset_flow_sensor;
+mod transform_flow_evaluator;
+
 pub use derived_dataset_flow_sensor::*;
+pub use transform_flow_evaluator::*;

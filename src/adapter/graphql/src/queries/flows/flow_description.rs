@@ -670,7 +670,7 @@ impl FlowDescriptionBuilder {
                         dataset_id
                     );
                     FlowDescriptionDataset::Unknown(FlowDescriptionUnknown {
-                        message: format!("No SetTransformEvent for dataset {}", dataset_id),
+                        message: format!("No SetTransformEvent for dataset {dataset_id}",),
                     })
                 }
             }

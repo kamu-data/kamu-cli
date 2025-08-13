@@ -28,6 +28,7 @@ impl DatasetResourceUpdateDetails {
     pub fn push_source_name(&self) -> Option<String> {
         match &self.source {
             DatasetUpdateSource::UpstreamFlow { .. }
+            | DatasetUpdateSource::ExternallyDetectedChange
             | DatasetUpdateSource::SmartProtocolPush { .. } => None,
             DatasetUpdateSource::HttpIngest { source_name } => source_name.clone(),
         }
@@ -54,6 +55,9 @@ impl DatasetResourceUpdateDetails {
                     "Flow activated via Smart Transfer Protocol push anonymously".to_string()
                 }
             }
+            DatasetUpdateSource::ExternallyDetectedChange => {
+                "Flow activated by externally detected change".to_string()
+            }
         }
     }
 }
@@ -74,6 +78,7 @@ pub enum DatasetUpdateSource {
         account_name: Option<odf::AccountName>,
         is_force: bool,
     },
+    ExternallyDetectedChange,
 }
 
 impl DatasetUpdateSource {
@@ -84,7 +89,8 @@ impl DatasetUpdateSource {
                 ..
             } => maybe_flow_config_snapshot.as_ref(),
             DatasetUpdateSource::HttpIngest { .. }
-            | DatasetUpdateSource::SmartProtocolPush { .. } => None,
+            | DatasetUpdateSource::SmartProtocolPush { .. }
+            | DatasetUpdateSource::ExternallyDetectedChange => None,
         }
     }
 }

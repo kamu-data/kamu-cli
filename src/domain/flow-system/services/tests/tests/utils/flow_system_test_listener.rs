@@ -240,6 +240,9 @@ impl std::fmt::Display for FlowSystemTestListener {
                                         DatasetUpdateSource::SmartProtocolPush { .. } => {
                                             String::from("SmartProtocolPush")
                                         }
+                                        DatasetUpdateSource::ExternallyDetectedChange => {
+                                            String::from("ExternallyDetectedChange")
+                                        }
                                         DatasetUpdateSource::UpstreamFlow { .. } => format!(
                                             "Input({})",
                                             state

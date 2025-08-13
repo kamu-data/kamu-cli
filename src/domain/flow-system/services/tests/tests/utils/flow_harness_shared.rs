@@ -66,6 +66,7 @@ pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
     pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
+    pub mock_transform_flow_evaluator: Option<MockTransformFlowEvaluator>,
 }
 
 impl FlowHarness {
@@ -89,6 +90,8 @@ impl FlowHarness {
                 ));
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
+        let mock_transform_flow_evaluator =
+            overrides.mock_transform_flow_evaluator.unwrap_or_default();
 
         let catalog = {
             let mut b = CatalogBuilder::new();
@@ -111,6 +114,8 @@ impl FlowHarness {
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_value(mock_dataset_changes)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
+            .add_value(mock_transform_flow_evaluator)
+            .bind::<dyn TransformFlowEvaluator, MockTransformFlowEvaluator>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<TaskSchedulerImpl>()
@@ -121,7 +126,12 @@ impl FlowHarness {
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             kamu_flow_system_services::register_dependencies(&mut b);
-            kamu_adapter_flow_dataset::register_dependencies(&mut b);
+            kamu_adapter_flow_dataset::register_dependencies(
+                &mut b,
+                kamu_adapter_flow_dataset::FlowDatasetAdapterDependencyOpts {
+                    with_default_transform_evaluator: false,
+                },
+            );
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,

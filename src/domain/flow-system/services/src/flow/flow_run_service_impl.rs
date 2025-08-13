@@ -48,10 +48,10 @@ impl FlowRunService for FlowRunServiceImpl {
             .trigger_flow_common(
                 flow_binding,
                 None,
-                FlowActivationCause::Manual(FlowActivationCauseManual {
+                vec![FlowActivationCause::Manual(FlowActivationCauseManual {
                     activation_time,
                     initiator_account_id,
-                }),
+                })],
                 maybe_forced_flow_config_rule,
             )
             .await
@@ -63,7 +63,7 @@ impl FlowRunService for FlowRunServiceImpl {
     async fn run_flow_automatically(
         &self,
         flow_binding: &FlowBinding,
-        activation_cause: FlowActivationCause,
+        activation_causes: Vec<FlowActivationCause>,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError> {
@@ -71,7 +71,7 @@ impl FlowRunService for FlowRunServiceImpl {
             .trigger_flow_common(
                 flow_binding,
                 maybe_flow_trigger_rule,
-                activation_cause,
+                activation_causes,
                 maybe_forced_flow_config_rule,
             )
             .await

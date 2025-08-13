@@ -13,7 +13,10 @@ use super::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
+pub fn register_dependencies(
+    catalog_builder: &mut CatalogBuilder,
+    opts: FlowDatasetAdapterDependencyOpts,
+) {
     catalog_builder.add::<FlowControllerIngest>();
     catalog_builder.add::<FlowControllerTransform>();
     catalog_builder.add::<FlowControllerCompact>();
@@ -21,6 +24,24 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowControllerResetToMetadata>();
 
     catalog_builder.add::<FlowDatasetsEventBridge>();
+    if opts.with_default_transform_evaluator {
+        catalog_builder.add::<TransformFlowEvaluatorImpl>();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+pub struct FlowDatasetAdapterDependencyOpts {
+    pub with_default_transform_evaluator: bool,
+}
+
+impl Default for FlowDatasetAdapterDependencyOpts {
+    fn default() -> Self {
+        Self {
+            with_default_transform_evaluator: true,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

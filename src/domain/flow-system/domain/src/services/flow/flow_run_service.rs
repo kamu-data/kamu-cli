@@ -40,7 +40,7 @@ pub trait FlowRunService: Sync + Send {
     async fn run_flow_automatically(
         &self,
         flow_binding: &FlowBinding,
-        activation_cause: FlowActivationCause,
+        activation_causes: Vec<FlowActivationCause>,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError>;

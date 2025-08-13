@@ -3936,7 +3936,7 @@ impl FlowRunsHarness {
                 .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
-            kamu_adapter_flow_dataset::register_dependencies(&mut b);
+            kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
 
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,

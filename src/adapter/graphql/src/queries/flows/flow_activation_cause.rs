@@ -86,6 +86,13 @@ impl FlowActivationCause {
                                 account_name: account_name.map(Into::into),
                             },
                         ),
+                        DatasetUpdateSource::ExternallyDetectedChange => {
+                            FlowActivationCauseDatasetUpdateSource::ExternallyDetectedChange(
+                                FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange {
+                                    dummy: true,
+                                },
+                            )
+                        }
                     },
                 })
             }
@@ -120,6 +127,7 @@ pub(crate) enum FlowActivationCauseDatasetUpdateSource {
     UpstreamFlow(FlowActivationCauseDatasetUpdateSourceUpstreamFlow),
     HttpIngest(FlowActivationCauseDatasetUpdateSourceHttpIngest),
     SmartProtocolPush(FlowActivationCauseDatasetUpdateSourceSmartProtocolPush),
+    ExternallyDetectedChange(FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange),
 }
 
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
@@ -136,6 +144,11 @@ pub(crate) struct FlowActivationCauseDatasetUpdateSourceHttpIngest {
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
     account_name: Option<AccountName<'static>>,
     is_force: bool,
+}
+
+#[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange {
+    dummy: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

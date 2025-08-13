@@ -91,9 +91,11 @@ impl FlowSchedulingHelper {
         self.trigger_flow_common(
             flow_binding,
             Some(FlowTriggerRule::Schedule(schedule.clone())),
-            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-                activation_time: start_time,
-            }),
+            vec![FlowActivationCause::AutoPolling(
+                FlowActivationCauseAutoPolling {
+                    activation_time: start_time,
+                },
+            )],
             None,
         )
         .await
@@ -103,9 +105,14 @@ impl FlowSchedulingHelper {
         &self,
         flow_binding: &FlowBinding,
         trigger_rule_maybe: Option<FlowTriggerRule>,
-        activation_cause: FlowActivationCause,
+        activation_causes: Vec<FlowActivationCause>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, InternalError> {
+        assert!(
+            !activation_causes.is_empty(),
+            "At least one activation cause is required"
+        );
+
         // Query previous runs stats to determine activation time
         let flow_run_stats = self
             .flow_event_store
@@ -114,7 +121,11 @@ impl FlowSchedulingHelper {
 
         // Flows may not be attempted more frequent than mandatory throttling period.
         // If flow has never run before, let it go without restriction.
-        let activation_time = activation_cause.activation_time();
+        let activation_time = activation_causes
+            .first()
+            .as_ref()
+            .unwrap()
+            .activation_time();
         let mut throttling_boundary_time = flow_run_stats
             .last_attempt_time
             .map_or(activation_time, |t| {
@@ -145,11 +156,10 @@ impl FlowSchedulingHelper {
                     .int_err()?;
 
                 // Only merge unique triggers, ignore identical
-                flow.add_activation_cause_if_unique(
-                    self.time_source.now(),
-                    activation_cause.clone(),
-                )
-                .int_err()?;
+                for activation_cause in activation_causes {
+                    flow.add_activation_cause_if_unique(self.time_source.now(), activation_cause)
+                        .int_err()?;
+                }
 
                 match trigger_context {
                     FlowTriggerContext::Reactive(reactive_rule) => {
@@ -239,7 +249,7 @@ impl FlowSchedulingHelper {
                     .make_new_flow(
                         self.flow_event_store.as_ref(),
                         flow_binding.clone(),
-                        &activation_cause,
+                        activation_causes,
                         maybe_flow_config_rule_snapshot,
                         retry_policy,
                     )
@@ -453,20 +463,34 @@ impl FlowSchedulingHelper {
         &self,
         flow_event_store: &dyn FlowEventStore,
         flow_binding: FlowBinding,
-        activation_cause: &FlowActivationCause,
+        mut activation_causes: Vec<FlowActivationCause>,
         maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
     ) -> Result<Flow, InternalError> {
-        tracing::trace!(?flow_binding, ?activation_cause, "Creating new flow");
+        tracing::trace!(?flow_binding, ?activation_causes, "Creating new flow");
 
-        let flow = Flow::new(
+        assert!(
+            !activation_causes.is_empty(),
+            "At least one activation cause is required"
+        );
+
+        let other_causes = activation_causes.split_off(1);
+        let first_cause = activation_causes.into_iter().next().unwrap();
+
+        let mut flow = Flow::new(
             self.time_source.now(),
             flow_event_store.new_flow_id().await?,
             flow_binding,
-            activation_cause.clone(),
+            first_cause,
             maybe_config_rule_snapshot,
             retry_policy,
         );
+
+        // Register additional activation causes
+        for cause in other_causes {
+            flow.add_activation_cause_if_unique(self.time_source.now(), cause)
+                .int_err()?;
+        }
 
         Ok(flow)
     }

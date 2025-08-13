@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::InternalError;
 use thiserror::Error;
@@ -29,6 +28,11 @@ pub trait TransformRequestPlanner: Send + Sync {
         target: ResolvedDataset,
         block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     ) -> Result<VerifyTransformOperation, VerifyTransformPlanError>;
+
+    async fn evaluate_transform_status(
+        &self,
+        target: ResolvedDataset,
+    ) -> Result<TransformStatus, TransformStatusError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,8 +50,6 @@ impl std::fmt::Debug for TransformPreliminaryPlan {
 
 #[derive(Debug, Clone)]
 pub struct TransformPreliminaryRequestExt {
-    /// Randomly assigned value that identifies this specific engine operation
-    pub operation_id: String,
     /// Identifies the output dataset
     pub dataset_handle: odf::DatasetHandle,
     /// Block reference to advance upon commit
@@ -56,8 +58,6 @@ pub struct TransformPreliminaryRequestExt {
     pub head: odf::Multihash,
     /// Transformation that will be applied to produce new data
     pub transform: odf::metadata::Transform,
-    /// System time to use for new records
-    pub system_time: DateTime<Utc>,
     /// Expected data schema (if already defined)
     pub schema: Option<SchemaRef>,
     /// Preceding record offset, if any
@@ -93,6 +93,15 @@ impl std::fmt::Debug for VerifyTransformOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_list().entries(self.steps.iter()).finish()
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum TransformStatus {
+    UpToDate,
+    NewInputDataAvailable {
+        input_advancements: Vec<odf::metadata::ExecuteTransformInput>,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,8 +203,6 @@ pub enum VerifyTransformPlanError {
     ),
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl From<odf::GetRefError> for VerifyTransformPlanError {
     fn from(v: odf::GetRefError) -> Self {
         match v {
@@ -206,8 +213,6 @@ impl From<odf::GetRefError> for VerifyTransformPlanError {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl From<odf::GetBlockError> for VerifyTransformPlanError {
     fn from(v: odf::GetBlockError) -> Self {
         match v {
@@ -216,6 +221,34 @@ impl From<odf::GetBlockError> for VerifyTransformPlanError {
             odf::GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
             odf::GetBlockError::Access(e) => Self::Access(e),
             odf::GetBlockError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum TransformStatusError {
+    #[error(transparent)]
+    TransformNotDefined(
+        #[from]
+        #[backtrace]
+        TransformNotDefinedError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<TransformPlanError> for TransformStatusError {
+    fn from(value: TransformPlanError) -> Self {
+        match value {
+            TransformPlanError::TransformNotDefined(e) => Self::TransformNotDefined(e),
+            TransformPlanError::Internal(e) => Self::Internal(e),
         }
     }
 }

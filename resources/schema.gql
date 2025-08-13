@@ -1979,7 +1979,11 @@ type FlowActivationCauseDatasetUpdate {
 	source: FlowActivationCauseDatasetUpdateSource!
 }
 
-union FlowActivationCauseDatasetUpdateSource = FlowActivationCauseDatasetUpdateSourceUpstreamFlow | FlowActivationCauseDatasetUpdateSourceHttpIngest | FlowActivationCauseDatasetUpdateSourceSmartProtocolPush
+union FlowActivationCauseDatasetUpdateSource = FlowActivationCauseDatasetUpdateSourceUpstreamFlow | FlowActivationCauseDatasetUpdateSourceHttpIngest | FlowActivationCauseDatasetUpdateSourceSmartProtocolPush | FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange
+
+type FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange {
+	dummy: Boolean!
+}
 
 type FlowActivationCauseDatasetUpdateSourceHttpIngest {
 	sourceName: String

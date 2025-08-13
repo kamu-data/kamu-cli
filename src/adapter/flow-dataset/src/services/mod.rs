@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod flow_datasets_event_bridge;
+mod transform_flow_evaluator_impl;
 
 pub use flow_datasets_event_bridge::*;
+pub use transform_flow_evaluator_impl::*;

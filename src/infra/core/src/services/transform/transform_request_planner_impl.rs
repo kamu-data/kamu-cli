@@ -10,47 +10,36 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use dill::*;
 use engine::TransformRequestExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use random_strings::get_random_name;
-use time_source::SystemTimeSource;
 
 use super::build_preliminary_request_ext;
-use crate::get_transform_input_from_query_input;
+use crate::{
+    GetTransformQueryInputError,
+    get_transform_input_from_query_input,
+    get_transform_query_input,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TransformRequestPlannerImpl {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    time_source: Arc<dyn SystemTimeSource>,
-}
-
 #[component(pub)]
 #[interface(dyn TransformRequestPlanner)]
-impl TransformRequestPlannerImpl {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        time_source: Arc<dyn SystemTimeSource>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            time_source,
-        }
-    }
+pub struct TransformRequestPlannerImpl {
+    dataset_registry: Arc<dyn DatasetRegistry>,
+}
 
+impl TransformRequestPlannerImpl {
     // TODO: PERF: Avoid multiple passes over metadata chain
     #[tracing::instrument(level = "info", skip_all)]
     async fn get_next_operation(
         &self,
         target: ResolvedDataset,
-        system_time: DateTime<Utc>,
     ) -> Result<TransformPreliminaryPlan, TransformPlanError> {
         // Build prelmiinary request
-        let preliminary_request =
-            build_preliminary_request_ext(target.clone(), system_time).await?;
+        let preliminary_request = build_preliminary_request_ext(target.clone()).await?;
 
         // Pre-fill datasets that is used in the operation
         let mut datasets_map = ResolvedDatasetsMap::default();
@@ -98,8 +87,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         target: ResolvedDataset,
     ) -> Result<TransformPreliminaryPlan, TransformPlanError> {
         // TODO: There might be more operations to do
-        self.get_next_operation(target.clone(), self.time_source.now())
-            .await
+        self.get_next_operation(target.clone()).await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?block_range))]
@@ -300,6 +288,44 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             steps,
             datasets_map,
         })
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    async fn evaluate_transform_status(
+        &self,
+        target: ResolvedDataset,
+    ) -> Result<TransformStatus, TransformStatusError> {
+        // Build a plan
+        let plan = self.get_next_operation(target.clone()).await?;
+
+        // Resolve query inputs
+        use futures::{StreamExt, TryStreamExt};
+        let query_inputs: Vec<_> = futures::stream::iter(plan.preliminary_request.input_states)
+            .then(|(input_decl, input_state)| {
+                get_transform_query_input(input_decl, input_state, &plan.datasets_map)
+            })
+            .try_collect()
+            .await
+            .map_err(|e| match e {
+                GetTransformQueryInputError::Internal(e) => TransformStatusError::Internal(e),
+            })?;
+
+        // Filter out query inputs that have no changes
+        let filtered_query_inputs: Vec<_> = query_inputs
+            .into_iter()
+            .filter(|input| input.new_block_hash.is_some())
+            .collect();
+
+        // If there is at least one query input with changes, transform is out of date
+        if filtered_query_inputs.is_empty() {
+            // No new data, so the transform is up-to-date
+            Ok(TransformStatus::UpToDate)
+        } else {
+            // New data is available, so we need to run the transform
+            Ok(TransformStatus::NewInputDataAvailable {
+                input_advancements: filtered_query_inputs,
+            })
+        }
     }
 }
 
