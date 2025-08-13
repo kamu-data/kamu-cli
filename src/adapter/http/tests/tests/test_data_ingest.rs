@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, TimeZone, Utc};
+use file_utils::MediaType;
 use indoc::indoc;
 use kamu::domain::upload_service::{FileUploadLimitConfig, UploadToken, UploadTokenBase64Json};
 use kamu::domain::*;

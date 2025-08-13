@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
+use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::upload_service::{
     FileUploadLimitConfig,
@@ -52,7 +53,7 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_core::{MediaType, TenancyConfig};
+use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;

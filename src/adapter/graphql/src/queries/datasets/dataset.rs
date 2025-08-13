@@ -10,6 +10,7 @@
 use chrono::prelude::*;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{ResolvedDataset, ServerUrlConfig, auth};
+use kamu_datasets::{CONTENT_HASH_COLUMN_NAME, VERSION_COLUMN_NAME};
 use odf::dataset::MetadataChainExt;
 
 use crate::prelude::*;
@@ -73,7 +74,8 @@ impl Dataset {
     pub(crate) async fn is_versioned_file(dataset: &ResolvedDataset) -> Result<bool> {
         // TODO: Currently guessing whether its OK to cast by push source. Replace with
         // some archetype metadata on ODF layer.
-        Self::push_source_has_columns(dataset, &["version", "content_hash"]).await
+        Self::push_source_has_columns(dataset, &[VERSION_COLUMN_NAME, CONTENT_HASH_COLUMN_NAME])
+            .await
     }
 
     pub(crate) async fn is_collection(dataset: &ResolvedDataset) -> Result<bool> {

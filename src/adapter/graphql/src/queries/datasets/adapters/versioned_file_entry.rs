@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::{MediaType, MediaTypeRef, ResolvedDataset};
+use kamu_core::ResolvedDataset;
+use kamu_datasets::VersionedFileEntity;
 
 use crate::prelude::*;
 
@@ -47,44 +48,16 @@ pub struct VersionedFileEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl VersionedFileEntry {
-    pub const DEFAULT_CONTENT_TYPE: MediaTypeRef<'static> =
-        MediaTypeRef("application/octet-stream");
-
-    pub fn new(
-        dataset: ResolvedDataset,
-        version: FileVersion,
-        content_hash: odf::Multihash,
-        content_length: usize,
-        content_type: Option<impl Into<MediaType>>,
-        extra_data: Option<ExtraData>,
-    ) -> Self {
-        let extra_data = extra_data.unwrap_or_default();
-        let now = Utc::now();
-
-        Self {
-            dataset,
-            system_time: now,
-            event_time: now,
-            version,
-            content_length,
-            content_type: content_type
-                .map(Into::into)
-                .unwrap_or_else(|| Self::DEFAULT_CONTENT_TYPE.to_owned())
-                .to_string(),
-            content_hash: content_hash.into(),
-            extra_data,
-        }
-    }
-
     pub fn from_json(
         dataset: ResolvedDataset,
         record: serde_json::Value,
     ) -> Result<Self, InternalError> {
-        let mut event: VersionedFileEvent = serde_json::from_value(record).int_err()?;
+        let event: VersionedFileEvent = serde_json::from_value(record).int_err()?;
 
         let vocab = odf::metadata::DatasetVocabulary::default();
-        event.record.extra_data.remove(&vocab.offset_column);
-        event.record.extra_data.remove(&vocab.operation_type_column);
+        let mut extra_data = event.record.extra_data.into_inner();
+        extra_data.remove(&vocab.offset_column);
+        extra_data.remove(&vocab.operation_type_column);
 
         Ok(Self {
             dataset,
@@ -94,18 +67,8 @@ impl VersionedFileEntry {
             content_length: event.record.content_length,
             content_type: event.record.content_type,
             content_hash: event.record.content_hash.into(),
-            extra_data: ExtraData::new(event.record.extra_data),
+            extra_data: ExtraData::new(extra_data),
         })
-    }
-
-    pub fn into_input_record(self) -> VersionedFileRecord {
-        VersionedFileRecord {
-            version: self.version,
-            content_type: self.content_type,
-            content_length: self.content_length,
-            content_hash: self.content_hash.into(),
-            extra_data: self.extra_data.into(),
-        }
     }
 }
 
@@ -181,18 +144,6 @@ pub struct VersionedFileContentDownload {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Used to serialize/deserialize entry from a dataset
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct VersionedFileRecord {
-    pub version: FileVersion,
-    pub content_type: String,
-    pub content_length: usize,
-    pub content_hash: odf::Multihash,
-
-    #[serde(flatten)]
-    pub extra_data: serde_json::Map<String, serde_json::Value>,
-}
-
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct VersionedFileEvent {
     #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
@@ -202,7 +153,7 @@ pub struct VersionedFileEvent {
     pub event_time: DateTime<Utc>,
 
     #[serde(flatten)]
-    pub record: VersionedFileRecord,
+    pub record: VersionedFileEntity,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,6 +11,7 @@ use axum::extract::{Extension, Query};
 use chrono::{DateTime, Utc};
 use database_common_macros::transactional_handler;
 use dill::Catalog;
+use file_utils::MediaType;
 use http::HeaderMap;
 use http_common::*;
 use internal_error::ErrorIntoInternal;

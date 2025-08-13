@@ -9,12 +9,11 @@
 
 use base64::Engine;
 use bytes::Bytes;
+use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::io::AsyncRead;
-
-use crate::MediaType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

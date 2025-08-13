@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
+use file_utils::{MediaType, MediaTypeRef};
 use kamu_core::ingest::*;
 use kamu_ingest_datafusion::*;
 use odf::metadata::ReadStep;
