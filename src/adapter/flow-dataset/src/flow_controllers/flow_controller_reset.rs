@@ -80,9 +80,6 @@ impl fs::FlowController for FlowControllerReset {
             return Ok(());
         }
 
-        // Reset is a breaking operation.
-        // Datasets with enabled updates would compact to metadata only.
-        // Other datasets will stay unaffected, but would break on next update attempt
         let dataset_id = FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
         let activation_cause =

@@ -6844,7 +6844,6 @@ dependencies = [
  "thiserror 2.0.14",
  "time-source",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -7828,7 +7827,6 @@ dependencies = [
  "thiserror 2.0.14",
  "tokio-stream",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -7849,7 +7847,6 @@ dependencies = [
  "test-log",
  "tokio",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -7927,7 +7924,6 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
- "uuid",
 ]
 
 [[package]]
