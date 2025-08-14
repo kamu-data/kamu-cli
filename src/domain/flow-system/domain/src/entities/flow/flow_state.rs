@@ -23,6 +23,8 @@ pub struct FlowState {
     pub flow_binding: FlowBinding,
     /// Activation causes
     pub activation_causes: Vec<FlowActivationCause>,
+    /// Activation causes that arrived after the task was formed
+    pub late_activation_causes: Vec<FlowActivationCause>,
     /// Start condition (if defined)
     pub start_condition: Option<FlowStartCondition>,
     /// Timing records
@@ -103,6 +105,7 @@ impl Projection for FlowState {
                     flow_id,
                     flow_binding,
                     activation_causes: vec![activation_cause],
+                    late_activation_causes: vec![],
                     start_condition: None,
                     timing: FlowTimingRecords {
                         first_scheduled_at: None,
@@ -153,6 +156,13 @@ impl Projection for FlowState {
                     }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
+                        } else if !s.task_ids.is_empty() {
+                            let mut late_activation_causes = s.late_activation_causes;
+                            late_activation_causes.push(activation_cause.clone());
+                            Ok(FlowState {
+                                late_activation_causes,
+                                ..s
+                            })
                         } else {
                             let mut activation_causes = s.activation_causes;
                             activation_causes.push(activation_cause.clone());

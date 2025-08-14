@@ -61,6 +61,24 @@ impl FlowSchedulingHelper {
         Ok(())
     }
 
+    pub(crate) async fn try_schedule_late_flow_activations(
+        &self,
+        flow: &FlowState,
+    ) -> Result<(), InternalError> {
+        // If there are late activation causes, schedule them
+        if !flow.late_activation_causes.is_empty() {
+            self.trigger_flow_common(
+                &flow.flow_binding,
+                None,
+                flow.late_activation_causes.clone(),
+                None,
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
     pub(crate) async fn try_schedule_auto_polling_flow_if_enabled(
         &self,
         start_time: DateTime<Utc>,
@@ -341,7 +359,8 @@ impl FlowSchedulingHelper {
         let mut accumulated_something = false;
         let mut had_breaking_changes = false;
 
-        // Scan each accumulated trigger to decide
+        // Scan each accumulated activation case to decide
+        assert!(flow.late_activation_causes.is_empty());
         for activation_cause in &flow.activation_causes {
             if let FlowActivationCause::ResourceUpdate(activation_cause) = activation_cause {
                 match activation_cause.changes {

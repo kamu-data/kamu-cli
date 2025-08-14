@@ -83,7 +83,9 @@ impl Flow {
         now: DateTime<Utc>,
         activation_cause: FlowActivationCause,
     ) -> Result<bool, ProjectionError<FlowState>> {
-        if activation_cause.is_unique_vs(&self.activation_causes) {
+        if activation_cause.is_unique_vs(&self.activation_causes)
+            && activation_cause.is_unique_vs(&self.late_activation_causes)
+        {
             let event = FlowEventActivationCauseAdded {
                 event_time: now,
                 flow_id: self.flow_id,

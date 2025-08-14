@@ -533,8 +533,13 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         }
 
                         // In case of success:
-                        //  - schedule next auto-polling flow cycle
+                        //  - schedule next flow, if we had any late activation cause
+                        //  - schedule next auto-polling flow, if schedule is enabled
                         if message.outcome.is_success() {
+                            scheduling_helper
+                                .try_schedule_late_flow_activations(&flow)
+                                .await?;
+
                             scheduling_helper
                                 .try_schedule_auto_polling_flow_if_enabled(
                                     finish_time,

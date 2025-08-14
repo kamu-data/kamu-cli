@@ -339,6 +339,7 @@ impl TestWebhookDeliverySchedulerHarness {
                             activation_time: now,
                         },
                     )],
+                    late_activation_causes: vec![],
                     outcome: None,
                     timing: FlowTimingRecords {
                         first_scheduled_at: Some(now),

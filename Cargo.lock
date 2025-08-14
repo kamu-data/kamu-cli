@@ -7904,7 +7904,6 @@ dependencies = [
  "indoc 2.0.6",
  "init-on-startup",
  "internal-error",
- "kamu",
  "kamu-accounts",
  "kamu-adapter-flow-dataset",
  "kamu-adapter-flow-webhook",
