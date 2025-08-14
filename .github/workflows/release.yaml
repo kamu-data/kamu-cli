@@ -68,7 +68,7 @@ jobs:
       # This will be replaced with `cross` for cross-compilation targets
       CARGO: cargo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
@@ -119,7 +119,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Sets the header for the release description
       - run: echo "" > RELEASE_HEAD.md
