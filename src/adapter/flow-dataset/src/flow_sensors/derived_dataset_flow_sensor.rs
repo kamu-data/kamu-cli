@@ -75,7 +75,6 @@ impl DerivedDatasetFlowSensor {
         &self,
         activation_causes: Vec<fs::FlowActivationCause>,
         flow_run_service: &dyn fs::FlowRunService,
-        with_reactive_rule: bool,
     ) -> Result<(), InternalError> {
         let flow_binding =
             fs::FlowBinding::new(FLOW_TYPE_DATASET_TRANSFORM, self.flow_scope.clone());
@@ -84,11 +83,7 @@ impl DerivedDatasetFlowSensor {
             .run_flow_automatically(
                 &flow_binding,
                 activation_causes,
-                if with_reactive_rule {
-                    Some(fs::FlowTriggerRule::Reactive(self.reactive_rule))
-                } else {
-                    None
-                },
+                Some(fs::FlowTriggerRule::Reactive(self.reactive_rule)),
                 None,
             )
             .await
@@ -165,74 +160,50 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                     "Derived dataset has new input data available, triggering transform flow",
                 );
 
-                let flow_event_store = catalog.get_one::<dyn fs::FlowEventStore>().unwrap();
                 let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
 
-                // Has flow ever succeeded?
-                let flow_run_stats = flow_event_store
-                    .get_flow_run_stats(&fs::FlowBinding::new(
-                        FLOW_TYPE_DATASET_TRANSFORM,
-                        self.flow_scope.clone(),
-                    ))
-                    .await?;
-                if flow_run_stats.last_success_time.is_none() {
-                    // Run transform flow for the first time, unconditionally
-                    self.run_transform_flow(
-                        vec![fs::FlowActivationCause::AutoPolling(
-                            fs::FlowActivationCauseAutoPolling { activation_time },
-                        )],
-                        flow_run_service.as_ref(),
-                        false, // No reactive rule for the first run
-                    )
-                    .await?;
-                } else {
-                    // Use increment of each input dataset to create activation causes
-                    let dataset_increment_query_service = catalog
-                        .get_one::<dyn DatasetIncrementQueryService>()
-                        .unwrap();
+                // Use increment of each input dataset to create activation causes
+                let dataset_increment_query_service = catalog
+                    .get_one::<dyn DatasetIncrementQueryService>()
+                    .unwrap();
 
-                    let mut all_activation_causes = Vec::with_capacity(input_advancements.len());
-                    for input_advancement in input_advancements {
-                        // Compute increment for 1 input dataset
-                        let dataset_increment = dataset_increment_query_service
-                            .get_increment_between(
-                                &input_advancement.dataset_id,
-                                input_advancement.prev_block_hash.as_ref(),
-                                input_advancement.new_block_hash.as_ref().unwrap(),
-                            )
-                            .await
-                            .int_err()?;
+                let mut all_activation_causes = Vec::with_capacity(input_advancements.len());
+                for input_advancement in input_advancements {
+                    // Compute increment for 1 input dataset
+                    let dataset_increment = dataset_increment_query_service
+                        .get_increment_between(
+                            &input_advancement.dataset_id,
+                            input_advancement.prev_block_hash.as_ref(),
+                            input_advancement.new_block_hash.as_ref().unwrap(),
+                        )
+                        .await
+                        .int_err()?;
 
-                        // Form activation cause
-                        let activation_cause = fs::FlowActivationCause::ResourceUpdate(
-                            fs::FlowActivationCauseResourceUpdate {
-                                activation_time,
-                                changes: fs::ResourceChanges::NewData {
-                                    blocks_added: dataset_increment.num_blocks,
-                                    records_added: dataset_increment.num_records,
-                                    new_watermark: dataset_increment.updated_watermark,
-                                },
-                                resource_type: DATASET_RESOURCE_TYPE.to_string(),
-                                details: serde_json::to_value(DatasetResourceUpdateDetails {
-                                    dataset_id: input_advancement.dataset_id,
-                                    source: DatasetUpdateSource::ExternallyDetectedChange,
-                                    new_head: input_advancement.new_block_hash.unwrap(),
-                                    old_head_maybe: input_advancement.prev_block_hash.clone(),
-                                })
-                                .int_err()?,
+                    // Form activation cause
+                    let activation_cause = fs::FlowActivationCause::ResourceUpdate(
+                        fs::FlowActivationCauseResourceUpdate {
+                            activation_time,
+                            changes: fs::ResourceChanges::NewData {
+                                blocks_added: dataset_increment.num_blocks,
+                                records_added: dataset_increment.num_records,
+                                new_watermark: dataset_increment.updated_watermark,
                             },
-                        );
-                        all_activation_causes.push(activation_cause);
-                    }
-
-                    // Trigger transform flow with all activation causes
-                    self.run_transform_flow(
-                        all_activation_causes,
-                        flow_run_service.as_ref(),
-                        true, /* apply reactive rules */
-                    )
-                    .await?;
+                            resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                            details: serde_json::to_value(DatasetResourceUpdateDetails {
+                                dataset_id: input_advancement.dataset_id,
+                                source: DatasetUpdateSource::ExternallyDetectedChange,
+                                new_head: input_advancement.new_block_hash.unwrap(),
+                                old_head_maybe: input_advancement.prev_block_hash.clone(),
+                            })
+                            .int_err()?,
+                        },
+                    );
+                    all_activation_causes.push(activation_cause);
                 }
+
+                // Trigger transform flow with all activation causes
+                self.run_transform_flow(all_activation_causes, flow_run_service.as_ref())
+                    .await?;
             }
         }
 
@@ -270,7 +241,6 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                     self.run_transform_flow(
                         vec![activation_cause.clone()],
                         flow_run_service.as_ref(),
-                        true, /* with reactive rule */
                     )
                     .await?;
                 }
