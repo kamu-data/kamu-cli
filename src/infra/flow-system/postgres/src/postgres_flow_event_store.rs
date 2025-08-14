@@ -681,7 +681,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         let (scope_conditions, _) =
-            self.generate_scope_condition_clauses(&flow_scope_query, 2 /* 1 param + 1 */);
+            self.generate_scope_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
 
         let scope_values = self.form_scope_condition_values(flow_scope_query);
 
@@ -694,11 +694,11 @@ impl FlowEventStore for PostgresFlowEventStore {
                 SELECT DISTINCT(initiator) FROM flows
                 WHERE
                     ({scope_conditions})
-                    AND initiator != $1
+                    AND initiator != '{SYSTEM_INITIATOR}'
                 "#,
             );
 
-            let mut query = sqlx::query(&query_str).bind(SYSTEM_INITIATOR);
+            let mut query = sqlx::query(&query_str);
             for values in scope_values {
                 query = query.bind(values);
             }

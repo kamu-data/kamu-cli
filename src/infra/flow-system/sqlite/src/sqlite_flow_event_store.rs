@@ -791,7 +791,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             let connection_mut = tr.connection_mut().await?;
 
             let (scope_clauses, _) =
-                self.generate_scope_condition_clauses(&flow_scope_query, 2 /* 1 param + 1 */);
+                self.generate_scope_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
 
             let scope_values = self.form_scope_condition_values(flow_scope_query);
 
@@ -800,12 +800,11 @@ impl FlowEventStore for SqliteFlowEventStore {
                 SELECT DISTINCT(initiator) FROM flows
                 WHERE
                     ({scope_clauses})
-                    AND initiator != $1
+                    AND initiator != '{SYSTEM_INITIATOR}'
                 "#,
             );
 
-            let mut query = sqlx::query(&query_str)
-                .bind(SYSTEM_INITIATOR);
+            let mut query = sqlx::query(&query_str);
             for value in scope_values {
                 query = query.bind(value);
             }
