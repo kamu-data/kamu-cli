@@ -12,7 +12,6 @@ use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
@@ -1533,58 +1532,63 @@ pub struct FlowApi<'a> {
 }
 
 impl FlowApi<'_> {
-    pub async fn trigger(
+    async fn trigger_flow(
         &self,
         dataset_id: &odf::DatasetID,
-        flow_type: &str,
+        mutation_name: &str,
     ) -> FlowTriggerResponse {
-        let response = self
-            .client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    mutation {
-                      datasets {
-                        byId(datasetId: "<dataset_id>") {
-                          flows {
-                            runs {
-                              triggerFlow(datasetFlowType: <dataset_flow_type>) {
-                                message
-                                ... on TriggerFlowSuccess {
-                                  flow {
-                                    flowId
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#
-                )
-                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-                .replace(
-                    "<dataset_flow_type>",
-                    &format!("{flow_type:?}").to_case(Case::UpperSnake),
-                )
-                .as_str(),
-                None,
-            )
-            .await
-            .data();
+        let mutation = format!(
+            r#"
+            mutation {{
+              datasets {{
+                byId(datasetId: "<dataset_id>") {{
+                  flows {{
+                    runs {{
+                      {mutation_name} {{
+                        message
+                        ... on TriggerFlowSuccess {{
+                          flow {{
+                            flowId
+                          }}
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+            "#
+        )
+        .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string());
 
-        let trigger_node = &response["datasets"]["byId"]["flows"]["runs"]["triggerFlow"];
+        let response = self.client.graphql_api_call(&mutation, None).await.data();
+
+        let trigger_node = &response["datasets"]["byId"]["flows"]["runs"][mutation_name];
         let message = trigger_node["message"].as_str().unwrap();
 
         if message == "Success" {
             let flow_id_as_str = trigger_node["flow"]["flowId"].as_str().unwrap();
             let flow_id = flow_id_as_str.parse::<u64>().unwrap();
-
             FlowTriggerResponse::Success(flow_id.into())
         } else {
             FlowTriggerResponse::Error(message.to_owned())
         }
+    }
+
+    pub async fn trigger_ingest(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
+        self.trigger_flow(dataset_id, "triggerIngestFlow").await
+    }
+
+    pub async fn trigger_transform(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
+        self.trigger_flow(dataset_id, "triggerTransformFlow").await
+    }
+
+    pub async fn trigger_compaction(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
+        self.trigger_flow(dataset_id, "triggerCompactionFlow").await
+    }
+
+    pub async fn trigger_reset(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
+        self.trigger_flow(dataset_id, "triggerResetFlow").await
     }
 
     // Method to wait for a flow to finish

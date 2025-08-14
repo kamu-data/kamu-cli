@@ -49,7 +49,7 @@ file-utils = { workspace = true }
 http-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-observability = { workspace = true, features = ["prometheus"] }
+observability = { workspace = true, features = ["dill", "prometheus"] }
 time-source = { workspace = true }
 server-console = { workspace = true }
 
@@ -200,7 +200,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "48", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
+datafusion = { version = "49", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
 dill = { version = "0.14", default-features = false }
 dirs = "6"
 fs_extra = "1.3"

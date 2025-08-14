@@ -20,7 +20,10 @@ use crate::queries::Account;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, SimpleObject, PartialEq, Eq)]
+#[graphql(complex)]
 pub struct MetadataBlockExtended {
+    #[graphql(skip)]
+    pub block: odf::metadata::MetadataBlock,
     pub block_hash: Multihash<'static>,
     pub prev_block_hash: Option<Multihash<'static>>,
     pub system_time: DateTime<Utc>,
@@ -29,24 +32,73 @@ pub struct MetadataBlockExtended {
     pub sequence_number: u64,
 }
 
+#[ComplexObject]
 impl MetadataBlockExtended {
+    #[graphql(skip)]
     pub async fn new(
         ctx: &Context<'_>,
         block_hash: impl Into<Multihash<'static>>,
         block: odf::metadata::MetadataBlock,
         author: Account,
     ) -> Result<Self, InternalError> {
-        let b: MetadataBlock = MetadataBlock::with_extended_aliases(ctx, block)
-            .await?
-            .into();
+        let odf_block = MetadataBlock::with_extended_aliases(ctx, block).await?;
+        let original_block = odf_block.clone();
+        let block: MetadataBlock = odf_block.into();
+
         Ok(Self {
             block_hash: block_hash.into(),
-            prev_block_hash: b.prev_block_hash,
-            system_time: b.system_time,
+            prev_block_hash: block.prev_block_hash,
+            system_time: block.system_time,
             author,
-            event: b.event,
-            sequence_number: b.sequence_number,
+            event: block.event,
+            sequence_number: block.sequence_number,
+            block: original_block,
         })
+    }
+
+    #[expect(clippy::unused_async)]
+    async fn encoded(
+        &self,
+        encoding: MetadataManifestFormat,
+    ) -> Result<Option<EncodedBlock>, InternalError> {
+        Ok(Some(EncodedBlock::new(encoding, &self.block)?))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EncodedBlock
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, SimpleObject, PartialEq, Eq)]
+pub struct EncodedBlock {
+    pub encoding: MetadataManifestFormat,
+    pub content: String,
+}
+
+impl EncodedBlock {
+    pub fn new(
+        encoding: MetadataManifestFormat,
+        block: &odf::metadata::MetadataBlock,
+    ) -> Result<Self, InternalError> {
+        let content = Self::encode_block(block, encoding)?;
+        Ok(Self { encoding, content })
+    }
+
+    pub fn encode_block(
+        block: &odf::metadata::MetadataBlock,
+        format: MetadataManifestFormat,
+    ) -> Result<String, InternalError> {
+        use odf::metadata::serde::MetadataBlockSerializer;
+
+        match format {
+            MetadataManifestFormat::Yaml => {
+                let ser = odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
+
+                let buffer = ser.write_manifest(block).int_err()?;
+                let content = std::str::from_utf8(&buffer).int_err()?;
+                Ok(content.to_string())
+            }
+        }
     }
 }
 
@@ -187,4 +239,19 @@ impl MetadataEvent {
             _ => event,
         })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+pub enum MetadataEventType {
+    Seed,
+    SetPollingSource,
+    SetVocab,
+    SetAttachments,
+    SetInfo,
+    SetLicense,
+    SetDataSchema,
+    SetTransform,
+    AddPushSource,
 }

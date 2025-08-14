@@ -26,7 +26,7 @@ impl WebhookSubscription {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl WebhookSubscription {
     /// Unique identifier of the webhook subscription

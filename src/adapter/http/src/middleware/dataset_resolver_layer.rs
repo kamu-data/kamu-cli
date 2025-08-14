@@ -131,7 +131,7 @@ where
                 Ok(p) => p,
                 Err(err) => {
                     tracing::warn!("Could not extract params: {:?}", err);
-                    return Ok(bad_request_response());
+                    return Ok(bad_request_response::<axum::body::Body>(None));
                 }
             };
 

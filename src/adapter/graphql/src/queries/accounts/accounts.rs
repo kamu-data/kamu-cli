@@ -14,7 +14,7 @@ use crate::queries::Account;
 
 pub struct Accounts;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Accounts {
     /// Returns account by its ID

@@ -129,7 +129,7 @@ impl VersionedFile {
     }
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl VersionedFile {
     const DEFAULT_VERSIONS_PER_PAGE: usize = 100;

@@ -248,6 +248,7 @@ impl DataWriterDataFusion {
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
+                    file_decryption_properties: None,
                 },
             )
             .await
@@ -505,6 +506,7 @@ impl DataWriterDataFusion {
                 ),
             ]),
             key_value_metadata: HashMap::new(),
+            crypto: datafusion::config::ParquetEncryptionOptions::default(),
         }
     }
 
@@ -582,6 +584,7 @@ impl DataWriterDataFusion {
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
+                    file_decryption_properties: None,
                 },
             )
             .await

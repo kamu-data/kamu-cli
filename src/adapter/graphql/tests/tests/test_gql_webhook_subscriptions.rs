@@ -540,7 +540,7 @@ async fn test_label_length_validation() {
     let errors = res.errors;
     assert_eq!(errors.len(), 1);
     assert!(errors[0].message.contains(
-        "WebhookSubscriptionLabel is too long. The value length must be less than 100 character(s)"
+        "WebhookSubscriptionLabel is too long: the maximum valid length is 100 characters"
     ),);
 
     assert_eq!(

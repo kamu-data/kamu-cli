@@ -32,6 +32,13 @@ impl FlowBinding {
         }
     }
 
+    pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
+        let FlowScope::Dataset { dataset_id } = &self.scope else {
+            return None;
+        };
+        Some(dataset_id)
+    }
+
     pub fn get_dataset_id_or_die(&self) -> Result<odf::DatasetID, InternalError> {
         let FlowScope::Dataset { dataset_id } = &self.scope else {
             return InternalError::bail("Expecting dataset flow binding scope");

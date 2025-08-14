@@ -25,7 +25,7 @@ use crate::queries;
 
 pub struct AccountsMut;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AccountsMut {
     /// Returns a mutable account by its id

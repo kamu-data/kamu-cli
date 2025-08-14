@@ -28,12 +28,15 @@ pub struct HardCompactDatasetTaskRunner {
     compaction_executor: Arc<dyn CompactionExecutor>,
 }
 
+#[common_macros::method_names_consts]
 impl HardCompactDatasetTaskRunner {
-    #[tracing::instrument(level = "debug", skip_all, fields(?task_compact))]
+    #[tracing::instrument(name = HardCompactDatasetTaskRunner_run_hard_compact, level = "debug", skip_all)]
     async fn run_hard_compact(
         &self,
         task_compact: TaskDefinitionDatasetHardCompact,
     ) -> Result<TaskOutcome, InternalError> {
+        tracing::debug!(?task_compact, "Running hard compaction task");
+
         // Run compaction execution without transaction
         let compaction_result = self
             .compaction_executor
@@ -80,7 +83,7 @@ impl HardCompactDatasetTaskRunner {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_head))]
+    #[tracing::instrument(name = HardCompactDatasetTaskRunner_update_dataset_head, level = "debug", skip_all, fields(%dataset_handle, %new_head))]
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn update_dataset_head(
         &self,

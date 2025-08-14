@@ -315,6 +315,7 @@ impl KamuTable {
             table_partition_cols: Vec::new(),
             parquet_pruning: None,
             skip_metadata: None,
+            file_decryption_properties: None,
         };
 
         let table_paths = file_urls.to_urls().int_err()?;

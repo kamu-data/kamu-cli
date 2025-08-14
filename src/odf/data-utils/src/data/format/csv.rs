@@ -154,6 +154,10 @@ fn encoder_for<'a>(
             c,
             CsvEscapeStringEncoder::new(StringEncoder(c.as_string::<i64>()), opts),
         )),
+        DataType::Utf8View => Box::new(CsvNullableEncoder(
+            c,
+            CsvEscapeStringEncoder::new(StringViewEncoder(c.as_string_view()), opts),
+        )),
         DataType::Timestamp(_, _)
         | DataType::Date32
         | DataType::Date64
@@ -192,7 +196,6 @@ fn encoder_for<'a>(
             ),
         )),
         DataType::BinaryView
-        | DataType::Utf8View
         | DataType::Union(_, _)
         | DataType::Dictionary(_, _)
         | DataType::Map(_, _)

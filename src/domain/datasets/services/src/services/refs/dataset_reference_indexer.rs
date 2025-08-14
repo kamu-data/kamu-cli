@@ -11,19 +11,15 @@ use std::sync::Arc;
 
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{
     DatasetReferenceRepository,
+    GetDatasetEntryError,
     JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DatasetReferenceIndexer {
-    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-    dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
-}
 
 #[component(pub)]
 #[interface(dyn InitOnStartup)]
@@ -34,17 +30,13 @@ pub struct DatasetReferenceIndexer {
     ],
     requires_transaction: true,
 })]
-impl DatasetReferenceIndexer {
-    pub fn new(
-        dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-        dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
-    ) -> Self {
-        Self {
-            dataset_storage_unit,
-            dataset_reference_repo,
-        }
-    }
+pub struct DatasetReferenceIndexer {
+    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
+    dataset_entry_repo: Arc<dyn kamu_datasets::DatasetEntryRepository>,
+    dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
+}
 
+impl DatasetReferenceIndexer {
     async fn has_references_indexed(&self) -> Result<bool, InternalError> {
         self.dataset_reference_repo.has_any_references().await
     }
@@ -69,6 +61,18 @@ impl DatasetReferenceIndexer {
                 .get_stored_dataset_by_id(&dataset_id)
                 .await
                 .int_err()?;
+
+            match self.dataset_entry_repo.get_dataset_entry(&dataset_id).await {
+                Ok(_) => {}
+                Err(GetDatasetEntryError::NotFound(_)) => {
+                    tracing::warn!(
+                        "Dataset entry for dataset {} not found, skipping reference indexing",
+                        dataset_id
+                    );
+                    continue;
+                }
+                Err(e) => return Err(e.int_err()),
+            }
 
             let head = dataset
                 .as_metadata_chain()

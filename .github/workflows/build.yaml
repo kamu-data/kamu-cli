@@ -20,7 +20,7 @@ jobs:
     name: Lint / Code
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rs/toolchain@v1
         with:
           components: rustfmt, clippy
@@ -48,25 +48,29 @@ jobs:
     name: Lint / Codegen
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: kamu-data/kamu-cli
           path: kamu-cli
       - name: Copy rust-toolchain file
         run: cp kamu-cli/rust-toolchain ./rust-toolchain
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: open-data-fabric/open-data-fabric
           path: open-data-fabric
       - uses: actions-rs/toolchain@v1
         with:
           components: rustfmt
-      # TODO: Generate all artifacts (requires containerizing tools like flatc and protoc)
+      # We use nix flake to install flatc, protoc and other tools needed for codegen
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v16
+        with:
+          name: kamu
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - name: Generate artifacts
         run: |
           cd kamu-cli
-          make codegen-odf-flatbuffers-schema
-          make codegen-graphql
+          nix develop .config -c make codegen
       - name: Check generated files
         run: cd kamu-cli && git diff && git diff-index --quiet HEAD
 
@@ -74,7 +78,7 @@ jobs:
     name: Lint / Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rs/toolchain@v1
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall cargo-deny -y
@@ -167,7 +171,7 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions-rs/toolchain@v1
 
