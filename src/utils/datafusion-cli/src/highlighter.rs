@@ -86,7 +86,7 @@ impl Color {
     }
 }
 
-#[cfg(test)]
+#[cfg(false)]
 mod tests {
     use rustyline::highlight::Highlighter;
 

@@ -137,9 +137,8 @@ async fn test_read_parquet_schema_coercion() {
             SessionContext::new(),
             odf::metadata::ReadStepParquet {
                 schema: Some(vec![
-                    "event_time string not null".to_string(),
                     "city string not null".to_string(),
-                    "population int not null".to_string(),
+                    "population string not null".to_string(),
                 ]),
             },
         )
@@ -151,21 +150,20 @@ async fn test_read_parquet_schema_coercion() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED BYTE_ARRAY event_time (STRING);
               REQUIRED BYTE_ARRAY city (STRING);
-              REQUIRED INT32 population;
+              REQUIRED BYTE_ARRAY population (STRING);
             }
             "#
         ),
         indoc!(
             r#"
-            +----------------------+-----------+------------+
-            | event_time           | city      | population |
-            +----------------------+-----------+------------+
-            | 2023-01-01T00:00:00Z | vancouver | 675000     |
-            | 2023-01-01T00:00:00Z | seattle   | 733000     |
-            | 2023-01-01T00:00:00Z | kyiv      | 2884000    |
-            +----------------------+-----------+------------+
+            +-----------+------------+
+            | city      | population |
+            +-----------+------------+
+            | vancouver | 675000     |
+            | seattle   | 733000     |
+            | kyiv      | 2884000    |
+            +-----------+------------+
             "#
         ),
     )

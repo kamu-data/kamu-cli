@@ -103,6 +103,25 @@ async fn test_non_anonymous_api_access_expired_token() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_correct_handle_empty_bearer_token() {
+    let server_harness = ServerHarness::new(MockAuthenticationService::expired_token(), None).await;
+    let test_url = server_harness.test_url();
+
+    let api_server_handle = server_harness.api_server_run();
+
+    let client_handle = async {
+        let client = reqwest::Client::new();
+        let response = client.get(test_url).bearer_auth("").send().await.unwrap();
+
+        assert_eq!(http::StatusCode::BAD_REQUEST, response.status());
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_non_anonymous_api_access_invalid_token() {
     let server_harness = ServerHarness::new(MockAuthenticationService::invalid_token(), None).await;
     let test_url = server_harness.test_url();

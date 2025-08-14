@@ -106,10 +106,11 @@ impl UnsupportedError {
 
 impl From<datafusion::error::DataFusionError> for ReadError {
     fn from(value: datafusion::error::DataFusionError) -> Self {
-        match value {
-            datafusion::error::DataFusionError::SQL(ParserError::ParserError(err), _) => {
-                Self::ParseError(ParseDdlError::new(err))
-            }
+        match &value {
+            datafusion::error::DataFusionError::SQL(err, _) => match err.as_ref() {
+                ParserError::ParserError(msg) => Self::ParseError(ParseDdlError::new(msg)),
+                _ => Self::Internal(value.int_err()),
+            },
             _ => Self::Internal(value.int_err()),
         }
     }

@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_log,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_log_command,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );

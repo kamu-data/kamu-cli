@@ -20,10 +20,76 @@ use crate::queries::*;
 use crate::scalars::DatasetPushStatuses;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct DatasetMetadata<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
+
+impl<'a> DatasetMetadata<'a> {
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_polling_source(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::SetPollingSource>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let result = metadata_query_service
+            .get_active_polling_source(resolved_dataset)
+            .await
+            .int_err()?;
+
+        Ok(result)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_push_sources(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Vec<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::AddPushSource>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+
+        let result = metadata_query_service
+            .get_active_push_sources(resolved_dataset)
+            .await
+            .int_err()?;
+
+        Ok(result)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_transform(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::SetTransform>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let result = metadata_query_service
+            .get_active_transform(resolved_dataset)
+            .await?;
+
+        Ok(result)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
@@ -140,27 +206,17 @@ impl<'a> DatasetMetadata<'a> {
     /// Current polling source used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_polling_source, skip_all)]
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+        let source_maybe = self.get_current_polling_source(ctx).await?;
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let source = metadata_query_service
-            .get_active_polling_source(resolved_dataset)
-            .await
-            .int_err()?;
-
-        Ok(source.map(|(_hash, block)| block.event.into()))
+        Ok(source_maybe.map(|(_hash, block)| block.event.into()))
     }
 
     /// Current push sources used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_push_sources, skip_all)]
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
-
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let mut push_sources: Vec<AddPushSource> = metadata_query_service
-            .get_active_push_sources(resolved_dataset)
-            .await
-            .int_err()?
+        let mut push_sources: Vec<AddPushSource> = self
+            .get_current_push_sources(ctx)
+            .await?
             .into_iter()
             .map(|(_hash, block)| block.event.into())
             .collect();
@@ -185,14 +241,9 @@ impl<'a> DatasetMetadata<'a> {
     /// Current transformation used by the derivative dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_transform, skip_all)]
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+        let source_maybe = self.get_current_transform(ctx).await?;
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let source = metadata_query_service
-            .get_active_transform(resolved_dataset)
-            .await?;
-
-        if let Some((_hash, block)) = source {
+        if let Some((_hash, block)) = source_maybe {
             Ok(Some(
                 SetTransform::with_extended_aliases(ctx, block.event)
                     .await?
@@ -272,6 +323,122 @@ impl<'a> DatasetMetadata<'a> {
             .int_err()?
             .into_event()
             .map(Into::into))
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetMetadata_metadata_projection, skip_all)]
+    async fn metadata_projection(
+        &self,
+        ctx: &Context<'_>,
+        event_types: Vec<MetadataEventType>,
+        head: Option<Multihash<'_>>,
+    ) -> Result<Vec<MetadataBlockExtended>> {
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
+
+        let mut attachments_visitor = event_types
+            .contains(&MetadataEventType::SetAttachments)
+            .then(odf::dataset::SearchSetAttachmentsVisitor::new);
+        let mut info_visitor = event_types
+            .contains(&MetadataEventType::SetInfo)
+            .then(odf::dataset::SearchSetInfoVisitor::new);
+        let mut license_visitor = event_types
+            .contains(&MetadataEventType::SetLicense)
+            .then(odf::dataset::SearchSetLicenseVisitor::new);
+        let mut schema_visitor = event_types
+            .contains(&MetadataEventType::SetDataSchema)
+            .then(odf::dataset::SearchSetDataSchemaVisitor::new);
+        let mut seed_visitor = event_types
+            .contains(&MetadataEventType::Seed)
+            .then(odf::dataset::SearchSeedVisitor::new);
+        let mut vocab_visitor = event_types
+            .contains(&MetadataEventType::SetVocab)
+            .then(odf::dataset::SearchSetVocabVisitor::new);
+        let mut polling_source_visitor = event_types
+            .contains(&MetadataEventType::SetPollingSource)
+            .then(odf::dataset::SearchSetPollingSourceVisitor::new);
+        let mut transform_visitor = event_types
+            .contains(&MetadataEventType::SetTransform)
+            .then(odf::dataset::SearchSetTransformVisitor::new);
+        let mut push_sources_visitor = event_types
+            .contains(&MetadataEventType::AddPushSource)
+            .then(odf::dataset::SearchActivePushSourcesVisitor::new);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+
+        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>;
+            9] = [
+            &mut attachments_visitor,
+            &mut info_visitor,
+            &mut license_visitor,
+            &mut schema_visitor,
+            &mut seed_visitor,
+            &mut vocab_visitor,
+            &mut polling_source_visitor,
+            &mut transform_visitor,
+            &mut push_sources_visitor,
+        ];
+
+        let head_hash = match head {
+            Some(h) => h.into(),
+            None => resolved_dataset
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?,
+        };
+
+        resolved_dataset
+            .as_metadata_chain()
+            .accept_by_interval(visitors.as_mut_slice(), Some(&head_hash), None)
+            .await
+            .int_err()?;
+
+        let mut maybe_hashed_blocks: Vec<Option<(odf::Multihash, odf::metadata::MetadataBlock)>> = vec![
+            attachments_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            info_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            license_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            schema_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            seed_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            vocab_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            polling_source_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+            transform_visitor
+                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .map(|(h, b)| (h, b.into())),
+        ];
+        maybe_hashed_blocks.extend(
+            push_sources_visitor
+                .map(odf::dataset::SearchActivePushSourcesVisitor::into_hashed_blocks)
+                .into_iter()
+                .flatten()
+                .map(|(h, b)| Some((h, b.into()))),
+        );
+
+        let futures_iter = maybe_hashed_blocks
+            .into_iter()
+            .flatten() // Skip nones
+            .map(|(hash, block)| async {
+                MetadataBlockExtended::new(ctx, hash, block, account.clone()).await
+            });
+
+        let result = futures::future::try_join_all(futures_iter).await?;
+
+        Ok(result)
     }
 }
 

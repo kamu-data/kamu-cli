@@ -105,6 +105,7 @@ async fn test_data_writer_happy_path() {
                 "nullable": true,
             }, {
                 "name": "city",
+                // Note that Datafusion 49+ defaults to View for all text types
                 "data_type": "Utf8View",
                 "dict_id": 0,
                 "dict_is_ordered": false,
@@ -188,8 +189,7 @@ async fn test_data_writer_happy_path() {
                 "nullable": true,
             }, {
                 "name": "city",
-                // NOTE: The difference between Utf8 and Utf8View is expected
-                "data_type": "Utf8",
+                "data_type": "Utf8View",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
@@ -539,15 +539,14 @@ fn test_data_writer_offsets_are_sequential_partitioned() {
             Optimized physical plan:
             DataSinkExec: sink=ParquetSink(file_groups=[])
               SortPreservingMergeExec: [offset@0 ASC]
-                SortExec: expr=[offset@0 ASC], preserve_partitioning=[true]
-                  ProjectionExec: expr=[CAST(CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Decimal128(20, 0)) + Some(-1),20,0 AS Int64) as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
-                    BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Ok(Field { name: "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {} }), frame: WindowFrame { units: Rows, start_bound: Preceding(UInt64(NULL)), end_bound: CurrentRow, is_causal: true }], mode=[Sorted]
-                      SortExec: expr=[event_time@1 ASC], preserve_partitioning=[true]
-                        CoalesceBatchesExec: target_batch_size=8192
-                          RepartitionExec: partitioning=Hash([1], 4), input_partitions=4
-                            ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
-                              ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
-                                DataSourceExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[event_time, city, population], file_type=json
+                ProjectionExec: expr=[CAST(CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Decimal128(20, 0)) + Some(-1),20,0 AS Int64) as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
+                  BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Field { name: "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {} }, frame: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW], mode=[Sorted]
+                    SortExec: expr=[event_time@1 ASC], preserve_partitioning=[true]
+                      CoalesceBatchesExec: target_batch_size=8192
+                        RepartitionExec: partitioning=Hash([1], 4), input_partitions=4
+                          ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
+                            ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
+                              DataSourceExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[event_time, city, population], file_type=json
             "#
         ).trim(),
         plan
@@ -571,13 +570,12 @@ fn test_data_writer_offsets_are_sequential_serialized() {
             r#"
             Optimized physical plan:
             DataSinkExec: sink=ParquetSink(file_groups=[])
-              SortExec: expr=[offset@0 ASC], preserve_partitioning=[false]
-                ProjectionExec: expr=[CAST(CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Decimal128(20, 0)) + Some(-1),20,0 AS Int64) as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
-                  BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Ok(Field { name: "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {} }), frame: WindowFrame { units: Rows, start_bound: Preceding(UInt64(NULL)), end_bound: CurrentRow, is_causal: true }], mode=[Sorted]
-                    SortExec: expr=[event_time@1 ASC], preserve_partitioning=[false]
-                      ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
-                        ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
-                          DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[event_time, city, population], file_type=json
+              ProjectionExec: expr=[CAST(CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Decimal128(20, 0)) + Some(-1),20,0 AS Int64) as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
+                BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Field { name: "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {} }, frame: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW], mode=[Sorted]
+                  SortExec: expr=[event_time@1 ASC], preserve_partitioning=[false]
+                    ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
+                      ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
+                        DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[event_time, city, population], file_type=json
             "#
         ).trim(),
         plan
