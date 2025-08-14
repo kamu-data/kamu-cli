@@ -2659,7 +2659,7 @@ type Molecule {
 }
 
 type MoleculeMut {
-	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: BigInt!): CreateProjectResult!
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
 	"""
 	Looks up the project
 	"""
@@ -3908,6 +3908,11 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
 	message: String!
 }
+
+"""
+256-bit unsigned number. Can be constructed from string.
+"""
+scalar U256
 
 scalar URL
 

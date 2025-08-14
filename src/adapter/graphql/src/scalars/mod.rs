@@ -39,6 +39,7 @@ mod os_path;
 mod pagination;
 mod task_id;
 mod task_status;
+mod u256;
 mod webhook_scalars;
 
 pub use access_token::*;
@@ -73,6 +74,7 @@ pub use os_path::*;
 pub use pagination::*;
 pub use task_id::*;
 pub use task_status::*;
+pub use u256::*;
 pub use webhook_scalars::*;
 
 macro_rules! simple_scalar {

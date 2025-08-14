@@ -382,6 +382,8 @@ pub struct MoleculeProject {
     /// Address of the IPNFT contract
     pub ipnft_address: String,
 
+    // NOTE: For backward compatibility (and existing projects),
+    //       we continue using BigInt type, which is wider than needed U256.
     /// Token ID withing the IPNFT contract
     pub ipnft_token_id: BigInt,
 
