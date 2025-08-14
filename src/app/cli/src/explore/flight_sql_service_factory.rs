@@ -58,8 +58,8 @@ impl FlightSqlServiceFactory {
                     Ok(req)
                 },
             ))
-            .layer(AuthenticationLayer::new())
             .layer(AuthPolicyLayer::new(allow_anonymous))
+            .layer(AuthenticationLayer::new())
             .add_service(FlightServiceServer::new(
                 kamu_adapter_flight_sql::KamuFlightSqlServiceWrapper,
             ))
