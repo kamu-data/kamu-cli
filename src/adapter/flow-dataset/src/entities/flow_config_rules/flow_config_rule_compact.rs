@@ -20,7 +20,7 @@ kamu_flow_system::flow_config_struct! {
 }
 
 impl FlowConfigRuleCompact {
-    pub fn new_checked(
+    pub fn try_new(
         max_slice_size: u64,
         max_slice_records: u64,
     ) -> Result<Self, FlowConfigRuleCompactValidationError> {
@@ -69,18 +69,15 @@ mod tests {
 
     #[test]
     fn test_valid_compaction_rule() {
-        assert_matches!(FlowConfigRuleCompact::new_checked(1, 1), Ok(_));
-        assert_matches!(
-            FlowConfigRuleCompact::new_checked(1_000_000, 1_000_000),
-            Ok(_)
-        );
-        assert_matches!(FlowConfigRuleCompact::new_checked(1, 20), Ok(_));
+        assert_matches!(FlowConfigRuleCompact::try_new(1, 1), Ok(_));
+        assert_matches!(FlowConfigRuleCompact::try_new(1_000_000, 1_000_000), Ok(_));
+        assert_matches!(FlowConfigRuleCompact::try_new(1, 20), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_slice_records() {
         assert_matches!(
-            FlowConfigRuleCompact::new_checked(100, 0),
+            FlowConfigRuleCompact::try_new(100, 0),
             Err(FlowConfigRuleCompactValidationError::MaxSliceRecordsNotPositive)
         );
     }
@@ -88,7 +85,7 @@ mod tests {
     #[test]
     fn test_non_positive_max_slice_size() {
         assert_matches!(
-            FlowConfigRuleCompact::new_checked(0, 100),
+            FlowConfigRuleCompact::try_new(0, 100),
             Err(FlowConfigRuleCompactValidationError::MaxSliceSizeNotPositive)
         );
     }

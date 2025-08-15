@@ -182,7 +182,7 @@ impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
     type Error = String;
 
     fn try_from(value: FlowConfigCompactionInput) -> Result<Self, Self::Error> {
-        afs::FlowConfigRuleCompact::new_checked(value.max_slice_size, value.max_slice_records)
+        afs::FlowConfigRuleCompact::try_new(value.max_slice_size, value.max_slice_records)
             .map_err(|err| err.to_string())
     }
 }

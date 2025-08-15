@@ -1372,7 +1372,7 @@ async fn test_manual_trigger_compaction_with_config() {
     harness
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::new_checked(max_slice_size, max_slice_records).unwrap(),
+            FlowConfigRuleCompact::try_new(max_slice_size, max_slice_records).unwrap(),
         )
         .await;
 
@@ -1502,7 +1502,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
     harness
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
-            FlowConfigRuleCompact::new_checked(max_slice_size, max_slice_records).unwrap(),
+            FlowConfigRuleCompact::try_new(max_slice_size, max_slice_records).unwrap(),
         )
         .await;
 

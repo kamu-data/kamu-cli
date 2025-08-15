@@ -44,7 +44,7 @@ async fn test_visibility() {
         .await;
 
     let foo_compaction_binding = compaction_dataset_binding(&foo_id);
-    let foo_compaction_config = FlowConfigRuleCompact::new_checked(2, 3)
+    let foo_compaction_config = FlowConfigRuleCompact::try_new(2, 3)
         .unwrap()
         .into_flow_config();
 
@@ -57,7 +57,7 @@ async fn test_visibility() {
         .await;
 
     let bar_compaction_binding = compaction_dataset_binding(&bar_id);
-    let bar_compaction_config = FlowConfigRuleCompact::new_checked(3, 4)
+    let bar_compaction_config = FlowConfigRuleCompact::try_new(3, 4)
         .unwrap()
         .into_flow_config();
 
@@ -92,7 +92,7 @@ async fn test_modify() {
     // Make a dataset and configure compaction config
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_compaction_binding = compaction_dataset_binding(&foo_id);
-    let foo_compaction_config = FlowConfigRuleCompact::new_checked(1, 2)
+    let foo_compaction_config = FlowConfigRuleCompact::try_new(1, 2)
         .unwrap()
         .into_flow_config();
 
@@ -115,7 +115,7 @@ async fn test_modify() {
     );
 
     // Now make the config with different parameters
-    let foo_compaction_config_2 = FlowConfigRuleCompact::new_checked(2, 3)
+    let foo_compaction_config_2 = FlowConfigRuleCompact::try_new(2, 3)
         .unwrap()
         .into_flow_config();
 

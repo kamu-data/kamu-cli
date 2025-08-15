@@ -36,6 +36,22 @@ impl MockDatasetIncrementQueryService {
             .returning(move |_, _, _| Ok(increment));
         dataset_changes_mock
     }
+
+    pub fn with_increment_between_for_args(
+        dataset_id: odf::DatasetID,
+        old_head: Option<odf::Multihash>,
+        new_head: odf::Multihash,
+        increment: DatasetIntervalIncrement,
+    ) -> Self {
+        let mut dataset_changes_mock = MockDatasetIncrementQueryService::default();
+        dataset_changes_mock
+            .expect_get_increment_between()
+            .withf(move |id, old, new| {
+                *id == dataset_id && *old == old_head.as_ref() && *new == new_head
+            })
+            .returning(move |_, _, _| Ok(increment));
+        dataset_changes_mock
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

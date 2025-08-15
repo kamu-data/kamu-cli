@@ -12,10 +12,11 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
-use crate::{FlowActivationCause, FlowBinding, FlowScope, FlowSensor};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowSensorDispatcher: Send + Sync {
     async fn register_sensor(
@@ -33,6 +34,40 @@ pub trait FlowSensorDispatcher: Send + Sync {
         input_flow_binding: &FlowBinding,
         activation_cause: FlowActivationCause,
     ) -> Result<(), InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "testing")]
+impl MockFlowSensorDispatcher {
+    pub fn with_register_sensor_for_scope(flow_scope: FlowScope) -> Self {
+        let mut mock = MockFlowSensorDispatcher::new();
+        mock.expect_register_sensor()
+            .withf(move |_, _, sensor| sensor.flow_scope() == &flow_scope)
+            .returning(|_, _, _| Ok(()));
+        mock
+    }
+
+    pub fn with_dispatch_for_resource_update_cause(
+        input_flow_binding: FlowBinding,
+        activation_cause: FlowActivationCauseResourceUpdate,
+    ) -> Self {
+        use std::assert_matches::assert_matches;
+
+        let mut mock = MockFlowSensorDispatcher::new();
+        mock.expect_dispatch_input_flow_success()
+            .withf(move |_, binding, cause| {
+                assert_eq!(*binding, input_flow_binding);
+                assert_matches!(cause, FlowActivationCause::ResourceUpdate(c)
+                    if c.changes == activation_cause.changes &&
+                        c.resource_type == activation_cause.resource_type &&
+                        c.details == activation_cause.details
+                );
+                true
+            })
+            .returning(|_, _, _| Ok(()));
+        mock
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
