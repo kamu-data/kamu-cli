@@ -21,6 +21,10 @@ use tower::{Layer, Service};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const WHITELISTED_QUERY_NAMES: [&str; 2] = ["auth", "__schema"];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct AuthPolicyLayer {}
 
@@ -60,7 +64,7 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
         }
     }
 
-    pub async fn is_auth_graphql_operation_request(
+    pub async fn is_whitelisted_graphql_operation_request(
         request: Request<Body>,
     ) -> (Request<Body>, bool) {
         // '/graphql' GET endpoint is a GQL playground. Ignore auth policy checks.
@@ -88,7 +92,7 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
             return (Request::from_parts(parts, Body::from(body_bytes)), false);
         };
 
-        let is_auth = parsed_query.definitions.iter().any(|def| match def {
+        let is_whitelisted = parsed_query.definitions.iter().any(|def| match def {
             Definition::Operation(op) => {
                 let selection_set = match op {
                     graphql_parser::query::OperationDefinition::Query(q) => &q.selection_set,
@@ -99,7 +103,7 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
 
                 selection_set.items.iter().any(|sel| {
                     if let graphql_parser::query::Selection::Field(field) = sel {
-                        field.name.to_lowercase().contains("auth")
+                        WHITELISTED_QUERY_NAMES.contains(&field.name.to_lowercase().as_str())
                     } else {
                         false
                     }
@@ -108,7 +112,10 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
             _ => false,
         });
 
-        (Request::from_parts(parts, Body::from(body_bytes)), is_auth)
+        (
+            Request::from_parts(parts, Body::from(body_bytes)),
+            is_whitelisted,
+        )
     }
 }
 
@@ -134,13 +141,13 @@ where
         Box::pin(async move {
             let path = request.uri().path();
 
-            let (request, skip_auth) = if path == "/graphql" {
-                Self::is_auth_graphql_operation_request(request).await
+            let (request, skip_auth_policy) = if path == "/graphql" {
+                Self::is_whitelisted_graphql_operation_request(request).await
             } else {
                 (request, false)
             };
 
-            if skip_auth {
+            if skip_auth_policy {
                 return inner.call(request).await;
             }
 
