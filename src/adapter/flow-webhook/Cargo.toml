@@ -56,8 +56,10 @@ uuid = { version = "1", default-features = false }
 kamu-accounts = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system = { workspace = true, features = ["testing"] }
+kamu-flow-system-inmem = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 
+pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
 url = { version = "2", default-features = false }

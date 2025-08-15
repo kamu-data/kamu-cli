@@ -20,6 +20,7 @@ pub(crate) struct WebhookDatasetRefUpdatedPayload {
     pub owner_account_id: String,
     pub block_ref: String,
     pub new_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub old_hash: Option<String>,
     pub is_breaking_change: bool,
 }

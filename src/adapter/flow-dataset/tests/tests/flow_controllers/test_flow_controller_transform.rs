@@ -37,8 +37,6 @@ async fn test_transform_register_sensor() {
         mock_flow_sensor_dispatcher,
     );
 
-    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-
     let transform_binding = transform_dataset_binding(&foo_dataset_id);
 
     harness
