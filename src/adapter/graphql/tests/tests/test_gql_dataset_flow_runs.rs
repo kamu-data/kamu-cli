@@ -20,6 +20,12 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     LoggedAccount,
 };
+use kamu_adapter_flow_dataset::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
+    FLOW_TYPE_DATASET_INGEST,
+};
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
 use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
@@ -2816,7 +2822,7 @@ async fn test_cancel_already_succeeded_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_history_of_completed_flow() {
+async fn test_history_of_completed_ingest_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
     })
@@ -2932,6 +2938,207 @@ async fn test_history_of_completed_flow() {
                                         {
                                             "__typename": "FlowEventTaskChanged",
                                             "eventId": "7",
+                                            "taskId": "0",
+                                            "taskStatus": "FINISHED",
+                                            "task": {
+                                                "taskId": "0",
+                                            },
+                                            "nextAttemptAt": null,
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_history_of_completed_transform_flow() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dataset_changes_mock: None,
+    })
+    .await;
+
+    let foo_result = harness.create_root_dataset().await;
+    let bar_result = harness.create_derived_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_transform_flow_mutation(&bar_result.dataset_handle.id);
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    let response_json = response.data.into_json().unwrap();
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(
+        &response_json,
+        "triggerTransformFlow",
+    );
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+
+    harness
+        .mimic_flow_secondary_activation_cause(
+            flow_id,
+            FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
+                activation_time: Utc::now(),
+                resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                changes: ResourceChanges::NewData {
+                    blocks_added: 1,
+                    records_added: 5,
+                    new_watermark: None,
+                },
+                details: serde_json::to_value(DatasetResourceUpdateDetails {
+                    dataset_id: foo_result.dataset_handle.id.clone(),
+                    source: DatasetUpdateSource::ExternallyDetectedChange,
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_head_maybe: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                })
+                .unwrap(),
+            }),
+        )
+        .await;
+
+    harness
+        .mimic_flow_secondary_activation_cause(
+            flow_id,
+            FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
+                activation_time: Utc::now(),
+                resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                changes: ResourceChanges::NewData {
+                    blocks_added: 1,
+                    records_added: 5,
+                    new_watermark: None,
+                },
+                details: serde_json::to_value(DatasetResourceUpdateDetails {
+                    dataset_id: foo_result.dataset_handle.id.clone(),
+                    source: DatasetUpdateSource::UpstreamFlow {
+                        flow_type: FLOW_TYPE_DATASET_INGEST.to_string(),
+                        flow_id: FlowID::new(5),
+                        maybe_flow_config_snapshot: None,
+                    },
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_head_maybe: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                })
+                .unwrap(),
+            }),
+        )
+        .await;
+
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
+    harness
+        .mimic_task_running(flow_task_id, flow_task_metadata.clone(), Utc::now())
+        .await;
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            flow_task_metadata,
+            Utc::now(),
+            ts::TaskOutcome::Success(ts::TaskResult::empty()),
+        )
+        .await;
+
+    let query = FlowRunsHarness::flow_history_query(&bar_result.dataset_handle.id, flow_id);
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(query.clone()).data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "getFlow": {
+                                "__typename": "GetFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "history": [
+                                        {
+                                            "__typename": "FlowEventInitiated",
+                                            "eventId": "1",
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseManual"
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventScheduledForActivation",
+                                            "eventId": "2",
+                                        },
+                                        {
+                                            "__typename": "FlowEventActivationCauseAdded",
+                                            "eventId": "3",
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseDatasetUpdate",
+                                                "dataset": {
+                                                    "id": foo_result.dataset_handle.id.to_string(),
+                                                    "name": "foo"
+                                                },
+                                                "source": {
+                                                    "__typename": "FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventActivationCauseAdded",
+                                            "eventId": "4",
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseDatasetUpdate",
+                                                "dataset": {
+                                                    "id": foo_result.dataset_handle.id.to_string(),
+                                                    "name": "foo"
+                                                },
+                                                "source": {
+                                                    "__typename": "FlowActivationCauseDatasetUpdateSourceUpstreamFlow",
+                                                    "flowId": "5"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventStartConditionUpdated",
+                                            "eventId": "5",
+                                            "startCondition": {
+                                                "__typename" : "FlowStartConditionExecutor"
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "6",
+                                            "taskId": "0",
+                                            "taskStatus": "QUEUED",
+                                            "task": {
+                                                "taskId": "0",
+                                            },
+                                            "nextAttemptAt": null,
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "7",
+                                            "taskId": "0",
+                                            "taskStatus": "RUNNING",
+                                            "task": {
+                                                "taskId": "0",
+                                            },
+                                            "nextAttemptAt": null,
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "8",
                                             "taskId": "0",
                                             "taskStatus": "FINISHED",
                                             "task": {
@@ -4403,6 +4610,18 @@ impl FlowRunsHarness {
                                                 ... on FlowEventActivationCauseAdded {
                                                     activationCause {
                                                         __typename
+                                                        ... on FlowActivationCauseDatasetUpdate {
+                                                            dataset {
+                                                                id
+                                                                name
+                                                            }
+                                                            source {
+                                                                __typename
+                                                                ... on FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+                                                                    flowId
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                                 ... on FlowEventTaskChanged {
