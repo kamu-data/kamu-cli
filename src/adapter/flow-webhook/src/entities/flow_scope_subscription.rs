@@ -85,3 +85,90 @@ impl<'a> FlowScopeSubscription<'a> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_adapter_flow_dataset::FlowScopeDataset;
+    use kamu_webhooks::WebhookEventTypeCatalog;
+
+    use super::*;
+
+    #[test]
+    fn test_scope_pack_unpack_without_dataset_id() {
+        let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+        let event_type = WebhookEventTypeCatalog::test();
+
+        let scope = FlowScopeSubscription::make_scope(subscription_id, &event_type, None);
+        assert_eq!(scope.scope_type(), FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION);
+
+        let unpacked = FlowScopeSubscription::new(&scope);
+        assert_eq!(unpacked.webhook_subscription_id(), subscription_id);
+        assert_eq!(unpacked.event_type(), event_type);
+        assert_eq!(unpacked.maybe_dataset_id(), None);
+    }
+
+    #[test]
+    fn test_scope_pack_unpack_with_dataset_id() {
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(b"test_dataset");
+        let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+        let event_type = WebhookEventTypeCatalog::test();
+
+        let scope =
+            FlowScopeSubscription::make_scope(subscription_id, &event_type, Some(&dataset_id));
+        assert_eq!(scope.scope_type(), FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION);
+
+        let unpacked = FlowScopeSubscription::new(&scope);
+        assert_eq!(unpacked.webhook_subscription_id(), subscription_id);
+        assert_eq!(unpacked.event_type(), event_type);
+        assert_eq!(unpacked.maybe_dataset_id(), Some(dataset_id));
+    }
+
+    #[test]
+    fn test_matches_single_dataset_query() {
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(b"test_dataset");
+        let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+        let event_type = WebhookEventTypeCatalog::test();
+
+        let scope1 =
+            FlowScopeSubscription::make_scope(subscription_id, &event_type, Some(&dataset_id));
+        let scope2 = FlowScopeSubscription::make_scope(subscription_id, &event_type, None);
+
+        let query = FlowScopeDataset::query_for_single_dataset(&dataset_id);
+        assert!(scope1.matches_query(&query));
+        assert!(!scope2.matches_query(&query));
+
+        let wrong_query = FlowScopeDataset::query_for_single_dataset(
+            &odf::DatasetID::new_seeded_ed25519(b"wrong_dataset"),
+        );
+        assert!(!scope1.matches_query(&wrong_query));
+        assert!(!scope2.matches_query(&wrong_query));
+    }
+
+    #[test]
+    fn test_matches_multiple_datasets_query() {
+        let dataset_id1 = odf::DatasetID::new_seeded_ed25519(b"test_dataset1");
+        let dataset_id2 = odf::DatasetID::new_seeded_ed25519(b"test_dataset2");
+        let dataset_id3 = odf::DatasetID::new_seeded_ed25519(b"test_dataset3");
+        let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+        let event_type = WebhookEventTypeCatalog::test();
+
+        let scope1 =
+            FlowScopeSubscription::make_scope(subscription_id, &event_type, Some(&dataset_id1));
+        let scope2 =
+            FlowScopeSubscription::make_scope(subscription_id, &event_type, Some(&dataset_id2));
+        let scope3 = FlowScopeSubscription::make_scope(subscription_id, &event_type, None);
+
+        let query = FlowScopeDataset::query_for_multiple_datasets(&[&dataset_id1, &dataset_id2]);
+        assert!(scope1.matches_query(&query));
+        assert!(scope2.matches_query(&query));
+        assert!(!scope3.matches_query(&query));
+
+        let partially_wrong_query =
+            FlowScopeDataset::query_for_multiple_datasets(&[&dataset_id1, &dataset_id3]);
+        assert!(scope1.matches_query(&partially_wrong_query));
+        assert!(!scope2.matches_query(&partially_wrong_query));
+        assert!(!scope3.matches_query(&partially_wrong_query));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

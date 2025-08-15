@@ -92,3 +92,33 @@ impl FlowScopeQuery {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scope_pack_and_query() {
+        let scope = FlowScope::make_system_scope();
+        assert_eq!(scope.scope_type(), FLOW_SCOPE_TYPE_SYSTEM);
+
+        assert!(scope.is_system_scope());
+    }
+
+    #[test]
+    fn test_matches_scope_query() {
+        let scope = FlowScope::make_system_scope();
+        let query = FlowScopeQuery::build_for_system_scope();
+        assert!(scope.matches_query(&query));
+
+        let non_matching_query = FlowScopeQuery {
+            attributes: vec![(
+                FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                vec!["NonSystem".to_string()],
+            )],
+        };
+        assert!(!scope.matches_query(&non_matching_query));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
