@@ -482,10 +482,13 @@ async fn test_crud_reactive_derived_dataset() {
                                 reactive {
                                     __typename
                                     forNewData {
-                                        minRecordsToAwait
-                                        maxBatchingInterval {
-                                            every
-                                            unit
+                                        __typename
+                                        ... on FlowTriggerBatchingRuleBuffering {
+                                            minRecordsToAwait
+                                            maxBatchingInterval {
+                                                every
+                                                unit
+                                            }
                                         }
                                     }
                                     forBreakingChange
@@ -558,6 +561,7 @@ async fn test_crud_reactive_derived_dataset() {
                                     "reactive": {
                                         "__typename": "FlowTriggerReactiveRule",
                                         "forNewData": {
+                                            "__typename": "FlowTriggerBatchingRuleBuffering",
                                             "minRecordsToAwait": 1,
                                             "maxBatchingInterval": {
                                                 "every": 30,
@@ -1281,8 +1285,10 @@ impl FlowTriggerHarness {
                                     triggerInput: {
                                         reactive: {
                                             forNewData: {
-                                                minRecordsToAwait: <minRecordsToAwait>,
-                                                maxBatchingInterval: { every: <every>, unit: "<unit>" }
+                                                buffering: {
+                                                    minRecordsToAwait: <minRecordsToAwait>,
+                                                    maxBatchingInterval: { every: <every>, unit: "<unit>" }
+                                                }
                                             },
                                             forBreakingChange: "<forBreakingChange>"
                                         }
@@ -1303,10 +1309,13 @@ impl FlowTriggerHarness {
                                                 reactive {
                                                     __typename
                                                     forNewData {
-                                                        minRecordsToAwait
-                                                        maxBatchingInterval {
-                                                            every
-                                                            unit
+                                                        __typename
+                                                        ... on FlowTriggerBatchingRuleBuffering {
+                                                            minRecordsToAwait
+                                                            maxBatchingInterval {
+                                                                every
+                                                                unit
+                                                            }
                                                         }
                                                     }
                                                     forBreakingChange

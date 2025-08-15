@@ -1208,7 +1208,7 @@ async fn test_reset_trigger_derivatives_reactively() {
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_id),
             FlowTriggerRule::Reactive(ReactiveRule {
-                for_new_data: BatchingRule::empty(),
+                for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
         )
@@ -1220,7 +1220,7 @@ async fn test_reset_trigger_derivatives_reactively() {
             harness.now_datetime(),
             transform_dataset_binding(&foo_baz_id),
             FlowTriggerRule::Reactive(ReactiveRule {
-                for_new_data: BatchingRule::empty(),
+                for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::NoAction,
             }),
         )
@@ -1512,7 +1512,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_id),
             FlowTriggerRule::Reactive(ReactiveRule {
-                for_new_data: BatchingRule::empty(),
+                for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
         )
@@ -1524,7 +1524,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
             harness.now_datetime(),
             transform_dataset_binding(&foo_baz_id),
             FlowTriggerRule::Reactive(ReactiveRule {
-                for_new_data: BatchingRule::empty(),
+                for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::NoAction,
             }),
         )
@@ -1710,7 +1710,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_id),
             FlowTriggerRule::Reactive(ReactiveRule {
-                for_new_data: BatchingRule::empty(),
+                for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
         )
@@ -1721,7 +1721,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
             harness.now_datetime(),
             transform_dataset_binding(&foo_bar_baz_id),
             FlowTriggerRule::Reactive(ReactiveRule {
-                for_new_data: BatchingRule::empty(),
+                for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
         )
@@ -2845,7 +2845,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(1, Some(Duration::seconds(1))).unwrap(),
+                BatchingRule::try_buffering(1, Duration::seconds(1)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -3070,7 +3070,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(1, Some(Duration::seconds(1))).unwrap(),
+                BatchingRule::try_buffering(1, Duration::seconds(1)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -3473,7 +3473,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             harness.now_datetime(),
             transform_dataset_binding(&baz_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(1, Some(Duration::hours(24))).unwrap(),
+                BatchingRule::try_buffering(1, Duration::hours(24)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -3987,7 +3987,7 @@ async fn test_batching_condition_records_reached() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(10, Some(Duration::milliseconds(120))).unwrap(),
+                BatchingRule::try_buffering(10, Duration::milliseconds(120)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -4415,7 +4415,7 @@ async fn test_batching_condition_timeout() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(10, Some(Duration::milliseconds(150))).unwrap(),
+                BatchingRule::try_buffering(10, Duration::milliseconds(150)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -4690,7 +4690,7 @@ async fn test_batching_condition_watermark() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(10, Some(Duration::milliseconds(200))).unwrap(),
+                BatchingRule::try_buffering(10, Duration::milliseconds(200)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -5016,7 +5016,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             transform_dataset_binding(&baz_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(26, Some(Duration::milliseconds(300))).unwrap(),
+                BatchingRule::try_buffering(26, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -6313,7 +6313,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(1, Some(Duration::milliseconds(300))).unwrap(),
+                BatchingRule::try_buffering(1, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -6643,7 +6643,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(100, Some(Duration::milliseconds(100))).unwrap(),
+                BatchingRule::try_buffering(100, Duration::milliseconds(100)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -6894,7 +6894,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
             start_time,
             bar_transform_binding.clone(),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(100, Some(Duration::milliseconds(300))).unwrap(),
+                BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -6906,7 +6906,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
             start_time,
             baz_transform_binding.clone(),
             FlowTriggerRule::Reactive(ReactiveRule::new(
-                BatchingRule::try_new(100, Some(Duration::milliseconds(300))).unwrap(),
+                BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
         )
@@ -6953,7 +6953,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                     flow_id: flow_id_bar,
                     start_condition: FlowStartCondition::Reactive(FlowStartConditionReactive {
                         active_rule: ReactiveRule::new(
-                            BatchingRule::try_new(100, Some(Duration::milliseconds(300))).unwrap(),
+                            BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                             BreakingChangeRule::NoAction,
                         ),
                         batching_deadline: start_time + Duration::milliseconds(100),
@@ -7006,7 +7006,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                     flow_id: flow_id_baz,
                     start_condition: FlowStartCondition::Reactive(FlowStartConditionReactive {
                         active_rule: ReactiveRule::new(
-                          BatchingRule::try_new(100, Some(Duration::milliseconds(300))).unwrap(),
+                          BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                           BreakingChangeRule::NoAction,
                         ),
                         batching_deadline: start_time - Duration::milliseconds(100), // in the past

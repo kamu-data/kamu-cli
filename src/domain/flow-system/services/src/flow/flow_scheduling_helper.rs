@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
 use kamu_flow_system::*;
@@ -381,9 +381,7 @@ impl FlowSchedulingHelper {
 
         // The timeout for batching will happen at:
         let primary_activation_time = flow.primary_activation_cause().activation_time();
-        let max_batching_interval = batching_rule
-            .max_batching_interval()
-            .unwrap_or_else(|| Duration::seconds(0));
+        let max_batching_interval = batching_rule.max_batching_interval();
         let batching_deadline = primary_activation_time + max_batching_interval;
 
         // The condition is satisfied if

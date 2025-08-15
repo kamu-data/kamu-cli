@@ -29,7 +29,7 @@ impl ReactiveRule {
 
     pub fn empty() -> Self {
         Self {
-            for_new_data: BatchingRule::empty(),
+            for_new_data: BatchingRule::immediate(),
             for_breaking_change: BreakingChangeRule::NoAction,
         }
     }

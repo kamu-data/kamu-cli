@@ -391,19 +391,9 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
-input BatchingInput {
-	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDeltaInput
-}
-
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
-}
-
-enum BreakingChangeRule {
-	NO_ACTION
-	RECOVER
 }
 
 type BuildInfo {
@@ -2281,7 +2271,7 @@ type FlowStartConditionReactive {
 	batchingDeadline: DateTime!
 	accumulatedRecordsCount: Int!
 	watermarkModified: Boolean!
-	forBreakingChange: BreakingChangeRule!
+	forBreakingChange: FlowTriggerBreakingChangeRule!
 }
 
 type FlowStartConditionSchedule {
@@ -2339,19 +2329,57 @@ type FlowTrigger {
 	reactive: FlowTriggerReactiveRule
 }
 
-type FlowTriggerBatchingRule {
+union FlowTriggerBatchingRule = FlowTriggerBatchingRuleImmediate | FlowTriggerBatchingRuleBuffering
+
+type FlowTriggerBatchingRuleBuffering {
 	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDelta
+	maxBatchingInterval: TimeDelta!
+}
+
+input FlowTriggerBatchingRuleBufferingInput {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDeltaInput!
+}
+
+type FlowTriggerBatchingRuleImmediate {
+	dummy: Boolean!
+}
+
+input FlowTriggerBatchingRuleImmediateInput {
+	dummy: Boolean!
+}
+
+input FlowTriggerBatchingRuleInput @oneOf {
+	immediate: FlowTriggerBatchingRuleImmediateInput
+	buffering: FlowTriggerBatchingRuleBufferingInput
+}
+
+enum FlowTriggerBreakingChangeRule {
+	NO_ACTION
+	RECOVER
 }
 
 input FlowTriggerInput @oneOf {
-	schedule: ScheduleInput
-	reactive: ReactiveInput
+	schedule: FlowTriggerScheduleInput
+	reactive: FlowTriggerReactiveInput
+}
+
+input FlowTriggerReactiveInput {
+	forNewData: FlowTriggerBatchingRuleInput!
+	forBreakingChange: FlowTriggerBreakingChangeRule!
 }
 
 type FlowTriggerReactiveRule {
 	forNewData: FlowTriggerBatchingRule!
-	forBreakingChange: BreakingChangeRule!
+	forBreakingChange: FlowTriggerBreakingChangeRule!
+}
+
+input FlowTriggerScheduleInput @oneOf {
+	timeDelta: TimeDeltaInput
+	"""
+	Supported CRON syntax: min hour dayOfMonth month dayOfWeek
+	"""
+	cron5ComponentExpression: String
 }
 
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
@@ -2874,11 +2902,6 @@ enum QueryDialect {
 	SQL_RISING_WAVE
 }
 
-input ReactiveInput {
-	forNewData: BatchingInput!
-	forBreakingChange: BreakingChangeRule!
-}
-
 """
 Defines how raw data should be read into the structured form.
 
@@ -3191,14 +3214,6 @@ type RevokeResultAlreadyRevoked implements RevokeResult {
 type RevokeResultSuccess implements RevokeResult {
 	tokenId: AccessTokenID!
 	message: String!
-}
-
-input ScheduleInput @oneOf {
-	timeDelta: TimeDeltaInput
-	"""
-	Supported CRON syntax: min hour dayOfMonth month dayOfWeek
-	"""
-	cron5ComponentExpression: String
 }
 
 type Search {

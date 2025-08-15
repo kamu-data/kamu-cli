@@ -52,7 +52,7 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                         triggerInput: {
                                             reactive: {
                                                 forNewData: {
-                                                    minRecordsToAwait: 0,
+                                                    immediate: { dummy: false }
                                                 },
                                                 forBreakingChange: "NO_ACTION"
                                             }

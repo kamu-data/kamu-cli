@@ -158,7 +158,7 @@ impl From<chrono::Duration> for TimeDelta {
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 #[graphql(remote = "kamu_flow_system::BreakingChangeRule")]
-pub enum BreakingChangeRule {
+pub enum FlowTriggerBreakingChangeRule {
     NoAction,
     Recover,
 }

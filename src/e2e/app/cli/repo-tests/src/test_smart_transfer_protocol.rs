@@ -1753,7 +1753,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                                         triggerInput: {
                                             reactive: {
                                                 forNewData: {
-                                                    minRecordsToAwait: 0
+                                                    immediate: { dummy: false }
                                                 },
                                                 forBreakingChange: "NO_ACTION"
                                             }

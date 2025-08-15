@@ -4313,10 +4313,12 @@ impl FlowRunsHarness {
                                                 accumulatedRecordsCount
                                                 activeBatchingRule {
                                                     __typename
-                                                    minRecordsToAwait
-                                                    maxBatchingInterval {
-                                                        every
-                                                        unit
+                                                    ... on FlowTriggerBatchingRuleBuffering {
+                                                        minRecordsToAwait
+                                                        maxBatchingInterval {
+                                                            every
+                                                            unit
+                                                        }
                                                     }
                                                 }
                                                 watermarkModified

@@ -76,7 +76,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                             flow_binding,
                             false, // Enabled
                             fs::FlowTriggerRule::Reactive(fs::ReactiveRule::new(
-                                fs::BatchingRule::empty(),
+                                fs::BatchingRule::immediate(),
                                 fs::BreakingChangeRule::Recover,
                             )),
                         )
@@ -97,7 +97,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                             flow_binding,
                             true, // Paused
                             fs::FlowTriggerRule::Reactive(fs::ReactiveRule::new(
-                                fs::BatchingRule::empty(),
+                                fs::BatchingRule::immediate(),
                                 fs::BreakingChangeRule::Recover,
                             )),
                         )

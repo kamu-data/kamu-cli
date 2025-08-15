@@ -101,7 +101,7 @@ pub(crate) struct FlowStartConditionReactive {
     pub batching_deadline: DateTime<Utc>,
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
-    pub for_breaking_change: BreakingChangeRule,
+    pub for_breaking_change: FlowTriggerBreakingChangeRule,
     // TODO: we can list all applied input flows, if that is interesting for debugging
 }
 
