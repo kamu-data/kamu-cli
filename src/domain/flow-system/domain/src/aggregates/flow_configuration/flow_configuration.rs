@@ -57,12 +57,12 @@ impl FlowConfiguration {
         self.apply(event)
     }
 
-    /// Handle dataset removal
-    pub fn notify_dataset_removed(
+    /// Handle scope removal
+    pub fn notify_scope_removed(
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), ProjectionError<FlowConfigurationState>> {
-        let event = FlowConfigurationEventDatasetRemoved {
+        let event = FlowConfigurationEventScopeRemoved {
             event_time: now,
             flow_binding: self.flow_binding.clone(),
         };

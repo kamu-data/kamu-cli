@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod webhook_delivery_repository;
-mod webhook_event_repository;
 mod webhook_subscription_event_store;
 
 pub use webhook_delivery_repository::*;
-pub use webhook_event_repository::*;
 pub use webhook_subscription_event_store::*;

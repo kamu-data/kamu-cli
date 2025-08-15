@@ -9,8 +9,10 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
 use engine::TransformRequestExt;
 use kamu_core::*;
+use random_strings::get_random_name;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,12 +39,12 @@ impl MockTransformElaborationService {
             .returning(|_, plan, _, _| {
                 Ok(TransformElaboration::Elaborated(TransformPlan {
                     request: TransformRequestExt {
-                        operation_id: plan.preliminary_request.operation_id,
+                        operation_id: get_random_name(None, 10),
                         dataset_handle: plan.preliminary_request.dataset_handle,
                         block_ref: plan.preliminary_request.block_ref,
                         head: plan.preliminary_request.head,
                         transform: plan.preliminary_request.transform,
-                        system_time: plan.preliminary_request.system_time,
+                        system_time: Utc::now(),
                         schema: plan.preliminary_request.schema,
                         prev_offset: plan.preliminary_request.prev_offset,
                         vocab: plan.preliminary_request.vocab,

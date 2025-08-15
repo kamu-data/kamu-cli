@@ -19,7 +19,7 @@ use crate::*;
 pub enum FlowConfigurationEvent {
     Created(FlowConfigurationEventCreated),
     Modified(FlowConfigurationEventModified),
-    DatasetRemoved(FlowConfigurationEventDatasetRemoved),
+    ScopeRemoved(FlowConfigurationEventScopeRemoved),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +45,7 @@ pub struct FlowConfigurationEventModified {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowConfigurationEventDatasetRemoved {
+pub struct FlowConfigurationEventScopeRemoved {
     pub event_time: DateTime<Utc>,
     pub flow_binding: FlowBinding,
 }
@@ -57,7 +57,7 @@ impl FlowConfigurationEvent {
         match self {
             FlowConfigurationEvent::Created(_) => "FlowConfigurationEventCreated",
             FlowConfigurationEvent::Modified(_) => "FlowConfigurationEventModified",
-            FlowConfigurationEvent::DatasetRemoved(_) => "FlowConfigurationEventDatasetRemoved",
+            FlowConfigurationEvent::ScopeRemoved(_) => "FlowConfigurationEventScopeRemoved",
         }
     }
 
@@ -65,7 +65,7 @@ impl FlowConfigurationEvent {
         match self {
             FlowConfigurationEvent::Created(e) => &e.flow_binding,
             FlowConfigurationEvent::Modified(e) => &e.flow_binding,
-            FlowConfigurationEvent::DatasetRemoved(e) => &e.flow_binding,
+            FlowConfigurationEvent::ScopeRemoved(e) => &e.flow_binding,
         }
     }
 
@@ -73,7 +73,7 @@ impl FlowConfigurationEvent {
         match self {
             FlowConfigurationEvent::Created(e) => e.event_time,
             FlowConfigurationEvent::Modified(e) => e.event_time,
-            FlowConfigurationEvent::DatasetRemoved(e) => e.event_time,
+            FlowConfigurationEvent::ScopeRemoved(e) => e.event_time,
         }
     }
 }
@@ -87,8 +87,8 @@ impl_enum_variant!(FlowConfigurationEvent::Created(
 impl_enum_variant!(FlowConfigurationEvent::Modified(
     FlowConfigurationEventModified
 ));
-impl_enum_variant!(FlowConfigurationEvent::DatasetRemoved(
-    FlowConfigurationEventDatasetRemoved
+impl_enum_variant!(FlowConfigurationEvent::ScopeRemoved(
+    FlowConfigurationEventScopeRemoved
 ));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,6 @@
 use database_common::PostgresTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_postgres::PostgresTaskEventStore;
 use kamu_webhooks_postgres::*;
 use sqlx::PgPool;
 
@@ -42,7 +41,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_webhook_event_or_subscription_id,
+    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_subscription_id,
     harness = PostgresWebhooDeliveryRepositoryHarness
 );
 
@@ -58,9 +57,7 @@ impl PostgresWebhooDeliveryRepositoryHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
-        catalog_builder.add::<PostgresTaskEventStore>();
         catalog_builder.add::<PostgresWebhookSubscriptionEventStore>();
-        catalog_builder.add::<PostgresWebhookEventRepository>();
         catalog_builder.add::<PostgresWebhookDeliveryRepository>();
 
         Self {

@@ -11,7 +11,7 @@ use chrono::{DateTime, Duration, Utc};
 use kamu_task_system::TaskID;
 use serde::{Deserialize, Serialize};
 
-use crate::BatchingRule;
+use crate::ReactiveRule;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +19,7 @@ use crate::BatchingRule;
 pub enum FlowStartCondition {
     Schedule(FlowStartConditionSchedule),
     Throttling(FlowStartConditionThrottling),
-    Batching(FlowStartConditionBatching),
+    Reactive(FlowStartConditionReactive),
     Executor(FlowStartConditionExecutor),
 }
 
@@ -28,7 +28,7 @@ impl FlowStartCondition {
         match self {
             Self::Schedule(s) => Some(s.wake_up_at),
             Self::Throttling(t) => Some(t.wake_up_at),
-            Self::Batching(_) | Self::Executor(_) => None,
+            Self::Reactive(_) | Self::Executor(_) => None,
         }
     }
 }
@@ -54,8 +54,8 @@ pub struct FlowStartConditionThrottling {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowStartConditionBatching {
-    pub active_batching_rule: BatchingRule,
+pub struct FlowStartConditionReactive {
+    pub active_rule: ReactiveRule,
     pub batching_deadline: DateTime<Utc>,
 }
 

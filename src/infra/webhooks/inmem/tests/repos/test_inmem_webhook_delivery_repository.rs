@@ -9,7 +9,6 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_webhooks_inmem::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +39,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_webhook_event_or_subscription_id,
+    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_subscription_id,
     harness = InMemoryWebhookDeliveryRepositoryHarness
 );
 
@@ -53,9 +52,7 @@ struct InMemoryWebhookDeliveryRepositoryHarness {
 impl InMemoryWebhookDeliveryRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<InMemoryTaskEventStore>();
         catalog_builder.add::<InMemoryWebhookSubscriptionEventStore>();
-        catalog_builder.add::<InMemoryWebhookEventRepository>();
         catalog_builder.add::<InMemoryWebhookDeliveryRepository>();
 
         Self {

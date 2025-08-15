@@ -28,6 +28,7 @@ pub trait ResetExecutor: Send + Sync {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResetResult {
+    pub old_head: Option<odf::Multihash>,
     pub new_head: odf::Multihash,
 }
 

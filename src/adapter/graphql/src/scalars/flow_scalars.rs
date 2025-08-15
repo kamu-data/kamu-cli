@@ -12,9 +12,10 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FLOW_TYPE_DATASET_TRANSFORM,
 };
-use kamu_flow_system::{self as fs, FLOW_TYPE_SYSTEM_GC};
+use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
 
@@ -24,54 +25,15 @@ simple_scalar!(FlowID, fs::FlowID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Eq, PartialEq)]
-pub enum FlowKey {
-    Dataset(FlowKeyDataset),
-    System(FlowKeySystem),
-}
-
-impl From<fs::FlowBinding> for FlowKey {
-    fn from(value: fs::FlowBinding) -> Self {
-        match value.scope {
-            fs::FlowScope::Dataset { dataset_id } => Self::Dataset(FlowKeyDataset {
-                dataset_id: dataset_id.into(),
-                flow_type: match value.flow_type.as_str() {
-                    FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,
-                    FLOW_TYPE_DATASET_TRANSFORM => DatasetFlowType::ExecuteTransform,
-                    FLOW_TYPE_DATASET_COMPACT => DatasetFlowType::HardCompaction,
-                    FLOW_TYPE_DATASET_RESET => DatasetFlowType::Reset,
-                    _ => panic!("Unexpected dataset flow type: {:?}", value.flow_type),
-                },
-            }),
-            fs::FlowScope::System => Self::System(FlowKeySystem {
-                flow_type: match value.flow_type.as_str() {
-                    FLOW_TYPE_SYSTEM_GC => SystemFlowType::GC,
-                    _ => panic!("Unexpected system flow type: {:?}", value.flow_type),
-                },
-            }),
-        }
-    }
-}
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowKeyDataset {
-    pub dataset_id: DatasetID<'static>,
-    pub flow_type: DatasetFlowType,
-}
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowKeySystem {
-    pub flow_type: SystemFlowType,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject, Debug)]
 pub struct FlowTimingRecords {
     /// Initiation time
     pub initiated_at: DateTime<Utc>,
 
-    /// Planned scheduling time
+    /// First scheduling time
+    pub first_attempt_scheduled_at: Option<DateTime<Utc>>,
+
+    /// Planned scheduling time (different than first in case of retries)
     pub scheduled_at: Option<DateTime<Utc>>,
 
     /// Recorded time of last task scheduling
@@ -104,6 +66,7 @@ pub enum DatasetFlowType {
     ExecuteTransform,
     HardCompaction,
     Reset,
+    ResetToMetadata,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,6 +84,7 @@ pub(crate) fn map_dataset_flow_type(dataset_flow_type: DatasetFlowType) -> &'sta
         DatasetFlowType::ExecuteTransform => FLOW_TYPE_DATASET_TRANSFORM,
         DatasetFlowType::HardCompaction => FLOW_TYPE_DATASET_COMPACT,
         DatasetFlowType::Reset => FLOW_TYPE_DATASET_RESET,
+        DatasetFlowType::ResetToMetadata => FLOW_TYPE_DATASET_RESET_TO_METADATA,
     }
 }
 
@@ -132,7 +96,7 @@ pub struct TimeDelta {
     pub unit: TimeUnit,
 }
 
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Enum, Clone, Copy, PartialEq, Eq)]
 pub enum TimeUnit {
     Minutes,
     Hours,
@@ -188,6 +152,15 @@ impl From<chrono::Duration> for TimeDelta {
 
         panic!("Expecting intervals that are clearly dividable by unit, but received [{value}]");
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
+#[graphql(remote = "kamu_flow_system::BreakingChangeRule")]
+pub enum FlowTriggerBreakingChangeRule {
+    NoAction,
+    Recover,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

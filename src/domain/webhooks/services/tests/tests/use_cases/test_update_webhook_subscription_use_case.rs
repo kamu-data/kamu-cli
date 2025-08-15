@@ -15,8 +15,10 @@ use kamu_webhooks::{
     UpdateWebhookSubscriptionUseCase,
     WebhookEventTypeCatalog,
     WebhookSubscriptionLabel,
+    WebhookSubscriptionQueryMode,
 };
 use kamu_webhooks_services::UpdateWebhookSubscriptionUseCaseImpl;
+use messaging_outbox::DummyOutboxImpl;
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -128,7 +130,10 @@ async fn test_event_types_deduplicated() {
 
     // Find the subscription and ensure it has only one event type
 
-    let subscription = harness.find_subscription(subscription.id()).await.unwrap();
+    let subscription = harness
+        .find_subscription(subscription.id(), WebhookSubscriptionQueryMode::Active)
+        .await
+        .unwrap();
 
     assert_eq!(subscription.event_types().len(), 1,);
     assert_eq!(
@@ -231,6 +236,7 @@ impl UpdateWebhookSubscriptionUseCaseHarness {
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<UpdateWebhookSubscriptionUseCaseImpl>();
+        b.add::<DummyOutboxImpl>();
 
         let catalog = b.build();
 

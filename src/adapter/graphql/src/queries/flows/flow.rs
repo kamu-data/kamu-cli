@@ -9,10 +9,10 @@
 
 use std::collections::HashMap;
 
-use {kamu_flow_system as fs, kamu_task_system as ts};
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs, kamu_task_system as ts};
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
-use super::{FlowEvent, FlowOutcome, FlowStartCondition, FlowTriggerInstance};
+use super::{FlowActivationCause, FlowEvent, FlowOutcome, FlowStartCondition};
 use crate::prelude::*;
 use crate::queries::Account;
 
@@ -92,10 +92,8 @@ impl Flow {
 
     /// Associated dataset ID, if any
     async fn dataset_id(&self) -> Option<DatasetID<'static>> {
-        self.flow_state
-            .flow_binding
-            .dataset_id()
-            .map(|dataset_id| dataset_id.clone().into())
+        afs::FlowScopeDataset::maybe_dataset_id_in_scope(&self.flow_state.flow_binding.scope)
+            .map(Into::into)
     }
 
     /// Description of key flow parameters
@@ -130,7 +128,8 @@ impl Flow {
     /// Timing records associated with the flow lifecycle
     async fn timing(&self) -> FlowTimingRecords {
         FlowTimingRecords {
-            initiated_at: self.flow_state.primary_trigger().trigger_time(),
+            initiated_at: self.flow_state.primary_activation_cause().activation_time(),
+            first_attempt_scheduled_at: self.flow_state.timing.first_scheduled_at,
             scheduled_at: self.flow_state.timing.scheduled_for_activation_at,
             awaiting_executor_since: self.flow_state.timing.awaiting_executor_since,
             running_since: self.flow_state.timing.running_since,
@@ -169,7 +168,10 @@ impl Flow {
 
     /// A user, who initiated the flow run. None for system-initiated flows
     async fn initiator(&self, ctx: &Context<'_>) -> Result<Option<Account>> {
-        let maybe_initiator = self.flow_state.primary_trigger().initiator_account_id();
+        let maybe_initiator = self
+            .flow_state
+            .primary_activation_cause()
+            .initiator_account_id();
         Ok(if let Some(initiator) = maybe_initiator {
             Some(Account::from_account_id(ctx, initiator.clone()).await?)
         } else {
@@ -177,30 +179,27 @@ impl Flow {
         })
     }
 
-    /// Primary flow trigger
-    async fn primary_trigger(
+    /// Primary flow activation cause
+    async fn primary_activation_cause(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<FlowTriggerInstance, InternalError> {
-        FlowTriggerInstance::build(self.flow_state.primary_trigger(), ctx).await
+    ) -> Result<FlowActivationCause, InternalError> {
+        FlowActivationCause::build(self.flow_state.primary_activation_cause(), ctx).await
     }
 
     /// Start condition
-    async fn start_condition(&self, ctx: &Context<'_>) -> Result<Option<FlowStartCondition>> {
-        let maybe_condition =
-            if let Some(start_condition) = self.flow_state.start_condition.as_ref() {
-                Some(
-                    FlowStartCondition::create_from_raw_flow_data(
-                        start_condition,
-                        &self.flow_state.triggers,
-                        ctx,
-                    )
-                    .await
-                    .int_err()?,
+    #[allow(clippy::unused_async)]
+    async fn start_condition(&self) -> Result<Option<FlowStartCondition>> {
+        let maybe_condition = self
+            .flow_state
+            .start_condition
+            .as_ref()
+            .map(|start_condition| {
+                FlowStartCondition::create_from_raw_flow_data(
+                    start_condition,
+                    &self.flow_state.activation_causes,
                 )
-            } else {
-                None
-            };
+            });
 
         Ok(maybe_condition)
     }

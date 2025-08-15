@@ -13,13 +13,35 @@ use super::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<FlowSupportServiceImpl>();
+pub fn register_dependencies(
+    catalog_builder: &mut CatalogBuilder,
+    opts: FlowDatasetAdapterDependencyOpts,
+) {
+    catalog_builder.add::<FlowControllerIngest>();
+    catalog_builder.add::<FlowControllerTransform>();
+    catalog_builder.add::<FlowControllerCompact>();
+    catalog_builder.add::<FlowControllerReset>();
+    catalog_builder.add::<FlowControllerResetToMetadata>();
 
-    catalog_builder.add::<FlowDispatcherIngest>();
-    catalog_builder.add::<FlowDispatcherTransform>();
-    catalog_builder.add::<FlowDispatcherCompact>();
-    catalog_builder.add::<FlowDispatcherReset>();
+    catalog_builder.add::<FlowDatasetsEventBridge>();
+    if opts.with_default_transform_evaluator {
+        catalog_builder.add::<TransformFlowEvaluatorImpl>();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+pub struct FlowDatasetAdapterDependencyOpts {
+    pub with_default_transform_evaluator: bool,
+}
+
+impl Default for FlowDatasetAdapterDependencyOpts {
+    fn default() -> Self {
+        Self {
+            with_default_transform_evaluator: true,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

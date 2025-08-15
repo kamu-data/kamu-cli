@@ -10,9 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_datasets::DatasetLifecycleMessage;
 use kamu_flow_system::*;
-use messaging_outbox::{MessageConsumer, MessageConsumerT};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +24,7 @@ pub struct FlowConfigurationServiceImpl {
 
 #[component(pub)]
 #[interface(dyn FlowConfigurationService)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[interface(dyn FlowScopeRemovalHandler)]
 impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
@@ -43,8 +41,6 @@ impl FlowConfigurationServiceImpl {
 
 #[async_trait::async_trait]
 impl FlowConfigurationService for FlowConfigurationServiceImpl {
-    /// Find the current schedule, which may or may not be associated with the
-    /// given dataset
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
     async fn find_configuration(
         &self,
@@ -55,7 +51,6 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Ok(maybe_flow_configuration.map(Into::into))
     }
 
-    /// Set or modify dataset update schedule
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
     async fn set_configuration(
         &self,
@@ -96,7 +91,6 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Ok(flow_configuration.into())
     }
 
-    /// Lists all active configurations
     fn list_active_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
@@ -122,52 +116,31 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for FlowConfigurationServiceImpl {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl {
+impl FlowScopeRemovalHandler for FlowConfigurationServiceImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "FlowConfigurationServiceImpl[DatasetLifecycleMessage]"
+        name = "FlowConfigurationServiceImpl::handle_flow_scope_removal"
     )]
-    async fn consume_message(
-        &self,
-        _: &Catalog,
-        message: &DatasetLifecycleMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        let flow_bindings = self.event_store.all_bindings_for_scope(flow_scope).await?;
 
-        match message {
-            DatasetLifecycleMessage::Deleted(message) => {
-                let flow_bindings = self
-                    .event_store
-                    .all_bindings_for_dataset_flows(&message.dataset_id)
-                    .await?;
+        for flow_binding in flow_bindings {
+            let maybe_flow_configuration =
+                FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
+                    .await
+                    .int_err()?;
 
-                for flow_binding in flow_bindings {
-                    let maybe_flow_configuration =
-                        FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
-                            .await
-                            .int_err()?;
+            if let Some(mut flow_configuration) = maybe_flow_configuration {
+                flow_configuration
+                    .notify_scope_removed(self.time_source.now())
+                    .int_err()?;
 
-                    if let Some(mut flow_configuration) = maybe_flow_configuration {
-                        flow_configuration
-                            .notify_dataset_removed(self.time_source.now())
-                            .int_err()?;
-
-                        flow_configuration
-                            .save(self.event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    }
-                }
-            }
-
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
-                // no action required
+                flow_configuration
+                    .save(self.event_store.as_ref())
+                    .await
+                    .int_err()?;
             }
         }
 

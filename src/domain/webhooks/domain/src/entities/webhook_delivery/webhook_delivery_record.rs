@@ -9,11 +9,11 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_task_system as ts;
 
 use crate::{
     WebhookDelivery,
-    WebhookEventID,
+    WebhookDeliveryID,
+    WebhookEventType,
     WebhookRequest,
     WebhookResponse,
     WebhookSubscriptionID,
@@ -23,10 +23,11 @@ use crate::{
 
 #[derive(sqlx::FromRow)]
 pub struct WebhookDeliveryRecord {
-    pub task_id: i64,
-    pub event_id: uuid::Uuid,
+    pub delivery_id: uuid::Uuid,
     pub subscription_id: uuid::Uuid,
+    pub event_type: String,
     pub request_headers: serde_json::Value,
+    pub request_payload: serde_json::Value,
     pub requested_at: DateTime<Utc>,
     pub response_code: Option<i16>,
     pub response_body: Option<String>,
@@ -70,6 +71,7 @@ impl WebhookDeliveryRecord {
         let request = WebhookRequest {
             started_at: self.requested_at,
             headers: Self::deserialize_http_headers(self.request_headers)?,
+            payload: self.request_payload,
         };
 
         let response = if self.response_code.is_some() {
@@ -93,9 +95,9 @@ impl WebhookDeliveryRecord {
         };
 
         Ok(WebhookDelivery {
-            task_id: ts::TaskID::try_from(self.task_id).unwrap(),
+            webhook_delivery_id: WebhookDeliveryID::new(self.delivery_id),
             webhook_subscription_id: WebhookSubscriptionID::new(self.subscription_id),
-            webhook_event_id: WebhookEventID::new(self.event_id),
+            event_type: WebhookEventType::try_new(self.event_type).unwrap(),
             request,
             response,
         })

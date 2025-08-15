@@ -46,21 +46,6 @@ impl DatasetIncrementQueryServiceImpl {
             })
     }
 
-    async fn resolve_dataset_head(
-        &self,
-        resolved_dataset: &ResolvedDataset,
-    ) -> Result<odf::Multihash, GetIncrementError> {
-        resolved_dataset
-            .as_metadata_chain()
-            .resolve_ref(&odf::dataset::BlockRef::Head)
-            .await
-            .map_err(|e| match e {
-                odf::GetRefError::Access(e) => GetIncrementError::Access(e),
-                odf::GetRefError::NotFound(e) => GetIncrementError::RefNotFound(e),
-                odf::GetRefError::Internal(e) => GetIncrementError::Internal(e),
-            })
-    }
-
     // TODO: PERF: Avoid multiple passes over metadata chain
     async fn make_increment_from_interval(
         &self,
@@ -84,6 +69,7 @@ impl DatasetIncrementQueryServiceImpl {
 
         while let Some((_, block)) = block_stream.try_next().await.map_err(|err| match err {
             IterBlocksError::BlockNotFound(e) => GetIncrementError::BlockNotFound(e),
+            IterBlocksError::InvalidInterval(e) => GetIncrementError::InvalidInterval(e),
             _ => GetIncrementError::Internal(err.int_err()),
         })? {
             // Each block counts
@@ -199,21 +185,6 @@ impl DatasetIncrementQueryService for DatasetIncrementQueryServiceImpl {
 
         let increment = self
             .make_increment_from_interval(&resolved_dataset, old_head, new_head)
-            .await?;
-
-        Ok(increment)
-    }
-
-    async fn get_increment_since<'a>(
-        &'a self,
-        dataset_id: &'a odf::DatasetID,
-        old_head: Option<&'a odf::Multihash>,
-    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
-        let resolved_dataset = self.resolve_dataset_by_id(dataset_id).await?;
-        let current_head = self.resolve_dataset_head(&resolved_dataset).await?;
-
-        let increment = self
-            .make_increment_from_interval(&resolved_dataset, old_head, &current_head)
             .await?;
 
         Ok(increment)

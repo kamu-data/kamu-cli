@@ -15,13 +15,19 @@ use chrono::{DateTime, Utc};
 pub struct WebhookRequest {
     pub headers: http::HeaderMap,
     pub started_at: DateTime<Utc>,
+    pub payload: serde_json::Value,
 }
 
 impl WebhookRequest {
-    pub fn new(headers: http::HeaderMap, started_at: DateTime<Utc>) -> Self {
+    pub fn new(
+        headers: http::HeaderMap,
+        started_at: DateTime<Utc>,
+        payload: serde_json::Value,
+    ) -> Self {
         Self {
             headers,
             started_at,
+            payload,
         }
     }
 }

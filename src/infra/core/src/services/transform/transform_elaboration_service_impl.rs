@@ -13,10 +13,11 @@ use dill::*;
 use engine::{TransformRequestExt, TransformRequestInputExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 use super::get_transform_input_from_query_input;
-use crate::build_preliminary_request_ext;
+use crate::{build_preliminary_request_ext, get_transform_query_input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,12 +71,12 @@ impl TransformElaborationServiceImpl {
         }
 
         let final_request: TransformRequestExt = TransformRequestExt {
-            operation_id: preliminary_request.operation_id,
+            operation_id: get_random_name(None, 10),
             dataset_handle: preliminary_request.dataset_handle,
             block_ref: preliminary_request.block_ref,
             head: preliminary_request.head,
             transform: preliminary_request.transform,
-            system_time: preliminary_request.system_time,
+            system_time: self.time_source.now(),
             schema: preliminary_request.schema,
             prev_offset: preliminary_request.prev_offset,
             vocab: preliminary_request.vocab,
@@ -92,62 +93,13 @@ impl TransformElaborationServiceImpl {
         input_state: Option<odf::metadata::ExecuteTransformInput>,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformRequestInputExt, TransformElaborateError> {
-        let dataset_id = input_decl.dataset_ref.id().unwrap();
-        if let Some(input_state) = &input_state {
-            assert_eq!(*dataset_id, input_state.dataset_id);
-        }
+        let input_alias = input_decl.alias.clone().unwrap();
 
-        let target = datasets_map.get_by_id(dataset_id);
-        let input_chain = target.as_metadata_chain();
+        let query_input = get_transform_query_input(input_decl, input_state, datasets_map).await?;
 
-        // Determine last processed input block and offset
-        let last_processed_block = input_state.as_ref().and_then(|i| i.last_block_hash());
-        let last_processed_offset = input_state
-            .as_ref()
-            .and_then(odf::metadata::ExecuteTransformInput::last_offset);
-
-        // Determine unprocessed block and offset range
-        let last_unprocessed_block = input_chain
-            .resolve_ref(&odf::BlockRef::Head)
+        get_transform_input_from_query_input(query_input, input_alias, None, datasets_map)
             .await
-            .int_err()?;
-
-        use odf::dataset::MetadataChainExt;
-        let last_unprocessed_offset = input_chain
-            .accept_one_by_hash(
-                &last_unprocessed_block,
-                odf::dataset::SearchSingleDataBlockVisitor::next(),
-            )
-            .await
-            .int_err()?
-            .into_event()
-            .and_then(|event| event.last_offset())
-            .or(last_processed_offset);
-
-        let query_input = odf::metadata::ExecuteTransformInput {
-            dataset_id: dataset_id.clone(),
-            prev_block_hash: last_processed_block.cloned(),
-            new_block_hash: if Some(&last_unprocessed_block) != last_processed_block {
-                Some(last_unprocessed_block)
-            } else {
-                None
-            },
-            prev_offset: last_processed_offset,
-            new_offset: if last_unprocessed_offset != last_processed_offset {
-                last_unprocessed_offset
-            } else {
-                None
-            },
-        };
-
-        get_transform_input_from_query_input(
-            query_input,
-            input_decl.alias.clone().unwrap(),
-            None,
-            datasets_map,
-        )
-        .await
-        .map_err(Into::into)
+            .map_err(Into::into)
     }
 }
 
@@ -234,12 +186,9 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
                     self.elaborate_transform(
                         target.clone(),
                         TransformPreliminaryPlan {
-                            preliminary_request: build_preliminary_request_ext(
-                                target,
-                                self.time_source.now(),
-                            )
-                            .await
-                            .int_err()?,
+                            preliminary_request: build_preliminary_request_ext(target)
+                                .await
+                                .int_err()?,
                             datasets_map: plan.datasets_map,
                         },
                         TransformOptions {

@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT event_id, event_payload\n                FROM flow_trigger_events\n                WHERE flow_type = $1\n                    AND scope_data = $2\n                    AND (cast($3 as BIGINT) IS NULL or event_id > $3)\n                    AND (cast($4 as BIGINT) IS NULL or event_id <= $4)\n                ORDER BY event_id ASC\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_payload",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "4467d068a79febc3462ba8b83e0d6f5189af9974e45c265fc49a16f7e5c10ea1"
+}

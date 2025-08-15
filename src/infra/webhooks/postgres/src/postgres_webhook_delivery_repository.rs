@@ -10,7 +10,6 @@
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_task_system as ts;
 use kamu_webhooks::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,9 +41,11 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let task_id: i64 = delivery.task_id.try_into().unwrap();
-        let event_id = delivery.webhook_event_id.as_ref();
+        let delivery_id = delivery.webhook_delivery_id.as_ref();
         let subscription_id = delivery.webhook_subscription_id.as_ref();
+        let event_type_str = delivery.event_type.to_string();
+
+        let request_payload = delivery.request.payload;
 
         let request_headers =
             WebhookDeliveryRecord::serialize_http_headers(&delivery.request.headers)
@@ -54,12 +55,13 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
 
         sqlx::query!(
             r#"
-            INSERT into webhook_deliveries(task_id, event_id, subscription_id, request_headers, requested_at)
-                VALUES ($1, $2, $3, $4, $5)
+            INSERT into webhook_deliveries(delivery_id, subscription_id, event_type, request_payload, request_headers, requested_at)
+                VALUES ($1, $2, $3, $4, $5, $6)
             "#,
-            task_id,
-            event_id,
+            delivery_id,
             subscription_id,
+            event_type_str,
+            request_payload,
             request_headers,
             requested_at,
         )
@@ -68,7 +70,7 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateWebhookDeliveryError::DeliveryExists(WebhookDeliveryAlreadyExistsError {
-                    task_id: delivery.task_id,
+                    webhook_delivery_id: delivery.webhook_delivery_id,
                 })
             }
             _ => CreateWebhookDeliveryError::Internal(e.int_err()),
@@ -79,14 +81,14 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
 
     async fn update_response(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
         response: WebhookResponse,
     ) -> Result<(), UpdateWebhookDeliveryError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let task_id: i64 = task_id.try_into().unwrap();
+        let delivery_id = webhook_delivery_id.as_ref();
 
         let response_headers = WebhookDeliveryRecord::serialize_http_headers(&response.headers)
             .map_err(|e| UpdateWebhookDeliveryError::Internal(e.int_err()))?;
@@ -98,13 +100,13 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
                     response_headers = $2,
                     response_body = $3,
                     response_at = $4
-                WHERE task_id = $5
+                WHERE delivery_id = $5
             "#,
             i16::try_from(response.status_code.as_u16()).unwrap(),
             response_headers,
             response.body,
             response.finished_at,
-            task_id,
+            delivery_id,
         )
         .execute(connection_mut)
         .await
@@ -113,23 +115,24 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
         Ok(())
     }
 
-    async fn get_by_task_id(
+    async fn get_by_webhook_delivery_id(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
     ) -> Result<Option<WebhookDelivery>, GetWebhookDeliveryError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let task_id: i64 = task_id.try_into().unwrap();
+        let delivery_id = webhook_delivery_id.as_ref();
 
         let record: Option<WebhookDeliveryRecord> = sqlx::query_as!(
             WebhookDeliveryRecord,
             r#"
             SELECT
-                task_id,
-                event_id,
+                delivery_id,
                 subscription_id,
+                event_type,
+                request_payload,
                 request_headers,
                 requested_at,
                 response_code,
@@ -137,9 +140,9 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
                 response_headers,
                 response_at
             FROM webhook_deliveries
-                WHERE task_id = $1
+                WHERE delivery_id = $1
             "#,
-            task_id,
+            delivery_id,
         )
         .fetch_optional(connection_mut)
         .await
@@ -149,48 +152,6 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
             .map(WebhookDeliveryRecord::try_into_webhook_delivery)
             .transpose()
             .map_err(GetWebhookDeliveryError::Internal)
-    }
-
-    async fn list_by_event_id(
-        &self,
-        event_id: WebhookEventID,
-    ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let event_id = event_id.as_ref();
-
-        let records = sqlx::query_as!(
-            WebhookDeliveryRecord,
-            r#"
-            SELECT
-                task_id,
-                event_id,
-                subscription_id,
-                request_headers,
-                requested_at,
-                response_code,
-                response_body,
-                response_headers,
-                response_at
-            FROM webhook_deliveries
-                WHERE event_id = $1
-            "#,
-            event_id,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        records
-            .into_iter()
-            .map(|record| {
-                record
-                    .try_into_webhook_delivery()
-                    .map_err(|e| ListWebhookDeliveriesError::Internal(e.int_err()))
-            })
-            .collect()
     }
 
     async fn list_by_subscription_id(
@@ -208,9 +169,10 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
             WebhookDeliveryRecord,
             r#"
             SELECT
-                task_id,
-                event_id,
+                delivery_id,
                 subscription_id,
+                event_type,
+                request_payload,
                 request_headers,
                 requested_at,
                 response_code,

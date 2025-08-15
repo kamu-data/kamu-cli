@@ -9,7 +9,6 @@
 
 use std::collections::HashSet;
 
-use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
 
@@ -24,7 +23,6 @@ pub struct InMemoryFlowTriggerEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<FlowTriggerEvent>,
-    dataset_ids: Vec<odf::DatasetID>,
 }
 
 impl EventStoreState<FlowTriggerState> for State {
@@ -83,12 +81,6 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
             return Err(SaveEventsError::NothingToSave);
         }
 
-        if let FlowScope::Dataset { dataset_id } = &query.scope {
-            let state = self.inner.as_state();
-            let mut g = state.lock().unwrap();
-            g.dataset_ids.push(dataset_id.clone());
-        }
-
         self.inner
             .save_events(query, maybe_prev_stored_event_id, events)
             .await
@@ -99,29 +91,6 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn list_dataset_ids(
-        &self,
-        pagination: &PaginationOpts,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        Ok(self
-            .inner
-            .as_state()
-            .lock()
-            .unwrap()
-            .dataset_ids
-            .iter()
-            .skip(pagination.offset)
-            .take(pagination.limit)
-            .cloned()
-            .collect())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
-        Ok(self.inner.as_state().lock().unwrap().dataset_ids.len())
-    }
-
     #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
         let state = self.inner.as_state();
@@ -141,7 +110,7 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
             let is_active = match event {
                 FlowTriggerEvent::Created(e) => !e.paused,
                 FlowTriggerEvent::Modified(e) => !e.paused,
-                FlowTriggerEvent::DatasetRemoved { .. } => false,
+                FlowTriggerEvent::ScopeRemoved { .. } => false,
             };
 
             if is_active {
@@ -153,10 +122,10 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn all_trigger_bindings_for_dataset_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
+    async fn all_trigger_bindings_for_scope(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -165,14 +134,12 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         let mut bindings = Vec::new();
 
         for event in g.events.iter().rev() {
-            if let FlowBinding {
-                scope: FlowScope::Dataset { dataset_id: id },
-                flow_type,
-            } = event.flow_binding()
-                && id == dataset_id
-                && seen_flow_types.insert(flow_type)
-            {
-                bindings.push(FlowBinding::for_dataset(id.clone(), flow_type));
+            let binding = event.flow_binding();
+            if binding.scope != *flow_scope {
+                continue;
+            }
+            if seen_flow_types.insert(binding.flow_type.clone()) {
+                bindings.push(binding.clone());
             }
         }
 
@@ -180,42 +147,18 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_trigger_bindings_for_system_flows(
+    async fn has_active_triggers_for_scopes(
         &self,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-
-        let mut seen_flow_types = HashSet::new();
-        let mut bindings = Vec::new();
-
-        for event in g.events.iter().rev() {
-            if let FlowBinding {
-                scope: FlowScope::System,
-                flow_type,
-            } = event.flow_binding()
-                && seen_flow_types.insert(flow_type)
-            {
-                bindings.push(FlowBinding::for_system(flow_type));
-            }
-        }
-
-        Ok(bindings)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn has_active_triggers_for_datasets(
-        &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError> {
-        if dataset_ids.is_empty() {
+        if scopes.is_empty() {
             return Ok(false);
         }
 
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        let dataset_ids: HashSet<&odf::DatasetID> = dataset_ids.iter().collect();
+        let scopes: HashSet<&FlowScope> = scopes.iter().collect();
         let mut seen_bindings = HashSet::new();
 
         for event in g.events.iter().rev() {
@@ -225,25 +168,22 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
                 continue;
             }
 
-            match &flow_binding.scope {
-                FlowScope::Dataset { dataset_id } if dataset_ids.contains(dataset_id) => {
-                    match event {
-                        FlowTriggerEvent::Created(e) => {
-                            if !e.paused {
-                                return Ok(true);
-                            }
-                        }
-                        FlowTriggerEvent::Modified(e) => {
-                            if !e.paused {
-                                return Ok(true);
-                            }
-                        }
-                        FlowTriggerEvent::DatasetRemoved { .. } => {
-                            // permanently stopped — not active
+            if scopes.contains(&flow_binding.scope) {
+                match event {
+                    FlowTriggerEvent::Created(e) => {
+                        if !e.paused {
+                            return Ok(true);
                         }
                     }
+                    FlowTriggerEvent::Modified(e) => {
+                        if !e.paused {
+                            return Ok(true);
+                        }
+                    }
+                    FlowTriggerEvent::ScopeRemoved { .. } => {
+                        // permanently stopped — not active
+                    }
                 }
-                _ => {} // skip system flows
             }
         }
 

@@ -9,7 +9,6 @@
 
 use std::collections::HashSet;
 
-use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
 
@@ -24,7 +23,6 @@ pub struct InMemoryFlowConfigurationEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<FlowConfigurationEvent>,
-    dataset_ids: Vec<odf::DatasetID>,
 }
 
 impl EventStoreState<FlowConfigurationState> for State {
@@ -83,12 +81,6 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
             return Err(SaveEventsError::NothingToSave);
         }
 
-        if let FlowScope::Dataset { dataset_id } = &query.scope {
-            let state = self.inner.as_state();
-            let mut g = state.lock().unwrap();
-            g.dataset_ids.push(dataset_id.clone());
-        }
-
         self.inner
             .save_events(query, maybe_prev_stored_event_id, events)
             .await
@@ -99,29 +91,6 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn list_dataset_ids(
-        &self,
-        pagination: &PaginationOpts,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        Ok(self
-            .inner
-            .as_state()
-            .lock()
-            .unwrap()
-            .dataset_ids
-            .iter()
-            .skip(pagination.offset)
-            .take(pagination.limit)
-            .cloned()
-            .collect())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
-        Ok(self.inner.as_state().lock().unwrap().dataset_ids.len())
-    }
-
     #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream {
         let state = self.inner.as_state();
@@ -145,10 +114,10 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
         Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn all_bindings_for_dataset_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
+    async fn all_bindings_for_scope(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -157,14 +126,12 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
         let mut bindings = Vec::new();
 
         for event in g.events.iter().rev() {
-            if let FlowBinding {
-                scope: FlowScope::Dataset { dataset_id: id },
-                flow_type,
-            } = event.flow_binding()
-                && id == dataset_id
-                && seen_flow_types.insert(flow_type)
-            {
-                bindings.push(FlowBinding::for_dataset(id.clone(), flow_type));
+            let flow_binding = event.flow_binding();
+            if flow_binding.scope != *flow_scope {
+                continue;
+            }
+            if seen_flow_types.insert(flow_binding.flow_type.clone()) {
+                bindings.push(flow_binding.clone());
             }
         }
 

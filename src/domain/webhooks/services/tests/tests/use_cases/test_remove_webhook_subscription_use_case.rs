@@ -10,8 +10,9 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_webhooks::RemoveWebhookSubscriptionUseCase;
+use kamu_webhooks::{RemoveWebhookSubscriptionUseCase, WebhookSubscriptionQueryMode};
 use kamu_webhooks_services::RemoveWebhookSubscriptionUseCaseImpl;
+use messaging_outbox::DummyOutboxImpl;
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -25,8 +26,21 @@ async fn test_remove_subscription_success() {
     let res = harness.use_case.execute(&mut subscription).await;
     assert!(res.is_ok(), "Failed to remove subscription: {res:?}",);
 
-    let res = harness.find_subscription(subscription.id()).await;
+    let res = harness
+        .find_subscription(subscription.id(), WebhookSubscriptionQueryMode::Active)
+        .await;
     assert!(res.is_none(), "Subscription was not removed: {res:?}",);
+
+    let res = harness
+        .find_subscription(
+            subscription.id(),
+            WebhookSubscriptionQueryMode::IncludingRemoved,
+        )
+        .await;
+    assert!(
+        res.is_some(),
+        "Subscription should be found in including removed mode: {res:?}",
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,6 +71,7 @@ impl RemoveWebhookSubscriptionUseCaseHarness {
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<RemoveWebhookSubscriptionUseCaseImpl>();
+        b.add::<DummyOutboxImpl>();
 
         let catalog = b.build();
 

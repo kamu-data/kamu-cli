@@ -9,6 +9,8 @@
 
 use internal_error::InternalError;
 
+use crate::FlowScope;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -18,42 +20,13 @@ pub struct FlowBinding {
 }
 
 impl FlowBinding {
-    pub fn for_dataset(dataset_id: odf::DatasetID, flow_type: &str) -> Self {
+    #[inline]
+    pub fn new(flow_type: &str, scope: FlowScope) -> Self {
         Self {
             flow_type: flow_type.to_string(),
-            scope: FlowScope::Dataset { dataset_id },
+            scope,
         }
     }
-
-    pub fn for_system(flow_type: &str) -> Self {
-        Self {
-            flow_type: flow_type.to_string(),
-            scope: FlowScope::System,
-        }
-    }
-
-    pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
-        let FlowScope::Dataset { dataset_id } = &self.scope else {
-            return None;
-        };
-        Some(dataset_id)
-    }
-
-    pub fn get_dataset_id_or_die(&self) -> Result<odf::DatasetID, InternalError> {
-        let FlowScope::Dataset { dataset_id } = &self.scope else {
-            return InternalError::bail("Expecting dataset flow binding scope");
-        };
-        Ok(dataset_id.clone())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "PascalCase")]
-pub enum FlowScope {
-    Dataset { dataset_id: odf::DatasetID },
-    System,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

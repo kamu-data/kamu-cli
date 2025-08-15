@@ -33,13 +33,13 @@ impl FlowTriggerState {
     pub fn try_get_schedule_rule(self) -> Option<Schedule> {
         match self.rule {
             FlowTriggerRule::Schedule(schedule) => Some(schedule),
-            FlowTriggerRule::Batching(_) => None,
+            FlowTriggerRule::Reactive(_) => None,
         }
     }
 
-    pub fn try_get_batching_rule(self) -> Option<BatchingRule> {
+    pub fn try_get_reactive_rule(self) -> Option<ReactiveRule> {
         match self.rule {
-            FlowTriggerRule::Batching(batching) => Some(batching),
+            FlowTriggerRule::Reactive(reactive) => Some(reactive),
             FlowTriggerRule::Schedule(_) => None,
         }
     }
@@ -79,7 +79,7 @@ impl Projection for FlowTriggerState {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
                     E::Modified(FlowTriggerEventModified { paused, rule, .. }) => {
-                        // Note: when deleted dataset is re-added with the same id, we have to
+                        // Note: when deleted scope is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowTriggerState {
                             status: if *paused {
@@ -92,18 +92,14 @@ impl Projection for FlowTriggerState {
                         })
                     }
 
-                    E::DatasetRemoved(_) => {
-                        if let FlowScope::Dataset { .. } = &s.flow_binding.scope {
-                            if s.status == FlowTriggerStatus::StoppedPermanently {
-                                Ok(s) // idempotent DELETE
-                            } else {
-                                Ok(FlowTriggerState {
-                                    status: FlowTriggerStatus::StoppedPermanently,
-                                    ..s
-                                })
-                            }
+                    E::ScopeRemoved(_) => {
+                        if s.status == FlowTriggerStatus::StoppedPermanently {
+                            Ok(s) // idempotent DELETE
                         } else {
-                            Err(ProjectionError::new(Some(s), event))
+                            Ok(FlowTriggerState {
+                                status: FlowTriggerStatus::StoppedPermanently,
+                                ..s
+                            })
                         }
                     }
                 }

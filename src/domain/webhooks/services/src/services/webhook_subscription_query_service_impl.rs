@@ -88,17 +88,21 @@ impl WebhookSubscriptionQueryService for WebhookSubscriptionQueryServiceImpl {
     async fn find_webhook_subscription(
         &self,
         subscription_id: WebhookSubscriptionID,
+        query_mode: WebhookSubscriptionQueryMode,
     ) -> Result<Option<WebhookSubscription>, InternalError> {
         match WebhookSubscription::load(subscription_id, self.subscription_event_store.as_ref())
             .await
         {
-            Ok(subscription) => Ok(
-                if subscription.status() != WebhookSubscriptionStatus::Removed {
-                    Some(subscription)
-                } else {
-                    None
-                },
-            ),
+            Ok(subscription) => match query_mode {
+                WebhookSubscriptionQueryMode::Active => {
+                    if subscription.status() != WebhookSubscriptionStatus::Removed {
+                        Ok(Some(subscription))
+                    } else {
+                        Ok(None)
+                    }
+                }
+                WebhookSubscriptionQueryMode::IncludingRemoved => Ok(Some(subscription)),
+            },
             Err(LoadError::NotFound(_)) => Ok(None),
             Err(LoadError::ProjectionError(e)) => Err(e.int_err()),
             Err(LoadError::Internal(e)) => Err(e),

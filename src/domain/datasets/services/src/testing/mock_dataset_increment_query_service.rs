@@ -23,13 +23,6 @@ mockall::mock! {
             old_head: Option<&'a odf::Multihash>,
             new_head: &'a odf::Multihash,
         ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
-
-        #[allow(clippy::ref_option_ref)]
-        async fn get_increment_since<'a>(
-            &'a self,
-            dataset_id: &'a odf::DatasetID,
-            old_head: Option<&'a odf::Multihash>,
-        ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
     }
 }
 
@@ -41,14 +34,6 @@ impl MockDatasetIncrementQueryService {
         dataset_changes_mock
             .expect_get_increment_between()
             .returning(move |_, _, _| Ok(increment));
-        dataset_changes_mock
-    }
-
-    pub fn with_increment_since(increment: DatasetIntervalIncrement) -> Self {
-        let mut dataset_changes_mock = MockDatasetIncrementQueryService::default();
-        dataset_changes_mock
-            .expect_get_increment_since()
-            .returning(move |_, _| Ok(increment));
         dataset_changes_mock
     }
 }

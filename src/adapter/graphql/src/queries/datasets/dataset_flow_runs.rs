@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::AccountService;
-use kamu_flow_system as fs;
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use crate::mutations::{FlowInDatasetError, FlowNotFound, check_if_flow_belongs_to_dataset};
 use crate::prelude::*;
@@ -78,7 +78,7 @@ impl<'a> DatasetFlowRuns<'a> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let filters = match filters {
+        let maybe_filters = match filters {
             Some(filters) => Some(kamu_flow_system::FlowFilters {
                 by_flow_type: filters
                     .by_flow_type
@@ -104,19 +104,18 @@ impl<'a> DatasetFlowRuns<'a> {
             None => None,
         };
 
-        let filters = filters.unwrap_or_default();
-
         let flows_state_listing = flow_query_service
-            .list_all_flows_by_dataset(
-                &self.dataset_request_state.dataset_handle().id,
-                filters,
+            .list_scoped_flows(
+                afs::FlowScopeDataset::query_for_single_dataset(
+                    self.dataset_request_state.dataset_id(),
+                ),
+                maybe_filters.unwrap_or_default(),
                 PaginationOpts::from_page(page, per_page),
             )
             .await
             .int_err()?;
 
         let matched_flow_states: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
-
         let matched_flows = Flow::build_batch(matched_flow_states, ctx).await?;
 
         Ok(FlowConnection::new(
@@ -132,7 +131,9 @@ impl<'a> DatasetFlowRuns<'a> {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service
-            .list_all_flow_initiators_by_dataset(&self.dataset_request_state.dataset_handle().id)
+            .list_scoped_flow_initiators(afs::FlowScopeDataset::query_for_single_dataset(
+                self.dataset_request_state.dataset_id(),
+            ))
             .await
             .int_err()?
             .matched_stream

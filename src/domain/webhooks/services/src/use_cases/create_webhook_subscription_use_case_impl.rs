@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_webhooks::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,6 +20,7 @@ use kamu_webhooks::*;
 pub struct CreateWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,6 +90,19 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 .save(self.subscription_event_store.as_ref())
                 .await
                 .map_err(|e| CreateWebhookSubscriptionError::Internal(e.int_err()))?;
+
+            for event_type in subscription.event_types() {
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+                        WebhookSubscriptionEventChangesMessage::event_enabled(
+                            subscription.id(),
+                            subscription.dataset_id(),
+                            event_type.clone(),
+                        ),
+                    )
+                    .await?;
+            }
 
             return Ok(CreateWebhookSubscriptionResult {
                 subscription_id: subscription.id(),

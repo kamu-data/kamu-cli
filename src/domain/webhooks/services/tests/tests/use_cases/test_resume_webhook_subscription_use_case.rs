@@ -17,6 +17,7 @@ use kamu_webhooks::{
     WebhookSubscriptionStatus,
 };
 use kamu_webhooks_services::ResumeWebhookSubscriptionUseCaseImpl;
+use messaging_outbox::DummyOutboxImpl;
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -98,6 +99,7 @@ impl ResumeWebhookSubscriptionUseCaseHarness {
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<ResumeWebhookSubscriptionUseCaseImpl>();
+        b.add::<DummyOutboxImpl>();
 
         let catalog = b.build();
 

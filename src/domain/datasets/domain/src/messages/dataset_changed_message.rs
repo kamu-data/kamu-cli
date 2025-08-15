@@ -26,11 +26,13 @@ pub enum DatasetExternallyChangedMessage {
 impl DatasetExternallyChangedMessage {
     pub fn ingest_http(
         dataset_id: &odf::DatasetID,
+        maybe_source_name: Option<String>,
         maybe_prev_block_hash: Option<&odf::Multihash>,
         new_block_hash: &odf::Multihash,
     ) -> Self {
         Self::HttpIngest(DatasetExternallyChangedMessageHttpIngest {
             dataset_id: dataset_id.clone(),
+            maybe_source_name,
             maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
             new_block_hash: new_block_hash.clone(),
         })
@@ -67,6 +69,9 @@ pub struct DatasetExternallyChangedMessageHttpIngest {
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
+    /// The name of the source that triggered the update.
+    pub maybe_source_name: Option<String>,
+
     /// The previous block hash: this value will only be None
     /// for datasets that were just created.
     pub maybe_prev_block_hash: Option<odf::Multihash>,
@@ -78,11 +83,13 @@ pub struct DatasetExternallyChangedMessageHttpIngest {
 impl DatasetExternallyChangedMessageHttpIngest {
     pub fn new(
         dataset_id: odf::DatasetID,
+        maybe_source_name: Option<String>,
         maybe_prev_block_hash: Option<odf::Multihash>,
         new_block_hash: odf::Multihash,
     ) -> Self {
         Self {
             dataset_id,
+            maybe_source_name,
             maybe_prev_block_hash,
             new_block_hash,
         }

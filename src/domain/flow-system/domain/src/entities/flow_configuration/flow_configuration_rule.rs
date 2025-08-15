@@ -43,7 +43,7 @@ impl<'de> Deserialize<'de> for FlowConfigurationRule {
             type Value = FlowConfigurationRule;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a map with one key representing the plan type")
+                formatter.write_str("a map with one key representing the rule type")
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<FlowConfigurationRule, M::Error>

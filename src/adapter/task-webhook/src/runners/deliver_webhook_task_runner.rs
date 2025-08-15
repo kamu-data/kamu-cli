@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_task_system::*;
-use kamu_webhooks::WebhookDeliveryWorker;
+use kamu_webhooks::{WebhookDeliveryID, WebhookDeliveryWorker};
 
 use crate::TaskDefinitionWebhookDeliver;
 
@@ -32,12 +32,16 @@ impl DeliverWebhookTaskRunner {
         &self,
         task_webhook: TaskDefinitionWebhookDeliver,
     ) -> Result<TaskOutcome, InternalError> {
+        let webhook_delivery_id = WebhookDeliveryID::new(uuid::Uuid::new_v4());
+        let webhook_subscription_id = task_webhook.webhook_subscription_id;
+
         match self
             .webhook_delivery_worker
             .deliver_webhook(
-                task_webhook.task_id,
-                task_webhook.webhook_subscription_id,
-                task_webhook.webhook_event_id,
+                webhook_delivery_id,
+                webhook_subscription_id,
+                task_webhook.webhook_event_type,
+                task_webhook.webhook_payload,
             )
             .await
         {

@@ -9,8 +9,10 @@
 
 mod task_result_dataset_hard_compact;
 mod task_result_dataset_reset;
+mod task_result_dataset_reset_to_metadata;
 mod task_result_dataset_update;
 
 pub use task_result_dataset_hard_compact::*;
 pub use task_result_dataset_reset::*;
+pub use task_result_dataset_reset_to_metadata::*;
 pub use task_result_dataset_update::*;

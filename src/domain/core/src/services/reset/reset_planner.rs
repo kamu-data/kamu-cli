@@ -28,6 +28,7 @@ pub trait ResetPlanner: Send + Sync {
 
 #[derive(Debug)]
 pub struct ResetPlan {
+    pub old_head: Option<odf::Multihash>,
     pub new_head: odf::Multihash,
 }
 

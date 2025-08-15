@@ -9,6 +9,7 @@
 
 use chrono::Utc;
 use kamu_accounts::Account;
+use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::FlowTriggerService;
 
@@ -44,12 +45,15 @@ impl<'a> AccountFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
-        for dataset_id in &account_dataset_ids {
-            flow_trigger_service
-                .resume_dataset_flows(Utc::now(), dataset_id, None)
-                .await
-                .int_err()?;
-        }
+        let lookup_scopes = account_dataset_ids
+            .iter()
+            .map(FlowScopeDataset::make_scope)
+            .collect::<Vec<_>>();
+
+        flow_trigger_service
+            .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
+            .await
+            .int_err()?;
 
         Ok(true)
     }
@@ -59,12 +63,15 @@ impl<'a> AccountFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
-        for dataset_id in &account_dataset_ids {
-            flow_trigger_service
-                .pause_dataset_flows(Utc::now(), dataset_id, None)
-                .await
-                .int_err()?;
-        }
+        let lookup_scopes = account_dataset_ids
+            .iter()
+            .map(FlowScopeDataset::make_scope)
+            .collect::<Vec<_>>();
+
+        flow_trigger_service
+            .pause_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
+            .await
+            .int_err()?;
 
         Ok(true)
     }

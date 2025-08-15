@@ -11,7 +11,6 @@ use std::num::NonZeroUsize;
 
 use database_common::{
     EventModel,
-    PaginationOpts,
     ReturningEventModel,
     TransactionRef,
     TransactionRefT,
@@ -36,95 +35,6 @@ impl SqliteFlowTriggerEventStore {
             transaction: transaction.into(),
         }
     }
-
-    fn get_system_events(
-        &self,
-        system_flow_type: String,
-        maybe_from_id: Option<i64>,
-        maybe_to_id: Option<i64>,
-    ) -> EventStream<FlowTriggerEvent> {
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
-
-            let mut query_stream = sqlx::query_as!(
-                EventModel,
-                r#"
-                SELECT event_id, event_payload as "event_payload: _"
-                FROM flow_trigger_events
-                WHERE flow_type = $1
-                    AND json_extract(scope_data, '$.type') = 'System'
-                    AND (cast($2 as INT8) IS NULL or event_id > $2)
-                    AND (cast($3 as INT8) IS NULL or event_id <= $3)
-                ORDER BY event_id ASC
-                "#,
-                system_flow_type,
-                maybe_from_id,
-                maybe_to_id,
-            )
-            .try_map(|event_row| {
-                let event = serde_json::from_value::<FlowTriggerEvent>(event_row.event_payload)
-                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-
-                Ok((EventID::new(event_row.event_id), event))
-            })
-            .fetch(connection_mut)
-            .map_err(|e| GetEventsError::Internal(e.int_err()));
-
-            while let Some((event_id, event)) = query_stream.try_next().await? {
-                yield Ok((event_id, event));
-            }
-        })
-    }
-
-    fn get_dataset_events(
-        &self,
-        dataset_id: &odf::DatasetID,
-        dataset_flow_type: String,
-        maybe_from_id: Option<i64>,
-        maybe_to_id: Option<i64>,
-    ) -> EventStream<FlowTriggerEvent> {
-        let dataset_id = dataset_id.to_string();
-
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
-
-            let mut query_stream = sqlx::query_as!(
-                EventModel,
-                r#"
-                SELECT event_id, event_payload as "event_payload: _"
-                FROM flow_trigger_events
-                WHERE flow_type = $1
-                    AND json_extract(scope_data, '$.dataset_id') = $2
-                    AND json_extract(scope_data, '$.type') = 'Dataset'
-                    AND (cast($3 as INT8) IS NULL or event_id > $3)
-                    AND (cast($4 as INT8) IS NULL or event_id <= $4)
-                ORDER BY event_id ASC
-                "#,
-                dataset_flow_type,
-                dataset_id,
-                maybe_from_id,
-                maybe_to_id,
-            )
-            .try_map(|event_row| {
-                let event = serde_json::from_value::<FlowTriggerEvent>(event_row.event_payload)
-                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-
-                Ok((EventID::new(event_row.event_id), event))
-            })
-            .fetch(connection_mut)
-            .map_err(|e| GetEventsError::Internal(e.int_err()));
-
-            while let Some((event_id, event)) = query_stream.try_next().await? {
-                yield Ok((event_id, event));
-            }
-        })
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,17 +49,46 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
-        match &flow_binding.scope {
-            FlowScope::Dataset { dataset_id } => self.get_dataset_events(
-                dataset_id,
-                flow_binding.flow_type.clone(),
+        let flow_type = flow_binding.flow_type.to_string();
+
+        let scope_json = serde_json::to_value(&flow_binding.scope).unwrap();
+        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query_as!(
+                EventModel,
+                r#"
+                SELECT event_id, event_payload as "event_payload: _"
+                FROM flow_trigger_events
+                WHERE flow_type = $1
+                    AND scope_data = $2
+                    AND (cast($3 as INT8) IS NULL or event_id > $3)
+                    AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                ORDER BY event_id ASC
+                "#,
+                flow_type,
+                scope_json_str,
                 maybe_from_id,
                 maybe_to_id,
-            ),
-            FlowScope::System => {
-                self.get_system_events(flow_binding.flow_type.clone(), maybe_from_id, maybe_to_id)
+            )
+            .try_map(|event_row| {
+                let event = serde_json::from_value::<FlowTriggerEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
             }
-        }
+        })
     }
 
     async fn save_events(
@@ -171,11 +110,12 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
             "#,
         );
 
-        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
 
         query_builder.push_values(events, |mut b, event| {
             b.push_bind(flow_binding.flow_type.as_str());
-            b.push_bind(&scope_data_json);
+            b.push_bind(&scope_json_str);
             b.push_bind(event.typename());
             b.push_bind(event.event_time());
             b.push_bind(serde_json::to_value(event).unwrap());
@@ -218,68 +158,6 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
-    async fn list_dataset_ids(
-        &self,
-        pagination: &PaginationOpts,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-        let limit = i64::try_from(pagination.limit).unwrap();
-        let offset = i64::try_from(pagination.offset).unwrap();
-
-        let dataset_ids = sqlx::query!(
-            r#"
-            WITH scope AS (
-                SELECT
-                    json_extract(scope_data, '$.type') AS scope_type,
-                    json_extract(scope_data, '$.dataset_id') AS dataset_id,
-                    event_type
-                FROM flow_trigger_events
-            )
-            SELECT DISTINCT dataset_id as "dataset_id: String"
-            FROM scope
-                WHERE scope_type = 'Dataset'
-                AND event_type = 'FlowTriggerEventCreated'
-            ORDER BY dataset_id
-            LIMIT $1 OFFSET $2
-            "#,
-            limit,
-            offset,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(dataset_ids
-            .into_iter()
-            .map(|event_row| {
-                odf::DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str()).int_err()
-            })
-            .collect::<Result<Vec<_>, InternalError>>()?)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let dataset_ids_count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(DISTINCT json_extract(scope_data, '$.dataset_id')) AS count
-            FROM flow_trigger_events
-            WHERE json_extract(scope_data, '$.type') = 'Dataset'
-                AND event_type = 'FlowTriggerEventCreated'
-            "#,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(usize::try_from(dataset_ids_count).unwrap_or(0))
-    }
-
     #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
         Box::pin(async_stream::stream! {
@@ -330,76 +208,49 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn all_trigger_bindings_for_dataset_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
+    async fn all_trigger_bindings_for_scope(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let dataset_id_str = dataset_id.to_string();
+        let scope_json = serde_json::to_value(flow_scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
 
         let flow_bindings = sqlx::query!(
             r#"
             SELECT DISTINCT flow_type, scope_data as "scope_data: String"
                 FROM flow_trigger_events
-                WHERE json_extract(scope_data, '$.dataset_id') = $1
+                WHERE scope_data = $1
                     AND event_type = 'FlowTriggerEventCreated'
             "#,
-            dataset_id_str,
+            scope_json_str,
         )
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        Ok(flow_bindings
+        flow_bindings
             .into_iter()
-            .map(|row| FlowBinding {
-                flow_type: row.flow_type,
-                scope: FlowScope::Dataset {
-                    dataset_id: dataset_id.clone(),
-                },
+            .map(|row| {
+                let scope = serde_json::from_str::<FlowScope>(&row.scope_data).unwrap();
+                Ok(FlowBinding {
+                    flow_type: row.flow_type,
+                    scope,
+                })
             })
-            .collect())
+            .collect()
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_trigger_bindings_for_system_flows(
+    async fn has_active_triggers_for_scopes(
         &self,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let flow_bindings = sqlx::query!(
-            r#"
-            SELECT DISTINCT flow_type, scope_data as "scope_data: String"
-                FROM flow_trigger_events
-                WHERE json_extract(scope_data, '$.type') = 'System'
-                    AND event_type = 'FlowTriggerEventCreated'
-            "#,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(flow_bindings
-            .into_iter()
-            .map(|row| FlowBinding {
-                flow_type: row.flow_type,
-                scope: FlowScope::System,
-            })
-            .collect())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn has_active_triggers_for_datasets(
-        &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError> {
-        if dataset_ids.is_empty() {
+        if scopes.is_empty() {
             return Ok(false);
         }
 
@@ -424,8 +275,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                     FROM flow_trigger_events
                 ) AS latest_events
                 WHERE row_num = 1
-                AND json_extract(scope_data, '$.type') = 'Dataset'
-                AND json_extract(scope_data, '$.dataset_id') IN ({})
+                AND scope_data IN ({})
                 AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
                     (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)
@@ -434,12 +284,14 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                 )
             )
             "#,
-            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(1).unwrap())
+            sqlite_generate_placeholders_list(scopes.len(), NonZeroUsize::new(1).unwrap())
         );
 
         let mut query = sqlx::query_scalar(&query_str);
-        for dataset_id in dataset_ids {
-            query = query.bind(dataset_id.to_string());
+        for scope in scopes {
+            let scope_json = serde_json::to_value(scope).int_err()?;
+            let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
+            query = query.bind(scope_json_str);
         }
 
         let has_active_triggers: Option<bool> = query.fetch_one(connection_mut).await.int_err()?;

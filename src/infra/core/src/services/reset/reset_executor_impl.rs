@@ -39,6 +39,7 @@ impl ResetExecutor for ResetExecutorImpl {
             .await?;
 
         Ok(ResetResult {
+            old_head: plan.old_head,
             new_head: plan.new_head,
         })
     }

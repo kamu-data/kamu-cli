@@ -7,8 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, DurationRound, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
+
+use crate::RetryPolicy;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,16 +31,20 @@ pub struct FlowAgentConfig {
     pub awaiting_step: chrono::Duration,
     /// Defines minimal time between 2 runs of the same flow configuration
     pub mandatory_throttling_period: chrono::Duration,
+    /// Default retry policy for specific flow types
+    pub default_retry_policy_by_flow_type: HashMap<String, RetryPolicy>,
 }
 
 impl FlowAgentConfig {
     pub fn new(
         awaiting_step: chrono::Duration,
         mandatory_throttling_period: chrono::Duration,
+        default_retry_policy_by_flow_type: HashMap<String, RetryPolicy>,
     ) -> Self {
         Self {
             awaiting_step,
             mandatory_throttling_period,
+            default_retry_policy_by_flow_type,
         }
     }
 

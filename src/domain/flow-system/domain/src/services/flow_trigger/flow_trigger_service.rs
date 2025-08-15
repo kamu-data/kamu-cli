@@ -24,7 +24,7 @@ pub trait FlowTriggerService: Sync + Send {
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowTriggerState>, FindFlowTriggerError>;
 
-    /// Set or modify flow configuration
+    /// Set or modify flow trigger
     async fn set_trigger(
         &self,
         request_time: DateTime<Utc>,
@@ -33,62 +33,41 @@ pub trait FlowTriggerService: Sync + Send {
         rule: FlowTriggerRule,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
-    /// Lists all flow configurations, which are currently enabled
+    /// Lists all flow triggers, which are currently enabled
     fn list_enabled_triggers(&self) -> FlowTriggerStateStream;
 
-    /// Pauses particular flow configuration
+    /// Pauses particular flow trigger
     async fn pause_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError>;
 
-    /// Resumes particular flow configuration
+    /// Resumes particular flow trigger
     async fn resume_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        fflow_binding: &FlowBinding,
+        flow_binding: &FlowBinding,
     ) -> Result<(), InternalError>;
 
-    /// Pauses dataset flows of given type for given dataset.
-    /// If type is omitted, all possible dataset flow types are paused
-    async fn pause_dataset_flows(
+    /// Pauses flow triggers for given list of scopes
+    async fn pause_flow_triggers_for_scopes(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<&str>,
+        scopes: &[FlowScope],
     ) -> Result<(), InternalError>;
 
-    /// Pauses system flows of given type.
-    /// If type is omitted, all possible system flow types are paused
-    async fn pause_system_flows(
+    /// Resumes flow triggers for given list of scopes
+    async fn resume_flow_triggers_for_scopes(
         &self,
         request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<&str>,
+        scopes: &[FlowScope],
     ) -> Result<(), InternalError>;
 
-    /// Resumes dataset flows of given type for given dataset.
-    /// If type is omitted, all possible types are resumed (where configured)
-    async fn resume_dataset_flows(
+    /// Checks if there are any active triggers for the given list of scopes
+    async fn has_active_triggers_for_scopes(
         &self,
-        request_time: DateTime<Utc>,
-        dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<&str>,
-    ) -> Result<(), InternalError>;
-
-    /// Resumes system flows of given type.
-    /// If type is omitted, all possible system flow types are resumed (where
-    /// configured)
-    async fn resume_system_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<&str>,
-    ) -> Result<(), InternalError>;
-
-    /// Checks if there are any active triggers for the given list of datasets
-    async fn has_active_triggers_for_datasets(
-        &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError>;
 }
 
@@ -101,10 +80,10 @@ pub trait FlowTriggerServiceExt {
         flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, FindFlowTriggerError>;
 
-    async fn try_get_flow_batching_rule(
+    async fn try_get_flow_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<BatchingRule>, FindFlowTriggerError>;
+    ) -> Result<Option<ReactiveRule>, FindFlowTriggerError>;
 }
 
 #[async_trait::async_trait]
@@ -125,16 +104,16 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
         )
     }
 
-    async fn try_get_flow_batching_rule(
+    async fn try_get_flow_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<BatchingRule>, FindFlowTriggerError> {
+    ) -> Result<Option<ReactiveRule>, FindFlowTriggerError> {
         let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
                 && trigger.is_active()
             {
-                trigger.try_get_batching_rule()
+                trigger.try_get_reactive_rule()
             } else {
                 None
             },

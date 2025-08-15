@@ -22,14 +22,6 @@ pub trait DatasetIncrementQueryService: Sync + Send {
         old_head: Option<&'a odf::Multihash>,
         new_head: &'a odf::Multihash,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
-
-    /// Computes incremental stats between the given block and the current head
-    /// of the dataset
-    async fn get_increment_since<'a>(
-        &'a self,
-        dataset_id: &'a odf::DatasetID,
-        old_head: Option<&'a odf::Multihash>,
-    ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +59,9 @@ pub enum GetIncrementError {
 
     #[error(transparent)]
     BlockNotFound(odf::storage::BlockNotFoundError),
+
+    #[error(transparent)]
+    InvalidInterval(odf::dataset::InvalidIntervalError),
 
     #[error(transparent)]
     Access(odf::AccessError),

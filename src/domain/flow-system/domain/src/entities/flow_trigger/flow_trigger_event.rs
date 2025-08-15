@@ -19,7 +19,7 @@ use crate::*;
 pub enum FlowTriggerEvent {
     Created(FlowTriggerEventCreated),
     Modified(FlowTriggerEventModified),
-    DatasetRemoved(FlowTriggerEventDatasetRemoved),
+    ScopeRemoved(FlowTriggerEventScopeRemoved),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +45,7 @@ pub struct FlowTriggerEventModified {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowTriggerEventDatasetRemoved {
+pub struct FlowTriggerEventScopeRemoved {
     pub event_time: DateTime<Utc>,
     pub flow_binding: FlowBinding,
 }
@@ -57,7 +57,7 @@ impl FlowTriggerEvent {
         match self {
             Self::Created(_) => "FlowTriggerEventCreated",
             Self::Modified(_) => "FlowTriggerEventModified",
-            Self::DatasetRemoved(_) => "FlowTriggerEventDatasetRemoved",
+            Self::ScopeRemoved(_) => "FlowTriggerEventScopeRemoved",
         }
     }
 
@@ -65,7 +65,7 @@ impl FlowTriggerEvent {
         match self {
             Self::Created(e) => &e.flow_binding,
             Self::Modified(e) => &e.flow_binding,
-            Self::DatasetRemoved(e) => &e.flow_binding,
+            Self::ScopeRemoved(e) => &e.flow_binding,
         }
     }
 
@@ -73,7 +73,7 @@ impl FlowTriggerEvent {
         match self {
             Self::Created(e) => e.event_time,
             Self::Modified(e) => e.event_time,
-            Self::DatasetRemoved(e) => e.event_time,
+            Self::ScopeRemoved(e) => e.event_time,
         }
     }
 }
@@ -83,8 +83,6 @@ impl FlowTriggerEvent {
 impl_enum_with_variants!(FlowTriggerEvent);
 impl_enum_variant!(FlowTriggerEvent::Created(FlowTriggerEventCreated));
 impl_enum_variant!(FlowTriggerEvent::Modified(FlowTriggerEventModified));
-impl_enum_variant!(FlowTriggerEvent::DatasetRemoved(
-    FlowTriggerEventDatasetRemoved
-));
+impl_enum_variant!(FlowTriggerEvent::ScopeRemoved(FlowTriggerEventScopeRemoved));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

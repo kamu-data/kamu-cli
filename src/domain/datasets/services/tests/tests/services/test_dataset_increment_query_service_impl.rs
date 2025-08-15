@@ -44,20 +44,6 @@ async fn test_initial_increment() {
             updated_watermark: None
         }
     );
-
-    let increment_since = harness
-        .dataset_increment_query_service
-        .get_increment_since(&foo.dataset_handle.id, None)
-        .await
-        .unwrap();
-    assert_eq!(
-        increment_since,
-        DatasetIntervalIncrement {
-            num_blocks: 2,
-            num_records: 0,
-            updated_watermark: None
-        }
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,13 +65,6 @@ async fn test_no_changes_with_same_bounds() {
         .await
         .unwrap();
     assert_eq!(increment_between, DatasetIntervalIncrement::default());
-
-    let increment_since = harness
-        .dataset_increment_query_service
-        .get_increment_since(&foo.dataset_handle.id, Some(&foo.head))
-        .await
-        .unwrap();
-    assert_eq!(increment_since, DatasetIntervalIncrement::default());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,49 +212,6 @@ async fn test_add_data_differences() {
 
     harness
         .check_between_cases(&foo.dataset_handle.id, &between_cases)
-        .await;
-
-    let since_cases = [
-        // Since beginning
-        (
-            None,
-            DatasetIntervalIncrement {
-                num_blocks: 5,
-                num_records: 15,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-        // Since SetPollingSource
-        (
-            Some(commit_result_1.old_head.as_ref().unwrap()),
-            DatasetIntervalIncrement {
-                num_blocks: 3,
-                num_records: 15,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-        // Since SetDataSchema
-        (
-            Some(&commit_result_1.new_head),
-            DatasetIntervalIncrement {
-                num_blocks: 2,
-                num_records: 15,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-        // Since odf::metadata::AddData #1
-        (
-            Some(&commit_result_2.new_head),
-            DatasetIntervalIncrement {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-    ];
-
-    harness
-        .check_since_cases(&foo.dataset_handle.id, &since_cases)
         .await;
 }
 
@@ -431,49 +367,6 @@ async fn test_execute_transform_differences() {
     harness
         .check_between_cases(&bar.dataset_handle.id, &between_cases)
         .await;
-
-    let since_cases = [
-        // Since beginning
-        (
-            None,
-            DatasetIntervalIncrement {
-                num_blocks: 5,
-                num_records: 20,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-        // Since SetTransform
-        (
-            Some(commit_result_1.old_head.as_ref().unwrap()),
-            DatasetIntervalIncrement {
-                num_blocks: 3,
-                num_records: 20,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-        // Since SetDataSchema
-        (
-            Some(&commit_result_1.new_head),
-            DatasetIntervalIncrement {
-                num_blocks: 2,
-                num_records: 20,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-        // Since ExecuteTransform #1
-        (
-            Some(&commit_result_2.new_head),
-            DatasetIntervalIncrement {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: Some(new_watermark_time),
-            },
-        ),
-    ];
-
-    harness
-        .check_since_cases(&bar.dataset_handle.id, &since_cases)
-        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -594,31 +487,6 @@ async fn test_multiple_watermarks_within_interval() {
 
     harness
         .check_between_cases(&foo.dataset_handle.id, &between_cases)
-        .await;
-
-    let since_cases = [
-        // Since beginning
-        (
-            None,
-            DatasetIntervalIncrement {
-                num_blocks: 5,
-                num_records: 25,
-                updated_watermark: Some(watermark_2_time),
-            },
-        ),
-        // Since odf::metadata::AddData #1
-        (
-            Some(&commit_result_2.new_head),
-            DatasetIntervalIncrement {
-                num_blocks: 1,
-                num_records: 15,
-                updated_watermark: Some(watermark_2_time),
-            },
-        ),
-    ];
-
-    harness
-        .check_since_cases(&foo.dataset_handle.id, &since_cases)
         .await;
 }
 
@@ -773,31 +641,6 @@ async fn test_older_watermark_before_interval() {
     harness
         .check_between_cases(&foo.dataset_handle.id, &between_cases)
         .await;
-
-    let since_cases = [
-        // Since beginning
-        (
-            None,
-            DatasetIntervalIncrement {
-                num_blocks: 6,
-                num_records: 37,
-                updated_watermark: Some(watermark_2_time),
-            },
-        ),
-        // Since odf::metadata::AddData #1
-        (
-            Some(&commit_result_2.new_head),
-            DatasetIntervalIncrement {
-                num_blocks: 2,
-                num_records: 27,
-                updated_watermark: Some(watermark_2_time),
-            },
-        ),
-    ];
-
-    harness
-        .check_since_cases(&foo.dataset_handle.id, &since_cases)
-        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -845,23 +688,6 @@ impl DatasetIncrementQueryServiceHarness {
                     .unwrap(),
                 *expected_increment,
                 "Checking between-case #{index}"
-            );
-        }
-    }
-
-    async fn check_since_cases(
-        &self,
-        dataset_id: &odf::DatasetID,
-        since_cases: &[(Option<&odf::Multihash>, DatasetIntervalIncrement)],
-    ) {
-        for (index, (old_head, expected_increment)) in since_cases.iter().enumerate() {
-            assert_eq!(
-                self.dataset_increment_query_service
-                    .get_increment_since(dataset_id, *old_head)
-                    .await
-                    .unwrap(),
-                *expected_increment,
-                "Checking since-case #{index}"
             );
         }
     }

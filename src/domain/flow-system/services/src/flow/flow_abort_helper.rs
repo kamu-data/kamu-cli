@@ -9,9 +9,20 @@
 
 use std::sync::Arc;
 
-use dill::component;
+use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_flow_system::{Flow, FlowEventStore, FlowID, FlowProgressMessage, FlowState, FlowStatus};
+use kamu_flow_system::{
+    Flow,
+    FlowBinding,
+    FlowEventStore,
+    FlowID,
+    FlowProgressMessage,
+    FlowScope,
+    FlowScopeRemovalHandler,
+    FlowSensorDispatcher,
+    FlowState,
+    FlowStatus,
+};
 use kamu_task_system::TaskScheduler;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
@@ -20,8 +31,12 @@ use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn FlowScopeRemovalHandler)]
 pub(crate) struct FlowAbortHelper {
+    catalog: dill::Catalog,
     flow_event_store: Arc<dyn FlowEventStore>,
+    flow_sensor_dispatcher: Arc<dyn FlowSensorDispatcher>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     outbox: Arc<dyn Outbox>,
@@ -29,22 +44,7 @@ pub(crate) struct FlowAbortHelper {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
 impl FlowAbortHelper {
-    pub(crate) fn new(
-        flow_event_store: Arc<dyn FlowEventStore>,
-        time_source: Arc<dyn SystemTimeSource>,
-        task_scheduler: Arc<dyn TaskScheduler>,
-        outbox: Arc<dyn Outbox>,
-    ) -> Self {
-        Self {
-            flow_event_store,
-            time_source,
-            task_scheduler,
-            outbox,
-        }
-    }
-
     pub(crate) async fn abort_flow(&self, flow_id: FlowID) -> Result<FlowState, InternalError> {
         // Mark flow as aborted
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
@@ -81,6 +81,50 @@ impl FlowAbortHelper {
         }
 
         Ok(flow.into())
+    }
+
+    pub(crate) async fn deactivate_flow_trigger(
+        &self,
+        target_catalog: &dill::Catalog,
+        flow_binding: &FlowBinding,
+    ) -> Result<(), InternalError> {
+        tracing::trace!(?flow_binding, "Deactivating flow trigger");
+
+        let maybe_pending_flow_id = {
+            let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
+            flow_event_store.try_get_pending_flow(flow_binding).await?
+        };
+
+        if let Some(flow_id) = maybe_pending_flow_id {
+            self.abort_flow(flow_id).await?;
+        }
+
+        self.flow_sensor_dispatcher
+            .unregister_sensor(&flow_binding.scope)
+            .await?;
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FlowScopeRemovalHandler for FlowAbortHelper {
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+        // Query flows by this scope
+        let flow_ids_2_abort = flow_event_store
+            .try_get_all_scope_pending_flows(flow_scope)
+            .await?;
+
+        // Abort matched flows
+        for flow_id in flow_ids_2_abort {
+            self.abort_flow(flow_id).await?;
+        }
+
+        Ok(())
     }
 }
 

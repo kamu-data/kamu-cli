@@ -12,72 +12,40 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{AccountFlowFilters, FlowFilters, FlowID, FlowState};
+use crate::{FlowFilters, FlowID, FlowScope, FlowScopeQuery, FlowState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FlowQueryService: Sync + Send {
-    /// Returns states of flows associated with a given dataset
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified filters/pagination
-    async fn list_all_flows_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-        filters: FlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
-
-    /// Returns initiators of flows associated with a given dataset
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified filters/pagination
-    async fn list_all_flow_initiators_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError>;
-
-    /// Returns datasets with flows associated with a given account
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified pagination
-    async fn list_all_datasets_with_flow_by_account(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, ListFlowsByDatasetError>;
-
-    /// Returns states of flows associated with a given account
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified pagination
-    async fn list_all_flows_by_account(
-        &self,
-        account_id: &odf::AccountID,
-        filters: AccountFlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
-
-    /// Returns states of flows associated with the given dataset IDs,
-    /// ordered by creation time from newest to oldest.
-    async fn list_all_flows_by_dataset_ids(
-        &self,
-        dataset_ids: &[&odf::DatasetID],
-        filters: FlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
-
-    /// Returns states of system flows associated with a given dataset
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified filters/pagination
-    async fn list_all_system_flows(
-        &self,
-        filters: FlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListSystemFlowsError>;
-
-    /// Returns state of all flows, whether they are system-level or
-    /// dataset-bound, ordered by creation time from newest to oldest
+    /// Returns state of all flows, regardless of the scope,
+    /// ordered by creation time from newest to oldest
     async fn list_all_flows(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsError>;
+    ) -> Result<FlowStateListing, InternalError>;
+
+    /// Returns states of flows matching scope and other filters
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified filters/pagination
+    async fn list_scoped_flows(
+        &self,
+        scope_query: FlowScopeQuery,
+        filters: FlowFilters,
+        pagination: PaginationOpts,
+    ) -> Result<FlowStateListing, InternalError>;
+
+    /// Returns initiators of flows associated with matching scopes
+    async fn list_scoped_flow_initiators(
+        &self,
+        scope_query: FlowScopeQuery,
+    ) -> Result<FlowInitiatorListing, InternalError>;
+
+    /// Returns subset of input scopes that have at least one flow
+    async fn filter_flow_scopes_having_flows(
+        &self,
+        scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError>;
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
@@ -103,36 +71,6 @@ pub type InitiatorsStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<odf::AccountID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-pub enum ListFlowsByDatasetError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ListSystemFlowsError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ListFlowsError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum GetLastDatasetFlowError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum GetLastSystemFlowError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetFlowError {

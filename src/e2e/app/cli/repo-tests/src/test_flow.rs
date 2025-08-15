@@ -307,72 +307,58 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       ingestResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
-                          __typename
                         }
                         ... on FlowDescriptionUpdateResultSuccess {
                           numBlocks
                           numRecords
                           updatedWatermark
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionDatasetPushIngest {
                       sourceName
-                      inputRecordsCount
                       ingestResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
-                          __typename
                         }
                         ... on FlowDescriptionUpdateResultSuccess {
                           numBlocks
                           numRecords
                           updatedWatermark
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionDatasetExecuteTransform {
                       transformResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
-                          __typename
                         }
                         ... on FlowDescriptionUpdateResultSuccess {
                           numBlocks
                           numRecords
                           updatedWatermark
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionDatasetHardCompaction {
                       compactionResult {
-                        ... on FlowDescriptionHardCompactionSuccess {
+                        ... on FlowDescriptionReorganizationSuccess {
                           originalBlocksCount
                           resultingBlocksCount
                           newHead
-                          __typename
                         }
-                        ... on FlowDescriptionHardCompactionNothingToDo {
+                        ... on FlowDescriptionReorganizationNothingToDo {
                           message
                           dummy
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionSystemGC {
                       dummy
-                      __typename
                     }
                     ... on FlowDescriptionDatasetReset {
                       resetResult {
@@ -380,6 +366,20 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                         __typename
                       }
                       __typename
+                    }
+                    ... on FlowDescriptionDatasetResetToMetadata {
+                      resetToMetadataResult {
+                        ... on FlowDescriptionReorganizationSuccess {
+                          originalBlocksCount
+                          resultingBlocksCount
+                          newHead
+                        }
+                        ... on FlowDescriptionReorganizationNothingToDo {
+                          message
+                          dummy
+                        }
+                        __typename
+                      }
                     }
                     __typename
                   }
@@ -407,18 +407,21 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       shiftedFrom
                       __typename
                     }
-                    ... on FlowStartConditionBatching {
+                    ... on FlowStartConditionReactive {
                       activeBatchingRule {
-                        minRecordsToAwait
-                        maxBatchingInterval {
-                          ...TimeDeltaData
-                          __typename
+                        ... on FlowTriggerBatchingRuleBuffering {
+                          minRecordsToAwait
+                          maxBatchingInterval {
+                            ...TimeDeltaData
+                            __typename
+                          }
                         }
                         __typename
                       }
                       batchingDeadline
                       accumulatedRecordsCount
                       watermarkModified
+                      forBreakingChange
                       __typename
                     }
                     ... on FlowStartConditionSchedule {
@@ -433,13 +436,10 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   configSnapshot {
                     ... on FlowConfigRuleIngest {
                       fetchUncacheable
-                      __typename
                     }
                     ... on FlowConfigRuleCompaction {
-                      compactionMode {
-                        __typename
-                      }
-                      __typename
+                      maxSliceSize
+                      maxSliceRecords
                     }
                     __typename
                   }
@@ -1589,79 +1589,78 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               ingestResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
-                  __typename
                 }
                 ... on FlowDescriptionUpdateResultSuccess {
                   numBlocks
                   numRecords
                   updatedWatermark
-                  __typename
                 }
-                __typename
               }
               __typename
             }
             ... on FlowDescriptionDatasetPushIngest {
               sourceName
-              inputRecordsCount
               ingestResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
-                  __typename
                 }
                 ... on FlowDescriptionUpdateResultSuccess {
                   numBlocks
                   numRecords
                   updatedWatermark
-                  __typename
                 }
                 __typename
               }
-              __typename
             }
             ... on FlowDescriptionDatasetExecuteTransform {
               transformResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
-                  __typename
                 }
                 ... on FlowDescriptionUpdateResultSuccess {
                   numBlocks
                   numRecords
                   updatedWatermark
-                  __typename
                 }
                 __typename
               }
-              __typename
             }
             ... on FlowDescriptionDatasetHardCompaction {
               compactionResult {
-                ... on FlowDescriptionHardCompactionSuccess {
+                ... on FlowDescriptionReorganizationSuccess {
                   originalBlocksCount
                   resultingBlocksCount
                   newHead
-                  __typename
                 }
-                ... on FlowDescriptionHardCompactionNothingToDo {
+                ... on FlowDescriptionReorganizationNothingToDo {
                   message
                   dummy
-                  __typename
                 }
                 __typename
               }
-              __typename
             }
             ... on FlowDescriptionSystemGC {
               dummy
-              __typename
             }
             ... on FlowDescriptionDatasetReset {
               resetResult {
                 newHead
                 __typename
               }
-              __typename
+            }
+            ... on FlowDescriptionDatasetResetToMetadata {
+              resetToMetadataResult {
+                ... on FlowDescriptionReorganizationSuccess {
+                  originalBlocksCount
+                  resultingBlocksCount
+                  newHead
+                }
+                ... on FlowDescriptionReorganizationNothingToDo {
+                  message
+                  dummy
+                }
+                __typename
+              }
             }
             __typename
           }
@@ -1686,18 +1685,23 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               shiftedFrom
               __typename
             }
-            ... on FlowStartConditionBatching {
+            ... on FlowStartConditionReactive {
               activeBatchingRule {
-                minRecordsToAwait
-                maxBatchingInterval {
-                  ...TimeDeltaData
-                  __typename
+                ... on FlowTriggerBatchingRule {
+                  ... on FlowTriggerBatchingRuleBuffering {
+                    minRecordsToAwait
+                    maxBatchingInterval {
+                      ...TimeDeltaData
+                      __typename
+                    }
+                  }
                 }
                 __typename
               }
               batchingDeadline
               accumulatedRecordsCount
               watermarkModified
+              forBreakingChange
               __typename
             }
             ... on FlowStartConditionSchedule {
@@ -1714,9 +1718,8 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               fetchUncacheable
             }
             ... on FlowConfigRuleCompaction {
-              compactionMode {
-                  __typename
-              }
+              maxSliceSize
+              maxSliceRecords
             }
             __typename
           }

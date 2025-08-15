@@ -16,7 +16,6 @@ use super::*;
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<DeliverWebhookTaskPlanner>();
     catalog_builder.add::<DeliverWebhookTaskRunner>();
-    catalog_builder.add::<WebhookTaskFactoryImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
