@@ -137,6 +137,35 @@ pub enum CompressionFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datafield-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataField {
+    /// TODO
+    pub name: String,
+    /// Logical type of the field that defines its semantic behavior and value
+    /// ranges
+    pub r#type: DataType,
+    /// ODF extensions
+    pub extra: Option<ExtraAttributes>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// This schema is aims to be a human-friendly variant of Arrow. Arrow currently specifies only the [flatbuffer format](https://github.com/apache/arrow/blob/f9301c0ba8a7ed1b0b63275cfdd4c44c26b04675/format/Schema.fbs) which has many legacy to it and is not suited to be defined by humans, so we had to define our own schema format. While inspired by Arrow - this format makes a clear separation between logical data types and encoding (physical layout) of data in the chunks.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataschema-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataSchema {
+    /// Top-level fields (columns) of the schema.
+    pub fields: Vec<DataField>,
+    /// ODF extensions
+    pub extra: Option<ExtraAttributes>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Describes a slice of data added to a dataset or produced via transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
@@ -151,6 +180,314 @@ pub struct DataSlice {
     /// Size of data file in bytes.
     pub size: u64,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a logical type of the field. Logical type determines the semantics
+/// and boudaries of a type and how it can be operated on, without a concern
+/// about encoding and physical layout of the data in chunks.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatype-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum DataType {
+    Binary(DataTypeBinary),
+    Bool(DataTypeBool),
+    Date(DataTypeDate),
+    Decimal(DataTypeDecimal),
+    Duration(DataTypeDuration),
+    Float16(DataTypeFloat16),
+    Float32(DataTypeFloat32),
+    Float64(DataTypeFloat64),
+    Int8(DataTypeInt8),
+    Int16(DataTypeInt16),
+    Int32(DataTypeInt32),
+    Int64(DataTypeInt64),
+    UInt8(DataTypeUInt8),
+    UInt16(DataTypeUInt16),
+    UInt32(DataTypeUInt32),
+    UInt64(DataTypeUInt64),
+    List(DataTypeList),
+    Map(DataTypeMap),
+    Null(DataTypeNull),
+    Option(DataTypeOption),
+    Struct(DataTypeStruct),
+    Time(DataTypeTime),
+    Timestamp(DataTypeTimestamp),
+    String(DataTypeString),
+}
+
+impl_enum_with_variants!(DataType);
+impl_enum_variant!(DataType::Binary(DataTypeBinary));
+impl_enum_variant!(DataType::Bool(DataTypeBool));
+impl_enum_variant!(DataType::Date(DataTypeDate));
+impl_enum_variant!(DataType::Decimal(DataTypeDecimal));
+impl_enum_variant!(DataType::Duration(DataTypeDuration));
+impl_enum_variant!(DataType::Float16(DataTypeFloat16));
+impl_enum_variant!(DataType::Float32(DataTypeFloat32));
+impl_enum_variant!(DataType::Float64(DataTypeFloat64));
+impl_enum_variant!(DataType::Int8(DataTypeInt8));
+impl_enum_variant!(DataType::Int16(DataTypeInt16));
+impl_enum_variant!(DataType::Int32(DataTypeInt32));
+impl_enum_variant!(DataType::Int64(DataTypeInt64));
+impl_enum_variant!(DataType::UInt8(DataTypeUInt8));
+impl_enum_variant!(DataType::UInt16(DataTypeUInt16));
+impl_enum_variant!(DataType::UInt32(DataTypeUInt32));
+impl_enum_variant!(DataType::UInt64(DataTypeUInt64));
+impl_enum_variant!(DataType::List(DataTypeList));
+impl_enum_variant!(DataType::Map(DataTypeMap));
+impl_enum_variant!(DataType::Null(DataTypeNull));
+impl_enum_variant!(DataType::Option(DataTypeOption));
+impl_enum_variant!(DataType::Struct(DataTypeStruct));
+impl_enum_variant!(DataType::Time(DataTypeTime));
+impl_enum_variant!(DataType::Timestamp(DataTypeTimestamp));
+impl_enum_variant!(DataType::String(DataTypeString));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A sequence of bytes. Used for arbitrary binary data.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebinary-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeBinary {
+    /// Number of bytes per value for fixed-size binary. If omitted, the binary
+    /// is variable-length.
+    pub fixed_length: Option<u64>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A boolean value representing true or false.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebool-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeBool {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A calendar date.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedate-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeDate {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A fixed-point decimal number with a specified precision and scale.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedecimal-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeDecimal {
+    /// Total number of decimal digits that can be stored.
+    pub precision: u32,
+    /// Number of digits after the decimal point. In certain situations, scale
+    /// could be negative number. For negative scale, it is the number of
+    /// padding 0 to the right of the digits.
+    ///
+    /// For example the number 12300 could be treated as a decimal has precision
+    /// 3 and scale -2.
+    pub scale: i32,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An elapsed time interval with a specified time unit.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeduration-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeDuration {
+    /// The unit of the duration measurement.
+    pub unit: TimeUnit,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A floating-point number.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat16-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeFloat16 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A floating-point number.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat32-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeFloat32 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A floating-point number.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat64-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeFloat64 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint16-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeInt16 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint32-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeInt32 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint64-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeInt64 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint8-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeInt8 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A list of values, all having the same data type.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypelist-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeList {
+    /// Data type of list items.
+    pub item_type: Box<DataType>,
+    /// Number of list items per value for fixed-size lists. If omitted, the
+    /// list is variable-length.
+    pub fixed_length: Option<u64>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A map of key-value pairs, represented as a list of entries (structs with key
+/// and value fields).
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypemap-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeMap {
+    /// Data type of the map's keys.
+    pub key_type: Box<DataType>,
+    /// Data type of the map's values.
+    pub value_type: Box<DataType>,
+    /// Set to true if the keys within each value are sorted.
+    pub keys_sorted: Option<bool>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A type representing the absence of a value (null).
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypenull-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeNull {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A type representing an optional (nullable) value of another data type.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeoption-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeOption {
+    /// Inner data type for the optional value.
+    pub inner: Box<DataType>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A Unicode string.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestring-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeString {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A collection of named fields, each with its own data type.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestruct-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeStruct {
+    /// Fields that make up the struct.
+    pub fields: Vec<DataField>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A time of day value, without a date, with a specified unit of granularity.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetime-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeTime {
+    /// The unit of the time value.
+    pub unit: TimeUnit,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A point in time, represented as an offset from the Unix epoch, with optional
+/// timezone.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetimestamp-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeTimestamp {
+    /// The unit of the timestamp value that determines its precision.
+    pub unit: TimeUnit,
+    /// The timezone is an optional string indicating the name of a timezone
+    /// one of
+    ///
+    /// * As used in the Olson timezone database (the "tz database" or
+    ///   "tzdata"), such as "America/New_York".
+    /// * An absolute timezone offset of the form "+XX:XX" or "-XX:XX", such as
+    ///   "+07:30".
+    ///
+    /// Whether a timezone string is present indicates different semantics about
+    /// the data (see above).
+    pub timezone: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint16-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeUInt16 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint32-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeUInt32 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint64-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeUInt64 {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An integer value.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint8-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataTypeUInt8 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -190,20 +527,12 @@ pub struct DatasetSnapshot {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetVocabulary {
     /// Name of the offset column.
-    ///
-    /// Defaults to: "offset"
     pub offset_column: String,
     /// Name of the operation type column.
-    ///
-    /// Defaults to: "op"
     pub operation_type_column: String,
     /// Name of the system time column.
-    ///
-    /// Defaults to: "system_time"
     pub system_time_column: String,
     /// Name of the event time column.
-    ///
-    /// Defaults to: "event_time"
     pub event_time_column: String,
 }
 
@@ -348,6 +677,19 @@ pub struct ExecuteTransformInput {
     /// `(prevOffset, newOffset]` interval of data records that will be
     /// considered in this transaction.
     pub new_offset: Option<u64>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for custom key-value extension attributes. Every key must be in
+/// the form of `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully
+/// disambiguate the value in the face of multiple extensions. Values may be any
+/// valid JSON including nested objects.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExtraAttributes {
+    pub attributes: serde_json::Map<String, serde_json::Value>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1097,8 +1439,12 @@ pub struct SetAttachments {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetDataSchema {
-    /// Apache Arrow schema encoded in its native flatbuffers representation.
-    pub schema: Vec<u8>,
+    /// DEPRECATED: Apache Arrow schema encoded in its native flatbuffers
+    /// representation.
+    pub raw_arrow_schema: Option<Vec<u8>>,
+    /// Defines the logical schema of the data files that follow this event.
+    /// Will become a required field after migration.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1257,6 +1603,19 @@ pub struct TemporalTable {
     pub name: String,
     /// Column names used as the primary key for creating a table.
     pub primary_key: Vec<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#timeunit-schema
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TimeUnit {
+    Second,
+    Millisecond,
+    Microsecond,
+    Nanosecond,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

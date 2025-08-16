@@ -12,6 +12,41 @@ use std::io::Write;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Prints schema in compact JSON format
+pub fn write_schema_odf_json(
+    output: &mut dyn Write,
+    schema: &odf_metadata::DataSchema,
+) -> Result<(), std::io::Error> {
+    let mut serializer = serde_json::Serializer::new(output);
+    odf_metadata::serde::yaml::DataSchemaDef::serialize(schema, &mut serializer)?;
+    Ok(())
+}
+
+pub fn format_schema_odf_json(schema: &odf_metadata::DataSchema) -> String {
+    let mut buf = Vec::with_capacity(1024);
+    write_schema_odf_json(&mut buf, schema).unwrap();
+    String::from_utf8(buf).unwrap()
+}
+
+/// Prints schema in yaml format
+pub fn write_schema_odf_yaml(
+    output: &mut dyn Write,
+    schema: &odf_metadata::DataSchema,
+) -> Result<(), serde_yaml::Error> {
+    let mut serializer = serde_yaml::Serializer::new(output);
+    odf_metadata::serde::yaml::DataSchemaDef::serialize(schema, &mut serializer)?;
+    Ok(())
+}
+
+pub fn format_schema_odf_yaml(schema: &odf_metadata::DataSchema) -> String {
+    let mut buf = Vec::with_capacity(1024);
+    write_schema_odf_yaml(&mut buf, schema).unwrap();
+    String::from_utf8(buf).unwrap()
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Prints schema in a style of `parquet-schema` output
@@ -38,12 +73,27 @@ pub fn write_schema_parquet_json(
     Ok(())
 }
 
+/// Same as [`write_schema_parquet_json`] but outputs into a String
+pub fn format_schema_parquet_json(schema: &Type) -> String {
+    let mut buf = Vec::new();
+    write_schema_parquet_json(&mut buf, schema).unwrap();
+    String::from_utf8(buf).unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn write_schema_arrow_json(
     output: &mut dyn Write,
     schema: &Schema,
 ) -> Result<(), std::io::Error> {
     serde_json::to_writer(output, schema)?;
     Ok(())
+}
+
+pub fn format_schema_arrow_json(schema: &Schema) -> String {
+    let mut buf = Vec::new();
+    write_schema_arrow_json(&mut buf, schema).unwrap();
+    String::from_utf8(buf).unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
