@@ -7,11 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod constants;
-mod dtos_extra;
-mod dtos_generated;
-mod extra_attributes_impl;
-mod operation_type;
+pub use super::dtos::{DataField, DataSchema, DataType, ExtraAttributes, TimeUnit};
 
-pub use dtos_generated::*;
-pub use operation_type::*;
+mod arrow_conversions;
+mod arrow_encoding;
+mod schema_cmp;
+mod schema_impl;
+
+pub use arrow_conversions::*;
+pub use arrow_encoding::*;
+pub use schema_cmp::*;
+pub use schema_impl::*;

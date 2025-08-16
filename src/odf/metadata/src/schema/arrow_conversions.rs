@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::data_encoding::ArrowEncoding;
-use super::dtos_generated::*;
+use super::arrow_encoding::ArrowEncoding;
+use crate::dtos::*;
 #[cfg(feature = "arrow")]
 use crate::UnsupportedSchema;
 use crate::{ArrowBufferEncoding, ArrowDateEncoding};

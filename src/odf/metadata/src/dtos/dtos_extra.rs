@@ -12,8 +12,6 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-#[cfg(feature = "arrow")]
-use crate::dtos::data_schema_impl::UnsupportedSchema;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -395,7 +393,7 @@ impl SetDataSchema {
 #[error(transparent)]
 pub enum SchemaAsArrowError {
     Serde(#[from] crate::serde::Error),
-    Unsupported(#[from] UnsupportedSchema),
+    Unsupported(#[from] crate::schema::UnsupportedSchema),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

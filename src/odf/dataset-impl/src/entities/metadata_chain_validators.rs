@@ -887,12 +887,12 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                     },
                 ) {
                     DataSchemaCmp::Identical => {
-                        return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                        Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
                             set_new_schema.clone(),
                             "New schema is identical to the current",
-                        )));
+                        )))
                     }
-                    DataSchemaCmp::Equivalent => return Ok(MetadataVisitorDecision::Stop),
+                    DataSchemaCmp::Equivalent => Ok(MetadataVisitorDecision::Stop),
                     DataSchemaCmp::Incompatible => invalid_event!(
                         self.new_schema.unwrap().clone(),
                         "Schema evolution is not yet supported"

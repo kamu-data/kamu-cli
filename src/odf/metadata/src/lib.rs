@@ -24,6 +24,7 @@ pub mod dtos;
 pub mod errors;
 pub mod formats;
 pub mod identity;
+pub mod schema;
 pub mod serde;
 
 pub mod metadata;
@@ -32,3 +33,4 @@ pub use errors::*;
 pub use formats::*;
 pub use identity::*;
 pub use metadata::*;
+pub use schema::*;
