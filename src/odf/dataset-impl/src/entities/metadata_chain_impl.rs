@@ -126,6 +126,7 @@ where
                 &mut ValidateAddPushSourceVisitor::new(&block)?,
                 &mut ValidateSetPollingSourceVisitor::new(&block)?,
                 &mut ValidateSetTransformVisitor::new(&block)?,
+                &mut ValidateSetDataSchemaVisitor::new(&block)?,
             ];
 
             match self
