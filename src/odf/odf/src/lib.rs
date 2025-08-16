@@ -48,19 +48,7 @@ pub use odf_metadata::{
 pub use odf_storage::{GetBlockError, GetRefError};
 
 pub mod schema {
-    pub use odf_metadata::{
-        ArrowBufferEncoding,
-        ArrowDateEncoding,
-        ArrowDateUnit,
-        ArrowDecimalEncoding,
-        ArrowEncoding,
-        DataField,
-        DataSchema,
-        DataType,
-        ExtraAttributes,
-        TimeUnit,
-        ToArrowSettings,
-    };
+    pub use odf_metadata::schema::*;
 }
 
 pub mod metadata {
