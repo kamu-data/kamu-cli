@@ -9,6 +9,8 @@
 
 mod constants;
 mod data_encoding;
+mod data_schema_arrow_conversions;
+mod data_schema_cmp;
 mod data_schema_impl;
 mod dtos_extra;
 mod dtos_generated;
@@ -16,6 +18,8 @@ mod extra_attributes_impl;
 mod operation_type;
 
 pub use data_encoding::*;
+pub use data_schema_arrow_conversions::*;
+pub use data_schema_cmp::*;
 pub use data_schema_impl::*;
 pub use dtos_generated::*;
 pub use operation_type::*;

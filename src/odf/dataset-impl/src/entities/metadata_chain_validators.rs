@@ -834,6 +834,81 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ValidateSetDataSchemaVisitor<'a> {
+    new_schema: Option<&'a SetDataSchema>,
+}
+
+impl<'a> ValidateSetDataSchemaVisitor<'a> {
+    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendValidationError> {
+        let new_schema = match &block.event {
+            MetadataEvent::SetDataSchema(e) => Some(e),
+            _ => None,
+        };
+
+        Ok(Self { new_schema })
+    }
+}
+
+impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
+    type Error = AppendValidationError;
+
+    fn initial_decision(&self) -> MetadataVisitorDecision {
+        if self.new_schema.is_some() {
+            MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_DATA_SCHEMA)
+        } else {
+            MetadataVisitorDecision::Stop
+        }
+    }
+
+    fn visit(
+        &mut self,
+        (_, block): HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error> {
+        match &block.event {
+            MetadataEvent::SetDataSchema(e) => {
+                // NOTE: During the initial upgrade from legacy to ODF schema we allow field
+                // optionality differences, as Arrow currently has no control over it, and in
+                // ODF schema we want to enforce optionality checks eventually.
+                let ignore_optionality = e.raw_arrow_schema.is_some();
+
+                // TODO: Avoid cloning in no-upgrade case
+                let prev_schema = e.clone().upgrade().schema;
+
+                let set_new_schema = self.new_schema.unwrap();
+                let new_schema = set_new_schema.schema.as_ref().unwrap();
+
+                match DataSchema::compare(
+                    &prev_schema,
+                    new_schema,
+                    DataSchemaCmpOptions {
+                        ignore_attributes: true,
+                        ignore_optionality,
+                    },
+                ) {
+                    DataSchemaCmp::Identical => {
+                        return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                            set_new_schema.clone(),
+                            "New schema is identical to the current",
+                        )));
+                    }
+                    DataSchemaCmp::Equivalent => return Ok(MetadataVisitorDecision::Stop),
+                    DataSchemaCmp::Incompatible => invalid_event!(
+                        self.new_schema.unwrap().clone(),
+                        "Schema evolution is not yet supported"
+                    ),
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
