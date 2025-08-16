@@ -9692,6 +9692,7 @@ dependencies = [
 name = "opendatafabric-dataset-impl"
 version = "0.246.1"
 dependencies = [
+ "arrow",
  "async-stream",
  "async-trait",
  "bytes",
@@ -9715,6 +9716,7 @@ dependencies = [
  "regex",
  "reqwest",
  "s3-utils",
+ "serde_json",
  "tempfile",
  "test-group",
  "test-log",
