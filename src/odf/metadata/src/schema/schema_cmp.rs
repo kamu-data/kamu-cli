@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::dtos_generated::*;
+use crate::dtos::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -142,18 +142,20 @@ impl DataType {
             (DataType::Option(DataTypeOption { inner: inner_lhs }), _)
                 if opts.ignore_optionality =>
             {
-                match DataType::compare(&inner_lhs, other, opts) {
-                    DataSchemaCmp::Identical => DataSchemaCmp::Equivalent,
-                    DataSchemaCmp::Equivalent => DataSchemaCmp::Equivalent,
+                match DataType::compare(inner_lhs, other, opts) {
+                    DataSchemaCmp::Identical | DataSchemaCmp::Equivalent => {
+                        DataSchemaCmp::Equivalent
+                    }
                     DataSchemaCmp::Incompatible => DataSchemaCmp::Incompatible,
                 }
             }
             (_, DataType::Option(DataTypeOption { inner: inner_rhs }))
                 if opts.ignore_optionality =>
             {
-                match DataType::compare(self, &inner_rhs, opts) {
-                    DataSchemaCmp::Identical => DataSchemaCmp::Equivalent,
-                    DataSchemaCmp::Equivalent => DataSchemaCmp::Equivalent,
+                match DataType::compare(self, inner_rhs, opts) {
+                    DataSchemaCmp::Identical | DataSchemaCmp::Equivalent => {
+                        DataSchemaCmp::Equivalent
+                    }
                     DataSchemaCmp::Incompatible => DataSchemaCmp::Incompatible,
                 }
             }
