@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::schema_impl::UnsupportedSchema;
 use crate::dtos::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +27,20 @@ pub struct ArrowEncoding {
     #[serde(rename = "arrow.apache.org/decimalEncoding")]
     #[serde(default)]
     pub decimal: Option<ArrowDecimalEncoding>,
+}
+
+impl ArrowEncoding {
+    pub const KEY_ARROW_BUFFER_ENCODING: &str = "arrow.apache.org/bufferEncoding";
+    pub const KEY_ARROW_DATE_ENCODING: &str = "arrow.apache.org/dateEncoding";
+    pub const KEY_ARROW_DECIMAL_ENCODING: &str = "arrow.apache.org/decimalEncoding";
+}
+
+impl Attribute for ArrowEncoding {
+    const KEYS: &[&str] = &[
+        Self::KEY_ARROW_BUFFER_ENCODING,
+        Self::KEY_ARROW_DATE_ENCODING,
+        Self::KEY_ARROW_DECIMAL_ENCODING,
+    ];
 }
 
 #[serde_with::serde_as]
@@ -87,32 +100,6 @@ impl ArrowDecimalEncoding {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ArrowEncoding {
-    pub const KEY_ARROW_BUFFER_ENCODING: &str = "arrow.apache.org/bufferEncoding";
-    pub const KEY_ARROW_DATE_ENCODING: &str = "arrow.apache.org/dateEncoding";
-    pub const KEY_ARROW_DECIMAL_ENCODING: &str = "arrow.apache.org/decimalEncoding";
-
-    pub const ALL_KEYS: [&str; 3] = [
-        Self::KEY_ARROW_BUFFER_ENCODING,
-        Self::KEY_ARROW_DATE_ENCODING,
-        Self::KEY_ARROW_DECIMAL_ENCODING,
-    ];
-
-    pub fn deserialize_from(
-        attrs: &ExtraAttributes,
-    ) -> Result<Option<ArrowEncoding>, UnsupportedSchema> {
-        if !Self::ALL_KEYS.iter().any(|k| attrs.contains_key(k)) {
-            return Ok(None);
-        }
-
-        let enc = attrs
-            .deserialize_as::<Self>()
-            .map_err(|e| UnsupportedSchema::new(format!("Invalid encoding: {e}")))?;
-
-        Ok(Some(enc))
-    }
-}
-
 impl From<ArrowBufferEncoding> for ArrowEncoding {
     fn from(value: ArrowBufferEncoding) -> Self {
         Self {
@@ -153,7 +140,7 @@ mod test {
     fn test_arrow_encoding_empty() {
         let attrs = ExtraAttributes::new_from_json(json!({})).unwrap();
 
-        let arrow_encoding = ArrowEncoding::deserialize_from(&attrs).unwrap();
+        let arrow_encoding = attrs.get::<ArrowEncoding>().unwrap();
 
         pretty_assertions::assert_eq!(arrow_encoding, None);
     }
@@ -166,7 +153,7 @@ mod test {
         }))
         .unwrap();
 
-        let arrow_encoding = ArrowEncoding::deserialize_from(&attrs).unwrap();
+        let arrow_encoding = attrs.get::<ArrowEncoding>().unwrap();
 
         pretty_assertions::assert_eq!(arrow_encoding, None);
     }
@@ -182,7 +169,7 @@ mod test {
         }))
         .unwrap();
 
-        let arrow_encoding = ArrowEncoding::deserialize_from(&attrs).unwrap();
+        let arrow_encoding = attrs.get::<ArrowEncoding>().unwrap();
 
         pretty_assertions::assert_eq!(
             arrow_encoding,
@@ -195,7 +182,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.merge_serialized(&arrow_encoding);
+        attrs.insert(&arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({
@@ -218,7 +205,7 @@ mod test {
         }))
         .unwrap();
 
-        let arrow_encoding = ArrowEncoding::deserialize_from(&attrs).unwrap();
+        let arrow_encoding = attrs.get::<ArrowEncoding>().unwrap();
 
         pretty_assertions::assert_eq!(
             arrow_encoding,
@@ -231,7 +218,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.merge_serialized(&arrow_encoding);
+        attrs.insert(&arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({
@@ -253,7 +240,7 @@ mod test {
         }))
         .unwrap();
 
-        let arrow_encoding = ArrowEncoding::deserialize_from(&attrs).unwrap();
+        let arrow_encoding = attrs.get::<ArrowEncoding>().unwrap();
 
         pretty_assertions::assert_eq!(
             arrow_encoding,
@@ -266,7 +253,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.merge_serialized(&arrow_encoding);
+        attrs.insert(&arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({
@@ -287,7 +274,7 @@ mod test {
         }))
         .unwrap();
 
-        let arrow_encoding = ArrowEncoding::deserialize_from(&attrs).unwrap();
+        let arrow_encoding = attrs.get::<ArrowEncoding>().unwrap();
 
         pretty_assertions::assert_eq!(
             arrow_encoding,
@@ -298,7 +285,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.merge_serialized(&arrow_encoding);
+        attrs.insert(&arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({
@@ -316,6 +303,6 @@ mod test {
         }))
         .unwrap();
 
-        std::assert_matches::assert_matches!(ArrowEncoding::deserialize_from(&attrs), Err(_));
+        std::assert_matches::assert_matches!(attrs.get::<ArrowEncoding>(), Err(_));
     }
 }

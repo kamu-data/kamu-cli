@@ -80,7 +80,7 @@ impl DataField {
 
         let mut extra = ExtraAttributes::new();
         if let Some(encoding) = encoding {
-            extra.merge_serialized(&encoding);
+            extra.insert(&encoding);
         }
 
         Ok(Self {
@@ -96,7 +96,10 @@ impl DataField {
         settings: &ToArrowSettings,
     ) -> Result<arrow::datatypes::Field, UnsupportedSchema> {
         let empty = ExtraAttributes::new();
-        let encoding = ArrowEncoding::deserialize_from(self.extra.as_ref().unwrap_or(&empty))?;
+        let extra = self.extra.as_ref().unwrap_or(&empty);
+        let encoding = extra
+            .get::<ArrowEncoding>()
+            .map_err(|e| UnsupportedSchema::new(format!("Invalid encoding: {e}")))?;
 
         let (data_type, nullable) = self.r#type.to_arrow(encoding.as_ref(), settings)?;
 
@@ -110,7 +113,7 @@ impl DataField {
             name: self.name,
             r#type: self.r#type.strip_encoding(),
             extra: self.extra.and_then(|e| {
-                e.retain(|k, _| !ArrowEncoding::ALL_KEYS.contains(&k.as_str()))
+                e.retain(|k, _| !ArrowEncoding::KEYS.contains(&k.as_str()))
                     .map_empty()
             }),
         }
@@ -875,7 +878,7 @@ mod test {
     use crate::*;
 
     #[test]
-    fn test_flied_from_to_arrow() {
+    fn test_field_from_to_arrow() {
         let arrow_schema = ArrowSchema::new(vec![
             ArrowField::new("utf8", ArrowDataType::Utf8, false),
             ArrowField::new("utf8_large", ArrowDataType::LargeUtf8, false),

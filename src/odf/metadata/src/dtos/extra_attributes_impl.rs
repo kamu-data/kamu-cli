@@ -13,6 +13,12 @@ use crate::*;
 // ExtraAttributes
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub trait Attribute: ::serde::Serialize + ::serde::de::DeserializeOwned {
+    const KEYS: &[&str];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ExtraAttributes {
     pub fn new() -> Self {
         Self {
@@ -36,28 +42,21 @@ impl ExtraAttributes {
         self.attributes.contains_key(key)
     }
 
-    pub fn deserialize_as<T>(&self) -> Result<T, serde_json::Error>
+    pub fn get<T>(&self) -> Result<Option<T>, serde_json::Error>
     where
-        T: ::serde::de::DeserializeOwned,
+        T: Attribute,
     {
+        if !T::KEYS.iter().any(|k| self.attributes.contains_key(*k)) {
+            return Ok(None);
+        }
+
         // TODO: PERF: Avoid cloning
         let json = serde_json::Value::Object(self.attributes.clone());
-        serde_json::from_value(json)
+        let val = serde_json::from_value(json)?;
+        Ok(Some(val))
     }
 
-    pub fn deserialize_key_as<T>(&self, key: &str) -> Result<Option<T>, serde_json::Error>
-    where
-        T: ::serde::de::DeserializeOwned,
-    {
-        let Some(value) = self.attributes.get(key) else {
-            return Ok(None);
-        };
-
-        // TODO: PERF: Avoid cloning
-        serde_json::from_value(value.clone()).map(Some)
-    }
-
-    pub fn merge_serialized<T: ::serde::Serialize>(&mut self, value: &T) {
+    pub fn insert<T: Attribute>(&mut self, value: &T) {
         let serde_json::Value::Object(mut other) = serde_json::to_value(value).unwrap() else {
             panic!(
                 "{} must serialize to object to use merge",
@@ -68,39 +67,12 @@ impl ExtraAttributes {
         self.attributes.append(&mut other);
     }
 
-    pub fn merge(&mut self, value: serde_json::Value) {
+    pub fn insert_json(&mut self, value: serde_json::Value) {
         let serde_json::Value::Object(mut other) = value else {
             panic!("Value must be an object");
         };
 
         self.attributes.append(&mut other);
-    }
-
-    pub fn insert_serialized<T: ::serde::Serialize>(
-        &mut self,
-        key: impl Into<String>,
-        value: &T,
-    ) -> Result<(), serde_json::Error> {
-        self.attributes
-            .insert(key.into(), serde_json::to_value(value)?);
-        Ok(())
-    }
-
-    pub fn get_str(&self, key: &str) -> Option<&str> {
-        match self.attributes.get(key) {
-            Some(serde_json::Value::String(v)) => Some(v.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn get_and_parse<T>(&self, key: &str) -> Result<Option<T>, <T as std::str::FromStr>::Err>
-    where
-        T: std::str::FromStr,
-    {
-        match self.get_str(key) {
-            None => Ok(None),
-            Some(v) => Some(v.parse()).transpose(),
-        }
     }
 
     pub fn retain<F>(mut self, fun: F) -> Self
