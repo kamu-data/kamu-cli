@@ -55,7 +55,7 @@ macro_rules! implement_serde_as {
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "AddData")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AddDataDef {
@@ -83,7 +83,7 @@ implement_serde_as!(AddData, AddDataDef, "AddDataDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "AddPushSource")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AddPushSourceDef {
@@ -106,7 +106,7 @@ implement_serde_as!(AddPushSource, AddPushSourceDef, "AddPushSourceDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "AttachmentEmbedded")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AttachmentEmbeddedDef {
@@ -126,7 +126,7 @@ implement_serde_as!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "Attachments")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum AttachmentsDef {
@@ -143,7 +143,7 @@ implement_serde_as!(Attachments, AttachmentsDef, "AttachmentsDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "AttachmentsEmbedded")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AttachmentsEmbeddedDef {
@@ -164,7 +164,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "Checkpoint")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CheckpointDef {
@@ -179,7 +179,7 @@ implement_serde_as!(Checkpoint, CheckpointDef, "CheckpointDef");
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "CompressionFormat")]
 #[serde(deny_unknown_fields)]
 pub enum CompressionFormatDef {
@@ -202,7 +202,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataField")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataFieldDef {
@@ -223,7 +223,7 @@ implement_serde_as!(DataField, DataFieldDef, "DataFieldDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataSchema")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataSchemaDef {
@@ -243,7 +243,7 @@ implement_serde_as!(DataSchema, DataSchemaDef, "DataSchemaDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataSlice")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataSliceDef {
@@ -262,7 +262,7 @@ implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataType")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum DataTypeDef {
@@ -325,7 +325,7 @@ implement_serde_as!(DataType, DataTypeDef, "DataTypeDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeBinary")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeBinaryDef {
@@ -341,7 +341,7 @@ implement_serde_as!(DataTypeBinary, DataTypeBinaryDef, "DataTypeBinaryDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeBool")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeBoolDef {}
@@ -355,7 +355,7 @@ implement_serde_as!(DataTypeBool, DataTypeBoolDef, "DataTypeBoolDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeDate")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeDateDef {}
@@ -369,7 +369,7 @@ implement_serde_as!(DataTypeDate, DataTypeDateDef, "DataTypeDateDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeDecimal")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeDecimalDef {
@@ -386,7 +386,7 @@ implement_serde_as!(DataTypeDecimal, DataTypeDecimalDef, "DataTypeDecimalDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeDuration")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeDurationDef {
@@ -403,7 +403,7 @@ implement_serde_as!(DataTypeDuration, DataTypeDurationDef, "DataTypeDurationDef"
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeFloat16")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeFloat16Def {}
@@ -417,7 +417,7 @@ implement_serde_as!(DataTypeFloat16, DataTypeFloat16Def, "DataTypeFloat16Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeFloat32")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeFloat32Def {}
@@ -431,7 +431,7 @@ implement_serde_as!(DataTypeFloat32, DataTypeFloat32Def, "DataTypeFloat32Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeFloat64")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeFloat64Def {}
@@ -445,7 +445,7 @@ implement_serde_as!(DataTypeFloat64, DataTypeFloat64Def, "DataTypeFloat64Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeInt16")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt16Def {}
@@ -459,7 +459,7 @@ implement_serde_as!(DataTypeInt16, DataTypeInt16Def, "DataTypeInt16Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeInt32")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt32Def {}
@@ -473,7 +473,7 @@ implement_serde_as!(DataTypeInt32, DataTypeInt32Def, "DataTypeInt32Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeInt64")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt64Def {}
@@ -487,7 +487,7 @@ implement_serde_as!(DataTypeInt64, DataTypeInt64Def, "DataTypeInt64Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeInt8")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt8Def {}
@@ -501,7 +501,7 @@ implement_serde_as!(DataTypeInt8, DataTypeInt8Def, "DataTypeInt8Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeList")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeListDef {
@@ -519,7 +519,7 @@ implement_serde_as!(DataTypeList, DataTypeListDef, "DataTypeListDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeMap")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeMapDef {
@@ -539,7 +539,7 @@ implement_serde_as!(DataTypeMap, DataTypeMapDef, "DataTypeMapDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeNull")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeNullDef {}
@@ -553,7 +553,7 @@ implement_serde_as!(DataTypeNull, DataTypeNullDef, "DataTypeNullDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeOption")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeOptionDef {
@@ -570,7 +570,7 @@ implement_serde_as!(DataTypeOption, DataTypeOptionDef, "DataTypeOptionDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeString")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeStringDef {}
@@ -584,7 +584,7 @@ implement_serde_as!(DataTypeString, DataTypeStringDef, "DataTypeStringDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeStruct")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeStructDef {
@@ -601,7 +601,7 @@ implement_serde_as!(DataTypeStruct, DataTypeStructDef, "DataTypeStructDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeTime")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeTimeDef {
@@ -618,7 +618,7 @@ implement_serde_as!(DataTypeTime, DataTypeTimeDef, "DataTypeTimeDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeTimestamp")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeTimestampDef {
@@ -640,7 +640,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeUInt16")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt16Def {}
@@ -654,7 +654,7 @@ implement_serde_as!(DataTypeUInt16, DataTypeUInt16Def, "DataTypeUInt16Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeUInt32")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt32Def {}
@@ -668,7 +668,7 @@ implement_serde_as!(DataTypeUInt32, DataTypeUInt32Def, "DataTypeUInt32Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeUInt64")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt64Def {}
@@ -682,7 +682,7 @@ implement_serde_as!(DataTypeUInt64, DataTypeUInt64Def, "DataTypeUInt64Def");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DataTypeUInt8")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt8Def {}
@@ -694,7 +694,7 @@ implement_serde_as!(DataTypeUInt8, DataTypeUInt8Def, "DataTypeUInt8Def");
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DatasetKind")]
 #[serde(deny_unknown_fields)]
 pub enum DatasetKindDef {
@@ -713,7 +713,7 @@ implement_serde_as!(DatasetKind, DatasetKindDef, "DatasetKindDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DatasetSnapshot")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetSnapshotDef {
@@ -733,7 +733,7 @@ implement_serde_as!(DatasetSnapshot, DatasetSnapshotDef, "DatasetSnapshotDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DatasetVocabulary")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetVocabularyDef {
@@ -756,7 +756,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DisablePollingSource")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DisablePollingSourceDef {}
@@ -774,7 +774,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "DisablePushSource")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DisablePushSourceDef {
@@ -794,7 +794,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "EnvVar")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EnvVarDef {
@@ -810,7 +810,7 @@ implement_serde_as!(EnvVar, EnvVarDef, "EnvVarDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "EventTimeSource")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum EventTimeSourceDef {
@@ -833,7 +833,7 @@ implement_serde_as!(EventTimeSource, EventTimeSourceDef, "EventTimeSourceDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "EventTimeSourceFromMetadata")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EventTimeSourceFromMetadataDef {}
@@ -851,7 +851,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "EventTimeSourceFromPath")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EventTimeSourceFromPathDef {
@@ -872,7 +872,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "EventTimeSourceFromSystemTime")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EventTimeSourceFromSystemTimeDef {}
@@ -890,7 +890,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ExecuteTransform")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteTransformDef {
@@ -917,7 +917,7 @@ implement_serde_as!(ExecuteTransform, ExecuteTransformDef, "ExecuteTransformDef"
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ExecuteTransformInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteTransformInputDef {
@@ -941,7 +941,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ExtraAttributes")]
 pub struct ExtraAttributesDef {
     #[serde(flatten)]
@@ -957,7 +957,7 @@ implement_serde_as!(ExtraAttributes, ExtraAttributesDef, "ExtraAttributesDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "FetchStep")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum FetchStepDef {
@@ -982,7 +982,7 @@ implement_serde_as!(FetchStep, FetchStepDef, "FetchStepDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "FetchStepContainer")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FetchStepContainerDef {
@@ -1007,7 +1007,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "FetchStepEthereumLogs")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FetchStepEthereumLogsDef {
@@ -1030,7 +1030,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "FetchStepFilesGlob")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FetchStepFilesGlobDef {
@@ -1059,7 +1059,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "FetchStepMqtt")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FetchStepMqttDef {
@@ -1080,7 +1080,7 @@ implement_serde_as!(FetchStepMqtt, FetchStepMqttDef, "FetchStepMqttDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "FetchStepUrl")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FetchStepUrlDef {
@@ -1104,7 +1104,7 @@ implement_serde_as!(FetchStepUrl, FetchStepUrlDef, "FetchStepUrlDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MergeStrategy")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum MergeStrategyDef {
@@ -1131,7 +1131,7 @@ implement_serde_as!(MergeStrategy, MergeStrategyDef, "MergeStrategyDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MergeStrategyAppend")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MergeStrategyAppendDef {}
@@ -1149,7 +1149,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MergeStrategyChangelogStream")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MergeStrategyChangelogStreamDef {
@@ -1169,7 +1169,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MergeStrategyLedger")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MergeStrategyLedgerDef {
@@ -1189,7 +1189,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MergeStrategySnapshot")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MergeStrategySnapshotDef {
@@ -1210,7 +1210,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MergeStrategyUpsertStream")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MergeStrategyUpsertStreamDef {
@@ -1230,7 +1230,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MetadataBlock")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MetadataBlockDef {
@@ -1250,7 +1250,7 @@ implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MetadataEvent")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum MetadataEventDef {
@@ -1289,7 +1289,7 @@ implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MqttQos")]
 #[serde(deny_unknown_fields)]
 pub enum MqttQosDef {
@@ -1310,7 +1310,7 @@ implement_serde_as!(MqttQos, MqttQosDef, "MqttQosDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "MqttTopicSubscription")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MqttTopicSubscriptionDef {
@@ -1333,7 +1333,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "OffsetInterval")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct OffsetIntervalDef {
@@ -1349,7 +1349,7 @@ implement_serde_as!(OffsetInterval, OffsetIntervalDef, "OffsetIntervalDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "PrepStep")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum PrepStepDef {
@@ -1368,7 +1368,7 @@ implement_serde_as!(PrepStep, PrepStepDef, "PrepStepDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "PrepStepDecompress")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct PrepStepDecompressDef {
@@ -1390,7 +1390,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "PrepStepPipe")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct PrepStepPipeDef {
@@ -1406,7 +1406,7 @@ implement_serde_as!(PrepStepPipe, PrepStepPipeDef, "PrepStepPipeDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "RawQueryRequest")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RawQueryRequestDef {
@@ -1424,7 +1424,7 @@ implement_serde_as!(RawQueryRequest, RawQueryRequestDef, "RawQueryRequestDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "RawQueryResponse")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum RawQueryResponseDef {
@@ -1449,7 +1449,7 @@ implement_serde_as!(RawQueryResponse, RawQueryResponseDef, "RawQueryResponseDef"
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "RawQueryResponseInternalError")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RawQueryResponseInternalErrorDef {
@@ -1470,7 +1470,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "RawQueryResponseInvalidQuery")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RawQueryResponseInvalidQueryDef {
@@ -1490,7 +1490,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "RawQueryResponseProgress")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RawQueryResponseProgressDef {}
@@ -1508,7 +1508,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "RawQueryResponseSuccess")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RawQueryResponseSuccessDef {
@@ -1527,7 +1527,7 @@ implement_serde_as!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStep")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum ReadStepDef {
@@ -1556,7 +1556,7 @@ implement_serde_as!(ReadStep, ReadStepDef, "ReadStepDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStepCsv")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepCsvDef {
@@ -1581,7 +1581,7 @@ implement_serde_as!(ReadStepCsv, ReadStepCsvDef, "ReadStepCsvDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStepEsriShapefile")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepEsriShapefileDef {
@@ -1602,7 +1602,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStepGeoJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepGeoJsonDef {
@@ -1618,7 +1618,7 @@ implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef, "ReadStepGeoJsonDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStepJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepJsonDef {
@@ -1638,7 +1638,7 @@ implement_serde_as!(ReadStepJson, ReadStepJsonDef, "ReadStepJsonDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStepNdGeoJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepNdGeoJsonDef {
@@ -1658,7 +1658,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStepNdJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepNdJsonDef {
@@ -1677,7 +1677,7 @@ implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef, "ReadStepNdJsonDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "ReadStepParquet")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepParquetDef {
@@ -1693,7 +1693,7 @@ implement_serde_as!(ReadStepParquet, ReadStepParquetDef, "ReadStepParquetDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "RequestHeader")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RequestHeaderDef {
@@ -1710,7 +1710,7 @@ implement_serde_as!(RequestHeader, RequestHeaderDef, "RequestHeaderDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "Seed")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SeedDef {
@@ -1728,7 +1728,7 @@ implement_serde_as!(Seed, SeedDef, "SeedDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SetAttachments")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetAttachmentsDef {
@@ -1745,7 +1745,7 @@ implement_serde_as!(SetAttachments, SetAttachmentsDef, "SetAttachmentsDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SetDataSchema")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetDataSchemaDef {
@@ -1766,7 +1766,7 @@ implement_serde_as!(SetDataSchema, SetDataSchemaDef, "SetDataSchemaDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SetInfo")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetInfoDef {
@@ -1783,7 +1783,7 @@ implement_serde_as!(SetInfo, SetInfoDef, "SetInfoDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SetLicense")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetLicenseDef {
@@ -1802,7 +1802,7 @@ implement_serde_as!(SetLicense, SetLicenseDef, "SetLicenseDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SetPollingSource")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetPollingSourceDef {
@@ -1829,7 +1829,7 @@ implement_serde_as!(SetPollingSource, SetPollingSourceDef, "SetPollingSourceDef"
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SetTransform")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetTransformDef {
@@ -1848,7 +1848,7 @@ implement_serde_as!(SetTransform, SetTransformDef, "SetTransformDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SetVocab")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetVocabDef {
@@ -1866,7 +1866,7 @@ implement_serde_as!(SetVocab, SetVocabDef, "SetVocabDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SourceCaching")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum SourceCachingDef {
@@ -1883,7 +1883,7 @@ implement_serde_as!(SourceCaching, SourceCachingDef, "SourceCachingDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SourceCachingForever")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SourceCachingForeverDef {}
@@ -1899,7 +1899,7 @@ implement_serde_as!(
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourceordering-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SourceOrdering")]
 #[serde(deny_unknown_fields)]
 pub enum SourceOrderingDef {
@@ -1918,7 +1918,7 @@ implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SourceState")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SourceStateDef {
@@ -1936,7 +1936,7 @@ implement_serde_as!(SourceState, SourceStateDef, "SourceStateDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "SqlQueryStep")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SqlQueryStepDef {
@@ -1953,7 +1953,7 @@ implement_serde_as!(SqlQueryStep, SqlQueryStepDef, "SqlQueryStepDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TemporalTable")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TemporalTableDef {
@@ -1968,7 +1968,7 @@ implement_serde_as!(TemporalTable, TemporalTableDef, "TemporalTableDef");
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#timeunit-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TimeUnit")]
 #[serde(deny_unknown_fields)]
 pub enum TimeUnitDef {
@@ -1990,7 +1990,7 @@ implement_serde_as!(TimeUnit, TimeUnitDef, "TimeUnitDef");
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "Transform")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum TransformDef {
@@ -2007,7 +2007,7 @@ implement_serde_as!(Transform, TransformDef, "TransformDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformSql")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformSqlDef {
@@ -2031,7 +2031,7 @@ implement_serde_as!(TransformSql, TransformSqlDef, "TransformSqlDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformInputDef {
@@ -2048,7 +2048,7 @@ implement_serde_as!(TransformInput, TransformInputDef, "TransformInputDef");
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformRequest")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformRequestDef {
@@ -2077,7 +2077,7 @@ implement_serde_as!(TransformRequest, TransformRequestDef, "TransformRequestDef"
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformRequestInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformRequestInputDef {
@@ -2107,7 +2107,7 @@ implement_serde_as!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformResponse")]
 #[serde(deny_unknown_fields, tag = "kind")]
 pub enum TransformResponseDef {
@@ -2138,7 +2138,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformResponseInternalError")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformResponseInternalErrorDef {
@@ -2159,7 +2159,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformResponseInvalidQuery")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformResponseInvalidQueryDef {
@@ -2179,7 +2179,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformResponseProgress")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformResponseProgressDef {}
@@ -2197,7 +2197,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TransformResponseSuccess")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformResponseSuccessDef {
@@ -2221,7 +2221,7 @@ implement_serde_as!(
 
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "Watermark")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct WatermarkDef {
