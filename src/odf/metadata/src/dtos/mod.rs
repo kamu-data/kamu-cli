@@ -14,4 +14,5 @@ mod extra_attributes_impl;
 mod operation_type;
 
 pub use dtos_generated::*;
+pub use extra_attributes_impl::*;
 pub use operation_type::*;
