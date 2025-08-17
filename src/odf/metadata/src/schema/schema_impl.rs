@@ -133,7 +133,7 @@ impl DataField {
     }
     pub fn extra(self, attrs: serde_json::Value) -> Self {
         let mut extra = self.extra.unwrap_or_default();
-        extra.merge(attrs);
+        extra.insert_json(attrs);
         Self {
             extra: extra.map_empty(),
             ..self
@@ -142,7 +142,7 @@ impl DataField {
     pub fn encoding(self, enc: impl Into<ArrowEncoding>) -> Self {
         let enc = enc.into();
         let mut extra = self.extra.unwrap_or_default();
-        extra.merge_serialized(&enc);
+        extra.insert(&enc);
         Self {
             extra: extra.map_empty(),
             ..self
