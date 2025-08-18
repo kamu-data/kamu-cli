@@ -10,9 +10,13 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_webhooks::{RemoveWebhookSubscriptionUseCase, WebhookSubscriptionQueryMode};
+use kamu_webhooks::{
+    RemoveWebhookSubscriptionUseCase,
+    WebhookEventTypeCatalog,
+    WebhookSubscriptionQueryMode,
+};
 use kamu_webhooks_services::RemoveWebhookSubscriptionUseCaseImpl;
-use messaging_outbox::DummyOutboxImpl;
+use messaging_outbox::{MockOutbox, Outbox};
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -20,8 +24,18 @@ use super::WebhookSubscriptionUseCaseHarness;
 
 #[test_log::test(tokio::test)]
 async fn test_remove_subscription_success() {
-    let harness = RemoveWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_subscription_deleted_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&foo_id),
+        1,
+    );
+
+    let harness = RemoveWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness.use_case.execute(&mut subscription).await;
     assert!(res.is_ok(), "Failed to remove subscription: {res:?}",);
@@ -47,8 +61,18 @@ async fn test_remove_subscription_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_remove_idempotence() {
-    let harness = RemoveWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_subscription_deleted_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&foo_id),
+        1,
+    );
+
+    let harness = RemoveWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness.use_case.execute(&mut subscription).await;
     assert!(res.is_ok(), "Failed to remove subscription: {res:?}",);
@@ -66,12 +90,13 @@ struct RemoveWebhookSubscriptionUseCaseHarness {
 }
 
 impl RemoveWebhookSubscriptionUseCaseHarness {
-    fn new() -> Self {
+    fn new(mock_outbox: MockOutbox) -> Self {
         let base_harness = WebhookSubscriptionUseCaseHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<RemoveWebhookSubscriptionUseCaseImpl>();
-        b.add::<DummyOutboxImpl>();
+        b.add_value(mock_outbox);
+        b.bind::<dyn Outbox, MockOutbox>();
 
         let catalog = b.build();
 

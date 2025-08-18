@@ -53,6 +53,7 @@ uuid = { version = "1", default-features = false }
 kamu-webhooks = { workspace = true, features = ["testing"] }
 kamu-webhooks-inmem = { workspace = true }
 
+mockall = { version = "0.11", default-features = false }
 oop = { version = "0.0.2", default-features = false }
 test-log = { version = "0.2", default-features = false }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

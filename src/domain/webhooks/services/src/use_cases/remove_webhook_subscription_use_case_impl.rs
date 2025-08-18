@@ -37,6 +37,8 @@ impl RemoveWebhookSubscriptionUseCase for RemoveWebhookSubscriptionUseCaseImpl {
         &self,
         subscription: &mut WebhookSubscription,
     ) -> Result<(), RemoveWebhookSubscriptionError> {
+        let previous_status = subscription.status();
+
         subscription
             .remove()
             .map_err(|e| RemoveWebhookSubscriptionError::Internal(e.int_err()))?;
@@ -45,16 +47,18 @@ impl RemoveWebhookSubscriptionUseCase for RemoveWebhookSubscriptionUseCaseImpl {
             .await
             .map_err(|e| RemoveWebhookSubscriptionError::Internal(e.int_err()))?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
-                WebhookSubscriptionLifecycleMessage::deleted(
-                    subscription.id(),
-                    subscription.dataset_id().cloned(),
-                    subscription.event_types().to_vec(),
-                ),
-            )
-            .await?;
+        if previous_status != WebhookSubscriptionStatus::Removed {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
+                    WebhookSubscriptionLifecycleMessage::deleted(
+                        subscription.id(),
+                        subscription.dataset_id().cloned(),
+                        subscription.event_types().to_vec(),
+                    ),
+                )
+                .await?;
+        }
 
         Ok(())
     }

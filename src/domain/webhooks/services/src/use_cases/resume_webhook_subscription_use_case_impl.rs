@@ -37,6 +37,8 @@ impl ResumeWebhookSubscriptionUseCase for ResumeWebhookSubscriptionUseCaseImpl {
         &self,
         subscription: &mut WebhookSubscription,
     ) -> Result<(), ResumeWebhookSubscriptionError> {
+        let old_status = subscription.status();
+
         subscription
             .resume()
             .map_err(|e: ProjectionError<WebhookSubscriptionState>| {
@@ -53,17 +55,21 @@ impl ResumeWebhookSubscriptionUseCase for ResumeWebhookSubscriptionUseCaseImpl {
             .await
             .map_err(|e| ResumeWebhookSubscriptionError::Internal(e.int_err()))?;
 
-        for event_type in subscription.event_types() {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
-                    WebhookSubscriptionEventChangesMessage::event_enabled(
-                        subscription.id(),
-                        subscription.dataset_id(),
-                        event_type.clone(),
-                    ),
-                )
-                .await?;
+        let latest_status = subscription.status();
+
+        if old_status != latest_status {
+            for event_type in subscription.event_types() {
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+                        WebhookSubscriptionEventChangesMessage::event_enabled(
+                            subscription.id(),
+                            subscription.dataset_id(),
+                            event_type.clone(),
+                        ),
+                    )
+                    .await?;
+            }
         }
 
         Ok(())

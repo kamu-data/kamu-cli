@@ -37,6 +37,8 @@ impl PauseWebhookSubscriptionUseCase for PauseWebhookSubscriptionUseCaseImpl {
         &self,
         subscription: &mut WebhookSubscription,
     ) -> Result<(), PauseWebhookSubscriptionError> {
+        let old_status = subscription.status();
+
         subscription
             .pause()
             .map_err(|e: ProjectionError<WebhookSubscriptionState>| {
@@ -53,17 +55,21 @@ impl PauseWebhookSubscriptionUseCase for PauseWebhookSubscriptionUseCaseImpl {
             .await
             .map_err(|e| PauseWebhookSubscriptionError::Internal(e.int_err()))?;
 
-        for event_type in subscription.event_types() {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
-                    WebhookSubscriptionEventChangesMessage::event_disabled(
-                        subscription.id(),
-                        subscription.dataset_id(),
-                        event_type.clone(),
-                    ),
-                )
-                .await?;
+        let latest_status = subscription.status();
+
+        if old_status != latest_status {
+            for event_type in subscription.event_types() {
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+                        WebhookSubscriptionEventChangesMessage::event_disabled(
+                            subscription.id(),
+                            subscription.dataset_id(),
+                            event_type.clone(),
+                        ),
+                    )
+                    .await?;
+            }
         }
 
         Ok(())
