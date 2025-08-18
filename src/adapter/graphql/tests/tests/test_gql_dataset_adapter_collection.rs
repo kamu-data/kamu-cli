@@ -649,11 +649,11 @@ async fn test_add_entry_errors() {
     let res = harness
         .execute_authorized_query(harness.add_entry_request(
             &did,
-            json!({
+            &json!({
                 "path": "/foo",
                 "ref": foo,
             }),
-            Some(expected_head.clone()),
+            Some(&expected_head),
         ))
         .await;
 
@@ -875,8 +875,8 @@ impl GraphQLDatasetsHarness {
     pub fn add_entry_request(
         &self,
         did: &str,
-        entry: serde_json::Value,
-        expected_head: Option<odf::Multihash>,
+        entry: &serde_json::Value,
+        expected_head: Option<&odf::Multihash>,
     ) -> async_graphql::Request {
         async_graphql::Request::new(indoc!(
             r#"
