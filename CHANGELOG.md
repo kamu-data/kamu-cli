@@ -19,6 +19,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - GQL: `dataset_metadata`: Added new method `MetadataProjection` to get `[MetadataExtendedBlock]` filtered by types and range
 ### Fixed
+- GQL: `add_entry`: Return CASError if expected head not found
 - Return bad request response for requests with empty bearer authentication token
 
 ## [0.245.3] - 2025-07-29
