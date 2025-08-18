@@ -1136,17 +1136,26 @@ async fn test_data_writer_schema_evolution_from_inferred() {
 
     // Set explicit schema with extra attributes
     harness
-        .commit_event(
-            odf::metadata::SetDataSchema::new(odf::schema::DataSchema::new(vec![
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
                 odf::schema::DataField::i64("offset"),
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
-                odf::schema::DataField::timestamp_millis_utc("event_time").optional().extra(json!({"opendatafabric.org/description": "Date the census was done rounded to a year mark"})),
-                odf::schema::DataField::string("city").optional().extra(json!({"opendatafabric.org/description": "Name of the city"})),
-                odf::schema::DataField::i64("population").optional().extra(json!({"opendatafabric.org/description": "Estimated population"})),
-            ]))
-        )
-        .await.unwrap();
+                odf::schema::DataField::timestamp_millis_utc("event_time")
+                    .optional()
+                    .extra(&odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    )),
+                odf::schema::DataField::string("city").optional().extra(
+                    &odf::metadata::ext::AttrDescription::new("Name of the city"),
+                ),
+                odf::schema::DataField::i64("population").optional().extra(
+                    &odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+            ]),
+        ))
+        .await
+        .unwrap();
 
     // Round 2
     harness
@@ -1172,9 +1181,17 @@ async fn test_data_writer_schema_evolution_from_inferred() {
             odf::schema::DataField::i64("offset"),
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
-            odf::schema::DataField::timestamp_millis_utc("event_time").optional().extra(json!({"opendatafabric.org/description": "Date the census was done rounded to a year mark"})),
-            odf::schema::DataField::string("city").optional().extra(json!({"opendatafabric.org/description": "Name of the city"})),
-            odf::schema::DataField::i64("population").optional().extra(json!({"opendatafabric.org/description": "Estimated population"})),
+            odf::schema::DataField::timestamp_millis_utc("event_time")
+                .optional()
+                .extra(&odf::metadata::ext::AttrDescription::new(
+                    "Date the census was done rounded to a year mark",
+                )),
+            odf::schema::DataField::string("city").optional().extra(
+                &odf::metadata::ext::AttrDescription::new("Name of the city"),
+            ),
+            odf::schema::DataField::i64("population").optional().extra(
+                &odf::metadata::ext::AttrDescription::new("Estimated population"),
+            ),
         ]),
     );
 
@@ -1204,17 +1221,26 @@ async fn test_data_writer_schema_evolution_from_explicit() {
     // NOTE: All fields are required, while actual Arrow schema will differ in
     // nullability
     harness
-        .commit_event(
-            odf::metadata::SetDataSchema::new(odf::schema::DataSchema::new(vec![
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
                 odf::schema::DataField::i64("offset"),
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
-                odf::schema::DataField::timestamp_millis_utc("event_time").extra(json!({"opendatafabric.org/description": "Date the census was done rounded to a year mark"})),
-                odf::schema::DataField::string("city").extra(json!({"opendatafabric.org/description": "Name of the city"})),
-                odf::schema::DataField::i64("population").extra(json!({"opendatafabric.org/description": "Estimated population"})),
-            ]))
-        )
-        .await.unwrap();
+                odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                    &odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    ),
+                ),
+                odf::schema::DataField::string("city").extra(
+                    &odf::metadata::ext::AttrDescription::new("Name of the city"),
+                ),
+                odf::schema::DataField::i64("population").extra(
+                    &odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+            ]),
+        ))
+        .await
+        .unwrap();
 
     // Round 1: Write conforming data
     harness

@@ -27,7 +27,7 @@ testing = ["dep:pretty_assertions"]
 
 
 [dependencies]
-odf-metadata = { workspace = true }
+odf-metadata = { workspace = true, features = ["arrow"] }
 
 async-trait = "0.1"
 arrow = { version = "55", default-features = false }

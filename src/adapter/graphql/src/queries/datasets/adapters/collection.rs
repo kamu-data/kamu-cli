@@ -20,11 +20,38 @@ pub struct Collection {
 }
 
 impl Collection {
-    pub fn dataset_shapshot(
+    pub fn dataset_snapshot(
         alias: odf::DatasetAlias,
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
-    ) -> odf::DatasetSnapshot {
+    ) -> Result<odf::DatasetSnapshot, odf::schema::UnsupportedSchema> {
+        let extra_columns_ddl: Vec<String> = extra_columns
+            .into_iter()
+            .map(|c| format!("{} {}", c.name, c.data_type.ddl))
+            .collect();
+
+        let extra_columns_schema =
+            odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
+
+        let schema = odf::schema::DataSchema::new(
+            [
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("path"),
+                odf::schema::DataField::string("ref").extra(&odf::schema::ext::AttrType::new(
+                    odf::schema::ext::DataTypeExt::did(),
+                )),
+            ]
+            .into_iter()
+            .chain(extra_columns_schema.fields)
+            .collect(),
+        )
+        .extra(&odf::schema::ext::AttrArchetype::new(
+            odf::schema::ext::DatasetArchetype::Collection,
+        ));
+
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
@@ -32,11 +59,7 @@ impl Collection {
                     ["op INT", "path STRING", "ref STRING"]
                         .into_iter()
                         .map(str::to_string)
-                        .chain(
-                            extra_columns
-                                .into_iter()
-                                .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
-                        )
+                        .chain(extra_columns_ddl)
                         .collect(),
                 ),
                 ..Default::default()
@@ -49,14 +72,17 @@ impl Collection {
             ),
         };
 
-        odf::DatasetSnapshot {
+        Ok(odf::DatasetSnapshot {
             name: alias,
             kind: odf::DatasetKind::Root,
-            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
-                .into_iter()
-                .chain(extra_events)
-                .collect(),
-        }
+            metadata: [
+                odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema::new(schema)),
+                odf::MetadataEvent::AddPushSource(push_source),
+            ]
+            .into_iter()
+            .chain(extra_events)
+            .collect(),
+        })
     }
 }
 

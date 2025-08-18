@@ -945,7 +945,7 @@ async fn test_append_set_data_schema_evolution() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time"),
-                odf::schema::DataField::string("city").extra(json!({"kamu.dev/test": "foo"})),
+                odf::schema::DataField::string("city").extra_json(json!({"kamu.dev/test": "foo"})),
                 odf::schema::DataField::i64("population"),
             ])))
             .prev(&head, 1)
