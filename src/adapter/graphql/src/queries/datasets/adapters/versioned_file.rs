@@ -28,7 +28,38 @@ impl VersionedFile {
         alias: odf::DatasetAlias,
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
-    ) -> odf::DatasetSnapshot {
+    ) -> Result<odf::DatasetSnapshot, odf::schema::UnsupportedSchema> {
+        let extra_columns_ddl: Vec<String> = extra_columns
+            .into_iter()
+            .map(|c| format!("{} {}", c.name, c.data_type.ddl))
+            .collect();
+
+        let extra_columns_schema =
+            odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
+
+        let schema = odf::schema::DataSchema::new(
+            [
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::i32("version"),
+                odf::schema::DataField::string("content_hash").extra(
+                    &odf::schema::ext::AttrType::new(odf::schema::ext::DataTypeExt::object_link(
+                        odf::schema::ext::DataTypeExt::multihash(),
+                    )),
+                ),
+                odf::schema::DataField::i64("content_length"),
+                odf::schema::DataField::string("content_type").optional(),
+            ]
+            .into_iter()
+            .chain(extra_columns_schema.fields)
+            .collect(),
+        )
+        .extra(&odf::schema::ext::AttrArchetype::new(
+            odf::schema::ext::DatasetArchetype::VersionedFile,
+        ));
+
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
@@ -41,11 +72,7 @@ impl VersionedFile {
                     ]
                     .into_iter()
                     .map(str::to_string)
-                    .chain(
-                        extra_columns
-                            .into_iter()
-                            .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
-                    )
+                    .chain(extra_columns_ddl)
                     .collect(),
                 ),
                 ..Default::default()
@@ -54,14 +81,17 @@ impl VersionedFile {
             merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
         };
 
-        odf::DatasetSnapshot {
+        Ok(odf::DatasetSnapshot {
             name: alias,
             kind: odf::DatasetKind::Root,
-            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
-                .into_iter()
-                .chain(extra_events)
-                .collect(),
-        }
+            metadata: [
+                odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema::new(schema)),
+                odf::MetadataEvent::AddPushSource(push_source),
+            ]
+            .into_iter()
+            .chain(extra_events)
+            .collect(),
+        })
     }
 
     pub async fn get_entry(

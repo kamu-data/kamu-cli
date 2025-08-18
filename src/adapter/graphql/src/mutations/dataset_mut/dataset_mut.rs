@@ -208,9 +208,10 @@ impl DatasetMut {
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = DatasetMut_as_versioned_file, skip_all)]
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileMut>> {
-        if !Dataset::is_versioned_file(self.dataset_request_state.resolved_dataset(ctx).await?)
-            .await?
-        {
+        let dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let archetype = Dataset::get_archetype(dataset).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
             return Ok(None);
         }
 
@@ -220,13 +221,14 @@ impl DatasetMut {
     /// Downcast a dataset to a collection interface
     #[tracing::instrument(level = "info", name = DatasetMut_as_collection, skip_all)]
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<CollectionMut>> {
-        if !Dataset::is_collection(self.dataset_request_state.resolved_dataset(ctx).await?).await? {
+        let dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let archetype = Dataset::get_archetype(dataset).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {
             return Ok(None);
         }
 
-        Ok(Some(CollectionMut::new(
-            self.dataset_request_state.resolved_dataset(ctx).await?,
-        )))
+        Ok(Some(CollectionMut::new(dataset)))
     }
 }
 

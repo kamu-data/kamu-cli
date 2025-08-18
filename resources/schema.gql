@@ -1062,6 +1062,11 @@ enum DatasetAccessRole {
 
 scalar DatasetAlias
 
+enum DatasetArchetype {
+	COLLECTION
+	VERSIONED_FILE
+}
+
 type DatasetCollaboration {
 	"""
 	Accounts (and their roles) that have access to the dataset
@@ -1322,6 +1327,10 @@ type DatasetMetadata {
 	"""
 	currentVocab: SetVocab
 	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
+	"""
+	Experimental: Current archetype as per `kamu.dev/archetype` annotation, if any
+	"""
+	currentArchetype: DatasetArchetype
 }
 
 type DatasetMetadataMut {

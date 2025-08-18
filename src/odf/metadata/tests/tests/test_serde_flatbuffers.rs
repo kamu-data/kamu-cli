@@ -9,6 +9,7 @@
 
 use chrono::prelude::*;
 use digest::Digest;
+use opendatafabric_metadata::schema::ext::*;
 use opendatafabric_metadata::serde::flatbuffers::*;
 use opendatafabric_metadata::serde::*;
 use opendatafabric_metadata::*;
@@ -220,27 +221,21 @@ fn test_serializer_stability() {
 #[cfg(feature = "arrow")]
 #[test]
 fn serde_set_data_schema() {
-    use serde_json::json;
+    use opendatafabric_metadata::ext::{AttrArchetype, AttrType, DataTypeExt};
 
     let expected_schema = DataSchema::new(vec![
         DataField::string("city").encoding(ArrowBufferEncoding::View {
             offset_bit_width: Some(32),
         }),
         DataField::u64("population"),
-        DataField::string("census").optional().extra(json!({
-            "kamu.dev/logicalType": "multihash",
-            "kamu.dev/referenceType": "embedded",
-        })),
+        DataField::string("census")
+            .optional()
+            .extra(&AttrType::new(DataTypeExt::object_link(
+                DataTypeExt::multihash(),
+            ))),
         DataField::list("links", DataType::string()),
     ])
-    .extra(json!({
-        "kamu.dev/archetype": "table",
-        "kamu.dev/nested": {
-                "x": "a",
-                "y": "b",
-            },
-        }
-    ));
+    .extra(&AttrArchetype::new(DatasetArchetype::Collection));
 
     let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
 
@@ -257,7 +252,7 @@ fn serde_set_data_schema() {
     assert_eq!(expected_block, actual_block);
 
     let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
-    let hash_expected = "b78ea8622a86e8452c03d7652a48568fa377b22e432dd3c124725037e87cca27";
+    let hash_expected = "33d0a65cfb9853f14830fc84e443767d9acfedd24d13c3c22bdc82f3be1b507f";
 
     assert_eq!(hash_actual, hash_expected);
 
