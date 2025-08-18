@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{
+    DatasetDependenciesMessage,
     DatasetExternallyChangedMessage,
     DatasetLifecycleMessage,
     GetIncrementError,
@@ -35,6 +36,7 @@ use crate::{
 #[dill::component]
 #[dill::interface(dyn MessageConsumer)]
 #[dill::interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[dill::interface(dyn MessageConsumerT<DatasetDependenciesMessage>)]
 #[dill::interface(dyn MessageConsumerT<DatasetExternallyChangedMessage>)]
 #[dill::meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_DATASETS_EVENT_BRIDGE,
@@ -90,6 +92,36 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowDatasetsEventBridge {
 
             DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
                 // No action required
+            }
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetDependenciesMessage> for FlowDatasetsEventBridge {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "FlowDatasetsEventBridge[DatasetDependenciesMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        catalog: &dill::Catalog,
+        message: &DatasetDependenciesMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset dependencies message");
+
+        match message {
+            DatasetDependenciesMessage::Updated(updated_message) => {
+                let flow_scope = FlowScopeDataset::make_scope(&updated_message.dataset_id);
+                self.flow_sensor_dispatcher
+                    .refresh_sensor_dependencies(&flow_scope, catalog)
+                    .await
+                    .int_err()?;
             }
         }
 

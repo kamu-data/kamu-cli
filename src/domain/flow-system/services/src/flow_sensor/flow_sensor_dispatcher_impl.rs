@@ -45,6 +45,7 @@ impl FlowSensorDispatcherImpl {
 struct State {
     sensors: HashMap<FlowScope, Arc<dyn FlowSensor>>,
     sensitive_scopes_by_input_scope: HashMap<FlowScope, HashSet<FlowScope>>,
+    sensitive_to_by_output_scope: HashMap<FlowScope, HashSet<FlowScope>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,7 +71,13 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
         }
 
         // Get scopes this sensor is interested in
-        let sensitive_to_scopes = flow_sensor.get_sensitive_to_scopes();
+        let sensitive_to_scopes = flow_sensor.get_sensitive_to_scopes(catalog).await;
+
+        // Remember the sensor's interest in these scopes, as it might get updated later
+        state.sensitive_to_by_output_scope.insert(
+            flow_scope.clone(),
+            sensitive_to_scopes.iter().cloned().collect(),
+        );
 
         // Register sensor for each scope it's interested in
         for sensitive_to_scope in sensitive_to_scopes {
@@ -94,10 +101,10 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
         let mut state = self.state.write().await;
 
         // Try to remove the sensor - if it exists, clean up its scope mappings
-        if let Some(removed_sensor) = state.sensors.remove(flow_scope) {
-            // Get scopes this sensor was interested in from the removed sensor
-            let sensitive_to_scopes = removed_sensor.get_sensitive_to_scopes();
+        state.sensors.remove(flow_scope);
 
+        // Get scopes this sensor was interested in from the removed sensor
+        if let Some(sensitive_to_scopes) = state.sensitive_to_by_output_scope.remove(flow_scope) {
             // Remove sensor from mappings
             for sensitive_to_scope in sensitive_to_scopes {
                 if let Some(sensor_set) = state
@@ -110,6 +117,72 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
                     }
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    async fn refresh_sensor_dependencies(
+        &self,
+        flow_scope: &FlowScope,
+        catalog: &dill::Catalog,
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.write().await;
+        if let Some(sensor) = state.sensors.get(flow_scope) {
+            let latest_dependencies: HashSet<FlowScope> = sensor
+                .get_sensitive_to_scopes(catalog)
+                .await
+                .into_iter()
+                .collect();
+
+            // Get the current dependencies for this sensor
+            let current_dependencies = state
+                .sensitive_to_by_output_scope
+                .get(flow_scope)
+                .cloned()
+                .unwrap_or_default();
+
+            // Find dependencies to add (in latest but not in current)
+            let dependencies_to_add: HashSet<_> = latest_dependencies
+                .difference(&current_dependencies)
+                .cloned()
+                .collect();
+
+            // Find dependencies to remove (in current but not in latest)
+            let dependencies_to_remove: HashSet<_> = current_dependencies
+                .difference(&latest_dependencies)
+                .cloned()
+                .collect();
+
+            // Add new dependencies to sensitive_scopes_by_input_scope
+            for new_dependency in dependencies_to_add {
+                state
+                    .sensitive_scopes_by_input_scope
+                    .entry(new_dependency)
+                    .or_insert_with(HashSet::new)
+                    .insert(flow_scope.clone());
+            }
+
+            // Remove old dependencies from sensitive_scopes_by_input_scope
+            for old_dependency in dependencies_to_remove {
+                if let Some(sensor_set) = state
+                    .sensitive_scopes_by_input_scope
+                    .get_mut(&old_dependency)
+                {
+                    sensor_set.remove(flow_scope);
+                    // Clean up empty sets
+                    if sensor_set.is_empty() {
+                        state
+                            .sensitive_scopes_by_input_scope
+                            .remove(&old_dependency);
+                    }
+                }
+            }
+
+            // Update the stored dependencies for this sensor
+            state
+                .sensitive_to_by_output_scope
+                .insert(flow_scope.clone(), latest_dependencies);
         }
 
         Ok(())
@@ -160,10 +233,10 @@ impl FlowScopeRemovalHandler for FlowSensorDispatcherImpl {
         let mut state = self.state.write().await;
 
         // Remove the sensor associated with this flow scope, if it exists
-        if let Some(sensor) = state.sensors.remove(flow_scope) {
-            // Clean up this sensor's associations with all scopes
-            let sensitive_to_scopes = sensor.get_sensitive_to_scopes();
+        state.sensors.remove(flow_scope);
 
+        // Clean up this sensor's associations with all scopes
+        if let Some(sensitive_to_scopes) = state.sensitive_to_by_output_scope.remove(flow_scope) {
             for other_scope in sensitive_to_scopes {
                 if let Some(sensor_set) =
                     state.sensitive_scopes_by_input_scope.get_mut(&other_scope)

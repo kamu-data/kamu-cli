@@ -8,12 +8,20 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::sync::Arc;
 
 use chrono::Utc;
 use kamu_adapter_flow_dataset::*;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
+use kamu_datasets::{
+    DatasetDependenciesMessage,
+    DatasetIncrementQueryService,
+    DatasetIntervalIncrement,
+    MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+};
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
+use messaging_outbox::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,15 +30,20 @@ async fn test_sensor_basic_crud() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
     let baz_id = odf::DatasetID::new_seeded_ed25519(b"baz");
+    let quix_id = odf::DatasetID::new_seeded_ed25519(b"quix");
 
-    let mut sensor =
-        DerivedDatasetFlowSensorHarness::create_sensor(&foo_id, vec![&bar_id, &baz_id]);
+    let harness = DerivedDatasetFlowSensorHarness::new(Default::default());
+    harness
+        .declare_dependency(&foo_id, &[bar_id.clone(), baz_id.clone()], &[])
+        .await;
+
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
 
     let flow_scope = sensor.flow_scope();
     assert_eq!(flow_scope.scope_type(), FLOW_SCOPE_TYPE_DATASET);
     assert_eq!(FlowScopeDataset::new(flow_scope).dataset_id(), foo_id);
 
-    let scopes = sensor.get_sensitive_to_scopes();
+    let scopes = sensor.get_sensitive_to_scopes(&harness.catalog).await;
     assert_eq!(scopes.len(), 2);
     assert_eq!(scopes[0].scope_type(), FLOW_SCOPE_TYPE_DATASET);
     assert_eq!(scopes[1].scope_type(), FLOW_SCOPE_TYPE_DATASET);
@@ -43,11 +56,11 @@ async fn test_sensor_basic_crud() {
         [bar_id.clone(), baz_id.clone()].into_iter().collect()
     );
 
-    let quix_id = odf::DatasetID::new_seeded_ed25519(b"quix");
-    sensor.add_sensitive_dataset(quix_id.clone()).unwrap();
-    sensor.remove_sensitive_dataset(&bar_id).unwrap();
+    harness
+        .declare_dependency(&foo_id, &[quix_id.clone(), baz_id.clone()], &[bar_id])
+        .await;
 
-    let scopes = sensor.get_sensitive_to_scopes();
+    let scopes = sensor.get_sensitive_to_scopes(&harness.catalog).await;
     assert_eq!(scopes.len(), 2);
     assert_eq!(scopes[0].scope_type(), FLOW_SCOPE_TYPE_DATASET);
     assert_eq!(scopes[1].scope_type(), FLOW_SCOPE_TYPE_DATASET);
@@ -55,10 +68,7 @@ async fn test_sensor_basic_crud() {
         .iter()
         .map(|scope| FlowScopeDataset::new(scope).dataset_id())
         .collect();
-    assert_eq!(
-        scope_ids,
-        [quix_id.clone(), baz_id.clone()].into_iter().collect()
-    );
+    assert_eq!(scope_ids, [baz_id, quix_id].into_iter().collect());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,7 +91,9 @@ async fn test_sensor_activation_up_to_date() {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
-    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id, vec![&bar_id]);
+    harness.declare_dependency(&foo_id, &[bar_id], &[]).await;
+
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
 
     sensor
         .on_activated(&harness.catalog, Utc::now())
@@ -144,7 +156,9 @@ async fn test_sensor_activation_new_data() {
         mock_flow_run_service: Some(mock_flow_run_service),
         mock_dataset_increment_query_service: Some(mock_dataset_increment_query_service),
     });
-    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id, vec![&bar_id]);
+    harness.declare_dependency(&foo_id, &[bar_id], &[]).await;
+
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
 
     sensor
         .on_activated(&harness.catalog, Utc::now())
@@ -161,8 +175,9 @@ async fn test_sensor_sensitization_wrong_dataset() {
     let baz_id = odf::DatasetID::new_seeded_ed25519(b"baz");
 
     let harness = DerivedDatasetFlowSensorHarness::new(Default::default());
+    harness.declare_dependency(&foo_id, &[bar_id], &[]).await;
 
-    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id, vec![&bar_id]);
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
     let res = sensor
         .on_sensitized(
             &harness.catalog,
@@ -197,8 +212,11 @@ async fn test_sensor_sensitization_got_new_data() {
         mock_flow_run_service: Some(mock_flow_run_service),
         ..Default::default()
     });
+    harness
+        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .await;
 
-    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id, vec![&bar_id]);
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
 
     sensor
         .on_sensitized(
@@ -225,8 +243,11 @@ async fn test_sensor_sensitization_breaking_change_ignored() {
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
     let harness = DerivedDatasetFlowSensorHarness::new(Default::default());
+    harness
+        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .await;
 
-    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id, vec![&bar_id]);
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
 
     sensor
         .on_sensitized(
@@ -259,10 +280,12 @@ async fn test_sensor_sensitization_breaking_change_recovered() {
         mock_flow_run_service: Some(mock_flow_run_service),
         ..Default::default()
     });
+    harness
+        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .await;
 
     let sensor = DerivedDatasetFlowSensorHarness::create_sensor_with_reactive_rule(
         &foo_id,
-        vec![&bar_id],
         ReactiveRule {
             for_new_data: BatchingRule::Immediate,
             for_breaking_change: BreakingChangeRule::Recover,
@@ -286,6 +309,7 @@ async fn test_sensor_sensitization_breaking_change_recovered() {
 
 struct DerivedDatasetFlowSensorHarness {
     catalog: dill::Catalog,
+    outbox: Arc<dyn Outbox>,
 }
 
 #[derive(Default)]
@@ -304,6 +328,8 @@ impl DerivedDatasetFlowSensorHarness {
             .mock_dataset_increment_query_service
             .unwrap_or_default();
 
+        use dill::Component;
+
         let mut b = dill::CatalogBuilder::new();
         b.add_value(mock_transform_flow_evaluator);
         b.bind::<dyn TransformFlowEvaluator, MockTransformFlowEvaluator>();
@@ -311,28 +337,53 @@ impl DerivedDatasetFlowSensorHarness {
         b.bind::<dyn FlowRunService, MockFlowRunService>();
         b.add_value(mock_dataset_increment_query_service);
         b.bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>();
+        b.add::<DependencyGraphServiceImpl>();
+        b.add_builder(
+            OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
+        );
+        b.bind::<dyn Outbox, OutboxImmediateImpl>();
+
+        register_message_dispatcher::<DatasetDependenciesMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+        );
 
         let catalog = b.build();
-        Self { catalog }
+        Self {
+            outbox: catalog.get_one().unwrap(),
+            catalog,
+        }
     }
 
-    fn create_sensor(
-        dataset_id: &odf::DatasetID,
-        input_dataset_ids: Vec<&odf::DatasetID>,
-    ) -> DerivedDatasetFlowSensor {
-        Self::create_sensor_with_reactive_rule(dataset_id, input_dataset_ids, ReactiveRule::empty())
+    async fn declare_dependency(
+        &self,
+        downstream_dataset_id: &odf::DatasetID,
+        added_upstream_ids: &[odf::DatasetID],
+        removed_upstream_ids: &[odf::DatasetID],
+    ) {
+        let message = DatasetDependenciesMessage::updated(
+            downstream_dataset_id,
+            added_upstream_ids.to_vec(),
+            removed_upstream_ids.to_vec(),
+        );
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+                message,
+            )
+            .await
+            .unwrap();
+    }
+
+    fn create_sensor(dataset_id: &odf::DatasetID) -> DerivedDatasetFlowSensor {
+        Self::create_sensor_with_reactive_rule(dataset_id, ReactiveRule::empty())
     }
 
     fn create_sensor_with_reactive_rule(
         dataset_id: &odf::DatasetID,
-        input_dataset_ids: Vec<&odf::DatasetID>,
         reactive_rule: ReactiveRule,
     ) -> DerivedDatasetFlowSensor {
-        DerivedDatasetFlowSensor::new(
-            dataset_id,
-            input_dataset_ids.into_iter().cloned().collect(),
-            reactive_rule,
-        )
+        DerivedDatasetFlowSensor::new(dataset_id, reactive_rule)
     }
 
     fn make_input_activation_cause(

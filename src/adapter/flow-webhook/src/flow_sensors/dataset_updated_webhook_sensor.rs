@@ -40,7 +40,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         &self.webhook_flow_scope
     }
 
-    fn get_sensitive_to_scopes(&self) -> Vec<fs::FlowScope> {
+    async fn get_sensitive_to_scopes(&self, _: &dill::Catalog) -> Vec<fs::FlowScope> {
         vec![FlowScopeDataset::make_scope(&self.dataset_id)]
     }
 

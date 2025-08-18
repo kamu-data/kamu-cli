@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::PullResult;
-use kamu_datasets::{DatasetIncrementQueryService, DependencyGraphService};
+use kamu_datasets::DatasetIncrementQueryService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
@@ -35,7 +35,6 @@ pub struct FlowControllerTransform {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
 #[async_trait::async_trait]
@@ -52,16 +51,7 @@ impl fs::FlowController for FlowControllerTransform {
     ) -> Result<(), InternalError> {
         let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
 
-        use futures::StreamExt;
-        let upstream_dataset_ids = self
-            .dependency_graph_service
-            .get_upstream_dependencies(&dataset_id)
-            .await
-            .collect()
-            .await;
-
-        let sensor =
-            DerivedDatasetFlowSensor::new(&dataset_id, upstream_dataset_ids, reactive_rule);
+        let sensor = DerivedDatasetFlowSensor::new(&dataset_id, reactive_rule);
         self.flow_sensor_dispatcher
             .register_sensor(&self.catalog, activation_time, Arc::new(sensor))
             .await?;

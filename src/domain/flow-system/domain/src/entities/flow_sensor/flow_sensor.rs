@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::any::Any;
+
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use thiserror::Error;
@@ -16,10 +18,10 @@ use crate::{FlowActivationCause, FlowBinding, FlowScope};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowSensor: Send + Sync {
+pub trait FlowSensor: Send + Sync + Any {
     fn flow_scope(&self) -> &FlowScope;
 
-    fn get_sensitive_to_scopes(&self) -> Vec<FlowScope>;
+    async fn get_sensitive_to_scopes(&self, catalog: &dill::Catalog) -> Vec<FlowScope>;
 
     async fn on_activated(
         &self,

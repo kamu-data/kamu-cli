@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::TransformStatus;
-use kamu_datasets::DatasetIncrementQueryService;
+use kamu_datasets::*;
 use kamu_flow_system::{self as fs, FlowSensorSensitizationError};
 
 use crate::{
@@ -29,46 +27,15 @@ use crate::{
 
 pub struct DerivedDatasetFlowSensor {
     flow_scope: fs::FlowScope,
-    sensitive_dataset_ids: HashSet<odf::DatasetID>,
     reactive_rule: fs::ReactiveRule,
 }
 
 impl DerivedDatasetFlowSensor {
-    pub fn new(
-        dataset_id: &odf::DatasetID,
-        input_dataset_ids: Vec<odf::DatasetID>,
-        reactive_rule: fs::ReactiveRule,
-    ) -> Self {
+    pub fn new(dataset_id: &odf::DatasetID, reactive_rule: fs::ReactiveRule) -> Self {
         Self {
             flow_scope: FlowScopeDataset::make_scope(dataset_id),
-            sensitive_dataset_ids: HashSet::from_iter(input_dataset_ids),
             reactive_rule,
         }
-    }
-
-    pub fn add_sensitive_dataset(
-        &mut self,
-        dataset_id: odf::DatasetID,
-    ) -> Result<(), InternalError> {
-        if self.sensitive_dataset_ids.contains(&dataset_id) {
-            return Err(InternalError::new(format!(
-                "Dataset '{dataset_id}' is already in the sensitivity list",
-            )));
-        }
-        self.sensitive_dataset_ids.insert(dataset_id);
-        Ok(())
-    }
-
-    pub fn remove_sensitive_dataset(
-        &mut self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(), InternalError> {
-        if !self.sensitive_dataset_ids.remove(dataset_id) {
-            return Err(InternalError::new(format!(
-                "Dataset '{dataset_id}' is not in the sensitivity list",
-            )));
-        }
-        Ok(())
     }
 
     async fn run_transform_flow(
@@ -131,8 +98,18 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
         &self.flow_scope
     }
 
-    fn get_sensitive_to_scopes(&self) -> Vec<fs::FlowScope> {
-        self.sensitive_dataset_ids
+    async fn get_sensitive_to_scopes(&self, catalog: &dill::Catalog) -> Vec<fs::FlowScope> {
+        let dependency_graph_service = catalog.get_one::<dyn DependencyGraphService>().unwrap();
+        let dataset_id = FlowScopeDataset::new(&self.flow_scope).dataset_id();
+
+        use futures::StreamExt;
+        let upstream_dataset_ids: Vec<_> = dependency_graph_service
+            .get_upstream_dependencies(&dataset_id)
+            .await
+            .collect()
+            .await;
+
+        upstream_dataset_ids
             .iter()
             .map(FlowScopeDataset::make_scope)
             .collect()
@@ -218,10 +195,16 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
     ) -> Result<(), FlowSensorSensitizationError> {
         tracing::info!(?self.flow_scope, ?input_flow_binding, ?activation_cause, "Derived dataset flow sensor sensitized");
 
-        // First we should ensure we are sensitized with a valid input dataset
-
+        // Extract dataset IDs
         let input_dataset_id = FlowScopeDataset::new(&input_flow_binding.scope).dataset_id();
-        if !self.sensitive_dataset_ids.contains(&input_dataset_id) {
+        let own_dataset_id = FlowScopeDataset::new(&self.flow_scope).dataset_id();
+
+        // First we should ensure we are sensitized with a valid input dataset
+        let dependency_graph_service = catalog.get_one::<dyn DependencyGraphService>().unwrap();
+        if !dependency_graph_service
+            .dependency_exists(&input_dataset_id, &own_dataset_id)
+            .await?
+        {
             return Err(FlowSensorSensitizationError::InvalidInputFlowBinding {
                 binding: input_flow_binding.clone(),
             });
