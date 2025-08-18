@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+use thiserror::Error;
 
 use crate::{FlowActivationCause, FlowBinding, FlowScope};
 
@@ -31,7 +32,18 @@ pub trait FlowSensor: Send + Sync {
         catalog: &dill::Catalog,
         input_flow_binding: &FlowBinding,
         activation_cause: &FlowActivationCause,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), FlowSensorSensitizationError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum FlowSensorSensitizationError {
+    #[error("Flow binding unexpected: {binding:?}")]
+    InvalidInputFlowBinding { binding: FlowBinding },
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

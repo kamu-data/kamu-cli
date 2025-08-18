@@ -6832,6 +6832,7 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-accounts",
+ "kamu-adapter-flow-dataset",
  "kamu-adapter-task-dataset",
  "kamu-core",
  "kamu-datasets",

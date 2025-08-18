@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::TransformStatus;
 use kamu_datasets::DatasetIncrementQueryService;
-use kamu_flow_system::{self as fs};
+use kamu_flow_system::{self as fs, FlowSensorSensitizationError};
 
 use crate::{
     DATASET_RESOURCE_TYPE,
@@ -215,29 +215,24 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
         catalog: &dill::Catalog,
         input_flow_binding: &fs::FlowBinding,
         activation_cause: &fs::FlowActivationCause,
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), FlowSensorSensitizationError> {
         tracing::info!(?self.flow_scope, ?input_flow_binding, ?activation_cause, "Derived dataset flow sensor sensitized");
 
         // First we should ensure we are sensitized with a valid input dataset
 
         let input_dataset_id = FlowScopeDataset::new(&input_flow_binding.scope).dataset_id();
         if !self.sensitive_dataset_ids.contains(&input_dataset_id) {
-            return Err(InternalError::new(format!(
-                "Flow sensor {:?} received an input dataset {} that is not in the sensitivity list",
-                self.flow_scope, input_dataset_id
-            )));
+            return Err(FlowSensorSensitizationError::InvalidInputFlowBinding {
+                binding: input_flow_binding.clone(),
+            });
         }
 
-        // Depending on what happened to the input dataset,
-        // we may need to trigger a specific flow run
         if let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause {
-            // Extract flow run service
-            let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
-
             match update.changes {
                 // Input dataset was normally updated, there is new data available to process
                 fs::ResourceChanges::NewData { .. } => {
                     // Trigger transform flow for the target dataset
+                    let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
                     self.run_transform_flow(
                         vec![activation_cause.clone()],
                         flow_run_service.as_ref(),
@@ -250,6 +245,8 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                     // Trigger metadata-only compaction, if recovery is enabled
                     match self.reactive_rule.for_breaking_change {
                         fs::BreakingChangeRule::Recover => {
+                            let flow_run_service =
+                                catalog.get_one::<dyn fs::FlowRunService>().unwrap();
                             self.run_reset_to_metadata_only(
                                 activation_cause,
                                 flow_run_service.as_ref(),
@@ -272,7 +269,8 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
             return Err(InternalError::new(format!(
                 "Flow sensor {:?} received unsupported activation cause: {:?}",
                 self.flow_scope, activation_cause
-            )));
+            ))
+            .into());
         }
 
         Ok(())

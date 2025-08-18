@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, FlowScopeDataset};
-use kamu_flow_system as fs;
+use kamu_flow_system::{self as fs, FlowSensorSensitizationError};
 
 use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 
@@ -59,16 +59,15 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         catalog: &dill::Catalog,
         input_flow_binding: &fs::FlowBinding,
         activation_cause: &fs::FlowActivationCause,
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), FlowSensorSensitizationError> {
         tracing::info!(?self.webhook_flow_scope, ?input_flow_binding, ?activation_cause, "DatasetUpdatedWebhookSensor sensitized");
 
         // Ensure sensitized for right dataset id
         let input_dataset_id = FlowScopeDataset::new(&input_flow_binding.scope).dataset_id();
         if input_dataset_id != self.dataset_id {
-            return Err(InternalError::new(format!(
-                "FlowBinding dataset ID {} does not match sensor dataset ID {}",
-                input_dataset_id, self.dataset_id
-            )));
+            return Err(FlowSensorSensitizationError::InvalidInputFlowBinding {
+                binding: input_flow_binding.clone(),
+            });
         }
 
         // React to dataset updates
@@ -78,7 +77,8 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 return Err(InternalError::new(format!(
                     "Unexpected resource type: {}",
                     update.resource_type
-                )));
+                ))
+                .into());
             }
 
             // Skip if disabled for breaking changes
@@ -116,7 +116,8 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         } else {
             Err(InternalError::new(format!(
                 "Invalid activation cause for DatasetUpdatedWebhookSensor: {activation_cause:?}",
-            )))
+            ))
+            .into())
         }
     }
 }

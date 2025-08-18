@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     FlowActivationCause,
     FlowBinding,
@@ -144,7 +144,8 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
         for sensor in sensors_to_notify {
             sensor
                 .on_sensitized(catalog, input_flow_binding, &activation_cause)
-                .await?;
+                .await
+                .int_err()?;
         }
 
         Ok(())
