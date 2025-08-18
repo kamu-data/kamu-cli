@@ -74,6 +74,14 @@ impl MockFlowSensorDispatcher {
             .returning(|_, _, _| Ok(()));
         mock
     }
+
+    pub fn with_refresh_sensor_dependencies(flow_scope: FlowScope) -> Self {
+        let mut mock = MockFlowSensorDispatcher::new();
+        mock.expect_refresh_sensor_dependencies()
+            .withf(move |scope, _| scope == &flow_scope)
+            .returning(|_, _| Ok(()));
+        mock
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
