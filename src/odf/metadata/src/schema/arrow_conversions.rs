@@ -1001,27 +1001,27 @@ mod test {
                 .encoding(ArrowBufferEncoding::Contiguous {
                     offset_bit_width: Some(32),
                 })
-                .extra(json!({"foo.com/foo": "a"})),
+                .extra_json(json!({"foo.com/foo": "a"})),
             DataField::string("utf8_view")
                 .encoding(ArrowBufferEncoding::View {
                     offset_bit_width: Some(32),
                 })
-                .extra(json!({"foo.com/foo": "b"})),
+                .extra_json(json!({"foo.com/foo": "b"})),
             DataField::date("date")
                 .encoding(ArrowDateEncoding {
                     unit: ArrowDateUnit::Day,
                 })
-                .extra(json!({"foo.com/foo": "c"})),
+                .extra_json(json!({"foo.com/foo": "c"})),
             DataField::date("date_millis")
                 .encoding(ArrowDateEncoding {
                     unit: ArrowDateUnit::Millisecond,
                 })
-                .extra(json!({"foo.com/foo": "d"})),
+                .extra_json(json!({"foo.com/foo": "d"})),
             DataField::decimal("decimal", 10, 5)
                 .encoding(ArrowDecimalEncoding { bit_width: 256 })
-                .extra(json!({"foo.com/foo": "e"})),
+                .extra_json(json!({"foo.com/foo": "e"})),
         ])
-        .extra(json!({
+        .extra_json(json!({
             "foo.com/bar": "x",
         }));
 
