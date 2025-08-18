@@ -172,7 +172,7 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
     ) -> Result<ts::LogicalPlan, InternalError> {
         let subscription_scope = FlowScopeSubscription::new(&flow.flow_binding.scope);
 
-        let subscription_id = subscription_scope.webhook_subscription_id();
+        let subscription_id = subscription_scope.subscription_id();
         let event_type = subscription_scope.event_type();
         let maybe_dataset_id = subscription_scope.maybe_dataset_id();
 

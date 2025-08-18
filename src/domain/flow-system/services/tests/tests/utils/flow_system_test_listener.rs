@@ -160,7 +160,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                             FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
                                 let subscription_scope =
                                     FlowScopeSubscription::new(&flow_binding.scope);
-                                let subscription_id = subscription_scope.webhook_subscription_id();
+                                let subscription_id = subscription_scope.subscription_id();
                                 let maybe_dataset_id = subscription_scope.maybe_dataset_id();
 
                                 format!(

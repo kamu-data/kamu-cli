@@ -49,7 +49,7 @@ impl<'a> FlowScopeSubscription<'a> {
         fs::FlowScope::new(payload)
     }
 
-    pub fn webhook_subscription_id(&self) -> WebhookSubscriptionID {
+    pub fn subscription_id(&self) -> WebhookSubscriptionID {
         self.0
             .get_attribute(FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID)
             .and_then(|value| value.as_str())
@@ -102,7 +102,7 @@ mod tests {
         assert_eq!(scope.scope_type(), FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION);
 
         let unpacked = FlowScopeSubscription::new(&scope);
-        assert_eq!(unpacked.webhook_subscription_id(), subscription_id);
+        assert_eq!(unpacked.subscription_id(), subscription_id);
         assert_eq!(unpacked.event_type(), event_type);
         assert_eq!(unpacked.maybe_dataset_id(), None);
     }
@@ -118,7 +118,7 @@ mod tests {
         assert_eq!(scope.scope_type(), FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION);
 
         let unpacked = FlowScopeSubscription::new(&scope);
-        assert_eq!(unpacked.webhook_subscription_id(), subscription_id);
+        assert_eq!(unpacked.subscription_id(), subscription_id);
         assert_eq!(unpacked.event_type(), event_type);
         assert_eq!(unpacked.maybe_dataset_id(), Some(dataset_id));
     }

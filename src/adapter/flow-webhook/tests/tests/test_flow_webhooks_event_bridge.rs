@@ -319,7 +319,7 @@ impl TestWebhookDeliverySchedulerHarness {
 
                     let webhook_scope = FlowScopeSubscription::new(&flow_binding.scope);
                     webhook_scope.maybe_dataset_id().as_ref() == Some(&dataset_id_clone_1)
-                        && webhook_scope.webhook_subscription_id() == subscription_id
+                        && webhook_scope.subscription_id() == subscription_id
                 },
             )
             .returning(move |_, _, _, _| {

@@ -505,8 +505,8 @@ impl FlowDescriptionBuilder {
             }
 
             FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
-                let subscription_id = FlowScopeSubscription::new(&flow_state.flow_binding.scope)
-                    .webhook_subscription_id();
+                let subscription_id =
+                    FlowScopeSubscription::new(&flow_state.flow_binding.scope).subscription_id();
                 self.webhook_flow_description(ctx, flow_state, flow_type, subscription_id)
                     .await?
             }
