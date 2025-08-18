@@ -1810,11 +1810,6 @@ async fn test_smart_push_trigger_dependent_dataset_update(
             )
             .await;
 
-        kamu_api_server_client
-            .flow()
-            .wait(&derivative_dataset.dataset_id, 1)
-            .await;
-
         // Ingest data to the root dataset
         kamu_in_push_workspace
             .ingest_data(
@@ -1840,7 +1835,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
         // Check derivative dataset data was updated
         kamu_api_server_client
             .flow()
-            .wait(&derivative_dataset.dataset_id, 2)
+            .wait(&derivative_dataset.dataset_id, 1)
             .await;
 
         let mut tail_result = kamu_api_server_client

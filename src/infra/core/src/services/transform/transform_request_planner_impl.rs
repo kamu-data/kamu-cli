@@ -313,7 +313,11 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         // Filter out query inputs that have no changes
         let filtered_query_inputs: Vec<_> = query_inputs
             .into_iter()
-            .filter(|input| input.new_block_hash.is_some())
+            .filter(|input| {
+                input
+                    .new_offset
+                    .is_some_and(|offset| offset != input.prev_offset.unwrap_or_default())
+            })
             .collect();
 
         // If there is at least one query input with changes, transform is out of date

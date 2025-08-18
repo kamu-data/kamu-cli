@@ -97,6 +97,7 @@ impl std::fmt::Debug for VerifyTransformOperation {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum TransformStatus {
     UpToDate,
     NewInputDataAvailable {
