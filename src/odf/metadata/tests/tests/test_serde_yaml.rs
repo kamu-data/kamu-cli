@@ -13,9 +13,9 @@ use std::convert::TryFrom;
 use ::serde::{Deserialize, Serialize};
 use chrono::prelude::*;
 use indoc::indoc;
+use opendatafabric_metadata::ext::*;
 use opendatafabric_metadata::serde::yaml::*;
 use opendatafabric_metadata::*;
-use serde_json::json;
 
 #[test]
 fn serde_enum_tagging() {
@@ -136,20 +136,14 @@ fn serde_set_data_schema() {
             offset_bit_width: Some(32),
         }),
         DataField::u64("population"),
-        DataField::string("census").optional().extra(json!({
-            "kamu.dev/logicalType": "multihash",
-            "kamu.dev/referenceType": "embedded",
-        })),
+        DataField::string("census")
+            .optional()
+            .extra(&AttrType::new(DataTypeExt::object_link(
+                DataTypeExt::multihash(),
+            ))),
         DataField::list("links", DataType::string()),
     ])
-    .extra(json!({
-        "kamu.dev/archetype": "table",
-        "kamu.dev/nested": {
-                "x": "a",
-                "y": "b",
-            },
-        }
-    ));
+    .extra(&AttrArchetype::new(DatasetArchetype::Collection));
 
     let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
 
@@ -192,18 +186,17 @@ fn serde_set_data_schema() {
                   inner:
                     kind: String
                 extra:
-                  kamu.dev/logicalType: multihash
-                  kamu.dev/referenceType: embedded
+                  opendatafabric.org/type:
+                    kind: ObjectLink
+                    linkType:
+                      kind: Multihash
               - name: links
                 type:
                   kind: List
                   itemType:
                     kind: String
               extra:
-                kamu.dev/archetype: table
-                kamu.dev/nested:
-                  x: a
-                  y: b
+                kamu.dev/archetype: Collection
         "#
     );
 

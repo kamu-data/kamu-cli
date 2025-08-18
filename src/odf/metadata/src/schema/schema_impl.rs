@@ -29,9 +29,22 @@ impl DataSchema {
         }
     }
 
-    pub fn extra(self, attrs: serde_json::Value) -> Self {
+    /// Serializes custom attribute and merges with existing
+    pub fn extra<T: Attribute>(self, attr: &T) -> Self {
+        let mut extra = self.extra.unwrap_or_default();
+        extra.insert(attr);
         Self {
-            extra: Some(ExtraAttributes::new_from_json(attrs).unwrap()),
+            extra: extra.map_empty(),
+            ..self
+        }
+    }
+
+    /// Merges JSON object with existing attributes
+    pub fn extra_json(self, attrs: serde_json::Value) -> Self {
+        let mut extra = self.extra.unwrap_or_default();
+        extra.insert_json(attrs);
+        Self {
+            extra: extra.map_empty(),
             ..self
         }
     }
@@ -131,7 +144,27 @@ impl DataField {
             ..self
         }
     }
-    pub fn extra(self, attrs: serde_json::Value) -> Self {
+
+    /// Transforms Option<T> into T, leaving already non-optional types as-is
+    pub fn required(self) -> Self {
+        Self {
+            r#type: self.r#type.required(),
+            ..self
+        }
+    }
+
+    /// Serializes custom attribute and merges with existing
+    pub fn extra<T: Attribute>(self, attr: &T) -> Self {
+        let mut extra = self.extra.unwrap_or_default();
+        extra.insert(attr);
+        Self {
+            extra: extra.map_empty(),
+            ..self
+        }
+    }
+
+    /// Merges JSON object with existing attributes
+    pub fn extra_json(self, attrs: serde_json::Value) -> Self {
         let mut extra = self.extra.unwrap_or_default();
         extra.insert_json(attrs);
         Self {
@@ -139,6 +172,7 @@ impl DataField {
             ..self
         }
     }
+
     pub fn encoding(self, enc: impl Into<ArrowEncoding>) -> Self {
         let enc = enc.into();
         let mut extra = self.extra.unwrap_or_default();
@@ -244,6 +278,14 @@ impl DataType {
         Self::Option(DataTypeOption {
             inner: Box::new(self),
         })
+    }
+
+    /// Transforms Option<T> into T, leaving already non-optional types as-is
+    pub fn required(self) -> Self {
+        match self {
+            DataType::Option(t) => *t.inner,
+            _ => self,
+        }
     }
 }
 
