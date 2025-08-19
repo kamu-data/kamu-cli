@@ -619,7 +619,7 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
         target_catalog: &Catalog,
         message: &FlowTriggerUpdatedMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received flow configuration message");
+        tracing::debug!(received_message = ?message, "Received flow trigger message");
 
         if !self.has_agent_started() {
             // If the agent is not started yet, we do not process flow trigger updates
