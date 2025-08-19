@@ -63,6 +63,16 @@ impl<'a> CollectionMut<'a> {
             .await
         {
             Ok(res) => res,
+            Err(domain::PushIngestDataError::Planning(
+                domain::PushIngestPlanningError::HeadNotFound(e),
+            )) => {
+                return Ok(CollectionUpdateResult::CasFailed(
+                    CollectionUpdateErrorCasFailed {
+                        expected_head: e.hash.into(),
+                        actual_head: None,
+                    },
+                ));
+            }
             Err(domain::PushIngestDataError::Execution(domain::PushIngestError::CommitError(
                 odf::dataset::CommitError::MetadataAppendError(
                     odf::dataset::AppendError::RefCASFailed(e),
@@ -71,7 +81,7 @@ impl<'a> CollectionMut<'a> {
                 return Ok(CollectionUpdateResult::CasFailed(
                     CollectionUpdateErrorCasFailed {
                         expected_head: e.expected.unwrap().into(),
-                        actual_head: e.actual.unwrap().into(),
+                        actual_head: Some(e.actual.unwrap().into()),
                     },
                 ));
             }
@@ -392,7 +402,7 @@ impl CollectionUpdateUpToDate {
 #[graphql(complex)]
 pub struct CollectionUpdateErrorCasFailed {
     expected_head: Multihash<'static>,
-    actual_head: Multihash<'static>,
+    actual_head: Option<Multihash<'static>>,
 }
 #[ComplexObject]
 impl CollectionUpdateErrorCasFailed {

@@ -567,7 +567,7 @@ type CollectionProjection {
 
 type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
 	expectedHead: Multihash!
-	actualHead: Multihash!
+	actualHead: Multihash
 	isSuccess: Boolean!
 	message: String!
 }
