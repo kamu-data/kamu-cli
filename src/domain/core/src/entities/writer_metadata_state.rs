@@ -162,6 +162,12 @@ pub enum ScanMetadataError {
         SourceNotFoundError,
     ),
     #[error(transparent)]
+    HeadNotFound(
+        #[from]
+        #[backtrace]
+        odf::storage::BlockNotFoundError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -173,6 +179,9 @@ impl From<odf::dataset::AcceptVisitorError<ScanMetadataError>> for ScanMetadataE
     fn from(v: odf::dataset::AcceptVisitorError<ScanMetadataError>) -> Self {
         match v {
             odf::dataset::AcceptVisitorError::Visitor(err) => err,
+            odf::dataset::AcceptVisitorError::Traversal(odf::IterBlocksError::BlockNotFound(
+                err,
+            )) => Self::HeadNotFound(err),
             odf::dataset::AcceptVisitorError::Traversal(err) => Self::Internal(err.int_err()),
         }
     }

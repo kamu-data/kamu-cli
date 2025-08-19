@@ -53,6 +53,7 @@ impl PushIngestPlannerImpl {
             ScanMetadataError::SourceNotFound(err) => {
                 PushIngestPlanningError::SourceNotFound(err.into())
             }
+            ScanMetadataError::HeadNotFound(err) => PushIngestPlanningError::HeadNotFound(err),
             ScanMetadataError::Internal(err) => PushIngestPlanningError::Internal(err),
         })?;
         Ok(metadata_state)
