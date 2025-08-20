@@ -189,12 +189,10 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         };
 
         // Ensure start_block was found if specified
-        if tail.is_some() && !finished_range {
-            return Err(odf::dataset::InvalidIntervalError {
-                head,
-                tail: tail.unwrap(),
-            }
-            .into());
+        if let Some(tail) = tail
+            && !finished_range
+        {
+            return Err(odf::dataset::InvalidIntervalError { head, tail }.into());
         }
 
         let source = source.ok_or(

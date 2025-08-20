@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.246.0] - 2025-08-20
 ### Added
 - Webhooks are integrated into the Flow system, and support retries:
   - Webhook delivery is now a kind of a flow
