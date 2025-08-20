@@ -81,23 +81,12 @@ async fn test_update_versioned_file_use_case_errors() {
 
     let harness = UpdateVersionFileCaseHarness::new(
         MockDatasetActionAuthorizer::new()
-            .expect_check_read_dataset(&dataset_id_foo, 3, true)
-            .expect_check_write_dataset(&dataset_id_foo, 3, true),
+            .expect_check_read_dataset(&dataset_id_foo, 2, true)
+            .expect_check_write_dataset(&dataset_id_foo, 2, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
     let created_dataset_handle = harness.create_versioned_file(&alias_foo).await;
-
-    let content_args =
-        UpdateVersionFileCaseHarness::combine_content_args(b"very large content exceeds limit");
-
-    // TooLarge error
-    let res = harness
-        .use_case
-        .execute(&created_dataset_handle, Some(content_args), None, None)
-        .await;
-
-    assert_matches!(res, Err(UpdateVersionFileUseCaseError::TooLarge(_)));
 
     let content_args = UpdateVersionFileCaseHarness::combine_content_args(b"foo");
 

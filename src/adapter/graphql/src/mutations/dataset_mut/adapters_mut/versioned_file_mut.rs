@@ -150,12 +150,6 @@ impl<'a> VersionedFileMut<'a> {
                 new_head: res.new_head.into(),
                 content_hash: res.content_hash.into(),
             })),
-            Err(UpdateVersionFileUseCaseError::TooLarge(err)) => {
-                Ok(UpdateVersionResult::TooLarge(UploadVersionErrorTooLarge {
-                    upload_size: err.upload_size,
-                    upload_limit: err.upload_limit,
-                }))
-            }
             Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
                 return Ok(UpdateVersionResult::CasFailed(
                     UpdateVersionErrorCasFailed {
@@ -252,12 +246,6 @@ impl<'a> VersionedFileMut<'a> {
                 new_head: res.new_head.into(),
                 content_hash: res.content_hash.into(),
             })),
-            Err(UpdateVersionFileUseCaseError::TooLarge(err)) => {
-                Ok(UpdateVersionResult::TooLarge(UploadVersionErrorTooLarge {
-                    upload_size: err.upload_size,
-                    upload_limit: err.upload_limit,
-                }))
-            }
             Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
                 return Ok(UpdateVersionResult::CasFailed(
                     UpdateVersionErrorCasFailed {
@@ -300,12 +288,6 @@ impl<'a> VersionedFileMut<'a> {
                 new_head: res.new_head.into(),
                 content_hash: res.content_hash.into(),
             })),
-            Err(UpdateVersionFileUseCaseError::TooLarge(err)) => {
-                Ok(UpdateVersionResult::TooLarge(UploadVersionErrorTooLarge {
-                    upload_size: err.upload_size,
-                    upload_limit: err.upload_limit,
-                }))
-            }
             Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
                 return Ok(UpdateVersionResult::CasFailed(
                     UpdateVersionErrorCasFailed {
@@ -332,7 +314,6 @@ pub enum UpdateVersionResult {
     Success(UpdateVersionSuccess),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
-    TooLarge(UploadVersionErrorTooLarge),
 }
 
 #[derive(SimpleObject)]

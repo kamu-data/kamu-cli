@@ -14,7 +14,6 @@ use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
-    FileUploadLimitConfig,
     GetDataOptions,
     PushIngestDataError,
     PushIngestDataUseCase,
@@ -29,7 +28,6 @@ use kamu_datasets::{
     UpdateVersionFileResult,
     UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
-    UploadTooLargeError,
     VERSION_COLUMN_NAME,
     VersionedFileEntity,
 };
@@ -40,7 +38,6 @@ use kamu_datasets::{
 #[interface(dyn UpdateVersionFileUseCase)]
 pub struct UpdateVersionFileUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    upload_config: Arc<FileUploadLimitConfig>,
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
 }
@@ -171,15 +168,6 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
 
             last_entity
         };
-
-        if entity.content_length > self.upload_config.max_file_size_in_bytes() {
-            return Err(UpdateVersionFileUseCaseError::TooLarge(
-                UploadTooLargeError::new(
-                    entity.content_length,
-                    self.upload_config.max_file_size_in_bytes(),
-                ),
-            ));
-        }
 
         let content_hash = entity.content_hash.clone();
         let version = entity.version;

@@ -69,28 +69,7 @@ pub enum UpdateVersionFileUseCaseError {
     ),
 
     #[error(transparent)]
-    TooLarge(#[from] UploadTooLargeError),
-
-    #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Upload of {upload_size} exceeds the {upload_limit} limit")]
-pub struct UploadTooLargeError {
-    pub upload_size: usize,
-    pub upload_limit: usize,
-}
-
-impl UploadTooLargeError {
-    pub fn new(upload_size: usize, upload_limit: usize) -> Self {
-        Self {
-            upload_size,
-            upload_limit,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

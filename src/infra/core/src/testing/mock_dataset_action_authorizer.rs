@@ -213,14 +213,12 @@ impl MockDatasetActionAuthorizer {
     where
         P: Predicate<odf::DatasetID> + Sync + Send + 'static,
     {
-        println!("times = {times}, action = {action:?}, success = {success}");
         if times > 0 {
             self.expect_check_action_allowed()
                 .with(dataset_id_predicate, eq(action))
                 .times(times)
                 .returning(move |dataset_id, action| {
                     if success {
-                        println!("1");
                         Ok(())
                     } else {
                         Err(DatasetActionUnauthorizedError::not_enough_permissions(

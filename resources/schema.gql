@@ -3800,7 +3800,7 @@ type UpdateWebhookSubscriptionResultUnexpected implements UpdateWebhookSubscript
 	message: String!
 }
 
-type UploadVersionErrorTooLarge implements UpdateVersionResult & StartUploadVersionResult {
+type UploadVersionErrorTooLarge implements StartUploadVersionResult {
 	uploadSize: Int!
 	uploadLimit: Int!
 	isSuccess: Boolean!

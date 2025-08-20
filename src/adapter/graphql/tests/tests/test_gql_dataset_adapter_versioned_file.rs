@@ -432,44 +432,6 @@ async fn test_versioned_file_create_in_band() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_versioned_file_create_in_band_size_limit() {
-    let harness = GraphQLDatasetsHarness::builder()
-        .tenancy_config(TenancyConfig::MultiTenant)
-        .build()
-        .await;
-
-    // Create versioned file dataset
-    let did = harness
-        .create_versioned_file(&odf::DatasetAlias::new(
-            None,
-            odf::DatasetName::new_unchecked("foo"),
-        ))
-        .await;
-
-    // Try to upload file which exceeds size limit
-    let res = harness
-        .in_band_upload_versioned_file(
-            &did,
-            base64usnp_encode(b"large file exceeds size limit").as_str(),
-        )
-        .await;
-
-    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
-        ["uploadNewVersion"]
-        .clone();
-    pretty_assertions::assert_eq!(
-        upload_result,
-        json!({
-            "message": "Upload of 29 B exceeds the 24 B limit",
-            "uploadLimit": 24,
-            "uploadSize": 29,
-        })
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_versioned_file_extra_data() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -827,12 +789,6 @@ impl GraphQLDatasetsHarness {
                                             newVersion
                                             contentHash
                                             newHead
-                                        }
-                                        ... on UploadVersionErrorTooLarge {
-                                            message
-                                            uploadSize
-                                            uploadLimit
-
                                         }
                                     }
                                 }
