@@ -12,8 +12,6 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use dill::{component, interface};
 use futures::TryStreamExt;
-use internal_error::ResultIntoInternal;
-use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,7 +20,6 @@ use kamu_flow_system::*;
 #[interface(dyn FlowQueryService)]
 pub struct FlowQueryServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,182 +27,11 @@ pub struct FlowQueryServiceImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl FlowQueryService for FlowQueryServiceImpl {
-    /// Returns states of flows associated with a given dataset
-    /// ordered by creation time from newest to oldest
-    /// Applies specified filters
-    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows_by_dataset, level = "debug", skip_all, fields(%dataset_id))]
-    async fn list_all_flows_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-        filters: FlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        tracing::debug!(?filters, ?pagination, "Listing flows by dataset");
-
-        let total_count = self
-            .flow_event_store
-            .get_count_flows_by_dataset(dataset_id, &filters)
-            .await?;
-
-        let relevant_flow_ids: Vec<_> = self
-            .flow_event_store
-            .get_all_flow_ids_by_dataset(dataset_id, &filters, pagination)
-            .try_collect()
-            .await?;
-
-        let matched_stream = self.flow_event_store.get_stream(relevant_flow_ids);
-
-        Ok(FlowStateListing {
-            matched_stream,
-            total_count,
-        })
-    }
-
-    /// Returns initiators of flows associated with a given dataset
-    /// ordered by creation time from newest to oldest
-    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flow_initiators_by_dataset, level = "debug", skip_all, fields(%dataset_id))]
-    async fn list_all_flow_initiators_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError> {
-        Ok(FlowInitiatorListing {
-            matched_stream: self
-                .flow_event_store
-                .get_unique_flow_initiator_ids_by_dataset(dataset_id),
-        })
-    }
-
-    /// Returns states of flows associated with a given account
-    /// ordered by creation time from newest to oldest
-    /// Applies specified filters
-    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows_by_account, level = "debug", skip_all, fields(%account_id))]
-    async fn list_all_flows_by_account(
-        &self,
-        account_id: &odf::AccountID,
-        filters: AccountFlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        tracing::debug!(?filters, ?pagination, "Listing flows by account");
-
-        let owned_dataset_ids = self
-            .dataset_entry_service
-            .get_owned_dataset_ids(account_id)
-            .await
-            .int_err()?;
-
-        let filtered_dataset_ids = if !filters.by_dataset_ids.is_empty() {
-            owned_dataset_ids
-                .into_iter()
-                .filter(|dataset_id| filters.by_dataset_ids.contains(dataset_id))
-                .collect()
-        } else {
-            owned_dataset_ids
-        };
-
-        let account_dataset_id_refs = filtered_dataset_ids.iter().collect::<Vec<_>>();
-
-        let dataset_flow_filters = FlowFilters {
-            by_flow_status: filters.by_flow_status,
-            by_flow_type: filters.by_flow_type,
-            by_initiator: filters.by_initiator,
-        };
-
-        self.list_all_flows_by_dataset_ids(
-            &account_dataset_id_refs,
-            dataset_flow_filters,
-            pagination,
-        )
-        .await
-    }
-
-    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows_by_dataset_ids, level = "debug", skip_all)]
-    async fn list_all_flows_by_dataset_ids(
-        &self,
-        dataset_ids: &[&odf::DatasetID],
-        filters: FlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        let total_count = self
-            .flow_event_store
-            .get_count_flows_by_multiple_datasets(dataset_ids, &filters)
-            .await?;
-
-        let relevant_flow_ids: Vec<_> = self
-            .flow_event_store
-            .get_all_flow_ids_by_datasets(dataset_ids, &filters, pagination)
-            .try_collect()
-            .await
-            .int_err()?;
-        let matched_stream = self.flow_event_store.get_stream(relevant_flow_ids);
-
-        Ok(FlowStateListing {
-            matched_stream,
-            total_count,
-        })
-    }
-
-    /// Returns datasets with flows associated with a given account
-    /// ordered by creation time from newest to oldest.
-    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_datasets_with_flow_by_account, level = "debug", skip_all, fields(%account_id))]
-    async fn list_all_datasets_with_flow_by_account(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, ListFlowsByDatasetError> {
-        // Consider using ReBAC: not just owned, but any relation to account
-        let owned_dataset_ids = self
-            .dataset_entry_service
-            .get_owned_dataset_ids(account_id)
-            .await
-            .int_err()?;
-
-        let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
-
-        Ok(self
-            .flow_event_store
-            .filter_datasets_having_flows(&owned_dataset_id_refs)
-            .await?)
-    }
-
-    /// Returns states of system flows
-    /// ordered by creation time from newest to oldest
-    /// Applies specified filters
-    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_system_flows, level = "debug", skip_all)]
-    async fn list_all_system_flows(
-        &self,
-        filters: FlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListSystemFlowsError> {
-        tracing::debug!(?filters, ?pagination, "Listing system flows");
-
-        let total_count = self
-            .flow_event_store
-            .get_count_system_flows(&filters)
-            .await
-            .int_err()?;
-
-        let relevant_flow_ids: Vec<_> = self
-            .flow_event_store
-            .get_all_system_flow_ids(&filters, pagination)
-            .try_collect()
-            .await?;
-
-        let matched_stream = self.flow_event_store.get_stream(relevant_flow_ids);
-
-        Ok(FlowStateListing {
-            matched_stream,
-            total_count,
-        })
-    }
-
-    /// Returns state of all flows, whether they are system-level or
-    /// dataset-bound, ordered by creation time from newest to oldest
-    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows, level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_all_flows, skip_all)]
     async fn list_all_flows(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsError> {
-        tracing::debug!(?pagination, "Listing all flows");
-
+    ) -> Result<FlowStateListing, InternalError> {
         let empty_filters = FlowFilters::default();
         let total_count = self
             .flow_event_store
@@ -225,8 +51,59 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    /// Returns current state of a given flow
-    #[tracing::instrument(name = FlowQueryServiceImpl_get_flow, level = "debug", skip_all, fields(%flow_id))]
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_scoped_flows, skip_all)]
+    async fn list_scoped_flows(
+        &self,
+        scope_query: FlowScopeQuery,
+        filters: FlowFilters,
+        pagination: PaginationOpts,
+    ) -> Result<FlowStateListing, InternalError> {
+        tracing::debug!(?scope_query, ?filters, ?pagination, "Listing scoped flows");
+
+        let total_count = self
+            .flow_event_store
+            .get_count_flows_matching_scope_query(&scope_query, &filters)
+            .await?;
+
+        let relevant_flow_ids: Vec<_> = self
+            .flow_event_store
+            .get_all_flow_ids_matching_scope_query(scope_query, &filters, pagination)
+            .try_collect()
+            .await?;
+
+        let matched_stream = self.flow_event_store.get_stream(relevant_flow_ids);
+
+        Ok(FlowStateListing {
+            matched_stream,
+            total_count,
+        })
+    }
+
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_scoped_flow_initiators, skip_all)]
+    async fn list_scoped_flow_initiators(
+        &self,
+        scope_query: FlowScopeQuery,
+    ) -> Result<FlowInitiatorListing, InternalError> {
+        tracing::debug!(?scope_query, "Listing scoped flow initiators");
+
+        Ok(FlowInitiatorListing {
+            matched_stream: self
+                .flow_event_store
+                .list_scoped_flow_initiators(scope_query),
+        })
+    }
+
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_filter_flow_scopes_having_flows, skip_all)]
+    async fn filter_flow_scopes_having_flows(
+        &self,
+        scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError> {
+        self.flow_event_store
+            .filter_flow_scopes_having_flows(scopes)
+            .await
+    }
+
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_get_flow skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
         Ok(flow.into())

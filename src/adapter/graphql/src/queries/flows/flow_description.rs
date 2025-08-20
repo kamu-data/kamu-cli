@@ -11,19 +11,30 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use kamu_adapter_flow_dataset::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    FLOW_SCOPE_TYPE_DATASET,
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FLOW_TYPE_DATASET_TRANSFORM,
+    FlowScopeDataset,
+};
+use kamu_adapter_flow_webhook::{
+    FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION,
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
 };
 use kamu_adapter_task_dataset::{
     TaskResultDatasetHardCompact,
     TaskResultDatasetReset,
+    TaskResultDatasetResetToMetadata,
     TaskResultDatasetUpdate,
 };
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
-use kamu_flow_system::FLOW_TYPE_SYSTEM_GC;
+use kamu_flow_system::{FLOW_SCOPE_TYPE_SYSTEM, FLOW_TYPE_SYSTEM_GC};
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
@@ -36,6 +47,8 @@ pub(crate) enum FlowDescription {
     Dataset(FlowDescriptionDataset),
     #[graphql(flatten)]
     System(FlowDescriptionSystem),
+    #[graphql(flatten)]
+    Webhook(FlowDescriptionWebhook),
 }
 
 #[derive(Union)]
@@ -49,12 +62,31 @@ pub(crate) struct FlowDescriptionSystemGC {
 }
 
 #[derive(Union)]
+pub(crate) enum FlowDescriptionWebhook {
+    Deliver(FlowDescriptionWebhookDeliver),
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowDescriptionWebhookDeliver {
+    target_url: url::Url,
+    label: String,
+    event_type: String,
+}
+
+#[derive(Union)]
 pub(crate) enum FlowDescriptionDataset {
+    Unknown(FlowDescriptionUnknown),
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
     ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
     HardCompaction(FlowDescriptionDatasetHardCompaction),
     Reset(FlowDescriptionDatasetReset),
+    ResetToMetadata(FlowDescriptionDatasetResetToMetadata),
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowDescriptionUnknown {
+    message: String,
 }
 
 #[derive(SimpleObject)]
@@ -66,7 +98,6 @@ pub(crate) struct FlowDescriptionDatasetPollingIngest {
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPushIngest {
     source_name: Option<String>,
-    input_records_count: u64,
     ingest_result: Option<FlowDescriptionUpdateResult>,
     message: String,
     // TODO: SetPushSource
@@ -80,12 +111,17 @@ pub(crate) struct FlowDescriptionDatasetExecuteTransform {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetHardCompaction {
-    compaction_result: Option<FlowDescriptionDatasetHardCompactionResult>,
+    compaction_result: Option<FlowDescriptionDatasetReorganizationResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetReset {
     reset_result: Option<FlowDescriptionResetResult>,
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowDescriptionDatasetResetToMetadata {
+    reset_to_metadata_result: Option<FlowDescriptionDatasetReorganizationResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,9 +162,11 @@ impl FlowDescriptionUpdateResult {
                 fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
                     ts::TaskResult::TASK_RESULT_EMPTY
                     | TaskResultDatasetHardCompact::TYPE_ID
+                    | TaskResultDatasetResetToMetadata::TYPE_ID
                     | TaskResultDatasetReset::TYPE_ID => Ok(None),
 
                     TaskResultDatasetUpdate::TYPE_ID => {
+                        // TODO: consider caching the increment in the task result itself
                         let update = TaskResultDatasetUpdate::from_task_result(result)?;
                         if let Some((old_head, new_head)) = update.try_as_increment() {
                             match increment_query_service
@@ -198,13 +236,13 @@ impl FlowDescriptionUpdateResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Debug)]
-enum FlowDescriptionDatasetHardCompactionResult {
-    NothingToDo(FlowDescriptionHardCompactionNothingToDo),
-    Success(FlowDescriptionHardCompactionSuccess),
+enum FlowDescriptionDatasetReorganizationResult {
+    NothingToDo(FlowDescriptionReorganizationNothingToDo),
+    Success(FlowDescriptionReorganizationSuccess),
 }
 
 #[derive(SimpleObject, Debug)]
-struct FlowDescriptionHardCompactionSuccess {
+struct FlowDescriptionReorganizationSuccess {
     original_blocks_count: u64,
     resulting_blocks_count: u64,
     new_head: Multihash<'static>,
@@ -212,18 +250,18 @@ struct FlowDescriptionHardCompactionSuccess {
 
 #[derive(SimpleObject, Debug, Default)]
 #[graphql(complex)]
-pub struct FlowDescriptionHardCompactionNothingToDo {
+pub struct FlowDescriptionReorganizationNothingToDo {
     _dummy: Option<String>,
 }
 
 #[ComplexObject]
-impl FlowDescriptionHardCompactionNothingToDo {
+impl FlowDescriptionReorganizationNothingToDo {
     async fn message(&self) -> String {
         "Nothing to do".to_string()
     }
 }
 
-impl FlowDescriptionDatasetHardCompactionResult {
+impl FlowDescriptionDatasetReorganizationResult {
     fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Result<Option<Self>> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
@@ -231,21 +269,40 @@ impl FlowDescriptionDatasetHardCompactionResult {
                     TaskResultDatasetReset::TYPE_ID | TaskResultDatasetUpdate::TYPE_ID => Ok(None),
 
                     ts::TaskResult::TASK_RESULT_EMPTY => Ok(Some(Self::NothingToDo(
-                        FlowDescriptionHardCompactionNothingToDo::default(),
+                        FlowDescriptionReorganizationNothingToDo::default(),
                     ))),
 
                     TaskResultDatasetHardCompact::TYPE_ID => {
                         let r = TaskResultDatasetHardCompact::from_task_result(result)?;
                         match r.compaction_result {
                             CompactionResult::NothingToDo => Ok(Some(Self::NothingToDo(
-                                FlowDescriptionHardCompactionNothingToDo::default(),
+                                FlowDescriptionReorganizationNothingToDo::default(),
                             ))),
                             CompactionResult::Success {
                                 old_head: _,
                                 ref new_head,
                                 old_num_blocks,
                                 new_num_blocks,
-                            } => Ok(Some(Self::Success(FlowDescriptionHardCompactionSuccess {
+                            } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
+                                original_blocks_count: old_num_blocks as u64,
+                                resulting_blocks_count: new_num_blocks as u64,
+                                new_head: new_head.clone().into(),
+                            }))),
+                        }
+                    }
+
+                    TaskResultDatasetResetToMetadata::TYPE_ID => {
+                        let r = TaskResultDatasetResetToMetadata::from_task_result(result)?;
+                        match r.compaction_metadata_only_result {
+                            CompactionResult::NothingToDo => Ok(Some(Self::NothingToDo(
+                                FlowDescriptionReorganizationNothingToDo::default(),
+                            ))),
+                            CompactionResult::Success {
+                                old_head: _,
+                                ref new_head,
+                                old_num_blocks,
+                                new_num_blocks,
+                            } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
                                 original_blocks_count: old_num_blocks as u64,
                                 resulting_blocks_count: new_num_blocks as u64,
                                 new_head: new_head.clone().into(),
@@ -285,6 +342,7 @@ impl FlowDescriptionResetResult {
                 fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
                     ts::TaskResult::TASK_RESULT_EMPTY
                     | TaskResultDatasetHardCompact::TYPE_ID
+                    | TaskResultDatasetResetToMetadata::TYPE_ID
                     | TaskResultDatasetUpdate::TYPE_ID => Ok(None),
 
                     TaskResultDatasetReset::TYPE_ID => {
@@ -344,11 +402,7 @@ impl FlowDescriptionBuilder {
         flow_states
             .iter()
             .filter_map(|flow_state| {
-                if let fs::FlowScope::Dataset { dataset_id } = &flow_state.flow_binding.scope {
-                    Some(dataset_id.clone())
-                } else {
-                    None
-                }
+                FlowScopeDataset::maybe_dataset_id_in_scope(&flow_state.flow_binding.scope)
             })
             .collect::<HashSet<_>>()
             .into_iter()
@@ -441,15 +495,82 @@ impl FlowDescriptionBuilder {
         flow_state: &fs::FlowState,
     ) -> Result<FlowDescription> {
         let flow_type = flow_state.flow_binding.flow_type.as_str();
-        Ok(match &flow_state.flow_binding.scope {
-            fs::FlowScope::Dataset { dataset_id } => FlowDescription::Dataset(
-                self.dataset_flow_description(ctx, flow_state, flow_type, dataset_id)
-                    .await?,
-            ),
-            fs::FlowScope::System => {
+        Ok(match flow_state.flow_binding.scope.scope_type() {
+            FLOW_SCOPE_TYPE_DATASET => {
+                let dataset_id = FlowScopeDataset::new(&flow_state.flow_binding.scope).dataset_id();
+                FlowDescription::Dataset(
+                    self.dataset_flow_description(ctx, flow_state, flow_type, &dataset_id)
+                        .await?,
+                )
+            }
+
+            FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
+                let subscription_id =
+                    FlowScopeSubscription::new(&flow_state.flow_binding.scope).subscription_id();
+                self.webhook_flow_description(ctx, flow_state, flow_type, subscription_id)
+                    .await?
+            }
+
+            FLOW_SCOPE_TYPE_SYSTEM => {
                 FlowDescription::System(self.system_flow_description(flow_type)?)
             }
+
+            _ => {
+                tracing::error!(
+                    "Unexpected flow scope type: {}",
+                    flow_state.flow_binding.scope.scope_type()
+                );
+                return Err(GqlError::Internal(InternalError::new(format!(
+                    "Unexpected flow scope type: {}",
+                    flow_state.flow_binding.scope.scope_type()
+                ))));
+            }
         })
+    }
+
+    async fn webhook_flow_description(
+        &self,
+        ctx: &Context<'_>,
+        flow_state: &fs::FlowState,
+        flow_type: &str,
+        subscription_id: kamu_webhooks::WebhookSubscriptionID,
+    ) -> Result<FlowDescription> {
+        match flow_type {
+            FLOW_TYPE_WEBHOOK_DELIVER => {
+                let webhook_subscription_query_svc =
+                    from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionQueryService);
+
+                let subscription = webhook_subscription_query_svc
+                    .find_webhook_subscription(
+                        subscription_id,
+                        kamu_webhooks::WebhookSubscriptionQueryMode::IncludingRemoved,
+                    )
+                    .await
+                    .int_err()?
+                    .ok_or_else(|| {
+                        GqlError::Internal(InternalError::new(format!(
+                            "Webhook subscription not found: {subscription_id}",
+                        )))
+                    })?;
+
+                let subscription_scope = FlowScopeSubscription::new(&flow_state.flow_binding.scope);
+                let event_type = subscription_scope.event_type();
+
+                Ok(FlowDescription::Webhook(FlowDescriptionWebhook::Deliver(
+                    FlowDescriptionWebhookDeliver {
+                        target_url: subscription.target_url().clone(),
+                        label: subscription.label().to_string(),
+                        event_type: event_type.to_string(),
+                    },
+                )))
+            }
+            _ => {
+                tracing::error!("Unexpected webhook flow type: {}", flow_type);
+                Err(GqlError::Internal(InternalError::new(format!(
+                    "Unexpected webhook flow type: {flow_type}",
+                ))))
+            }
+        }
     }
 
     fn system_flow_description(&self, flow_type: &str) -> Result<FlowDescriptionSystem> {
@@ -468,7 +589,7 @@ impl FlowDescriptionBuilder {
     }
 
     async fn dataset_flow_description(
-        &mut self,
+        &self,
         ctx: &Context<'_>,
         flow_state: &fs::FlowState,
         flow_type: &str,
@@ -492,16 +613,32 @@ impl FlowDescriptionBuilder {
                         polling_source: polling_source.clone().into(),
                     })
                 } else {
-                    let source_name = flow_state.primary_trigger().push_source_name();
-                    let trigger_description = flow_state
-                        .primary_trigger()
-                        .trigger_source_description()
-                        .unwrap();
+                    let (maybe_push_source_name, activation_descrtiption) =
+                        match flow_state.primary_activation_cause() {
+                            fs::FlowActivationCause::Manual(_) => {
+                                (None, "Flow activated manually".to_string())
+                            }
+                            fs::FlowActivationCause::AutoPolling(_) => {
+                                (None, "Flow activated automatically".to_string())
+                            }
+                            fs::FlowActivationCause::ResourceUpdate(update) => {
+                                if update.resource_type == DATASET_RESOURCE_TYPE {
+                                    let dataset_update_details: DatasetResourceUpdateDetails =
+                                        serde_json::from_value(update.details.clone()).int_err()?;
+                                    (
+                                        dataset_update_details.push_source_name(),
+                                        dataset_update_details.flow_description(),
+                                    )
+                                } else {
+                                    panic!("Unexpected resource type: {}", update.resource_type);
+                                }
+                            }
+                        };
+
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
-                        source_name,
-                        input_records_count: 0, // TODO
+                        source_name: maybe_push_source_name,
                         ingest_result,
-                        message: trigger_description,
+                        message: activation_descrtiption,
                     })
                 }
             }
@@ -526,14 +663,22 @@ impl FlowDescriptionBuilder {
                         },
                     )
                 } else {
-                    panic!("Expected SetTransform event for dataset: {dataset_id}, but found None",);
+                    tracing::warn!(
+                        "Flow {} of type {} has no SetTransformEvent for dataset {}",
+                        flow_state.flow_id,
+                        flow_type,
+                        dataset_id
+                    );
+                    FlowDescriptionDataset::Unknown(FlowDescriptionUnknown {
+                        message: format!("No SetTransformEvent for dataset {dataset_id}",),
+                    })
                 }
             }
 
             FLOW_TYPE_DATASET_COMPACT => {
                 FlowDescriptionDataset::HardCompaction(FlowDescriptionDatasetHardCompaction {
                     compaction_result:
-                        FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
+                        FlowDescriptionDatasetReorganizationResult::from_maybe_flow_outcome(
                             flow_state.outcome.as_ref(),
                         )?,
                 })
@@ -544,6 +689,15 @@ impl FlowDescriptionBuilder {
                     flow_state.outcome.as_ref(),
                 )?,
             }),
+
+            FLOW_TYPE_DATASET_RESET_TO_METADATA => {
+                FlowDescriptionDataset::ResetToMetadata(FlowDescriptionDatasetResetToMetadata {
+                    reset_to_metadata_result:
+                        FlowDescriptionDatasetReorganizationResult::from_maybe_flow_outcome(
+                            flow_state.outcome.as_ref(),
+                        )?,
+                })
+            }
 
             _ => {
                 tracing::error!("Unexpected flow type: {flow_type} for flow state: {flow_state:?}",);

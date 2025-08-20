@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                delivery_id as \"delivery_id!: uuid::Uuid\",\n                subscription_id as \"subscription_id!: uuid::Uuid\",\n                event_type,\n                request_payload as \"request_payload!: serde_json::Value\",\n                request_headers as \"request_headers!: serde_json::Value\",\n                requested_at as \"requested_at!: DateTime<Utc>\",\n                response_code as \"response_code: i16\",\n                response_body,\n                response_headers as \"response_headers: serde_json::Value\",\n                response_at as \"response_at: DateTime<Utc>\"\n            FROM webhook_deliveries\n                WHERE subscription_id = $1\n            ORDER BY requested_at DESC\n            LIMIT $2 OFFSET $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "delivery_id!: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "subscription_id!: uuid::Uuid",
+        "ordinal": 1,
+        "type_info": "Null"
+      },
+      {
+        "name": "event_type",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "request_payload!: serde_json::Value",
+        "ordinal": 3,
+        "type_info": "Null"
+      },
+      {
+        "name": "request_headers!: serde_json::Value",
+        "ordinal": 4,
+        "type_info": "Null"
+      },
+      {
+        "name": "requested_at!: DateTime<Utc>",
+        "ordinal": 5,
+        "type_info": "Null"
+      },
+      {
+        "name": "response_code: i16",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "response_body",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "response_headers: serde_json::Value",
+        "ordinal": 8,
+        "type_info": "Null"
+      },
+      {
+        "name": "response_at: DateTime<Utc>",
+        "ordinal": 9,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "db7342778e88c0e807cefdd36d9d5448edc6f9c720c44f62bc262312d67c8f04"
+}

@@ -9,7 +9,7 @@
 
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::{ResolvedDataset, auth};
-use kamu_flow_system as fs;
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::FlowNotFound;
 use crate::prelude::*;
@@ -41,18 +41,18 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
     let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
     match flow_query_service.get_flow(flow_id.into()).await {
-        Ok(flow_state) => match flow_state.flow_binding.scope {
-            fs::FlowScope::Dataset {
-                dataset_id: flow_dataset_id,
-            } => {
+        Ok(flow_state) => {
+            if let Some(flow_dataset_id) =
+                afs::FlowScopeDataset::maybe_dataset_id_in_scope(&flow_state.flow_binding.scope)
+            {
                 if flow_dataset_id != *dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
-            }
-            fs::FlowScope::System => {
+            } else {
+                // If the flow is not bound to a dataset, treat as not found in this dataset
                 return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
             }
-        },
+        }
         Err(e) => {
             return match e {
                 fs::GetFlowError::NotFound(_) => {
@@ -94,7 +94,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let maybe_expected_kind = match dataset_flow_type {
         DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => Some(odf::DatasetKind::Root),
         DatasetFlowType::ExecuteTransform => Some(odf::DatasetKind::Derivative),
-        DatasetFlowType::Reset => None,
+        DatasetFlowType::Reset | DatasetFlowType::ResetToMetadata => None,
     };
 
     match maybe_expected_kind {
@@ -139,6 +139,7 @@ pub(crate) async fn ensure_flow_preconditions(
                 }));
             }
         }
+
         DatasetFlowType::ExecuteTransform => {
             let (metadata_query_service, rebac_dataset_registry_facade) = from_catalog_n!(
                 ctx,
@@ -181,7 +182,9 @@ pub(crate) async fn ensure_flow_preconditions(
                 }
             }
         }
-        DatasetFlowType::HardCompaction => (),
+
+        DatasetFlowType::HardCompaction | DatasetFlowType::ResetToMetadata => (),
+
         DatasetFlowType::Reset => {
             if let Some(reset_configuration) = reset_configuration {
                 use odf::dataset::MetadataChainExt as _;

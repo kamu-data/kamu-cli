@@ -15,7 +15,7 @@ use futures::TryStreamExt;
 use kamu_accounts::Account as AccountEntity;
 use kamu_core::DatasetRegistry;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use kamu_flow_system as fs;
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::Account;
 use crate::prelude::*;
@@ -54,35 +54,19 @@ impl<'a> AccountFlowRuns<'a> {
             return Ok(FlowConnection::new(Vec::new(), page, per_page, 0));
         }
 
-        let maybe_filters = filters.map(|filters| kamu_flow_system::AccountFlowFilters {
-            by_flow_type: filters
-                .by_flow_type
-                .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
-            by_flow_status: filters.by_status.map(Into::into),
-            by_dataset_ids: filters
-                .by_dataset_ids
-                .into_iter()
-                .map(Into::into)
-                .collect::<HashSet<_>>(),
-            by_initiator: filters
-                .by_initiator
-                .map(|initiator_filter| match initiator_filter {
-                    InitiatorFilterInput::System(_) => kamu_flow_system::InitiatorFilter::System,
-                    InitiatorFilterInput::Accounts(account_ids) => {
-                        kamu_flow_system::InitiatorFilter::Account(
-                            account_ids.into_iter().map(Into::into).collect(),
-                        )
-                    }
-                }),
-        });
-
         let (flow_query_service, dataset_entry_service) =
             from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetEntryService);
 
         let dataset_ids = {
-            let maybe_expected_dataset_ids = maybe_filters
-                .as_ref()
-                .map(|filters| &filters.by_dataset_ids);
+            let maybe_expected_dataset_ids: Option<HashSet<odf::DatasetID>> =
+                filters.as_ref().map(|filters| {
+                    filters
+                        .by_dataset_ids
+                        .iter()
+                        .cloned()
+                        .map(Into::into)
+                        .collect()
+                });
 
             // Note: consider using ReBAC to filter dataset
             // It should be okay if any kind of relation exists explicitly to view flows,
@@ -106,16 +90,30 @@ impl<'a> AccountFlowRuns<'a> {
 
         let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
-        let dataset_flow_filters = maybe_filters
-            .map(|fs| kamu_flow_system::FlowFilters {
-                by_flow_type: fs.by_flow_type,
-                by_flow_status: fs.by_flow_status,
-                by_initiator: fs.by_initiator,
+        let dataset_flow_filters = filters
+            .map(|filters| kamu_flow_system::FlowFilters {
+                by_flow_type: filters
+                    .by_flow_type
+                    .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
+                by_flow_status: filters.by_status.map(Into::into),
+                by_initiator: filters
+                    .by_initiator
+                    .map(|initiator_filter| match initiator_filter {
+                        InitiatorFilterInput::System(_) => {
+                            kamu_flow_system::InitiatorFilter::System
+                        }
+                        InitiatorFilterInput::Accounts(account_ids) => {
+                            kamu_flow_system::InitiatorFilter::Account(
+                                account_ids.into_iter().map(Into::into).collect(),
+                            )
+                        }
+                    }),
             })
             .unwrap_or_default();
+
         let flows_state_listing = flow_query_service
-            .list_all_flows_by_dataset_ids(
-                &dataset_id_refs,
+            .list_scoped_flows(
+                afs::FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs),
                 dataset_flow_filters,
                 PaginationOpts::from_page(page, per_page),
             )
@@ -141,15 +139,34 @@ impl<'a> AccountFlowRuns<'a> {
             return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
         }
 
-        let (flow_query_service, dataset_registry) =
-            from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetRegistry);
+        let (flow_query_service, dataset_entry_service, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn fs::FlowQueryService,
+            dyn DatasetEntryService,
+            dyn DatasetRegistry
+        );
 
-        let dataset_ids = flow_query_service
-            .list_all_datasets_with_flow_by_account(&self.account.id)
+        // Consider using ReBAC: not just owned, but perhaps "Maintain" too,
+        // which allows launching flows
+        let owned_dataset_ids = dataset_entry_service
+            .get_owned_dataset_ids(&self.account.id)
             .await
-            .int_err()?
-            .into_iter()
-            .map(Cow::Owned)
+            .int_err()?;
+
+        let input_flow_scopes = owned_dataset_ids
+            .iter()
+            .map(afs::FlowScopeDataset::make_scope)
+            .collect::<Vec<_>>();
+
+        let filtered_flow_scopes = flow_query_service
+            .filter_flow_scopes_having_flows(&input_flow_scopes)
+            .await?;
+
+        let dataset_ids = filtered_flow_scopes
+            .iter()
+            .filter_map(|flow_scope| {
+                afs::FlowScopeDataset::maybe_dataset_id_in_scope(flow_scope).map(Cow::Owned)
+            })
             .collect::<Vec<_>>();
 
         let dataset_handles_resolution = dataset_registry

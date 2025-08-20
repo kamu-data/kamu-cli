@@ -1,6 +1,6 @@
 [package]
 name = "kamu-flow-system"
-description = "Domain model of the flows management for scheduled dataset and system activities"
+description = "Domain model of the flows management for scheduled & reactive computation activities"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,7 +21,12 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+testing = ["dep:mockall"]
+
 [dependencies]
+async-utils = { workspace = true }
 database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
@@ -39,6 +44,7 @@ serde_json = { version = "1", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 
 # TODO: Make serde optional
@@ -47,7 +53,4 @@ serde_with = { version = "3", default-features = false, features = [
     "chrono_0_4",
 ] }
 
-
-[dev-dependencies]
-kamu-accounts = { workspace = true }
-kamu-core = { workspace = true }
+mockall = { optional = true, version = "0.13", default-features = false }

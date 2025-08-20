@@ -12,7 +12,6 @@ use std::sync::{Arc, RwLock};
 
 use database_common::PaginationOpts;
 use dill::*;
-use kamu_task_system as ts;
 use kamu_webhooks::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,9 +24,8 @@ pub struct InMemoryWebhookDeliveryRepository {
 
 #[derive(Default)]
 struct State {
-    webhook_deliveries: HashMap<ts::TaskID, WebhookDelivery>,
-    webhooks_by_event_id: HashMap<WebhookEventID, Vec<ts::TaskID>>,
-    webhooks_by_subscription_id: HashMap<WebhookSubscriptionID, Vec<ts::TaskID>>,
+    webhook_deliveries: HashMap<WebhookDeliveryID, WebhookDelivery>,
+    webhooks_by_subscription_id: HashMap<WebhookSubscriptionID, Vec<WebhookDeliveryID>>,
 }
 
 impl State {
@@ -35,7 +33,7 @@ impl State {
         Self::default()
     }
 
-    fn list_deliveries_by_attempt_ids(&self, ids: &[ts::TaskID]) -> Vec<WebhookDelivery> {
+    fn list_deliveries_by_attempt_ids(&self, ids: &[WebhookDeliveryID]) -> Vec<WebhookDelivery> {
         ids.iter()
             .filter_map(|id| self.webhook_deliveries.get(id).cloned())
             .collect()
@@ -60,65 +58,57 @@ impl InMemoryWebhookDeliveryRepository {
 #[async_trait::async_trait]
 impl WebhookDeliveryRepository for InMemoryWebhookDeliveryRepository {
     async fn create(&self, delivery: WebhookDelivery) -> Result<(), CreateWebhookDeliveryError> {
-        let task_id = delivery.task_id;
-        let event_id = delivery.webhook_event_id;
+        let webhook_delivery_id = delivery.webhook_delivery_id;
         let subscription_id = delivery.webhook_subscription_id;
 
         let mut state = self.state.write().unwrap();
 
-        if state.webhook_deliveries.insert(task_id, delivery).is_some() {
+        if state
+            .webhook_deliveries
+            .insert(webhook_delivery_id, delivery)
+            .is_some()
+        {
             return Err(CreateWebhookDeliveryError::DeliveryExists(
-                WebhookDeliveryAlreadyExistsError { task_id },
+                WebhookDeliveryAlreadyExistsError {
+                    webhook_delivery_id,
+                },
             ));
         }
-
-        state
-            .webhooks_by_event_id
-            .entry(event_id)
-            .or_default()
-            .push(task_id);
 
         state
             .webhooks_by_subscription_id
             .entry(subscription_id)
             .or_default()
-            .push(task_id);
+            .push(webhook_delivery_id);
 
         Ok(())
     }
 
     async fn update_response(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
         response: WebhookResponse,
     ) -> Result<(), UpdateWebhookDeliveryError> {
         let mut state = self.state.write().unwrap();
-        let delivery = state.webhook_deliveries.get_mut(&task_id).ok_or(
-            UpdateWebhookDeliveryError::NotFound(WebhookDeliveryNotFoundError { task_id }),
-        )?;
+        let delivery = state
+            .webhook_deliveries
+            .get_mut(&webhook_delivery_id)
+            .ok_or(UpdateWebhookDeliveryError::NotFound(
+                WebhookDeliveryNotFoundError {
+                    webhook_delivery_id,
+                },
+            ))?;
         delivery.set_response(response);
 
         Ok(())
     }
 
-    async fn get_by_task_id(
+    async fn get_by_webhook_delivery_id(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
     ) -> Result<Option<WebhookDelivery>, GetWebhookDeliveryError> {
         let state = self.state.read().unwrap();
-        Ok(state.webhook_deliveries.get(&task_id).cloned())
-    }
-
-    async fn list_by_event_id(
-        &self,
-        event_id: WebhookEventID,
-    ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError> {
-        let state = self.state.read().unwrap();
-        if let Some(task_attempt_ids) = state.webhooks_by_event_id.get(&event_id) {
-            Ok(state.list_deliveries_by_attempt_ids(task_attempt_ids))
-        } else {
-            Ok(vec![])
-        }
+        Ok(state.webhook_deliveries.get(&webhook_delivery_id).cloned())
     }
 
     async fn list_by_subscription_id(

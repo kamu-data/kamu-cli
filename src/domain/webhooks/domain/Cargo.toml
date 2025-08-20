@@ -30,9 +30,8 @@ database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
 odf = { workspace = true }
-kamu-datasets = { workspace = true }
-kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }

@@ -9,10 +9,9 @@
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
-use kamu_task_system as ts;
 use thiserror::Error;
 
-use crate::{WebhookDelivery, WebhookEventID, WebhookResponse, WebhookSubscriptionID};
+use crate::{WebhookDelivery, WebhookDeliveryID, WebhookResponse, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,19 +21,14 @@ pub trait WebhookDeliveryRepository: Send + Sync {
 
     async fn update_response(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
         response: WebhookResponse,
     ) -> Result<(), UpdateWebhookDeliveryError>;
 
-    async fn get_by_task_id(
+    async fn get_by_webhook_delivery_id(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
     ) -> Result<Option<WebhookDelivery>, GetWebhookDeliveryError>;
-
-    async fn list_by_event_id(
-        &self,
-        event_id: WebhookEventID,
-    ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError>;
 
     async fn list_by_subscription_id(
         &self,
@@ -100,17 +94,17 @@ pub enum ListWebhookDeliveriesError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Webhook delivery task '{}' not found", task_id)]
+#[error("Webhook delivery '{}' not found", webhook_delivery_id)]
 pub struct WebhookDeliveryNotFoundError {
-    pub task_id: ts::TaskID,
+    pub webhook_delivery_id: WebhookDeliveryID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Webhook delivery for task '{}' already exists", task_id)]
+#[error("Webhook delivery '{}' already exists", webhook_delivery_id)]
 pub struct WebhookDeliveryAlreadyExistsError {
-    pub task_id: ts::TaskID,
+    pub webhook_delivery_id: WebhookDeliveryID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

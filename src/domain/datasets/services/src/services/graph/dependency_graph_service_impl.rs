@@ -361,6 +361,27 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
         Box::pin(tokio_stream::iter(upstream_node_datasets))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%upstream_dataset_id, %downstream_dataset_id))]
+    async fn dependency_exists(
+        &self,
+        upstream_dataset_id: &odf::DatasetID,
+        downstream_dataset_id: &odf::DatasetID,
+    ) -> Result<bool, InternalError> {
+        let state = self.state.read().await;
+
+        let Ok(upstream_node_index) = state.get_dataset_node(upstream_dataset_id) else {
+            return Ok(false);
+        };
+
+        let Ok(downstream_node_index) = state.get_dataset_node(downstream_dataset_id) else {
+            return Ok(false);
+        };
+
+        Ok(state
+            .datasets_graph
+            .contains_edge(upstream_node_index, downstream_node_index))
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?order))]
     async fn in_dependency_order(
         &self,

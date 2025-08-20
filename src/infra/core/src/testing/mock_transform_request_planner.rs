@@ -25,6 +25,11 @@ mockall::mock! {
             target: ResolvedDataset,
             block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
         ) -> Result<VerifyTransformOperation, VerifyTransformPlanError>;
+
+        async fn evaluate_transform_status(
+            &self,
+            target: ResolvedDataset,
+        ) -> Result<TransformStatus, TransformStatusError>;
     }
 }
 

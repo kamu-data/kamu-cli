@@ -24,7 +24,7 @@ impl Flow {
         now: DateTime<Utc>,
         flow_id: FlowID,
         flow_binding: FlowBinding,
-        trigger: FlowTriggerInstance,
+        activation_cause: FlowActivationCause,
         config_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
     ) -> Self {
@@ -35,7 +35,7 @@ impl Flow {
                     event_time: now,
                     flow_id,
                     flow_binding,
-                    trigger,
+                    activation_cause,
                     config_snapshot,
                     retry_policy,
                 },
@@ -55,7 +55,7 @@ impl Flow {
                 event_time: now,
                 flow_id: self.flow_id,
                 start_condition,
-                last_trigger_index: self.triggers.len(),
+                last_activation_cause_index: self.activation_causes.len(),
             };
             self.apply(event)
         } else {
@@ -77,17 +77,19 @@ impl Flow {
         self.apply(event)
     }
 
-    /// Add extra trigger, if it's unique
-    pub fn add_trigger_if_unique(
+    /// Add extra activation cause, if it's unique
+    pub fn add_activation_cause_if_unique(
         &mut self,
         now: DateTime<Utc>,
-        trigger: FlowTriggerInstance,
+        activation_cause: FlowActivationCause,
     ) -> Result<bool, ProjectionError<FlowState>> {
-        if trigger.is_unique_vs(&self.triggers) {
-            let event = FlowEventTriggerAdded {
+        if activation_cause.is_unique_vs(&self.activation_causes)
+            && activation_cause.is_unique_vs(&self.late_activation_causes)
+        {
+            let event = FlowEventActivationCauseAdded {
                 event_time: now,
                 flow_id: self.flow_id,
-                trigger,
+                activation_cause,
             };
             self.apply(event)?;
             Ok(true)

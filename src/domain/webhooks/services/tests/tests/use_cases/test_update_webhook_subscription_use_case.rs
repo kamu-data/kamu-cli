@@ -15,8 +15,10 @@ use kamu_webhooks::{
     UpdateWebhookSubscriptionUseCase,
     WebhookEventTypeCatalog,
     WebhookSubscriptionLabel,
+    WebhookSubscriptionQueryMode,
 };
 use kamu_webhooks_services::UpdateWebhookSubscriptionUseCaseImpl;
+use messaging_outbox::{MockOutbox, Outbox};
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -24,8 +26,24 @@ use super::WebhookSubscriptionUseCaseHarness;
 
 #[test_log::test(tokio::test)]
 async fn test_update_in_dataset_success() {
-    let harness = UpdateWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_disabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&foo_id),
+        1,
+    );
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::dataset_ref_updated(),
+        Some(&foo_id),
+        1,
+    );
+
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness
         .use_case
@@ -53,8 +71,10 @@ async fn test_update_in_dataset_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_invalid_target_url_rejected() {
-    let harness = UpdateWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let invalid_urls = vec![
         "http://example.com",
@@ -86,8 +106,10 @@ async fn test_invalid_target_url_rejected() {
 
 #[test_log::test(tokio::test)]
 async fn test_no_event_types_rejected() {
-    let harness = UpdateWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness
         .use_case
@@ -109,8 +131,10 @@ async fn test_no_event_types_rejected() {
 
 #[test_log::test(tokio::test)]
 async fn test_event_types_deduplicated() {
-    let harness = UpdateWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness
         .use_case
@@ -128,7 +152,10 @@ async fn test_event_types_deduplicated() {
 
     // Find the subscription and ensure it has only one event type
 
-    let subscription = harness.find_subscription(subscription.id()).await.unwrap();
+    let subscription = harness
+        .find_subscription(subscription.id(), WebhookSubscriptionQueryMode::Active)
+        .await
+        .unwrap();
 
     assert_eq!(subscription.event_types().len(), 1,);
     assert_eq!(
@@ -144,22 +171,22 @@ async fn test_label_unique_in_dataset() {
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let harness = UpdateWebhookSubscriptionUseCaseHarness::new();
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
 
     let _subscription_1_1 = harness
-        .create_subscription_in_dataset(
+        .create_subscription_in_dataset_with_label(
             dataset_id_1.clone(),
             Some(WebhookSubscriptionLabel::try_new("test-label-1").unwrap()),
         )
         .await;
     let mut subscription_1_2 = harness
-        .create_subscription_in_dataset(
+        .create_subscription_in_dataset_with_label(
             dataset_id_1,
             Some(WebhookSubscriptionLabel::try_new("test-label-2").unwrap()),
         )
         .await;
     let _subscription_2 = harness
-        .create_subscription_in_dataset(
+        .create_subscription_in_dataset_with_label(
             dataset_id_2,
             Some(WebhookSubscriptionLabel::try_new("test-label-another").unwrap()),
         )
@@ -196,8 +223,10 @@ async fn test_label_unique_in_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_unexpected() {
-    let harness = UpdateWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
     subscription.remove().unwrap();
 
     let res = harness
@@ -226,11 +255,13 @@ struct UpdateWebhookSubscriptionUseCaseHarness {
 }
 
 impl UpdateWebhookSubscriptionUseCaseHarness {
-    fn new() -> Self {
+    fn new(mock_outbox: MockOutbox) -> Self {
         let base_harness = WebhookSubscriptionUseCaseHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<UpdateWebhookSubscriptionUseCaseImpl>();
+        b.add_value(mock_outbox);
+        b.bind::<dyn Outbox, MockOutbox>();
 
         let catalog = b.build();
 

@@ -1276,7 +1276,7 @@ dependencies = [
  "bstr",
  "doc-comment",
  "libc",
- "predicates",
+ "predicates 3.1.3",
  "predicates-core",
  "predicates-tree",
  "wait-timeout",
@@ -3498,7 +3498,7 @@ dependencies = [
  "hex",
  "hmac",
  "internal-error",
- "mockall",
+ "mockall 0.13.1",
  "pretty_assertions",
  "secrecy",
  "serde",
@@ -4953,6 +4953,15 @@ dependencies = [
  "crc32fast",
  "libz-rs-sys",
  "miniz_oxide",
+]
+
+[[package]]
+name = "float-cmp"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -6514,7 +6523,7 @@ dependencies = [
  "kamu-ingest-datafusion",
  "libc",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "nanoid",
  "object_store",
  "oop",
@@ -6564,7 +6573,7 @@ dependencies = [
  "kamu-auth-rebac",
  "merge",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "nutype",
  "opendatafabric",
  "rand 0.8.5",
@@ -6687,7 +6696,7 @@ dependencies = [
  "kamu-auth-rebac-services",
  "kamu-datasets",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "opendatafabric",
  "pretty_assertions",
  "random-strings",
@@ -6806,7 +6815,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-core",
  "like",
- "mockall",
+ "mockall 0.13.1",
  "opendatafabric",
  "prost",
  "rand 0.8.5",
@@ -6825,22 +6834,66 @@ name = "kamu-adapter-flow-dataset"
 version = "0.245.5"
 dependencies = [
  "async-trait",
+ "chrono",
  "database-common",
  "database-common-macros",
  "dill",
  "futures",
  "internal-error",
+ "kamu-accounts",
+ "kamu-adapter-flow-dataset",
  "kamu-adapter-task-dataset",
+ "kamu-core",
  "kamu-datasets",
+ "kamu-datasets-services",
  "kamu-flow-system",
+ "kamu-flow-system-inmem",
  "kamu-task-system",
  "messaging-outbox",
+ "mockall 0.13.1",
  "opendatafabric",
+ "pretty_assertions",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "test-log",
+ "thiserror 2.0.14",
  "time-source",
+ "tokio",
  "tracing",
+]
+
+[[package]]
+name = "kamu-adapter-flow-webhook"
+version = "0.245.5"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "futures",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-adapter-flow-dataset",
+ "kamu-adapter-task-webhook",
+ "kamu-datasets",
+ "kamu-datasets-services",
+ "kamu-flow-system",
+ "kamu-flow-system-inmem",
+ "kamu-task-system",
+ "kamu-webhooks",
+ "kamu-webhooks-inmem",
+ "messaging-outbox",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "test-log",
+ "thiserror 2.0.14",
+ "time-source",
+ "tokio",
+ "tracing",
+ "url",
  "uuid",
 ]
 
@@ -6873,8 +6926,10 @@ dependencies = [
  "kamu-accounts-services",
  "kamu-adapter-auth-oso-rebac",
  "kamu-adapter-flow-dataset",
+ "kamu-adapter-flow-webhook",
  "kamu-adapter-graphql",
  "kamu-adapter-task-dataset",
+ "kamu-adapter-task-webhook",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
@@ -6958,7 +7013,7 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "observability",
  "opendatafabric",
  "paste",
@@ -7076,6 +7131,7 @@ name = "kamu-adapter-task-webhook"
 version = "0.245.5"
 dependencies = [
  "async-trait",
+ "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -7324,6 +7380,7 @@ dependencies = [
  "kamu-adapter-auth-web3",
  "kamu-adapter-flight-sql",
  "kamu-adapter-flow-dataset",
+ "kamu-adapter-flow-webhook",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-adapter-oauth",
@@ -7566,7 +7623,7 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-datasets",
- "mockall",
+ "mockall 0.13.1",
  "object_store",
  "opendatafabric",
  "oso",
@@ -7617,7 +7674,7 @@ dependencies = [
  "internal-error",
  "merge",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "opendatafabric",
  "secrecy",
  "serde",
@@ -7718,7 +7775,7 @@ dependencies = [
  "kamu-datasets-inmem",
  "kamu-datasets-services",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "nutype",
  "oop",
  "opendatafabric",
@@ -7767,6 +7824,7 @@ name = "kamu-flow-system"
 version = "0.245.5"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "cron",
  "database-common",
@@ -7774,10 +7832,9 @@ dependencies = [
  "enum-variants",
  "event-sourcing",
  "internal-error",
- "kamu-accounts",
- "kamu-core",
  "kamu-task-system",
  "messaging-outbox",
+ "mockall 0.13.1",
  "opendatafabric",
  "rand 0.8.5",
  "serde",
@@ -7787,6 +7844,7 @@ dependencies = [
  "strum 0.26.3",
  "thiserror 2.0.14",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -7863,6 +7921,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-adapter-flow-dataset",
+ "kamu-adapter-flow-webhook",
  "kamu-adapter-task-dataset",
  "kamu-core",
  "kamu-datasets",
@@ -7874,7 +7933,7 @@ dependencies = [
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "observability",
  "opendatafabric",
  "pretty_assertions",
@@ -7891,6 +7950,7 @@ version = "0.245.5"
 dependencies = [
  "async-stream",
  "async-trait",
+ "canonical_json",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -8097,7 +8157,7 @@ dependencies = [
  "event-sourcing",
  "internal-error",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "opendatafabric",
  "serde",
  "serde_json",
@@ -8178,7 +8238,7 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "messaging-outbox",
- "mockall",
+ "mockall 0.13.1",
  "observability",
  "opendatafabric",
  "serde_json",
@@ -8222,9 +8282,8 @@ dependencies = [
  "event-sourcing",
  "http 1.3.1",
  "internal-error",
- "kamu-datasets",
- "kamu-task-system",
- "mockall",
+ "messaging-outbox",
+ "mockall 0.13.1",
  "nutype",
  "opendatafabric",
  "serde",
@@ -8246,8 +8305,6 @@ dependencies = [
  "dill",
  "event-sourcing",
  "futures",
- "kamu-task-system",
- "kamu-task-system-inmem",
  "kamu-webhooks",
  "kamu-webhooks-repo-tests",
  "opendatafabric",
@@ -8270,8 +8327,6 @@ dependencies = [
  "futures",
  "http 1.3.1",
  "internal-error",
- "kamu-task-system",
- "kamu-task-system-postgres",
  "kamu-webhooks",
  "kamu-webhooks-repo-tests",
  "opendatafabric",
@@ -8292,7 +8347,6 @@ dependencies = [
  "dill",
  "futures",
  "http 1.3.1",
- "kamu-task-system",
  "kamu-webhooks",
  "opendatafabric",
  "serde_json",
@@ -8315,14 +8369,11 @@ dependencies = [
  "hex",
  "http 1.3.1",
  "internal-error",
- "kamu-accounts",
- "kamu-adapter-task-webhook",
  "kamu-datasets",
- "kamu-datasets-services",
- "kamu-task-system",
  "kamu-webhooks",
  "kamu-webhooks-inmem",
  "messaging-outbox",
+ "mockall 0.11.4",
  "oop",
  "opendatafabric",
  "rand 0.8.5",
@@ -8332,6 +8383,7 @@ dependencies = [
  "sha2 0.10.9",
  "test-log",
  "thiserror 2.0.14",
+ "time-source",
  "tokio",
  "tracing",
  "url",
@@ -8350,8 +8402,6 @@ dependencies = [
  "dill",
  "futures",
  "internal-error",
- "kamu-task-system",
- "kamu-task-system-sqlite",
  "kamu-webhooks",
  "kamu-webhooks-repo-tests",
  "opendatafabric",
@@ -8926,7 +8976,7 @@ dependencies = [
  "internal-error",
  "itertools 0.14.0",
  "kamu-messaging-outbox-inmem",
- "mockall",
+ "mockall 0.13.1",
  "observability",
  "paste",
  "prometheus",
@@ -9011,6 +9061,21 @@ dependencies = [
 
 [[package]]
 name = "mockall"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c84490118f2ee2d74570d114f3d0493cbf02790df303d2707606c3e14e07c96"
+dependencies = [
+ "cfg-if",
+ "downcast",
+ "fragile",
+ "lazy_static",
+ "mockall_derive 0.11.4",
+ "predicates 2.1.5",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
@@ -9018,9 +9083,21 @@ dependencies = [
  "cfg-if",
  "downcast",
  "fragile",
- "mockall_derive",
- "predicates",
+ "mockall_derive 0.13.1",
+ "predicates 3.1.3",
  "predicates-tree",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22ce75669015c4f47b289fd4d4f56e894e4c96003ffdf3ac51313126f94c6cbb"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -9147,6 +9224,12 @@ dependencies = [
  "memchr",
  "minimal-lexical",
 ]
+
+[[package]]
+name = "normalize-line-endings"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "nu-ansi-term"
@@ -9575,7 +9658,7 @@ dependencies = [
  "file-utils",
  "futures",
  "internal-error",
- "mockall",
+ "mockall 0.13.1",
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "pin-project",
@@ -9603,7 +9686,7 @@ dependencies = [
  "hickory-resolver",
  "http 1.3.1",
  "internal-error",
- "mockall",
+ "mockall 0.13.1",
  "opendatafabric",
  "opendatafabric-data-utils",
  "opendatafabric-dataset",
@@ -9671,7 +9754,7 @@ dependencies = [
  "dashmap",
  "http 1.3.1",
  "internal-error",
- "mockall",
+ "mockall 0.13.1",
  "opendatafabric-metadata",
  "opendatafabric-storage-lfs",
  "pretty_assertions",
@@ -10451,6 +10534,20 @@ name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
+
+[[package]]
+name = "predicates"
+version = "2.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
+dependencies = [
+ "difflib",
+ "float-cmp",
+ "itertools 0.10.5",
+ "normalize-line-endings",
+ "predicates-core",
+ "regex",
+]
 
 [[package]]
 name = "predicates"

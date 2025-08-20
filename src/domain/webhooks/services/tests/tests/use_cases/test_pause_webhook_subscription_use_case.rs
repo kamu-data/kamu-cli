@@ -14,9 +14,11 @@ use dill::*;
 use kamu_webhooks::{
     PauseWebhookSubscriptionError,
     PauseWebhookSubscriptionUseCase,
+    WebhookEventTypeCatalog,
     WebhookSubscriptionStatus,
 };
 use kamu_webhooks_services::PauseWebhookSubscriptionUseCaseImpl;
+use messaging_outbox::{MockOutbox, Outbox};
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -24,8 +26,18 @@ use super::WebhookSubscriptionUseCaseHarness;
 
 #[test_log::test(tokio::test)]
 async fn test_pause_success() {
-    let harness = PauseWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_disabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&foo_id),
+        3,
+    );
+
+    let harness = PauseWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
     subscription.enable().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
@@ -50,8 +62,18 @@ async fn test_pause_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_pause_idempotence() {
-    let harness = PauseWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_disabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&foo_id),
+        1,
+    );
+
+    let harness = PauseWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
     subscription.enable().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
@@ -66,8 +88,10 @@ async fn test_pause_idempotence() {
 
 #[test_log::test(tokio::test)]
 async fn test_pause_unexpected() {
-    let harness = PauseWebhookSubscriptionUseCaseHarness::new();
-    let mut subscription = harness.create_subscription().await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = PauseWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
+    let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness.use_case.execute(&mut subscription).await;
     assert_matches!(
@@ -104,11 +128,13 @@ struct PauseWebhookSubscriptionUseCaseHarness {
 }
 
 impl PauseWebhookSubscriptionUseCaseHarness {
-    fn new() -> Self {
+    fn new(mock_outbox: MockOutbox) -> Self {
         let base_harness = WebhookSubscriptionUseCaseHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<PauseWebhookSubscriptionUseCaseImpl>();
+        b.add_value(mock_outbox);
+        b.bind::<dyn Outbox, MockOutbox>();
 
         let catalog = b.build();
 
