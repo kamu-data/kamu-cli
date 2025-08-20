@@ -1,0 +1,202 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+use internal_error::InternalError;
+use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, DatasetResourceUpdateDetails};
+use kamu_datasets::DatasetEntryService;
+use kamu_webhooks::{ResultIntoInternal, WebhookEventType, WebhookEventTypeCatalog};
+use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
+
+use crate::{
+    DatasetUpdatedWebhookSensor,
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
+    WEBHOOK_DATASET_REF_UPDATED_VERSION,
+    WebhookDatasetRefUpdatedPayload,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn fs::FlowController)]
+#[dill::meta(fs::FlowControllerMeta {
+    flow_type: FLOW_TYPE_WEBHOOK_DELIVER,
+})]
+pub struct FlowControllerWebhookDeliver {
+    catalog: dill::Catalog,
+    flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
+}
+
+impl FlowControllerWebhookDeliver {
+    async fn build_payload(
+        &self,
+        event_type: &WebhookEventType,
+        maybe_dataset_id: Option<&odf::DatasetID>,
+        flow: &fs::FlowState,
+    ) -> Result<serde_json::Value, InternalError> {
+        if event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
+            let input_dataset_id = maybe_dataset_id.ok_or_else(|| {
+                InternalError::new(format!(
+                    "Dataset ID is required for {} event",
+                    event_type.as_ref()
+                ))
+            })?;
+            self.build_dataset_ref_updated_payload(flow, input_dataset_id)
+                .await
+        } else {
+            panic!("FlowControllerWebhookDeliver does not support event type: {event_type}",);
+        }
+    }
+
+    async fn build_dataset_ref_updated_payload(
+        &self,
+        flow: &fs::FlowState,
+        input_dataset_id: &odf::DatasetID,
+    ) -> Result<serde_json::Value, InternalError> {
+        // Find out who is the owner of the dataset
+        let dataset_entry = self
+            .dataset_entry_service
+            .get_entry(input_dataset_id)
+            .await
+            .int_err()?;
+
+        // We need to build a summary of 1..N changes that happened to the input
+        // dataset, so that webhook was activated
+        struct ChangeSummary {
+            new_head: odf::Multihash,
+            old_head_maybe: Option<odf::Multihash>,
+            is_breaking_change: bool,
+        }
+        let mut summary: Option<ChangeSummary> = None;
+
+        // Scan activation causes for the flow, look for dataset updates only
+        for activation_cause in &flow.activation_causes {
+            if let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause {
+                assert_eq!(update.resource_type, DATASET_RESOURCE_TYPE);
+                let dataset_update_details =
+                    serde_json::from_value::<DatasetResourceUpdateDetails>(update.details.clone())
+                        .int_err()?;
+
+                assert_eq!(
+                    &dataset_update_details.dataset_id, input_dataset_id,
+                    "Dataset ID in update details does not match input dataset ID"
+                );
+
+                if let Some(summary) = &mut summary {
+                    summary.new_head = dataset_update_details.new_head;
+                    summary.is_breaking_change |=
+                        matches!(update.changes, fs::ResourceChanges::Breaking);
+                } else {
+                    summary = Some(ChangeSummary {
+                        new_head: dataset_update_details.new_head,
+                        old_head_maybe: dataset_update_details.old_head_maybe,
+                        is_breaking_change: matches!(update.changes, fs::ResourceChanges::Breaking),
+                    });
+                }
+            }
+        }
+        let summary = summary.ok_or_else(|| {
+            InternalError::new("No dataset updates found in the flow state for the input dataset")
+        })?;
+
+        // Build webhook payload
+        let webhook_payload = serde_json::to_value(WebhookDatasetRefUpdatedPayload {
+            version: WEBHOOK_DATASET_REF_UPDATED_VERSION,
+            dataset_id: input_dataset_id.to_string(),
+            owner_account_id: dataset_entry.owner_id.to_string(),
+            block_ref: odf::BlockRef::Head.to_string(),
+            new_hash: summary.new_head.to_string(),
+            old_hash: summary.old_head_maybe.map(|h| h.to_string()),
+            is_breaking_change: summary.is_breaking_change,
+        })
+        .int_err()?;
+
+        Ok(webhook_payload)
+    }
+}
+
+#[async_trait::async_trait]
+impl fs::FlowController for FlowControllerWebhookDeliver {
+    fn flow_type(&self) -> &'static str {
+        FLOW_TYPE_WEBHOOK_DELIVER
+    }
+
+    async fn register_flow_sensor(
+        &self,
+        flow_binding: &fs::FlowBinding,
+        activation_time: DateTime<Utc>,
+        reactive_rule: fs::ReactiveRule,
+    ) -> Result<(), InternalError> {
+        let subscription_scope = FlowScopeSubscription::new(&flow_binding.scope);
+        if subscription_scope.event_type() == WebhookEventTypeCatalog::dataset_ref_updated() {
+            let sensor = Arc::new(DatasetUpdatedWebhookSensor::new(
+                flow_binding.scope.clone(),
+                reactive_rule,
+            ));
+
+            self.flow_sensor_dispatcher
+                .register_sensor(&self.catalog, activation_time, sensor)
+                .await?;
+        } else {
+            tracing::error!(
+                "FlowControllerWebhookDeliver does not support event type: {}",
+                subscription_scope.event_type()
+            );
+        }
+
+        Ok(())
+    }
+
+    async fn build_task_logical_plan(
+        &self,
+        flow: &fs::FlowState,
+    ) -> Result<ts::LogicalPlan, InternalError> {
+        let subscription_scope = FlowScopeSubscription::new(&flow.flow_binding.scope);
+
+        let subscription_id = subscription_scope.subscription_id();
+        let event_type = subscription_scope.event_type();
+        let maybe_dataset_id = subscription_scope.maybe_dataset_id();
+
+        let webhook_payload = self
+            .build_payload(&event_type, maybe_dataset_id.as_ref(), flow)
+            .await?;
+
+        Ok(atw::LogicalPlanWebhookDeliver {
+            webhook_subscription_id: subscription_id,
+            webhook_event_type: event_type,
+            webhook_payload,
+        }
+        .into_logical_plan())
+    }
+
+    async fn propagate_success(
+        &self,
+        _: &fs::FlowState,
+        _: &ts::TaskResult,
+        _: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        // No further actions triggered with a webhook delivery
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

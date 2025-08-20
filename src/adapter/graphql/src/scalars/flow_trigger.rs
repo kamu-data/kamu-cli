@@ -7,7 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{BatchingRule, FlowTriggerRule, Schedule, ScheduleCron, ScheduleTimeDelta};
+use kamu_flow_system::{
+    BatchingRule,
+    FlowTriggerRule,
+    ReactiveRule,
+    Schedule,
+    ScheduleCron,
+    ScheduleTimeDelta,
+};
 
 use crate::mutations::{FlowInvalidTriggerInputError, FlowTypeIsNotSupported};
 use crate::prelude::*;
@@ -18,7 +25,7 @@ use crate::prelude::*;
 pub struct FlowTrigger {
     pub paused: bool,
     pub schedule: Option<FlowTriggerScheduleRule>,
-    pub batching: Option<FlowTriggerBatchingRule>,
+    pub reactive: Option<FlowTriggerReactiveRule>,
 }
 
 impl From<Schedule> for FlowTriggerScheduleRule {
@@ -37,16 +44,50 @@ pub enum FlowTriggerScheduleRule {
 }
 
 #[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowTriggerBatchingRule {
+pub struct FlowTriggerReactiveRule {
+    pub for_new_data: FlowTriggerBatchingRule,
+    pub for_breaking_change: FlowTriggerBreakingChangeRule,
+}
+
+impl From<ReactiveRule> for FlowTriggerReactiveRule {
+    fn from(value: ReactiveRule) -> Self {
+        Self {
+            for_new_data: value.for_new_data.into(),
+            for_breaking_change: value.for_breaking_change.into(),
+        }
+    }
+}
+
+#[derive(Union, PartialEq, Eq)]
+pub enum FlowTriggerBatchingRule {
+    Immediate(FlowTriggerBatchingRuleImmediate),
+    Buffering(FlowTriggerBatchingRuleBuffering),
+}
+
+#[derive(SimpleObject, PartialEq, Eq)]
+pub struct FlowTriggerBatchingRuleImmediate {
+    pub dummy: bool,
+}
+
+#[derive(SimpleObject, PartialEq, Eq)]
+pub struct FlowTriggerBatchingRuleBuffering {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDelta,
 }
 
 impl From<BatchingRule> for FlowTriggerBatchingRule {
     fn from(value: BatchingRule) -> Self {
-        Self {
-            min_records_to_await: value.min_records_to_await(),
-            max_batching_interval: (*value.max_batching_interval()).into(),
+        match value {
+            BatchingRule::Immediate => {
+                Self::Immediate(FlowTriggerBatchingRuleImmediate { dummy: true })
+            }
+            BatchingRule::Buffering {
+                min_records_to_await,
+                max_batching_interval,
+            } => Self::Buffering(FlowTriggerBatchingRuleBuffering {
+                min_records_to_await,
+                max_batching_interval: max_batching_interval.into(),
+            }),
         }
     }
 }
@@ -55,7 +96,7 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
     fn from(value: kamu_flow_system::FlowTriggerState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowTriggerRule::Batching(condition) = value.rule {
+            reactive: if let FlowTriggerRule::Reactive(condition) = value.rule {
                 Some(condition.into())
             } else {
                 None
@@ -71,26 +112,43 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject)]
+#[derive(OneofObject, Debug)]
 pub enum FlowTriggerInput {
-    Schedule(ScheduleInput),
-    Batching(BatchingInput),
+    Schedule(FlowTriggerScheduleInput),
+    Reactive(FlowTriggerReactiveInput),
 }
 
-#[derive(OneofObject)]
-pub enum ScheduleInput {
+#[derive(OneofObject, Debug)]
+pub enum FlowTriggerScheduleInput {
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
     Cron5ComponentExpression(String),
 }
 
-#[derive(InputObject)]
-pub struct BatchingInput {
+#[derive(InputObject, Debug)]
+pub struct FlowTriggerReactiveInput {
+    pub for_new_data: FlowTriggerBatchingRuleInput,
+    pub for_breaking_change: FlowTriggerBreakingChangeRule,
+}
+
+#[derive(OneofObject, Debug)]
+pub enum FlowTriggerBatchingRuleInput {
+    Immediate(FlowTriggerBatchingRuleImmediateInput),
+    Buffering(FlowTriggerBatchingRuleBufferingInput),
+}
+
+#[derive(InputObject, Debug)]
+pub struct FlowTriggerBatchingRuleImmediateInput {
+    pub dummy: bool,
+}
+
+#[derive(InputObject, Debug)]
+pub struct FlowTriggerBatchingRuleBufferingInput {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDeltaInput,
 }
 
-#[derive(InputObject)]
+#[derive(InputObject, Debug)]
 pub struct TimeDeltaInput {
     pub every: u32,
     pub unit: TimeUnit,
@@ -148,7 +206,7 @@ impl FlowTriggerInput {
                     return Ok(());
                 }
             }
-            Self::Batching(_) => {
+            Self::Reactive(_) => {
                 if flow_type == DatasetFlowType::ExecuteTransform {
                     return Ok(());
                 }
@@ -165,31 +223,36 @@ impl TryFrom<FlowTriggerInput> for FlowTriggerRule {
         match value {
             FlowTriggerInput::Schedule(schedule_input) => {
                 let schedule_rule = match schedule_input {
-                    ScheduleInput::TimeDelta(td) => {
+                    FlowTriggerScheduleInput::TimeDelta(td) => {
                         Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
                     }
-                    ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                        Schedule::try_from_5component_cron_expression(&cron_5component_expression)
-                            .map_err(|err| Self::Error {
+                    FlowTriggerScheduleInput::Cron5ComponentExpression(
+                        cron_5component_expression,
+                    ) => Schedule::try_from_5component_cron_expression(&cron_5component_expression)
+                        .map_err(|err| Self::Error {
                             reason: err.to_string(),
-                        })?
-                    }
+                        })?,
                 };
                 Ok(FlowTriggerRule::Schedule(schedule_rule))
             }
-            FlowTriggerInput::Batching(batching_input) => {
-                let batching_rule = match BatchingRule::new_checked(
-                    batching_input.min_records_to_await,
-                    batching_input.max_batching_interval.into(),
-                ) {
-                    Ok(rule) => rule,
-                    Err(e) => {
-                        return Err(Self::Error {
+            FlowTriggerInput::Reactive(reactive_input) => {
+                let batching_rule = match reactive_input.for_new_data {
+                    FlowTriggerBatchingRuleInput::Immediate(_) => BatchingRule::immediate(),
+                    FlowTriggerBatchingRuleInput::Buffering(collecting_input) => {
+                        BatchingRule::try_buffering(
+                            collecting_input.min_records_to_await,
+                            collecting_input.max_batching_interval.into(),
+                        )
+                        .map_err(|e| Self::Error {
                             reason: e.to_string(),
-                        });
+                        })?
                     }
                 };
-                Ok(FlowTriggerRule::Batching(batching_rule))
+
+                Ok(FlowTriggerRule::Reactive(ReactiveRule::new(
+                    batching_rule,
+                    reactive_input.for_breaking_change.into(),
+                )))
             }
         }
     }

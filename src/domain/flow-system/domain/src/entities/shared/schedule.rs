@@ -17,7 +17,7 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents dataset update settings
+/// Represents periodic evaluation schedule settings
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Schedule {
     /// Time-delta based schedule

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT DISTINCT flow_type, scope_data as \"scope_data: String\"\n                FROM flow_configuration_events\n                WHERE scope_data = $1\n                    AND event_type = 'FlowConfigurationEventCreated'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_type",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "scope_data: String",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "5f1fc3e084520f393e217f878be385b2917221b427cb0142fafce71e0db2f3e1"
+}

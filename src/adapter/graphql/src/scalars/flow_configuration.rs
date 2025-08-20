@@ -52,18 +52,7 @@ impl From<fs::FlowConfigurationRule> for FlowConfigRule {
 
             afs::FlowConfigRuleCompact::TYPE_ID => {
                 let compaction_rule = afs::FlowConfigRuleCompact::from_flow_config(&value).unwrap();
-                Self::Compaction(match compaction_rule {
-                    afs::FlowConfigRuleCompact::Full(full_rule) => FlowConfigRuleCompaction {
-                        compaction_mode: FlowConfigCompactionMode::Full(full_rule.into()),
-                    },
-                    afs::FlowConfigRuleCompact::MetadataOnly { recursive } => {
-                        FlowConfigRuleCompaction {
-                            compaction_mode: FlowConfigCompactionMode::MetadataOnly(
-                                FlowConfigCompactionModeMetadataOnly { recursive },
-                            ),
-                        }
-                    }
-                })
+                Self::Compaction(compaction_rule.into())
             }
 
             _ => panic!(
@@ -93,35 +82,17 @@ impl From<afs::FlowConfigRuleIngest> for FlowConfigRuleIngest {
 
 #[derive(SimpleObject, Eq, PartialEq)]
 pub struct FlowConfigRuleCompaction {
-    compaction_mode: FlowConfigCompactionMode,
-}
-
-#[derive(Union, PartialEq, Eq)]
-pub enum FlowConfigCompactionMode {
-    Full(FlowConfigCompactionModeFull),
-    MetadataOnly(FlowConfigCompactionModeMetadataOnly),
-}
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowConfigCompactionModeFull {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
-    pub recursive: bool,
 }
 
-impl From<afs::FlowConfigRuleCompactFull> for FlowConfigCompactionModeFull {
-    fn from(value: afs::FlowConfigRuleCompactFull) -> Self {
+impl From<afs::FlowConfigRuleCompact> for FlowConfigRuleCompaction {
+    fn from(value: afs::FlowConfigRuleCompact) -> Self {
         Self {
             max_slice_records: value.max_slice_records(),
             max_slice_size: value.max_slice_size(),
-            recursive: value.recursive(),
         }
     }
-}
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowConfigCompactionModeMetadataOnly {
-    pub recursive: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +101,6 @@ pub struct FlowConfigCompactionModeMetadataOnly {
 pub struct FlowConfigRuleReset {
     pub mode: FlowConfigResetPropagationMode,
     pub old_head_hash: Option<Multihash<'static>>,
-    pub recursive: bool,
 }
 
 #[derive(Union, PartialEq, Eq)]
@@ -161,7 +131,6 @@ impl From<afs::FlowConfigRuleReset> for FlowConfigRuleReset {
         Self {
             mode: propagation_mode,
             old_head_hash: value.old_head_hash.map(Into::into),
-            recursive: value.recursive,
         }
     }
 }
@@ -172,7 +141,6 @@ impl From<afs::FlowConfigRuleReset> for FlowConfigRuleReset {
 pub struct FlowConfigResetInput {
     pub mode: FlowConfigInputResetPropagationMode,
     pub old_head_hash: Option<Multihash<'static>>,
-    pub recursive: bool,
 }
 
 #[derive(OneofObject)]
@@ -204,43 +172,18 @@ impl FlowConfigResetInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject, Copy, Clone)]
-pub enum FlowConfigCompactionInput {
-    Full(FlowConfigInputCompactionFull),
-    MetadataOnly(FlowConfigInputCompactionMetadataOnly),
-}
-
 #[derive(InputObject, Copy, Clone)]
-pub struct FlowConfigInputCompactionFull {
+pub struct FlowConfigCompactionInput {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
-    pub recursive: bool,
-}
-
-#[derive(InputObject, Copy, Clone)]
-pub struct FlowConfigInputCompactionMetadataOnly {
-    pub recursive: bool,
 }
 
 impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
     type Error = String;
 
     fn try_from(value: FlowConfigCompactionInput) -> Result<Self, Self::Error> {
-        Ok(match value {
-            FlowConfigCompactionInput::Full(full_input) => afs::FlowConfigRuleCompact::Full(
-                afs::FlowConfigRuleCompactFull::new_checked(
-                    full_input.max_slice_size,
-                    full_input.max_slice_records,
-                    full_input.recursive,
-                )
-                .map_err(|err| err.to_string())?,
-            ),
-            FlowConfigCompactionInput::MetadataOnly(metadata_only_input) => {
-                afs::FlowConfigRuleCompact::MetadataOnly {
-                    recursive: metadata_only_input.recursive,
-                }
-            }
-        })
+        afs::FlowConfigRuleCompact::try_new(value.max_slice_size, value.max_slice_records)
+            .map_err(|err| err.to_string())
     }
 }
 

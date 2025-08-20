@@ -75,6 +75,13 @@ pub enum PushIngestPlanningError {
     ),
 
     #[error(transparent)]
+    HeadNotFound(
+        #[from]
+        #[backtrace]
+        odf::storage::BlockNotFoundError,
+    ),
+
+    #[error(transparent)]
     UnsupportedMediaType(
         #[from]
         #[backtrace]

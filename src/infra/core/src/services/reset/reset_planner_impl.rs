@@ -46,22 +46,25 @@ impl ResetPlanner for ResetPlannerImpl {
                 .0
         };
 
+        let current_head = target
+            .as_metadata_chain()
+            .try_get_ref(&odf::BlockRef::Head)
+            .await?;
+
         if let Some(old_head) = maybe_old_head
-            && let Some(current_head) = target
-                .as_metadata_chain()
-                .try_get_ref(&odf::BlockRef::Head)
-                .await?
-            && old_head != &current_head
+            && let Some(current_head) = current_head.as_ref()
+            && old_head != current_head
         {
             return Err(ResetPlanningError::OldHeadMismatch(
                 ResetOldHeadMismatchError {
-                    current_head,
+                    current_head: current_head.clone(),
                     old_head: old_head.clone(),
                 },
             ));
         }
 
         Ok(ResetPlan {
+            old_head: current_head,
             new_head: new_head.clone(),
         })
     }

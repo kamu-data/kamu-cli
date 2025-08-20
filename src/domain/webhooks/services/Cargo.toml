@@ -28,8 +28,8 @@ database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
+time-source = { workspace = true }
 kamu-datasets = { workspace = true }
-kamu-task-system = { workspace = true }
 kamu-webhooks = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
@@ -50,13 +50,10 @@ url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
-kamu-adapter-task-webhook = { workspace = true }
-kamu-accounts = { workspace = true }
-kamu-datasets-services = { workspace = true, features = ["testing"] }
-kamu-task-system = { workspace = true, features = ["testing"] }
 kamu-webhooks = { workspace = true, features = ["testing"] }
 kamu-webhooks-inmem = { workspace = true }
 
+mockall = { version = "0.11", default-features = false }
 oop = { version = "0.0.2", default-features = false }
 test-log = { version = "0.2", default-features = false }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

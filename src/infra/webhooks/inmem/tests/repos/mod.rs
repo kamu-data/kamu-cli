@@ -8,5 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_inmem_webhook_delivery_repository;
-mod test_inmem_webhook_event_repository;
 mod test_inmem_webhook_subscription_event_store;

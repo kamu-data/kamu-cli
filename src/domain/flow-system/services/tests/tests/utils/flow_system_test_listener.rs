@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use core::panic;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -15,11 +16,17 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
 use kamu_adapter_flow_dataset::{
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
+    FLOW_SCOPE_TYPE_DATASET,
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_RESET_TO_METADATA,
     FLOW_TYPE_DATASET_TRANSFORM,
+    FlowScopeDataset,
 };
+use kamu_adapter_flow_webhook::{FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION, FlowScopeSubscription};
 use kamu_flow_system::*;
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
@@ -111,6 +118,7 @@ impl FlowSystemTestListener {
             FLOW_TYPE_DATASET_TRANSFORM => "ExecuteTransform",
             FLOW_TYPE_DATASET_COMPACT => "HardCompaction",
             FLOW_TYPE_DATASET_RESET => "Reset",
+            FLOW_TYPE_DATASET_RESET_TO_METADATA => "ResetToMetadata",
             FLOW_TYPE_SYSTEM_GC => "GC",
             _ => "<unknown>",
         }
@@ -135,31 +143,59 @@ impl std::fmt::Display for FlowSystemTestListener {
                 .map(|flow_binding| {
                     (
                         flow_binding,
-                        match &flow_binding.scope {
-                            FlowScope::Dataset { dataset_id } => format!(
-                                "\"{}\" {}",
-                                state
-                                    .dataset_display_names
-                                    .get(dataset_id)
-                                    .cloned()
-                                    .unwrap_or_else(|| dataset_id.to_string()),
-                                Self::display_flow_type(flow_binding.flow_type.as_str())
-                            ),
-                            FlowScope::System => {
+                        match flow_binding.scope.scope_type() {
+                            FLOW_SCOPE_TYPE_DATASET => {
+                                let dataset_id =
+                                    FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+                                format!(
+                                    "\"{}\" {}",
+                                    state
+                                        .dataset_display_names
+                                        .get(&dataset_id)
+                                        .cloned()
+                                        .unwrap_or_else(|| dataset_id.to_string()),
+                                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                                )
+                            }
+                            FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
+                                let subscription_scope =
+                                    FlowScopeSubscription::new(&flow_binding.scope);
+                                let subscription_id = subscription_scope.subscription_id();
+                                let maybe_dataset_id = subscription_scope.maybe_dataset_id();
+
+                                format!(
+                                    "\"{}\" Subscription: {} {}",
+                                    match maybe_dataset_id {
+                                        Some(dataset_id) => state
+                                            .dataset_display_names
+                                            .get(&dataset_id)
+                                            .cloned()
+                                            .unwrap_or_else(|| dataset_id.to_string()),
+                                        None => "<None>".to_string(),
+                                    },
+                                    subscription_id,
+                                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                                )
+                            }
+                            FLOW_SCOPE_TYPE_SYSTEM => {
                                 format!(
                                     "System {}",
                                     Self::display_flow_type(flow_binding.flow_type.as_str())
                                 )
                             }
+                            _ => panic!(
+                                "Unexpected flow scope type: {}",
+                                flow_binding.scope.scope_type()
+                            ),
                         },
                     )
                 })
                 .collect::<Vec<_>>();
             flow_headings.sort_by_key(|(_, title)| title.clone());
 
-            for (flow_key, heading) in flow_headings {
+            for (flow_binding, heading) in flow_headings {
                 writeln!(f, "  {heading}:")?;
-                for flow_state in snapshots.get(flow_key).unwrap() {
+                for flow_state in snapshots.get(flow_binding).unwrap() {
                     write!(
                         f,
                         "    Flow ID = {} {}",
@@ -191,18 +227,34 @@ impl std::fmt::Display for FlowSystemTestListener {
                         write!(
                             f,
                             " {}",
-                            match flow_state.primary_trigger() {
-                                FlowTriggerInstance::Manual(_) => String::from("Manual"),
-                                FlowTriggerInstance::AutoPolling(_) => String::from("AutoPolling"),
-                                FlowTriggerInstance::Push(_) => String::from("Push"),
-                                FlowTriggerInstance::InputDatasetFlow(i) => format!(
-                                    "Input({})",
-                                    state
-                                        .dataset_display_names
-                                        .get(&i.dataset_id)
-                                        .cloned()
-                                        .unwrap_or_else(|| i.dataset_id.to_string()),
-                                ),
+                            match flow_state.primary_activation_cause() {
+                                FlowActivationCause::Manual(_) => String::from("Manual"),
+                                FlowActivationCause::AutoPolling(_) => String::from("AutoPolling"),
+                                FlowActivationCause::ResourceUpdate(update) => {
+                                    let update_details: DatasetResourceUpdateDetails =
+                                        serde_json::from_value(update.details.clone()).unwrap();
+                                    match &update_details.source {
+                                        DatasetUpdateSource::HttpIngest { .. } => {
+                                            String::from("HttpIngest")
+                                        }
+                                        DatasetUpdateSource::SmartProtocolPush { .. } => {
+                                            String::from("SmartProtocolPush")
+                                        }
+                                        DatasetUpdateSource::ExternallyDetectedChange => {
+                                            String::from("ExternallyDetectedChange")
+                                        }
+                                        DatasetUpdateSource::UpstreamFlow { .. } => format!(
+                                            "Input({})",
+                                            state
+                                                .dataset_display_names
+                                                .get(&update_details.dataset_id)
+                                                .cloned()
+                                                .unwrap_or_else(|| update_details
+                                                    .dataset_id
+                                                    .to_string())
+                                        ),
+                                    }
+                                }
                             }
                         )?;
                     }
@@ -218,10 +270,10 @@ impl std::fmt::Display for FlowSystemTestListener {
                                     (t.shifted_from - initial_time).num_milliseconds()
                                 )?;
                             }
-                            FlowStartCondition::Batching(b) => write!(
+                            FlowStartCondition::Reactive(b) => write!(
                                 f,
                                 " Batching({}, until={}ms)",
-                                b.active_batching_rule.min_records_to_await(),
+                                b.active_rule.for_new_data.min_records_to_await(),
                                 (b.batching_deadline - initial_time).num_milliseconds(),
                             )?,
                             FlowStartCondition::Executor(e) => {

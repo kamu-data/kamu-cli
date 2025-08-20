@@ -237,6 +237,13 @@ impl TransformTestHarness {
             .unwrap();
     }
 
+    async fn evaluate_transform_status(&self, target: ResolvedDataset) -> TransformStatus {
+        self.transform_request_planner
+            .evaluate_transform_status(target)
+            .await
+            .unwrap()
+    }
+
     async fn elaborate_transform(
         &self,
         target: ResolvedDataset,
@@ -766,6 +773,233 @@ async fn test_transform_with_compaction_retry() {
         )
         .await;
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_status() {
+    let harness = TransformTestHarness::new();
+
+    // Create root dataset
+    let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
+    let root_target = harness.new_root("foo", t0).await;
+    let root_head_schema = root_target
+        .as_metadata_chain()
+        .resolve_ref(&odf::BlockRef::Head)
+        .await
+        .unwrap();
+
+    let root_initial_sequence_number = 1;
+
+    // Create derivative
+    let (deriv_target, _) = harness
+        .new_deriv("bar", &[root_target.get_alias().clone()], t0)
+        .await;
+
+    let deriv_head_schema = deriv_target
+        .as_metadata_chain()
+        .resolve_ref(&odf::BlockRef::Head)
+        .await
+        .unwrap();
+    let deriv_initial_sequence_number = 2;
+
+    // Currently there is no data in root, so we have nothing to transform
+    let status = harness
+        .evaluate_transform_status(deriv_target.clone())
+        .await;
+    assert_matches!(status, TransformStatus::UpToDate);
+
+    // T1: Root data added
+    let t1 = Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap();
+    let root_head_t1 = harness
+        .append_block(
+            root_target.get_handle(),
+            MetadataFactory::metadata_block(odf::metadata::AddData {
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"new-logical"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"new-physical"),
+                    offset_interval: odf::metadata::OffsetInterval { start: 0, end: 99 },
+                    size: 10,
+                }),
+                new_checkpoint: None,
+                new_watermark: Some(t0),
+                new_source_state: None,
+            })
+            .system_time(t1)
+            .prev(&root_head_schema, root_initial_sequence_number)
+            .build(),
+        )
+        .await;
+
+    let root_head_t1_path = odf::utils::data::local_url::into_local_path(
+        root_target
+            .as_data_repo()
+            .get_internal_url(&root_head_t1)
+            .await,
+    )
+    .unwrap();
+    std::fs::write(root_head_t1_path, "<data>").unwrap();
+
+    // Evaluate again - should have an advacement
+    let status = harness
+        .evaluate_transform_status(deriv_target.clone())
+        .await;
+    assert_matches!(
+        status,
+        TransformStatus::NewInputDataAvailable { input_advancements }
+        if input_advancements.len() == 1 && input_advancements.first().is_some_and(|advancement| {
+            advancement.dataset_id == *root_target.get_id() &&
+            advancement.prev_offset.is_none() &&
+            advancement.new_offset.is_some_and(|offset| offset == 99) &&
+            advancement.prev_block_hash.is_none() &&
+            advancement.new_block_hash == Some(root_head_t1.clone())
+        })
+    );
+
+    // T2: Transform [SEED; T1]
+    let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
+    match harness
+        .elaborate_transform(deriv_target.clone(), TransformOptions::default())
+        .await
+        .unwrap()
+    {
+        TransformElaboration::Elaborated(_) => {}
+        TransformElaboration::UpToDate => panic!("Unexpected transform elab status"),
+    }
+    let deriv_head_t2 = harness
+        .append_block(
+            deriv_target.get_handle(),
+            MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
+                query_inputs: vec![odf::metadata::ExecuteTransformInput {
+                    dataset_id: root_target.get_id().clone(),
+                    prev_block_hash: None,
+                    new_block_hash: Some(root_head_t1.clone()),
+                    prev_offset: None,
+                    new_offset: Some(99),
+                }],
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"bar"),
+                    offset_interval: odf::metadata::OffsetInterval { start: 0, end: 99 },
+                    size: 10,
+                }),
+                new_checkpoint: None,
+                new_watermark: Some(t0),
+            })
+            .system_time(t2)
+            .prev(&deriv_head_schema, deriv_initial_sequence_number)
+            .build(),
+        )
+        .await;
+
+    // We've just transformed the target, so it should be up to date now
+    let status = harness
+        .evaluate_transform_status(deriv_target.clone())
+        .await;
+    assert_matches!(status, TransformStatus::UpToDate);
+
+    // T3: More root data
+    let t3 = Utc.with_ymd_and_hms(2020, 1, 3, 12, 0, 0).unwrap();
+    let root_head_t3 = harness
+        .append_block(
+            root_target.get_handle(),
+            MetadataFactory::metadata_block(odf::metadata::AddData {
+                prev_checkpoint: None,
+                prev_offset: Some(99),
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"new-more-logical"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"new-more-physical"),
+                    offset_interval: odf::metadata::OffsetInterval {
+                        start: 100,
+                        end: 109,
+                    },
+                    size: 10,
+                }),
+                new_checkpoint: None,
+                new_watermark: Some(t2),
+                new_source_state: None,
+            })
+            .system_time(t3)
+            .prev(&root_head_t1, root_initial_sequence_number + 1)
+            .build(),
+        )
+        .await;
+    let root_head_t3_path = odf::utils::data::local_url::into_local_path(
+        root_target
+            .as_data_repo()
+            .get_internal_url(&root_head_t3)
+            .await,
+    )
+    .unwrap();
+    std::fs::write(root_head_t3_path, "<data>").unwrap();
+
+    // Evaluate again - should have an advacement
+    let status = harness
+        .evaluate_transform_status(deriv_target.clone())
+        .await;
+    assert_matches!(
+        status,
+        TransformStatus::NewInputDataAvailable { input_advancements }
+        if input_advancements.len() == 1 && input_advancements.first().is_some_and(|advancement| {
+            advancement.dataset_id == *root_target.get_id() &&
+            advancement.prev_offset.is_some_and(|offset| offset == 99) &&
+            advancement.new_offset.is_some_and(|offset| offset == 109) &&
+            advancement.prev_block_hash == Some(root_head_t1.clone()) &&
+            advancement.new_block_hash == Some(root_head_t3.clone())
+        })
+    );
+
+    // T4: Transform (T1; T3]
+    let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();
+    match harness
+        .elaborate_transform(deriv_target.clone(), TransformOptions::default())
+        .await
+        .unwrap()
+    {
+        TransformElaboration::Elaborated(_) => {}
+        TransformElaboration::UpToDate => panic!("Unexpected transform elab status"),
+    }
+    let _deriv_head_t4 = harness
+        .append_block(
+            deriv_target.get_handle(),
+            MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
+                query_inputs: vec![odf::metadata::ExecuteTransformInput {
+                    dataset_id: root_target.get_id().clone(),
+                    prev_block_hash: Some(root_head_t1.clone()),
+                    new_block_hash: Some(root_head_t3.clone()),
+                    prev_offset: Some(99),
+                    new_offset: Some(109),
+                }],
+                prev_checkpoint: None,
+                prev_offset: Some(99),
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"bar"),
+                    offset_interval: odf::metadata::OffsetInterval {
+                        start: 100,
+                        end: 109,
+                    },
+                    size: 10,
+                }),
+                new_checkpoint: None,
+                new_watermark: Some(t2),
+            })
+            .system_time(t4)
+            .prev(&deriv_head_t2, deriv_initial_sequence_number + 1)
+            .build(),
+        )
+        .await;
+
+    // We've just transformed the target, so it should be up to date now
+    let status = harness
+        .evaluate_transform_status(deriv_target.clone())
+        .await;
+    assert_matches!(status, TransformStatus::UpToDate);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

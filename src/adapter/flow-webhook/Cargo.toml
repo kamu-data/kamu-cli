@@ -1,0 +1,65 @@
+[package]
+name = "kamu-adapter-flow-webhook"
+description = "Adapter for Kamu's flow system's abstract interactions with webhooks domain."
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+testing = []
+
+
+[dependencies]
+kamu-adapter-flow-dataset = { workspace = true }
+kamu-adapter-task-webhook = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-flow-system = { workspace = true }
+kamu-task-system ={ workspace = true }
+kamu-webhooks = { workspace = true }
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
+internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
+odf = { workspace = true }
+time-source = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.14", default-features = false }
+futures = { version = "0.3", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", default-features = false }
+tracing = "0.1"
+thiserror = { version = "2", default-features = false }
+uuid = { version = "1", default-features = false }
+
+
+
+[dev-dependencies]
+kamu-accounts = { workspace = true }
+kamu-datasets-services = { workspace = true, features = ["testing"] }
+kamu-flow-system = { workspace = true, features = ["testing"] }
+kamu-flow-system-inmem = { workspace = true }
+kamu-webhooks-inmem = { workspace = true }
+
+pretty_assertions = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = [] }
+url = { version = "2", default-features = false }

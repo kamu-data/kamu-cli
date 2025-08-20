@@ -633,6 +633,44 @@ async fn test_collection_resolve_ref_to_dataset() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_add_entry_errors() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let foo = harness.create_root_dataset("foo").await.dataset_handle.id;
+    let did = harness.create_collection("x", None).await;
+
+    // CAS error
+    let expected_head = odf::Multihash::from_digest_sha3_256(b"hello");
+    let res = harness
+        .execute_authorized_query(harness.add_entry_request(
+            &did,
+            &json!({
+                "path": "/foo",
+                "ref": foo,
+            }),
+            Some(&expected_head),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"].clone(),
+        json!({
+            "expectedHead": expected_head,
+            "actualHead": null,
+            "isSuccess": false,
+            "message": "Expected head didn't match, dataset was likely updated concurrently"
+        }),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -832,6 +870,41 @@ impl GraphQLDatasetsHarness {
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["latest"]["entries"]
             ["nodes"]
             .clone()
+    }
+
+    pub fn add_entry_request(
+        &self,
+        did: &str,
+        entry: &serde_json::Value,
+        expected_head: Option<&odf::Multihash>,
+    ) -> async_graphql::Request {
+        async_graphql::Request::new(indoc!(
+            r#"
+            mutation ($datasetId: DatasetID!, $entry: [CollectionEntryInput!], $expectedHead: Multihash) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        asCollection {
+                            addEntry(entry: $entry, expectedHead: $expectedHead) {
+                                isSuccess
+                                message
+                                ... on CollectionUpdateErrorCasFailed {
+                                    expectedHead
+                                    actualHead
+                                    isSuccess
+                                    message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        ))
+        .variables(async_graphql::Variables::from_json(json!({
+            "datasetId": did,
+            "entry": entry,
+            "expectedHead": expected_head
+        })))
     }
 
     pub async fn update_entries(&self, did: &str, operations: serde_json::Value) {

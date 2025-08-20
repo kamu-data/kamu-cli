@@ -27,6 +27,13 @@ pub trait DependencyGraphService: Sync + Send {
         dataset_id: &odf::DatasetID,
     ) -> DependencyDatasetIDStream;
 
+    /// Checks if a dependency exists between two datasets
+    async fn dependency_exists(
+        &self,
+        upstream_dataset_id: &odf::DatasetID,
+        downstream_dataset_id: &odf::DatasetID,
+    ) -> Result<bool, InternalError>;
+
     /// Iterates over all levels of dataset's upstream dependencies
     /// and return reversed result including passed parameters
     async fn get_recursive_upstream_dependencies(

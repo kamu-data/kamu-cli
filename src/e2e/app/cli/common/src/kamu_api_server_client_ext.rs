@@ -1591,6 +1591,14 @@ impl FlowApi<'_> {
         self.trigger_flow(dataset_id, "triggerResetFlow").await
     }
 
+    pub async fn trigger_reset_to_metadata_only(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> FlowTriggerResponse {
+        self.trigger_flow(dataset_id, "triggerResetToMetadataFlow")
+            .await
+    }
+
     // Method to wait for a flow to finish
     // Args:
     // - dataset_id: The ID of the dataset to check

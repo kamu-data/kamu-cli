@@ -92,7 +92,7 @@ impl Dataset {
         {
             Ok(src) => src,
             Err(kamu_core::ScanMetadataError::SourceNotFound(_)) => return Ok(false),
-            Err(kamu_core::ScanMetadataError::Internal(err)) => return Err(err.into()),
+            Err(err) => return Err(err.int_err().into()),
         };
 
         let Some(odf::MetadataEvent::AddPushSource(source)) = source else {

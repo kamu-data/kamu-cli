@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
+use kamu_datasets::DatasetIntervalIncrement;
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
@@ -20,60 +19,57 @@ use crate::prelude::*;
 pub(crate) enum FlowStartCondition {
     Schedule(FlowStartConditionSchedule),
     Throttling(FlowStartConditionThrottling),
-    Batching(FlowStartConditionBatching),
+    Reactive(FlowStartConditionReactive),
     Executor(FlowStartConditionExecutor),
 }
 
 impl FlowStartCondition {
-    pub async fn create_from_raw_flow_data(
+    pub fn create_from_raw_flow_data(
         start_condition: &fs::FlowStartCondition,
-        matching_triggers: &[fs::FlowTriggerInstance],
-        ctx: &Context<'_>,
-    ) -> Result<Self, InternalError> {
-        Ok(match start_condition {
+        matching_activation_causes: &[fs::FlowActivationCause],
+    ) -> Self {
+        match start_condition {
             fs::FlowStartCondition::Schedule(s) => Self::Schedule(FlowStartConditionSchedule {
                 wake_up_at: s.wake_up_at,
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
-            fs::FlowStartCondition::Batching(b) => {
-                let increment_query_service =
-                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
-
+            fs::FlowStartCondition::Reactive(b) => {
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();
 
                 // TODO: somehow limit dataset traversal to blocks that existed at the time of
                 // flow latest event, as they might have evolved after this state was loaded
 
-                // For each dataset trigger, add accumulated changes since trigger first fired
-                for trigger in matching_triggers {
-                    if let fs::FlowTriggerInstance::InputDatasetFlow(dataset_trigger) = trigger
-                        && dataset_trigger.task_result.result_type
-                            == TaskResultDatasetUpdate::TYPE_ID
-                        && let dataset_update =
-                            TaskResultDatasetUpdate::from_task_result(&dataset_trigger.task_result)
-                                .int_err()?
-                        && let Some((old_head, _)) = dataset_update.try_as_increment()
+                // For each dataset activation cause, add accumulated changes since the initial
+                for activation_cause in matching_activation_causes {
+                    if let fs::FlowActivationCause::ResourceUpdate(update_cause) = activation_cause
+                        && let fs::ResourceChanges::NewData {
+                            blocks_added,
+                            records_added,
+                            new_watermark,
+                        } = update_cause.changes
                     {
-                        total_increment += increment_query_service
-                            .get_increment_since(&dataset_trigger.dataset_id, old_head)
-                            .await
-                            .int_err()?;
+                        total_increment += DatasetIntervalIncrement {
+                            num_blocks: blocks_added,
+                            num_records: records_added,
+                            updated_watermark: new_watermark,
+                        };
                     }
                 }
 
                 // Finally, present the full picture from condition + computed view results
-                Self::Batching(FlowStartConditionBatching {
-                    active_batching_rule: b.active_batching_rule.into(),
+                Self::Reactive(FlowStartConditionReactive {
+                    active_batching_rule: b.active_rule.for_new_data.into(),
                     batching_deadline: b.batching_deadline,
                     accumulated_records_count: total_increment.num_records,
                     watermark_modified: total_increment.updated_watermark.is_some(),
+                    for_breaking_change: b.active_rule.for_breaking_change.into(),
                 })
             }
             fs::FlowStartCondition::Executor(e) => Self::Executor(FlowStartConditionExecutor {
                 task_id: e.task_id.into(),
             }),
-        })
+        }
     }
 }
 
@@ -100,11 +96,12 @@ impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowStartConditionBatching {
+pub(crate) struct FlowStartConditionReactive {
     pub active_batching_rule: FlowTriggerBatchingRule,
     pub batching_deadline: DateTime<Utc>,
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
+    pub for_breaking_change: FlowTriggerBreakingChangeRule,
     // TODO: we can list all applied input flows, if that is interesting for debugging
 }
 

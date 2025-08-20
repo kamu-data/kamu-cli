@@ -50,11 +50,11 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                         datasetFlowType: $datasetFlowType,
                                         paused: false,
                                         triggerInput: {
-                                            batching: {
-                                                maxBatchingInterval: {
-                                                    every: 0, unit: MINUTES
+                                            reactive: {
+                                                forNewData: {
+                                                    immediate: { dummy: false }
                                                 },
-                                                minRecordsToAwait: 0
+                                                forBreakingChange: "NO_ACTION"
                                             }
                                         }
                                     ) {
@@ -63,7 +63,7 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                         ... on SetFlowTriggerSuccess {
                                             trigger {
                                                 __typename
-                                                batching {
+                                                reactive {
                                                     __typename
                                                 }
                                             }
@@ -91,8 +91,8 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                             "message": "Success",
                             "trigger": {
                               "__typename": "FlowTrigger",
-                              "batching": {
-                                "__typename": "FlowTriggerBatchingRule"
+                              "reactive": {
+                                "__typename": "FlowTriggerReactiveRule"
                               }
                             }
                           }
@@ -107,21 +107,11 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
         .await;
 
     kamu_api_server_client
-        .flow()
-        .wait(&derivative_dataset_id, 1)
-        .await;
-
-    kamu_api_server_client
         .dataset()
         .ingest_data(
             &root_dataset_alias,
             RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
         )
-        .await;
-
-    kamu_api_server_client
-        .flow()
-        .wait(&derivative_dataset_id, 2)
         .await;
 
     let root_dataset_query = indoc::indoc!(
@@ -135,6 +125,22 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
         "#
     );
 
+    assert_matches!(
+        kamu_api_server_client.odf_query().query(root_dataset_query).await,
+        Ok(result)
+            if result == indoc::indoc!(
+                r#"
+                match_time,match_id,player_id,score
+                2000-01-01T00:00:00Z,1,Alice,100
+                2000-01-01T00:00:00Z,1,Bob,80"#
+            )
+    );
+
+    kamu_api_server_client
+        .flow()
+        .wait(&derivative_dataset_id, 1)
+        .await;
+
     let derivative_dataset_query = indoc::indoc!(
         r#"
         SELECT match_time,
@@ -145,17 +151,6 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
         FROM 'leaderboard'
         ORDER BY match_id, player_id
         "#
-    );
-
-    assert_matches!(
-        kamu_api_server_client.odf_query().query(root_dataset_query).await,
-        Ok(result)
-            if result == indoc::indoc!(
-                r#"
-                match_time,match_id,player_id,score
-                2000-01-01T00:00:00Z,1,Alice,100
-                2000-01-01T00:00:00Z,1,Bob,80"#
-            )
     );
 
     assert_matches!(

@@ -1295,6 +1295,7 @@ impl Default for FlowSystemConfig {
 pub struct FlowAgentConfig {
     pub awaiting_step_secs: Option<i64>,
     pub mandatory_throttling_period_secs: Option<i64>,
+    pub default_retry_policies: Option<BTreeMap<String, RetryPolicyConfig>>,
 }
 
 impl FlowAgentConfig {
@@ -1302,6 +1303,7 @@ impl FlowAgentConfig {
         Self {
             awaiting_step_secs: None,
             mandatory_throttling_period_secs: None,
+            default_retry_policies: None,
         }
     }
 
@@ -1315,8 +1317,28 @@ impl Default for FlowAgentConfig {
         Self {
             awaiting_step_secs: Some(1),
             mandatory_throttling_period_secs: Some(60),
+            default_retry_policies: Some(BTreeMap::new()),
         }
     }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RetryPolicyConfig {
+    pub max_attempts: Option<u32>,
+    pub min_delay_secs: Option<u32>,
+    pub backoff_type: Option<RetryPolicyConfigBackoffType>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub enum RetryPolicyConfigBackoffType {
+    Fixed,
+    Linear,
+    Exponential,
+    ExponentialWithJitter,
 }
 
 #[skip_serializing_none]

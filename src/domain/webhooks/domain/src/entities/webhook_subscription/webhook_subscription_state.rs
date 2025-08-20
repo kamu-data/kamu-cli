@@ -51,6 +51,10 @@ impl WebhookSubscriptionState {
         &self.event_types
     }
 
+    pub fn expects_event_type(&self, event_type: &WebhookEventType) -> bool {
+        self.event_types.contains(event_type)
+    }
+
     pub fn secret(&self) -> &WebhookSubscriptionSecret {
         &self.secret
     }

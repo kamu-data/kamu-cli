@@ -25,7 +25,6 @@ doctest = false
 database-common = { workspace = true }
 internal-error = { workspace = true }
 odf = { workspace = true }
-kamu-task-system = { workspace = true }
 kamu-webhooks = { workspace = true, features = ["sqlx"]}
 
 async-stream = "0.3"
@@ -50,7 +49,6 @@ uuid = { version = "1", default-features = false }
 [dev-dependencies]
 database-common-macros = { workspace = true }
 kamu-webhooks-repo-tests = { workspace = true }
-kamu-task-system-postgres = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }

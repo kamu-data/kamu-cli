@@ -343,7 +343,7 @@ pub enum PullResult {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PullResultUpToDate {
     PollingIngest(PollingIngestResultUpToDate),
-    PushIngest(PushInsgestResultUpToDate),
+    PushIngest(PushIngestResultUpToDate),
     Transform,
     Sync,
 }
@@ -354,7 +354,7 @@ pub struct PollingIngestResultUpToDate {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PushInsgestResultUpToDate {
+pub struct PushIngestResultUpToDate {
     pub uncacheable: bool,
 }
 

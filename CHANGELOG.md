@@ -11,10 +11,57 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.246.0] - 2025-08-20
+### Added
+- Webhooks are integrated into the Flow system, and support retries:
+  - Webhook delivery is now a kind of a flow
+  - Webhook delivery for dataset updates is associated with datasets, 
+    thus can be filtered in the flow history as related to the dataset,
+    so that updates and notifications are visible on the same page in the execution order
+  - Enabling, pausing, resuming webhooks is mapped to flow trigger operations
+  - Webhook payload is formed at the moment of task scheduling, thus can buffer multiple
+     intermediate updates to the interested dataset
+  - The updates to the interested datasets that arrive after a webhook task is scheduled
+     initiate next execution of the flow, which would run immediately after the current one
+     with respect of standard throttling conditions
+  - Webhook payload for dataset updates indicates whether a breaking change has happened
+  - GQL support for webhook-related flows
+  - Webhook deliveries are retryable by default (via a system-wide policy setting)
+### Changed
+- Batching rules for derived datasets have been revised and extended:
+  - Immediate (activate on first input trigger unconditionally) vs Buffering mode (non-zero records count, timeout)
+  - Explicit configuration whether the derived dataset should be reset to metadata if input has a breaking change
+  - Compaction and reset flows no longer consider ownership boundaries, and affect downstream datasets with enabled updates
+  - No more "recursive" options in compaction and reset flows. Propagating breaking change according to general rules instead.
+- Refactoring: flow system is fully decoupled from specific resource domains, and concentrates on orchestration logic only:
+  - Flow trigger instances converted into more abstract "activation cause" objects indicating source of change
+     and basic change properties (new data, breaking change)
+  - Flow scopes became type-erased JSON objects, with type-specific interpreters of attributes encapsulated in adapters
+  - Dataset-specific details of resource changes encapsulated in the adapter:
+     - supporting 4 types of sources for datasets: upstream flow, http ingest, smart protocol push, external change detection
+  - Introduced concept of dynamic flow sensors:
+     - Sensors are responsible for reacting to resource changes in flow type specific manner
+     - Sensor for derived datasets listens for input changes and decides on executing trasnform vs reset to metadata flow
+     - Sensor for webhooks dataset updates listen to monitored dataset, and schedule webhook delivery flows
+     - Sensors lifetime is bound to enabled periods of flow triggers
+     - Sensor dispatcher maintains dependencies between sensors and input events
+  - Transform flows are no longer launched at startup or at trigger enabling point unless there is new input data available
+  - Extracted "reset to metadata" into a separately managed flow type to avoid confusion
+  - Reworked database API for the flow system to provide resource-agnostic abstraction and preserve index-level effeciency.
+  - Important note: flow, task, and outbox history will be reset with this update
+- Refactoring: simplified structure of webhooks domain:
+  - `WebhookEvent` entity flattened into `WebhookDelivery`, since it can no longer be reused for multiple subscriptions
+  - Fixed handling removal of webhook subscription while flows are pending.
+
+## [0.245.5] - 2025-08-15
+### Fixed
+- GQL playground autocomplete in anonymous mode
+
+## [0.245.4] - 2025-08-13
 ### Added
 - GQL: `dataset_metadata`: Added new method `MetadataProjection` to get `[MetadataExtendedBlock]` filtered by types and range
 ### Fixed
+- GQL: `add_entry`: Return CASError if expected head not found
 - Return bad request response for requests with empty bearer authentication token
 
 ## [0.245.3] - 2025-07-29

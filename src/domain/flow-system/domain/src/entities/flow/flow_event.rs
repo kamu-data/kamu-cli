@@ -16,7 +16,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FlowEvent {
     /// Flow initiated
     Initiated(FlowEventInitiated),
@@ -24,8 +24,8 @@ pub enum FlowEvent {
     StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Config snapshot modified
     ConfigSnapshotModified(FlowConfigSnapshotModified),
-    /// Secondary trigger added
-    TriggerAdded(FlowEventTriggerAdded),
+    /// Secondary activation cause added
+    ActivationCauseAdded(FlowEventActivationCauseAdded),
     /// Scheduled for activation at a particular time
     ScheduledForActivation(FlowEventScheduledForActivation),
     /// Scheduled/Rescheduled a task
@@ -34,7 +34,7 @@ pub enum FlowEvent {
     TaskRunning(FlowEventTaskRunning),
     /// Finished task
     TaskFinished(FlowEventTaskFinished),
-    /// Aborted flow (system factor, such as dataset delete)
+    /// Aborted flow (not by user)
     Aborted(FlowEventAborted),
 }
 
@@ -44,7 +44,7 @@ impl FlowEvent {
             FlowEvent::Initiated(_) => "FlowEventInitiated",
             FlowEvent::StartConditionUpdated(_) => "FlowEventStartConditionUpdated",
             FlowEvent::ConfigSnapshotModified(_) => "FlowEventConfigSnapshotModified",
-            FlowEvent::TriggerAdded(_) => "FlowEventTriggerAdded",
+            FlowEvent::ActivationCauseAdded(_) => "FlowEventActivationCauseAdded",
             FlowEvent::ScheduledForActivation(_) => "FlowEventScheduledForActivation",
             FlowEvent::TaskScheduled(_) => "FlowEventTaskScheduled",
             FlowEvent::TaskRunning(_) => "FlowEventTaskRunning",
@@ -56,38 +56,38 @@ impl FlowEvent {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventInitiated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub flow_binding: FlowBinding,
-    pub trigger: FlowTriggerInstance,
+    pub activation_cause: FlowActivationCause,
     pub config_snapshot: Option<FlowConfigurationRule>,
     pub retry_policy: Option<RetryPolicy>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub start_condition: FlowStartCondition,
-    pub last_trigger_index: usize,
+    pub last_activation_cause_index: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowEventTriggerAdded {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowEventActivationCauseAdded {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub trigger: FlowTriggerInstance,
+    pub activation_cause: FlowActivationCause,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowConfigSnapshotModified {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -96,7 +96,7 @@ pub struct FlowConfigSnapshotModified {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventScheduledForActivation {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -105,7 +105,7 @@ pub struct FlowEventScheduledForActivation {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventTaskScheduled {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -114,7 +114,7 @@ pub struct FlowEventTaskScheduled {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventTaskRunning {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -123,7 +123,7 @@ pub struct FlowEventTaskRunning {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventTaskFinished {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -135,7 +135,7 @@ pub struct FlowEventTaskFinished {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventAborted {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -149,7 +149,7 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.flow_id,
             FlowEvent::StartConditionUpdated(e) => e.flow_id,
             FlowEvent::ConfigSnapshotModified(e) => e.flow_id,
-            FlowEvent::TriggerAdded(e) => e.flow_id,
+            FlowEvent::ActivationCauseAdded(e) => e.flow_id,
             FlowEvent::ScheduledForActivation(e) => e.flow_id,
             FlowEvent::TaskScheduled(e) => e.flow_id,
             FlowEvent::TaskRunning(e) => e.flow_id,
@@ -163,7 +163,7 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.event_time,
             FlowEvent::StartConditionUpdated(e) => e.event_time,
             FlowEvent::ConfigSnapshotModified(e) => e.event_time,
-            FlowEvent::TriggerAdded(e) => e.event_time,
+            FlowEvent::ActivationCauseAdded(e) => e.event_time,
             FlowEvent::ScheduledForActivation(e) => e.event_time,
             FlowEvent::TaskScheduled(e) => e.event_time,
             FlowEvent::TaskRunning(e) => e.event_time,
@@ -177,7 +177,7 @@ impl FlowEvent {
             FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
             FlowEvent::StartConditionUpdated(_)
             | FlowEvent::ConfigSnapshotModified(_)
-            | FlowEvent::TriggerAdded(_)
+            | FlowEvent::ActivationCauseAdded(_)
             | FlowEvent::ScheduledForActivation(_)
             | FlowEvent::TaskScheduled(_) => None,
             FlowEvent::TaskRunning(_) => Some(FlowStatus::Running),
@@ -202,7 +202,9 @@ impl_enum_variant!(FlowEvent::StartConditionUpdated(
 impl_enum_variant!(FlowEvent::ConfigSnapshotModified(
     FlowConfigSnapshotModified
 ));
-impl_enum_variant!(FlowEvent::TriggerAdded(FlowEventTriggerAdded));
+impl_enum_variant!(FlowEvent::ActivationCauseAdded(
+    FlowEventActivationCauseAdded
+));
 impl_enum_variant!(FlowEvent::ScheduledForActivation(
     FlowEventScheduledForActivation
 ));

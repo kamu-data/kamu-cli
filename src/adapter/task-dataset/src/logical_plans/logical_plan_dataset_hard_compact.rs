@@ -15,7 +15,6 @@ kamu_task_system::logical_plan_struct! {
         pub dataset_id: odf::DatasetID,
         pub max_slice_size: Option<u64>,
         pub max_slice_records: Option<u64>,
-        pub keep_metadata_only: bool,
     }
     => "HardCompactDataset"
 }

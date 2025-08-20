@@ -8,6 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod test_webhook_dataset_removal_handler;
-mod test_webhook_delivery_scheduler;
 mod test_webhook_delivery_worker_impl;
 mod test_webhook_signer_impl;

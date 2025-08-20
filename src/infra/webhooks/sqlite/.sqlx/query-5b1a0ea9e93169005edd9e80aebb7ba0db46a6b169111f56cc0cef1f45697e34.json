@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE webhook_deliveries\n                SET response_code = $1,\n                    response_headers = $2,\n                    response_body = $3,\n                    response_at = $4\n                WHERE delivery_id = $5\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "5b1a0ea9e93169005edd9e80aebb7ba0db46a6b169111f56cc0cef1f45697e34"
+}

@@ -9,12 +9,13 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use std::collections::HashMap;
+
 use async_graphql::value;
 use chrono::Duration;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_adapter_flow_dataset::*;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
@@ -88,8 +89,8 @@ async fn test_list_account_flows() {
                                             "lastAttemptFinishedAt": null,
                                         },
                                         "taskIds": [],
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                         },
                                         "startCondition": null,
                                     }
@@ -265,9 +266,8 @@ async fn test_pause_resume_account_flows() {
                                             "lastAttemptFinishedAt": null,
                                         },
                                         "taskIds": [],
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
-
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                         },
                                         "startCondition": null,
                                     }
@@ -465,8 +465,8 @@ async fn test_account_triggers_all_paused() {
                                             "lastAttemptFinishedAt": null,
                                         },
                                         "taskIds": [],
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
 
                                         },
                                         "startCondition": null,
@@ -601,10 +601,10 @@ impl FlowTriggerHarness {
                 .add_value(FlowAgentConfig::new(
                     Duration::seconds(1),
                     Duration::minutes(1),
+                    HashMap::new(),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>()
-                .add::<FlowSupportServiceImpl>();
+                .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 
@@ -642,31 +642,31 @@ impl FlowTriggerHarness {
     fn list_flows_query(account_name: &odf::AccountName) -> String {
         indoc!(
             r#"
-          {
+        {
             accounts {
                 byName (name: "<accountName>") {
-                      flows {
-                          runs {
-                              listFlows {
-                                  nodes {
-                                      flowId
-                                      datasetId
-                                      description {
-                                          __typename
-                                          ... on FlowDescriptionDatasetHardCompaction {
-                                              compactionResult {
-                                                  ... on FlowDescriptionHardCompactionSuccess {
-                                                      originalBlocksCount
-                                                      resultingBlocksCount
-                                                      newHead
-                                                  }
-                                                  ... on FlowDescriptionHardCompactionNothingToDo {
-                                                      message
-                                                  }
-                                              }
-                                          }
-                                          ... on FlowDescriptionDatasetExecuteTransform {
-                                              transformResult {
+                    flows {
+                        runs {
+                            listFlows {
+                                nodes {
+                                    flowId
+                                    datasetId
+                                    description {
+                                        __typename
+                                        ... on FlowDescriptionDatasetHardCompaction {
+                                            compactionResult {
+                                                ... on FlowDescriptionReorganizationSuccess {
+                                                    originalBlocksCount
+                                                    resultingBlocksCount
+                                                    newHead
+                                                }
+                                                ... on FlowDescriptionReorganizationNothingToDo {
+                                                    message
+                                                }
+                                            }
+                                        }
+                                        ... on FlowDescriptionDatasetExecuteTransform {
+                                            transformResult {
                                                 __typename
                                                 ... on FlowDescriptionUpdateResultUpToDate {
                                                     uncacheable
@@ -675,9 +675,9 @@ impl FlowTriggerHarness {
                                                     numBlocks
                                                     numRecords
                                                 }
-                                              }
-                                          }
-                                          ... on FlowDescriptionDatasetPollingIngest {
+                                            }
+                                        }
+                                        ... on FlowDescriptionDatasetPollingIngest {
                                             ingestResult {
                                                 __typename
                                                 ... on FlowDescriptionUpdateResultUpToDate {
@@ -688,11 +688,10 @@ impl FlowTriggerHarness {
                                                     numRecords
                                                 }
                                             }
-                                          }
-                                          ... on FlowDescriptionDatasetPushIngest {
-                                              sourceName
-                                              inputRecordsCount
-                                              ingestResult {
+                                        }
+                                        ... on FlowDescriptionDatasetPushIngest {
+                                            sourceName
+                                            ingestResult {
                                                 __typename
                                                 ... on FlowDescriptionUpdateResultUpToDate {
                                                     uncacheable
@@ -702,86 +701,84 @@ impl FlowTriggerHarness {
                                                     numRecords
                                                 }
                                             }
-                                          }
-                                      }
-                                      status
-                                      outcome {
-                                          ...on FlowSuccessResult {
-                                              message
-                                          }
-                                          ...on FlowAbortedResult {
-                                              message
-                                          }
-                                          ...on FlowFailedError {
-                                              reason {
-                                                  ...on TaskFailureReasonGeneral {
-                                                      message
-                                                  }
-                                                  ...on TaskFailureReasonInputDatasetCompacted {
-                                                      message
-                                                      inputDataset {
-                                                          id
-                                                      }
-                                                  }
-                                              }
-                                          }
-                                      }
-                                      timing {
-                                          awaitingExecutorSince
-                                          runningSince
-                                          lastAttemptFinishedAt
-                                      }
-                                      taskIds
-                                      primaryTrigger {
-                                          __typename
-                                          ... on FlowTriggerInputDatasetFlow {
-                                              dataset {
-                                                  id
-                                                  name
-                                              }
-                                              flowType
-                                              flowId
-                                          }
-                                          ... on FlowTriggerManual {
-                                            __typename
-                                          }
-                                      }
-                                      startCondition {
-                                          __typename
-                                          ... on FlowStartConditionBatching {
-                                              accumulatedRecordsCount
-                                              activeBatchingRule {
-                                                  __typename
-                                                  minRecordsToAwait
-                                                  maxBatchingInterval {
-                                                      every
-                                                      unit
-                                                  }
-                                              }
-                                              watermarkModified
-                                          }
-                                          ... on FlowStartConditionThrottling {
-                                              intervalSec
-                                              wakeUpAt
-                                              shiftedFrom
-                                          }
-                                          ... on FlowStartConditionExecutor {
-                                              taskId
-                                          }
-                                      }
-                                  }
-                                  pageInfo {
-                                      hasPreviousPage
-                                      hasNextPage
-                                      currentPage
-                                      totalPages
-                                  }
-                              }
-                          }
-                      }
-                  }
-              }
-          }
+                                        }
+                                    }
+                                    status
+                                    outcome {
+                                        ...on FlowSuccessResult {
+                                            message
+                                        }
+                                        ...on FlowAbortedResult {
+                                            message
+                                        }
+                                        ...on FlowFailedError {
+                                            reason {
+                                                ...on TaskFailureReasonGeneral {
+                                                    message
+                                                }
+                                                ...on TaskFailureReasonInputDatasetCompacted {
+                                                    message
+                                                    inputDataset {
+                                                        id
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    timing {
+                                        awaitingExecutorSince
+                                        runningSince
+                                        lastAttemptFinishedAt
+                                    }
+                                    taskIds
+                                    primaryActivationCause {
+                                        __typename
+                                        ... on FlowActivationCauseDatasetUpdate {
+                                            dataset {
+                                                id
+                                                name
+                                            }
+                                        }
+                                    }
+                                    startCondition {
+                                        __typename
+                                        ... on FlowStartConditionReactive {
+                                            accumulatedRecordsCount
+                                            activeBatchingRule {
+                                                __typename
+                                                ... on FlowTriggerBatchingRuleBuffering {
+                                                    minRecordsToAwait
+                                                    maxBatchingInterval {
+                                                        every
+                                                        unit
+                                                    }
+                                                }
+                                            }
+                                            watermarkModified
+                                            forBreakingChange
+                                        }
+                                        ... on FlowStartConditionThrottling {
+                                            intervalSec
+                                            wakeUpAt
+                                            shiftedFrom
+                                        }
+                                        ... on FlowStartConditionExecutor {
+                                            taskId
+                                        }
+                                    }
+                                }
+                                pageInfo {
+                                    hasPreviousPage
+                                    hasNextPage
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
           "#
         )
         .replace("<accountName>", account_name.as_ref())
@@ -993,7 +990,7 @@ impl FlowTriggerHarness {
                                                     unit
                                                 }
                                             }
-                                            batching {
+                                            reactive {
                                                 __typename
                                             }
                                         }
