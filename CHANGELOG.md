@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.246.1] - 2025-08-20
 ### Fixed
 - Improved idempotence of flow sensors registration for transform and webhook flows
 - Flow triggers not issuing duplicate update events unless their pause status or rule is actually modified
