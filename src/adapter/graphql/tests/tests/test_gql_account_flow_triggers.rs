@@ -18,7 +18,10 @@ use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
+use kamu_datasets_services::testing::{
+    FakeDependencyGraphIndexer,
+    MockDatasetIncrementQueryService,
+};
 use kamu_flow_system::FlowAgentConfig;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,
@@ -604,7 +607,8 @@ impl FlowTriggerHarness {
                     HashMap::new(),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>();
+                .add::<InMemoryTaskEventStore>()
+                .add::<FakeDependencyGraphIndexer>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 

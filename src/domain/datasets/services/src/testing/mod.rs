@@ -9,10 +9,12 @@
 
 mod fake_connecting_dataset_entry_writer;
 mod fake_dataset_entry_service;
+mod fake_dependency_graph_indexer;
 mod mock_dataset_increment_query_service;
 mod test_dataset_outbox_listener;
 
 pub use fake_connecting_dataset_entry_writer::*;
 pub use fake_dataset_entry_service::*;
+pub use fake_dependency_graph_indexer::*;
 pub use mock_dataset_increment_query_service::*;
 pub use test_dataset_outbox_listener::*;

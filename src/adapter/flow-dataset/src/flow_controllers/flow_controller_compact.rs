@@ -41,6 +41,7 @@ impl fs::FlowController for FlowControllerCompact {
         FLOW_TYPE_DATASET_COMPACT
     }
 
+    #[tracing::instrument(name = "FlowControllerCompact::build_task_logical_plan", skip_all, fields(flow_id = %flow.flow_id))]
     async fn build_task_logical_plan(
         &self,
         flow: &fs::FlowState,
@@ -66,6 +67,7 @@ impl fs::FlowController for FlowControllerCompact {
         .into_logical_plan())
     }
 
+    #[tracing::instrument(name = "FlowControllerCompact::propagate_success", skip_all, fields(flow_id = %success_flow_state.flow_id))]
     async fn propagate_success(
         &self,
         success_flow_state: &fs::FlowState,
@@ -80,6 +82,7 @@ impl fs::FlowController for FlowControllerCompact {
         match compact_compaction_result {
             CompactionResult::NothingToDo => {
                 // No compaction was performed, no propagation needed
+                tracing::debug!(flow_id=%success_flow_state.flow_id, "No compaction performed, skipping propagation");
                 return Ok(());
             }
             CompactionResult::Success {
@@ -90,6 +93,8 @@ impl fs::FlowController for FlowControllerCompact {
             } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
+
+                tracing::debug!(flow_id=%success_flow_state.flow_id, %dataset_id, "Compaction successful, propagating changes");
 
                 let activation_cause = fs::FlowActivationCause::ResourceUpdate(
                     fs::FlowActivationCauseResourceUpdate {

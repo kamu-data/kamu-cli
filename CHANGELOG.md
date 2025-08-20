@@ -11,6 +11,13 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.246.1] - 2025-08-20
+### Fixed
+- Improved idempotence of flow sensors registration for transform and webhook flows
+- Flow triggers not issuing duplicate update events unless their pause status or rule is actually modified
+- Flow agent should not attempt startup recovery until dependency graph is loaded
+- Extended telemetry for flow dispatchers and sensor operations
+
 ## [0.246.0] - 2025-08-20
 ### Added
 - Webhooks are integrated into the Flow system, and support retries:

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::{Arc, Mutex};
+
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::TransformStatus;
@@ -27,15 +29,32 @@ use crate::{
 
 pub struct DerivedDatasetFlowSensor {
     flow_scope: fs::FlowScope,
+    state: Arc<Mutex<State>>,
+}
+
+struct State {
     reactive_rule: fs::ReactiveRule,
 }
+
+impl State {
+    fn new(reactive_rule: fs::ReactiveRule) -> Self {
+        Self { reactive_rule }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DerivedDatasetFlowSensor {
     pub fn new(dataset_id: &odf::DatasetID, reactive_rule: fs::ReactiveRule) -> Self {
         Self {
             flow_scope: FlowScopeDataset::make_scope(dataset_id),
-            reactive_rule,
+            state: Arc::new(Mutex::new(State::new(reactive_rule))),
         }
+    }
+
+    #[inline]
+    fn reactive_rule(&self) -> fs::ReactiveRule {
+        self.state.lock().unwrap().reactive_rule
     }
 
     async fn run_transform_flow(
@@ -50,7 +69,7 @@ impl DerivedDatasetFlowSensor {
             .run_flow_automatically(
                 &flow_binding,
                 activation_causes,
-                Some(fs::FlowTriggerRule::Reactive(self.reactive_rule)),
+                Some(fs::FlowTriggerRule::Reactive(self.reactive_rule())),
                 None,
             )
             .await
@@ -113,6 +132,11 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
             .iter()
             .map(FlowScopeDataset::make_scope)
             .collect()
+    }
+
+    fn update_rule(&self, new_rule: fs::ReactiveRule) {
+        let mut state = self.state.lock().unwrap();
+        state.reactive_rule = new_rule;
     }
 
     async fn on_activated(
@@ -226,7 +250,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 // With auto-updates only, we can reset data and keep metadata only.
                 fs::ResourceChanges::Breaking => {
                     // Trigger metadata-only compaction, if recovery is enabled
-                    match self.reactive_rule.for_breaking_change {
+                    match self.reactive_rule().for_breaking_change {
                         fs::BreakingChangeRule::Recover => {
                             let flow_run_service =
                                 catalog.get_one::<dyn fs::FlowRunService>().unwrap();

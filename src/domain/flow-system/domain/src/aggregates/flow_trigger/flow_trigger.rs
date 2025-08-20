@@ -46,6 +46,13 @@ impl FlowTrigger {
         paused: bool,
         new_rule: FlowTriggerRule,
     ) -> Result<(), ProjectionError<FlowTriggerState>> {
+        // Ignore if nothing changed
+        let pause_affected = paused && self.is_active() || !paused && !self.is_active();
+        let rule_affected = self.rule != new_rule;
+        if !pause_affected && !rule_affected {
+            return Ok(());
+        }
+
         let event = FlowTriggerEventModified {
             event_time: now,
             flow_binding: self.flow_binding.clone(),
