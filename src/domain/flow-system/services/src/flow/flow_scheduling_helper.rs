@@ -46,7 +46,7 @@ impl FlowSchedulingHelper {
                 let flow_controller =
                     get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
                 flow_controller
-                    .register_flow_sensor(flow_binding, activation_time, *reactive_rule)
+                    .ensure_flow_sensor(flow_binding, activation_time, *reactive_rule)
                     .await
                     .int_err()?;
             }

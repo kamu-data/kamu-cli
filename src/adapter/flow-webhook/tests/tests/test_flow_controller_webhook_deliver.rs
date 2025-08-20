@@ -32,9 +32,13 @@ async fn test_delivery_register_sensor() {
     let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
     let event_type = WebhookEventTypeCatalog::dataset_ref_updated();
 
-    let mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::with_register_sensor_for_scope(
+    let mut mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::with_register_sensor_for_scope(
         FlowScopeSubscription::make_scope(subscription_id, &event_type, Some(&foo_dataset_id)),
     );
+    mock_flow_sensor_dispatcher
+        .expect_find_sensor()
+        .times(1)
+        .returning(|_| None);
 
     let harness = FlowControllerWebhookDeliverHarness::with_overrides(mock_flow_sensor_dispatcher);
     harness.register_dataset(&foo_dataset_id);
@@ -44,7 +48,7 @@ async fn test_delivery_register_sensor() {
 
     harness
         .controller
-        .register_flow_sensor(&delivery_binding, Utc::now(), ReactiveRule::empty())
+        .ensure_flow_sensor(&delivery_binding, Utc::now(), ReactiveRule::empty())
         .await
         .unwrap();
 }

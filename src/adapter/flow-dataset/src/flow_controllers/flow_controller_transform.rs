@@ -43,15 +43,33 @@ impl fs::FlowController for FlowControllerTransform {
         FLOW_TYPE_DATASET_TRANSFORM
     }
 
-    async fn register_flow_sensor(
+    #[tracing::instrument(name = "FlowControllerTransform::ensure_flow_sensor", skip_all)]
+    async fn ensure_flow_sensor(
         &self,
         flow_binding: &fs::FlowBinding,
         activation_time: DateTime<Utc>,
         reactive_rule: fs::ReactiveRule,
     ) -> Result<(), InternalError> {
-        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+        // Check if a sensor for this scope already exists
+        if let Some(sensor) = self
+            .flow_sensor_dispatcher
+            .find_sensor(&flow_binding.scope)
+            .await
+        {
+            tracing::debug!(scope=?flow_binding.scope, rule=?reactive_rule, "Updating existing sensor");
 
+            // Sensor already exists, update its rule
+            sensor.update_rule(reactive_rule);
+            return Ok(());
+        }
+
+        // Create and register a new sensor
+
+        tracing::info!(scope=?flow_binding.scope, rule=?reactive_rule, "Registering new sensor");
+
+        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
         let sensor = DerivedDatasetFlowSensor::new(&dataset_id, reactive_rule);
+
         self.flow_sensor_dispatcher
             .register_sensor(&self.catalog, activation_time, Arc::new(sensor))
             .await?;
@@ -59,6 +77,7 @@ impl fs::FlowController for FlowControllerTransform {
         Ok(())
     }
 
+    #[tracing::instrument(name = "FlowControllerTransform::build_task_logical_plan", skip_all, fields(flow_id = %flow.flow_id))]
     async fn build_task_logical_plan(
         &self,
         flow: &fs::FlowState,
@@ -72,6 +91,11 @@ impl fs::FlowController for FlowControllerTransform {
         .into_logical_plan())
     }
 
+    #[tracing::instrument(
+        name = "FlowControllerTransform::propagate_success",
+        skip_all,
+        fields(flow_id = %success_flow_state.flow_id)
+    )]
     async fn propagate_success(
         &self,
         success_flow_state: &fs::FlowState,
@@ -82,10 +106,16 @@ impl fs::FlowController for FlowControllerTransform {
             ats::TaskResultDatasetUpdate::from_task_result(task_result).int_err()?;
 
         match task_result_update.pull_result {
-            PullResult::UpToDate(_) => return Ok(()),
+            PullResult::UpToDate(_) => {
+                tracing::debug!(flow_id = %success_flow_state.flow_id, "Transform up-to-date, skipping propagation");
+                return Ok(());
+            }
+
             PullResult::Updated { old_head, new_head } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
+
+                tracing::debug!(flow_id = %success_flow_state.flow_id, %dataset_id, "Transformed new data, propagating changes");
 
                 let dataset_increment = self
                     .dataset_increment_query_service

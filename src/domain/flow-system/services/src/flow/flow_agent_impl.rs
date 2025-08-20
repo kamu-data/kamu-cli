@@ -18,6 +18,7 @@ use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
+use kamu_datasets::JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use messaging_outbox::{
@@ -70,7 +71,9 @@ pub struct FlowAgentImpl {
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
     job_name: JOB_KAMU_FLOW_AGENT_RECOVERY,
-    depends_on: &[],
+    depends_on: &[
+        JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER
+    ],
     requires_transaction: false,
 })]
 #[scope(Singleton)]

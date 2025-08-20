@@ -27,9 +27,13 @@ use serde_json::json;
 async fn test_transform_register_sensor() {
     let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::with_register_sensor_for_scope(
+    let mut mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::with_register_sensor_for_scope(
         FlowScopeDataset::make_scope(&foo_dataset_id),
     );
+    mock_flow_sensor_dispatcher
+        .expect_find_sensor()
+        .times(1)
+        .returning(|_| None);
 
     let harness = FlowControllerTransformHarness::with_overrides(
         MockDatasetIncrementQueryService::new(),
@@ -40,7 +44,7 @@ async fn test_transform_register_sensor() {
 
     harness
         .controller
-        .register_flow_sensor(&transform_binding, Utc::now(), ReactiveRule::empty())
+        .ensure_flow_sensor(&transform_binding, Utc::now(), ReactiveRule::empty())
         .await
         .unwrap();
 }

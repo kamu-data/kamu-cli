@@ -40,6 +40,7 @@ impl fs::FlowController for FlowControllerResetToMetadata {
         FLOW_TYPE_DATASET_RESET_TO_METADATA
     }
 
+    #[tracing::instrument(name = "FlowControllerResetToMetadata::build_task_logical_plan", skip_all, fields(flow_id = %flow.flow_id))]
     async fn build_task_logical_plan(
         &self,
         flow: &fs::FlowState,
@@ -48,6 +49,9 @@ impl fs::FlowController for FlowControllerResetToMetadata {
         Ok(ats::LogicalPlanDatasetResetToMetadata { dataset_id }.into_logical_plan())
     }
 
+    #[tracing::instrument(
+        name = "FlowControllerResetToMetadata::propagate_success", skip_all, fields(flow_id = %success_flow_state.flow_id)
+    )]
     async fn propagate_success(
         &self,
         success_flow_state: &fs::FlowState,
@@ -62,6 +66,7 @@ impl fs::FlowController for FlowControllerResetToMetadata {
         match reset_to_metadata_only_result {
             CompactionResult::NothingToDo => {
                 // No changes performed, no propagation needed
+                tracing::debug!(flow_id = %success_flow_state.flow_id, "No reset to metadata performed, skipping propagation");
                 return Ok(());
             }
             CompactionResult::Success {
@@ -75,6 +80,8 @@ impl fs::FlowController for FlowControllerResetToMetadata {
                 // Other datasets will stay unaffected, but would break on next update attempt
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
+
+                tracing::debug!(flow_id = %success_flow_state.flow_id, %dataset_id, "Reset to metadata successful, propagating changes");
 
                 let activation_cause = fs::FlowActivationCause::ResourceUpdate(
                     fs::FlowActivationCauseResourceUpdate {

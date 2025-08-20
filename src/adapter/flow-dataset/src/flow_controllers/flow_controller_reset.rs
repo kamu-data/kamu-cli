@@ -40,6 +40,7 @@ impl fs::FlowController for FlowControllerReset {
         FLOW_TYPE_DATASET_RESET
     }
 
+    #[tracing::instrument(name = "FlowControllerReset::build_task_logical_plan", skip_all, fields(flow_id = %flow.flow_id))]
     async fn build_task_logical_plan(
         &self,
         flow: &fs::FlowState,
@@ -61,6 +62,7 @@ impl fs::FlowController for FlowControllerReset {
         }
     }
 
+    #[tracing::instrument(name = "FlowControllerReset::propagate_success", skip_all, fields(flow_id = %success_flow_state.flow_id))]
     async fn propagate_success(
         &self,
         success_flow_state: &fs::FlowState,
@@ -77,10 +79,13 @@ impl fs::FlowController for FlowControllerReset {
             .is_some_and(|old_head| *old_head == reset_result.new_head)
         {
             // No reset was performed, no propagation needed
+            tracing::debug!(flow_id=%success_flow_state.flow_id, "No reset performed, skipping propagation");
             return Ok(());
         }
 
         let dataset_id = FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
+
+        tracing::debug!(flow_id=%success_flow_state.flow_id, %dataset_id, "Reset successful, propagating changes");
 
         let activation_cause =
             fs::FlowActivationCause::ResourceUpdate(fs::FlowActivationCauseResourceUpdate {

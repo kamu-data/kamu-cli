@@ -52,6 +52,11 @@ struct State {
 
 #[async_trait::async_trait]
 impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
+    async fn find_sensor(&self, flow_scope: &FlowScope) -> Option<Arc<dyn FlowSensor>> {
+        let state = self.state.read().await;
+        state.sensors.get(flow_scope).cloned()
+    }
+
     async fn register_sensor(
         &self,
         catalog: &dill::Catalog,
@@ -65,6 +70,7 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
 
         // Assert that this flow scope is not already registered
         if state.sensors.contains_key(&flow_scope) {
+            tracing::error!("Flow sensor with scope {flow_scope:?} is already registered");
             return Err(InternalError::new(format!(
                 "Flow sensor with scope {flow_scope:?} is already registered",
             )));
