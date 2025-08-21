@@ -47,6 +47,7 @@ impl DeliverWebhookTaskRunner {
         {
             Ok(_) => Ok(TaskOutcome::Success(TaskResult::empty())),
             Err(err) => {
+                // TODO: detalize delivery error (send, status, other)
                 tracing::error!(error = ?err, "Send webhook failed");
                 Ok(TaskOutcome::Failed(TaskError::empty()))
             }
