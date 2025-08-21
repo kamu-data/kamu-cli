@@ -140,7 +140,8 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         FLOW_TYPE_WEBHOOK_DELIVER
     }
 
-    async fn register_flow_sensor(
+    #[tracing::instrument(name = "FlowControllerWebhookDeliver::ensure_flow_sensor", skip_all)]
+    async fn ensure_flow_sensor(
         &self,
         flow_binding: &fs::FlowBinding,
         activation_time: DateTime<Utc>,
@@ -148,6 +149,23 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
     ) -> Result<(), InternalError> {
         let subscription_scope = FlowScopeSubscription::new(&flow_binding.scope);
         if subscription_scope.event_type() == WebhookEventTypeCatalog::dataset_ref_updated() {
+            // Attempt lookup for existing sensor
+            if let Some(sensor) = self
+                .flow_sensor_dispatcher
+                .find_sensor(&flow_binding.scope)
+                .await
+            {
+                tracing::debug!(scope=?flow_binding.scope, rule=?reactive_rule, "Updating existing sensor");
+
+                // Sensor already exists, update its rule
+                sensor.update_rule(reactive_rule);
+                return Ok(());
+            }
+
+            // Create and register a new sensor
+
+            tracing::info!(scope=?flow_binding.scope, rule=?reactive_rule, "Registering new sensor");
+
             let sensor = Arc::new(DatasetUpdatedWebhookSensor::new(
                 flow_binding.scope.clone(),
                 reactive_rule,
@@ -166,6 +184,10 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         Ok(())
     }
 
+    #[tracing::instrument(
+        name = "FlowControllerWebhookDeliver::build_task_logical_plan",
+        skip_all
+    )]
     async fn build_task_logical_plan(
         &self,
         flow: &fs::FlowState,
@@ -188,6 +210,7 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         .into_logical_plan())
     }
 
+    #[tracing::instrument(name = "FlowControllerWebhookDeliver::propagate_success", skip_all)]
     async fn propagate_success(
         &self,
         _: &fs::FlowState,

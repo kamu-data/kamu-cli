@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::{Arc, Mutex};
+
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, FlowScopeDataset};
@@ -19,8 +21,20 @@ use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 pub struct DatasetUpdatedWebhookSensor {
     webhook_flow_scope: fs::FlowScope,
     dataset_id: odf::DatasetID,
+    state: Arc<Mutex<State>>,
+}
+
+struct State {
     reactive_rule: fs::ReactiveRule,
 }
+
+impl State {
+    fn new(reactive_rule: fs::ReactiveRule) -> Self {
+        Self { reactive_rule }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetUpdatedWebhookSensor {
     pub fn new(webhook_flow_scope: fs::FlowScope, reactive_rule: fs::ReactiveRule) -> Self {
@@ -29,8 +43,13 @@ impl DatasetUpdatedWebhookSensor {
                 .maybe_dataset_id()
                 .unwrap(),
             webhook_flow_scope,
-            reactive_rule,
+            state: Arc::new(Mutex::new(State::new(reactive_rule))),
         }
+    }
+
+    #[inline]
+    pub fn reactive_rule(&self) -> fs::ReactiveRule {
+        self.state.lock().unwrap().reactive_rule
     }
 }
 
@@ -42,6 +61,11 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
 
     async fn get_sensitive_to_scopes(&self, _: &dill::Catalog) -> Vec<fs::FlowScope> {
         vec![FlowScopeDataset::make_scope(&self.dataset_id)]
+    }
+
+    fn update_rule(&self, new_rule: fs::ReactiveRule) {
+        let mut state = self.state.lock().unwrap();
+        state.reactive_rule = new_rule;
     }
 
     async fn on_activated(
@@ -81,9 +105,12 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 .into());
             }
 
+            // Extract reactive rule
+            let reactive_rule = self.reactive_rule();
+
             // Skip if disabled for breaking changes
             if matches!(update.changes, fs::ResourceChanges::Breaking) {
-                match self.reactive_rule.for_breaking_change {
+                match reactive_rule.for_breaking_change {
                     fs::BreakingChangeRule::NoAction => {
                         tracing::warn!(
                             "Skipping breaking change for dataset {} in flow {}",
@@ -106,7 +133,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 .run_flow_automatically(
                     &target_flow_binding,
                     vec![activation_cause.clone()],
-                    Some(fs::FlowTriggerRule::Reactive(self.reactive_rule)),
+                    Some(fs::FlowTriggerRule::Reactive(reactive_rule)),
                     None,
                 )
                 .await

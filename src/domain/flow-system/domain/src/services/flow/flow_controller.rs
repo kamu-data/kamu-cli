@@ -21,14 +21,14 @@ use crate::{FlowBinding, FlowState, ReactiveRule};
 pub trait FlowController: Send + Sync {
     fn flow_type(&self) -> &'static str;
 
-    async fn register_flow_sensor(
+    async fn ensure_flow_sensor(
         &self,
         flow_binding: &FlowBinding,
         _activation_time: DateTime<Utc>,
         _reactive_rule: ReactiveRule,
     ) -> Result<(), InternalError> {
         tracing::error!(
-            "{} does not expect regiostering flow sensors, flow_binding: {:?}",
+            "{} does not expect flow sensors, flow_binding: {:?}",
             self.flow_type(),
             flow_binding
         );

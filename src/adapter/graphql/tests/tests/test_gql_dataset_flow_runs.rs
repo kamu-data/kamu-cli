@@ -29,7 +29,10 @@ use kamu_adapter_flow_dataset::{
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
 use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
+use kamu_datasets_services::testing::{
+    FakeDependencyGraphIndexer,
+    MockDatasetIncrementQueryService,
+};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::{
@@ -4140,7 +4143,8 @@ impl FlowRunsHarness {
                     HashMap::new(),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>();
+                .add::<InMemoryTaskEventStore>()
+                .add::<FakeDependencyGraphIndexer>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
             kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());

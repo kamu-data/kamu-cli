@@ -158,7 +158,7 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
 
             #[inline]
             pub fn has_updates(&self) -> bool {
-                !self.0.has_updates()
+                self.0.has_updates()
             }
 
             #[inline]

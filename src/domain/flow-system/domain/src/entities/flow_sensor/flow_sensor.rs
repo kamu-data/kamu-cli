@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{FlowActivationCause, FlowBinding, FlowScope};
+use crate::{FlowActivationCause, FlowBinding, FlowScope, ReactiveRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +22,8 @@ pub trait FlowSensor: Send + Sync + Any {
     fn flow_scope(&self) -> &FlowScope;
 
     async fn get_sensitive_to_scopes(&self, catalog: &dill::Catalog) -> Vec<FlowScope>;
+
+    fn update_rule(&self, rule: ReactiveRule);
 
     async fn on_activated(
         &self,

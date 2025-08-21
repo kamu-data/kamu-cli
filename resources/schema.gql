@@ -3547,6 +3547,13 @@ type SqlQueryStep {
 	query: String!
 }
 
+type StartUploadVersionErrorTooLarge implements StartUploadVersionResult {
+	uploadSize: Int!
+	uploadLimit: Int!
+	isSuccess: Boolean!
+	message: String!
+}
+
 interface StartUploadVersionResult {
 	isSuccess: Boolean!
 	message: String!
@@ -3797,13 +3804,6 @@ type UpdateWebhookSubscriptionResultSuccess implements UpdateWebhookSubscription
 
 type UpdateWebhookSubscriptionResultUnexpected implements UpdateWebhookSubscriptionResult {
 	status: WebhookSubscriptionStatus!
-	message: String!
-}
-
-type UploadVersionErrorTooLarge implements StartUploadVersionResult {
-	uploadSize: Int!
-	uploadLimit: Int!
-	isSuccess: Boolean!
 	message: String!
 }
 

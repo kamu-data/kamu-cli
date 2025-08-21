@@ -163,13 +163,16 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             None => FlowTrigger::new(self.time_source.now(), flow_binding, paused, rule),
         };
 
-        flow_trigger
-            .save(self.event_store.as_ref())
-            .await
-            .int_err()?;
+        // Skip saving and publishing events if nothing changed
+        if flow_trigger.has_updates() {
+            flow_trigger
+                .save(self.event_store.as_ref())
+                .await
+                .int_err()?;
 
-        self.publish_flow_trigger_modified(&flow_trigger, request_time)
-            .await?;
+            self.publish_flow_trigger_modified(&flow_trigger, request_time)
+                .await?;
+        }
 
         Ok(flow_trigger.into())
     }

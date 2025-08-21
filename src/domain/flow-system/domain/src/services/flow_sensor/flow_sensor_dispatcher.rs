@@ -19,6 +19,8 @@ use crate::*;
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowSensorDispatcher: Send + Sync {
+    async fn find_sensor(&self, flow_scope: &FlowScope) -> Option<Arc<dyn FlowSensor>>;
+
     async fn register_sensor(
         &self,
         catalog: &dill::Catalog,

@@ -195,7 +195,7 @@ impl<'a> VersionedFileMut<'a> {
             Ok(ctx) => ctx,
             Err(domain::MakeUploadContextError::TooLarge(_)) => {
                 return Ok(StartUploadVersionResult::TooLarge(
-                    UploadVersionErrorTooLarge {
+                    StartUploadVersionErrorTooLarge {
                         upload_size: content_length,
                         upload_limit: limits.max_file_size_in_bytes(),
                     },
@@ -371,7 +371,7 @@ impl UpdateVersionErrorInvalidExtraData {
 )]
 pub enum StartUploadVersionResult {
     Success(StartUploadVersionSuccess),
-    TooLarge(UploadVersionErrorTooLarge),
+    TooLarge(StartUploadVersionErrorTooLarge),
 }
 
 #[derive(SimpleObject)]
@@ -392,12 +392,12 @@ impl StartUploadVersionSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct UploadVersionErrorTooLarge {
+pub struct StartUploadVersionErrorTooLarge {
     upload_size: usize,
     upload_limit: usize,
 }
 #[ComplexObject]
-impl UploadVersionErrorTooLarge {
+impl StartUploadVersionErrorTooLarge {
     async fn is_success(&self) -> bool {
         false
     }
