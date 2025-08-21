@@ -214,9 +214,7 @@ impl DatasetMut {
             return Ok(None);
         }
 
-        Ok(Some(VersionedFileMut::new(
-            self.dataset_request_state.resolved_dataset(ctx).await?,
-        )))
+        Ok(Some(VersionedFileMut::new(&self.dataset_request_state)))
     }
 
     /// Downcast a dataset to a collection interface

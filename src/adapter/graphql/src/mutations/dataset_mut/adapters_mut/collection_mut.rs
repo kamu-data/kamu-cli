@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use file_utils::MediaType;
 use kamu::domain;
 use odf::metadata::OperationType as Op;
 
@@ -55,7 +56,7 @@ impl<'a> CollectionMut<'a> {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
-                    media_type: Some(kamu_core::MediaType::NDJSON.to_owned()),
+                    media_type: Some(MediaType::NDJSON.to_owned()),
                     expected_head,
                 },
                 None,

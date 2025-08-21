@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use datafusion::prelude::*;
+use file_utils::MediaType;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;

@@ -22,3 +22,4 @@ doctest = false
 
 
 [dependencies]
+serde = { version = "1", default-features = false, features = ["derive"] }

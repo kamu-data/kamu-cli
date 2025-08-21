@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+## Changed
+- Moved versioned file logic from GQL level to `use_case`
+
 ## [0.246.1] - 2025-08-20
 ### Fixed
 - Improved idempotence of flow sensors registration for transform and webhook flows

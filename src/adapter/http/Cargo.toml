@@ -31,6 +31,7 @@ e2e = []
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
+file-utils = { workspace = true }
 internal-error = { workspace = true }
 http-common = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic

@@ -31,6 +31,7 @@ common-macros = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
+file-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -91,6 +92,7 @@ kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
+kamu-adapter-http = { workspace = true }
 kamu-adapter-graphql = { workspace = true, features = ["testing"] }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
