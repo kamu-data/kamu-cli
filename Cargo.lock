@@ -6922,6 +6922,7 @@ dependencies = [
  "event-sourcing",
  "file-utils",
  "futures",
+ "http 1.3.1",
  "humansize",
  "indoc 2.0.6",
  "init-on-startup",
@@ -7151,6 +7152,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tracing",
+ "url",
  "uuid",
 ]
 

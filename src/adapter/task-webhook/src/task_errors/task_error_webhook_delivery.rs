@@ -25,3 +25,15 @@ kamu_task_system::task_error_enum! {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl TaskErrorWebhookDelivery {
+    pub fn target_url(&self) -> &url::Url {
+        match self {
+            TaskErrorWebhookDelivery::FailedToConnect(e) => &e.target_url,
+            TaskErrorWebhookDelivery::ConnectionTimeout(e) => &e.target_url,
+            TaskErrorWebhookDelivery::UnsuccessfulResponse(e) => &e.target_url,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

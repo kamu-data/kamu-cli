@@ -70,6 +70,7 @@ chrono = "0.4"
 datafusion = { version = "49", default-features = false, features = ["serde"] }
 dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
+http = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 indoc = "2"
 jsonschema = { version = "0.30", default-features = false }
