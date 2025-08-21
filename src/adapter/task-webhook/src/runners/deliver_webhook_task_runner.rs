@@ -11,9 +11,14 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_task_system::*;
-use kamu_webhooks::{WebhookDeliveryID, WebhookDeliveryWorker};
+use kamu_webhooks::{
+    WebhookDeliveryError,
+    WebhookDeliveryID,
+    WebhookDeliveryWorker,
+    WebhookSendError,
+};
 
-use crate::TaskDefinitionWebhookDeliver;
+use crate::{TaskDefinitionWebhookDeliver, TaskErrorWebhookDelivery};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,8 +52,31 @@ impl DeliverWebhookTaskRunner {
         {
             Ok(_) => Ok(TaskOutcome::Success(TaskResult::empty())),
             Err(err) => {
-                tracing::error!(error = ?err, "Send webhook failed");
-                Ok(TaskOutcome::Failed(TaskError::empty()))
+                tracing::error!(
+                    error = ?err,
+                    error_msg = %err,
+                    "Webhook delivery failed"
+                );
+
+                match err {
+                    WebhookDeliveryError::UnsuccessfulResponse(e) => Ok(TaskOutcome::Failed(
+                        TaskErrorWebhookDelivery::UnsuccessfulResponse(e).into_task_error(),
+                    )),
+                    WebhookDeliveryError::SendError(WebhookSendError::FailedToConnect(e)) => {
+                        Ok(TaskOutcome::Failed(
+                            TaskErrorWebhookDelivery::FailedToConnect(e).into_task_error(),
+                        ))
+                    }
+                    WebhookDeliveryError::SendError(WebhookSendError::ConnectionTimeout(e)) => {
+                        Ok(TaskOutcome::Failed(
+                            TaskErrorWebhookDelivery::ConnectionTimeout(e).into_task_error(),
+                        ))
+                    }
+                    WebhookDeliveryError::SendError(WebhookSendError::Internal(_))
+                    | WebhookDeliveryError::Internal(_) => {
+                        Ok(TaskOutcome::Failed(TaskError::empty()))
+                    }
+                }
             }
         }
     }

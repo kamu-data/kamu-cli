@@ -12,6 +12,11 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+## Added
+- Extended support for webhook delivery errors, differentiating between:
+    - connection failure
+    - response timeout
+    - bad status code in response
 ## Changed
 - Moved versioned file logic from GQL level to `use_case`
 

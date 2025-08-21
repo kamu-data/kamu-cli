@@ -3605,7 +3605,7 @@ type Task {
 	finishedAt: DateTime
 }
 
-union TaskFailureReason = TaskFailureReasonGeneral | TaskFailureReasonInputDatasetCompacted
+union TaskFailureReason = TaskFailureReasonGeneral | TaskFailureReasonInputDatasetCompacted | TaskFailureReasonWebhookDeliveryProblem
 
 type TaskFailureReasonGeneral {
 	message: String!
@@ -3613,6 +3613,11 @@ type TaskFailureReasonGeneral {
 
 type TaskFailureReasonInputDatasetCompacted {
 	inputDataset: Dataset!
+	message: String!
+}
+
+type TaskFailureReasonWebhookDeliveryProblem {
+	targetUrl: Url!
 	message: String!
 }
 

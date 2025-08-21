@@ -8,8 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-use crate::{WebhookDeliveryID, WebhookEventType, WebhookSubscriptionID};
+use crate::{WebhookDeliveryID, WebhookEventType, WebhookSendError, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +23,30 @@ pub trait WebhookDeliveryWorker: Send + Sync {
         webhook_subscription_id: WebhookSubscriptionID,
         event_type: WebhookEventType,
         payload: serde_json::Value,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), WebhookDeliveryError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum WebhookDeliveryError {
+    #[error(transparent)]
+    SendError(#[from] WebhookSendError),
+
+    #[error(transparent)]
+    UnsuccessfulResponse(#[from] WebhookUnsuccessfulResponseError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[error("Webhook target URL '{target_url}' returned an unsuccessful response: {status_code}")]
+pub struct WebhookUnsuccessfulResponseError {
+    pub target_url: url::Url,
+    pub status_code: u16,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

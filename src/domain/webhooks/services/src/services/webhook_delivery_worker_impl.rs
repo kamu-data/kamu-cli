@@ -178,7 +178,8 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
         webhook_subscription_id: WebhookSubscriptionID,
         event_type: WebhookEventType,
         payload: serde_json::Value,
-    ) -> Result<(), internal_error::InternalError> {
+    ) -> Result<(), WebhookDeliveryError> {
+        // Prepare delivery, headers
         let delivery_data = self
             .prepare_delivery(
                 webhook_delivery_id,
@@ -188,20 +189,32 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
             )
             .await?;
 
+        // Send the webhook
         let webhook_response = self
             .webhook_sender
             .send_webhook(
-                delivery_data.target_url,
+                delivery_data.target_url.clone(),
                 delivery_data.payload_bytes,
                 delivery_data.headers,
             )
-            .await
-            .int_err()?;
+            .await?;
 
+        // Write the response back to the database
+        let response_status = webhook_response.status_code;
         self.write_delivery_response(webhook_delivery_id, webhook_response)
             .await?;
 
-        Ok(())
+        // Fail delivery, unless the response is successful
+        if response_status.is_success() {
+            Ok(())
+        } else {
+            Err(WebhookDeliveryError::UnsuccessfulResponse(
+                WebhookUnsuccessfulResponseError {
+                    target_url: delivery_data.target_url,
+                    status_code: response_status.as_u16(),
+                },
+            ))
+        }
     }
 }
 
