@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{WebhookDeliveryID, WebhookEventType, WebhookSendError, WebhookSubscriptionID};
@@ -41,11 +42,11 @@ pub enum WebhookDeliveryError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[error("Webhook target URL '{target_url}' returned an unsuccessful response: {status_code}")]
 pub struct WebhookUnsuccessfulResponseError {
     pub target_url: url::Url,
-    pub status_code: http::StatusCode,
+    pub status_code: u16,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -211,7 +211,7 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
             Err(WebhookDeliveryError::UnsuccessfulResponse(
                 WebhookUnsuccessfulResponseError {
                     target_url: delivery_data.target_url,
-                    status_code: response_status,
+                    status_code: response_status.as_u16(),
                 },
             ))
         }

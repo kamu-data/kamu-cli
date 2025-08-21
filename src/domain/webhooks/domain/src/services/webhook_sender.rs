@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::WebhookResponse;
@@ -41,7 +42,7 @@ pub enum WebhookSendError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[error("Failed to connect to webhook target URL: '{target_url}'")]
 pub struct WebhookSendFailedToConnectError {
     pub target_url: url::Url,
@@ -49,7 +50,7 @@ pub struct WebhookSendFailedToConnectError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[error("Webhook target URL '{target_url}' timed out after {timeout:?}")]
 pub struct WebhookSendConnectionTimeoutError {
     pub target_url: url::Url,
