@@ -317,14 +317,15 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                     // Determine actual number of consecutive failures.
                     // Note, if policy is set to 1, we can skip the query,
                     // we know the flow has just failed.
-                    let actual_failures_count = if failures_count > 1 {
+                    let failures_count_value = failures_count.into();
+                    let actual_failures_count = if failures_count_value > 1 {
                         self.flow_event_store
                             .get_current_consecutive_flow_failures_count(flow_binding)
                             .await?
                     } else {
                         1 /* this one */
                     };
-                    if actual_failures_count >= failures_count {
+                    if actual_failures_count >= failures_count_value {
                         tracing::warn!(
                             flow_binding = ?flow_binding,
                             "Auto-pausing flow trigger after {} consecutive failure(s)",
@@ -338,7 +339,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                             flow_binding = ?flow_binding,
                             "Flow has {} consecutive failures, but auto-pause threshold is {}, so keeping it active",
                             actual_failures_count,
-                            failures_count
+                            failures_count_value
                         );
                     }
                 }

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_flow_system as fs;
+use kamu_flow_system::{self as fs, ConsecutiveFailuresCount};
 use kamu_webhooks::*;
 use messaging_outbox::*;
 use time_source::SystemTimeSource;
@@ -81,7 +81,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                             )),
                             // TODO: externalize configuration
                             fs::FlowTriggerAutoPausePolicy::AfterConsecutiveFailures {
-                                failures_count: 5,
+                                failures_count: ConsecutiveFailuresCount::try_new(5).unwrap(),
                             },
                         )
                         .await
@@ -106,7 +106,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                             )),
                             // TODO: externalize configuration
                             fs::FlowTriggerAutoPausePolicy::AfterConsecutiveFailures {
-                                failures_count: 5,
+                                failures_count: ConsecutiveFailuresCount::try_new(5).unwrap(),
                             },
                         )
                         .await

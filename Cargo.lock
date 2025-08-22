@@ -7851,6 +7851,7 @@ dependencies = [
  "kamu-task-system",
  "messaging-outbox",
  "mockall 0.13.1",
+ "nutype",
  "opendatafabric",
  "rand 0.8.5",
  "serde",
