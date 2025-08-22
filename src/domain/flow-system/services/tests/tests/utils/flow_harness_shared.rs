@@ -286,6 +286,7 @@ impl FlowHarness {
         request_time: DateTime<Utc>,
         flow_binding: FlowBinding,
         trigger_rule: FlowTriggerRule,
+        auto_pause_policy: FlowTriggerAutoPausePolicy,
     ) {
         self.flow_trigger_service
             .set_trigger(
@@ -293,10 +294,21 @@ impl FlowHarness {
                 flow_binding,
                 false,
                 trigger_rule,
-                FlowTriggerAutoPausePolicy::default(),
+                auto_pause_policy,
             )
             .await
             .unwrap();
+    }
+
+    pub async fn get_flow_trigger_status(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Option<FlowTriggerStatus> {
+        self.flow_trigger_service
+            .find_trigger(flow_binding)
+            .await
+            .unwrap()
+            .map(|t| t.status)
     }
 
     pub async fn set_dataset_flow_ingest(
