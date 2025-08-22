@@ -316,6 +316,7 @@ impl FlowTriggerHarness {
             .add::<FlowDatasetsEventBridge>()
             .add::<FlowSensorDispatcherImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
+            .add::<InMemoryFlowEventStore>()
             .add::<SystemTimeSourceDefault>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -368,6 +369,7 @@ impl FlowTriggerHarness {
                 FlowBinding::new(system_flow_type, FlowScope::make_system_scope()),
                 false,
                 FlowTriggerRule::Schedule(schedule),
+                FlowTriggerAutoPausePolicy::default(),
             )
             .await?;
         Ok(())
@@ -375,7 +377,13 @@ impl FlowTriggerHarness {
 
     async fn set_flow_trigger(&self, flow_binding: FlowBinding, trigger_rule: FlowTriggerRule) {
         self.flow_trigger_service
-            .set_trigger(Utc::now(), flow_binding, false, trigger_rule)
+            .set_trigger(
+                Utc::now(),
+                flow_binding,
+                false,
+                trigger_rule,
+                FlowTriggerAutoPausePolicy::default(),
+            )
             .await
             .unwrap();
     }

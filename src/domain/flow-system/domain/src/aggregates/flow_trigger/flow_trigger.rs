@@ -24,6 +24,7 @@ impl FlowTrigger {
         flow_binding: FlowBinding,
         paused: bool,
         rule: FlowTriggerRule,
+        auto_pause_policy: FlowTriggerAutoPausePolicy,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -33,6 +34,7 @@ impl FlowTrigger {
                     flow_binding,
                     paused,
                     rule,
+                    auto_pause_policy,
                 },
             )
             .unwrap(),
@@ -45,11 +47,13 @@ impl FlowTrigger {
         now: DateTime<Utc>,
         paused: bool,
         new_rule: FlowTriggerRule,
+        auto_pause_policy: FlowTriggerAutoPausePolicy,
     ) -> Result<(), ProjectionError<FlowTriggerState>> {
         // Ignore if nothing changed
         let pause_affected = paused && self.is_active() || !paused && !self.is_active();
         let rule_affected = self.rule != new_rule;
-        if !pause_affected && !rule_affected {
+        let auto_pause_policy_affected = self.auto_pause_policy != auto_pause_policy;
+        if !pause_affected && !rule_affected && !auto_pause_policy_affected {
             return Ok(());
         }
 
@@ -58,6 +62,7 @@ impl FlowTrigger {
             flow_binding: self.flow_binding.clone(),
             paused,
             rule: new_rule,
+            auto_pause_policy,
         };
         self.apply(event)
     }
@@ -70,6 +75,7 @@ impl FlowTrigger {
                 flow_binding: self.flow_binding.clone(),
                 paused: true,
                 rule: self.rule.clone(),
+                auto_pause_policy: self.auto_pause_policy,
             };
             self.apply(event)
         } else {
@@ -87,6 +93,7 @@ impl FlowTrigger {
                 flow_binding: self.flow_binding.clone(),
                 paused: false,
                 rule: self.rule.clone(),
+                auto_pause_policy: self.auto_pause_policy,
             };
             self.apply(event)
         }

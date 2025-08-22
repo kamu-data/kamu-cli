@@ -113,20 +113,20 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(OneofObject, Debug)]
-pub enum FlowTriggerInput {
-    Schedule(FlowTriggerScheduleInput),
-    Reactive(FlowTriggerReactiveInput),
+pub enum FlowTriggerRuleInput {
+    Schedule(FlowTriggerRuleScheduleInput),
+    Reactive(FlowTriggerRuleReactiveInput),
 }
 
 #[derive(OneofObject, Debug)]
-pub enum FlowTriggerScheduleInput {
+pub enum FlowTriggerRuleScheduleInput {
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
     Cron5ComponentExpression(String),
 }
 
 #[derive(InputObject, Debug)]
-pub struct FlowTriggerReactiveInput {
+pub struct FlowTriggerRuleReactiveInput {
     pub for_new_data: FlowTriggerBatchingRuleInput,
     pub for_breaking_change: FlowTriggerBreakingChangeRule,
 }
@@ -195,7 +195,7 @@ impl From<ScheduleCron> for Cron5ComponentExpression {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl FlowTriggerInput {
+impl FlowTriggerRuleInput {
     pub fn check_type_compatible(
         &self,
         flow_type: DatasetFlowType,
@@ -216,17 +216,17 @@ impl FlowTriggerInput {
     }
 }
 
-impl TryFrom<FlowTriggerInput> for FlowTriggerRule {
+impl TryFrom<FlowTriggerRuleInput> for FlowTriggerRule {
     type Error = FlowInvalidTriggerInputError;
 
-    fn try_from(value: FlowTriggerInput) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: FlowTriggerRuleInput) -> std::result::Result<Self, Self::Error> {
         match value {
-            FlowTriggerInput::Schedule(schedule_input) => {
+            FlowTriggerRuleInput::Schedule(schedule_input) => {
                 let schedule_rule = match schedule_input {
-                    FlowTriggerScheduleInput::TimeDelta(td) => {
+                    FlowTriggerRuleScheduleInput::TimeDelta(td) => {
                         Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
                     }
-                    FlowTriggerScheduleInput::Cron5ComponentExpression(
+                    FlowTriggerRuleScheduleInput::Cron5ComponentExpression(
                         cron_5component_expression,
                     ) => Schedule::try_from_5component_cron_expression(&cron_5component_expression)
                         .map_err(|err| Self::Error {
@@ -235,7 +235,7 @@ impl TryFrom<FlowTriggerInput> for FlowTriggerRule {
                 };
                 Ok(FlowTriggerRule::Schedule(schedule_rule))
             }
-            FlowTriggerInput::Reactive(reactive_input) => {
+            FlowTriggerRuleInput::Reactive(reactive_input) => {
                 let batching_rule = match reactive_input.for_new_data {
                     FlowTriggerBatchingRuleInput::Immediate(_) => BatchingRule::immediate(),
                     FlowTriggerBatchingRuleInput::Buffering(collecting_input) => {
