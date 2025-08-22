@@ -226,11 +226,11 @@ impl<'a> DatasetFlowRunsMut<'a> {
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
 
-        let flow_run_service = from_catalog_n!(ctx, dyn fs::FlowRunService);
+        let (flow_run_service, dataset_registry) =
+            from_catalog_n!(ctx, dyn fs::FlowRunService, dyn kamu_core::DatasetRegistry);
+
         let logged_account = utils::get_logged_account(ctx);
         let dataset_handle = self.dataset_request_state.dataset_handle();
-
-        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
         let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
         // Assume unwrap safe such as we have checked this existence during
@@ -320,48 +320,41 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }))
     }
 
-    #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_cancel_scheduled_tasks, skip_all)]
+    #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_cancel_flow_run, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn cancel_scheduled_tasks(
+    async fn cancel_flow_run(
         &self,
         ctx: &Context<'_>,
         flow_id: FlowID,
-    ) -> Result<CancelScheduledTasksResult> {
+    ) -> Result<CancelFlowRunResult> {
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
         if let Some(error) =
             check_if_flow_belongs_to_dataset(ctx, flow_id, &dataset_handle.id).await?
         {
             return Ok(match error {
-                FlowInDatasetError::NotFound(e) => CancelScheduledTasksResult::NotFound(e),
+                FlowInDatasetError::NotFound(e) => CancelFlowRunResult::NotFound(e),
             });
         }
 
-        // Attempt cancelling scheduled tasks
         let flow_run_service = from_catalog_n!(ctx, dyn fs::FlowRunService);
+
+        // Attempt cancelling the flow
+
         let flow_state = flow_run_service
-            .cancel_scheduled_tasks(flow_id.into())
+            .cancel_flow_run(Utc::now(), flow_id.into())
             .await
             .map_err(|e| match e {
-                fs::CancelScheduledTasksError::NotFound(_) => unreachable!("Flow checked already"),
-                fs::CancelScheduledTasksError::Internal(e) => GqlError::Internal(e),
+                fs::CancelFlowRunError::NotFound(_) => unreachable!("Flow checked already"),
+                fs::CancelFlowRunError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        // Pause flow triggers regardless of current state.
-        // Duplicate requests are auto-ignored.
-        let flow_trigger_service = from_catalog_n!(ctx, dyn fs::FlowTriggerService);
-        flow_trigger_service
-            .pause_flow_trigger(Utc::now(), &flow_state.flow_binding)
-            .await?;
-
-        Ok(CancelScheduledTasksResult::Success(
-            CancelScheduledTasksSuccess {
-                flow: Flow::build_batch(vec![flow_state], ctx)
-                    .await?
-                    .pop()
-                    .unwrap(),
-            },
-        ))
+        Ok(CancelFlowRunResult::Success(CancelFlowRunSuccess {
+            flow: Flow::build_batch(vec![flow_state], ctx)
+                .await?
+                .pop()
+                .unwrap(),
+        }))
     }
 }
 
@@ -393,19 +386,19 @@ impl TriggerFlowSuccess {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum CancelScheduledTasksResult {
-    Success(CancelScheduledTasksSuccess),
+enum CancelFlowRunResult {
+    Success(CancelFlowRunSuccess),
     NotFound(FlowNotFound),
 }
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-struct CancelScheduledTasksSuccess {
+struct CancelFlowRunSuccess {
     pub flow: Flow,
 }
 
 #[ComplexObject]
-impl CancelScheduledTasksSuccess {
+impl CancelFlowRunSuccess {
     pub async fn message(&self) -> String {
         "Success".to_string()
     }

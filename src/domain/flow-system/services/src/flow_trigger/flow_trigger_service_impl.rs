@@ -45,8 +45,8 @@ impl FlowTriggerServiceImpl {
 
     async fn pause_given_trigger(
         &self,
-        mut flow_trigger: FlowTrigger,
         request_time: DateTime<Utc>,
+        mut flow_trigger: FlowTrigger,
     ) -> Result<(), InternalError> {
         flow_trigger.pause(request_time).int_err()?;
         flow_trigger
@@ -62,8 +62,8 @@ impl FlowTriggerServiceImpl {
 
     async fn resume_given_trigger(
         &self,
-        mut flow_trigger: FlowTrigger,
         request_time: DateTime<Utc>,
+        mut flow_trigger: FlowTrigger,
     ) -> Result<(), InternalError> {
         flow_trigger.resume(request_time).int_err()?;
         flow_trigger
@@ -128,9 +128,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn find_trigger(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<FlowTriggerState>, FindFlowTriggerError> {
-        let maybe_flow_trigger =
-            FlowTrigger::try_load(flow_binding, self.event_store.as_ref()).await?;
+    ) -> Result<Option<FlowTriggerState>, InternalError> {
+        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
+            .await
+            .int_err()?;
         Ok(maybe_flow_trigger.map(Into::into))
     }
 
@@ -202,7 +203,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .int_err()?;
 
         if let Some(flow_trigger) = maybe_flow_trigger {
-            self.pause_given_trigger(flow_trigger, request_time)
+            self.pause_given_trigger(request_time, flow_trigger)
                 .await
                 .int_err()?;
         }
@@ -220,7 +221,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .int_err()?;
 
         if let Some(flow_trigger) = maybe_flow_trigger {
-            self.resume_given_trigger(flow_trigger, request_time)
+            self.resume_given_trigger(request_time, flow_trigger)
                 .await
                 .int_err()?;
         }
@@ -248,7 +249,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                     .int_err()?;
 
             for flow_trigger in flow_triggers {
-                self.pause_given_trigger(flow_trigger, request_time)
+                self.pause_given_trigger(request_time, flow_trigger)
                     .await
                     .int_err()?;
             }
@@ -277,7 +278,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                     .int_err()?;
 
             for flow_trigger in flow_triggers {
-                self.resume_given_trigger(flow_trigger, request_time)
+                self.resume_given_trigger(request_time, flow_trigger)
                     .await
                     .int_err()?;
             }

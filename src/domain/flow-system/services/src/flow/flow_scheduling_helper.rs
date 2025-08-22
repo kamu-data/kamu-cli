@@ -86,7 +86,7 @@ impl FlowSchedulingHelper {
     ) -> Result<(), InternalError> {
         let maybe_active_schedule = self
             .flow_trigger_service
-            .try_get_flow_schedule_rule(flow_binding)
+            .try_get_flow_active_schedule_rule(flow_binding)
             .await
             .int_err()?;
 

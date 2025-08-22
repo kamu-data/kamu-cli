@@ -2326,8 +2326,8 @@ async fn test_cancel_ingest_root_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2401,8 +2401,8 @@ async fn test_cancel_running_transform_derived_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2473,8 +2473,8 @@ async fn test_cancel_hard_compaction_root_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2522,7 +2522,7 @@ async fn test_cancel_wrong_flow_id_fails() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
+                            "cancelFlowRun": {
                                 "__typename": "FlowNotFound",
                                 "message": "Flow '5' was not found",
                             }
@@ -2581,7 +2581,7 @@ async fn test_cancel_foreign_flow_fails() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
+                            "cancelFlowRun": {
                                 "__typename": "FlowNotFound",
                                 "message": "Flow '0' was not found",
                             }
@@ -2641,8 +2641,8 @@ async fn test_cancel_waiting_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2724,8 +2724,8 @@ async fn test_cancel_already_aborted_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2802,8 +2802,8 @@ async fn test_cancel_already_succeeded_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -4961,12 +4961,12 @@ impl FlowRunsHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             runs {
-                                cancelScheduledTasks (
+                                cancelFlowRun (
                                     flowId: "<flow_id>",
                                 ) {
                                     __typename,
                                     message
-                                    ... on CancelScheduledTasksSuccess {
+                                    ... on CancelFlowRunSuccess {
                                         flow {
                                             __typename
                                             flowId
