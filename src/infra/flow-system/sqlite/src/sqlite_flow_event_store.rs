@@ -614,8 +614,8 @@ impl FlowEventStore for SqliteFlowEventStore {
                 JOIN flows f ON f.flow_id = e.flow_id
                 WHERE
                     e.event_type = 'FlowEventTaskFinished'
-                    AND f.flow_type = ?
-                    AND f.scope_data = ?
+                    AND f.flow_type = $1
+                    AND f.scope_data = $2
             ),
             last_success AS (
                 SELECT event_id

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH finished AS (\n                SELECT\n                    e.event_id,\n                    json_extract(e.event_payload, '$.TaskFinished.task_outcome.Success') IS NOT NULL AS is_success,\n                    json_extract(e.event_payload, '$.TaskFinished.task_outcome.Failed')  IS NOT NULL AS is_failed\n                FROM flow_events e\n                JOIN flows f ON f.flow_id = e.flow_id\n                WHERE\n                    e.event_type = 'FlowEventTaskFinished'\n                    AND f.flow_type = $1\n                    AND f.scope_data = $2\n            ),\n            last_success AS (\n                SELECT event_id\n                FROM finished\n                WHERE is_success\n                ORDER BY event_id DESC\n                LIMIT 1\n            )\n            SELECT\n                COUNT(*) AS consecutive_failures\n            FROM finished\n            WHERE\n                is_failed AND event_id > IFNULL((SELECT event_id FROM last_success), 0);\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "consecutive_failures",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ac448ab1fd31d4f135acc6bfa8680f04841d4c67bef72f1edfdc7bb31f36a312"
+}
