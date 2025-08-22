@@ -527,8 +527,8 @@ impl FlowEventStore for PostgresFlowEventStore {
             WITH finished AS (
                 SELECT
                     e.event_id,
-                    (e.event_payload ->> '$.TaskFinished.task_outcome.Success') IS NOT NULL AS is_success,
-                    (e.event_payload ->> '$.TaskFinished.task_outcome.Failed')  IS NOT NULL AS is_failed
+                    (e.event_payload #>> '{TaskFinished,task_outcome,Success}') IS NOT NULL AS is_success,
+                    (e.event_payload #>> '{TaskFinished,task_outcome,Failed}') IS NOT NULL AS is_failed
                 FROM flow_events e
                 JOIN flows f ON f.flow_id = e.flow_id
                 WHERE
