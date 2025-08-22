@@ -412,11 +412,11 @@ type BuildInfo {
 	cargoOptLevel: String
 }
 
-interface CancelScheduledTasksResult {
+interface CancelFlowRunResult {
 	message: String!
 }
 
-type CancelScheduledTasksSuccess implements CancelScheduledTasksResult {
+type CancelFlowRunSuccess implements CancelFlowRunResult {
 	flow: Flow!
 	message: String!
 }
@@ -1116,7 +1116,7 @@ type DatasetFlowRunsMut {
 	triggerCompactionFlow(compactionConfigInput: FlowConfigCompactionInput): TriggerFlowResult!
 	triggerResetFlow(resetConfigInput: FlowConfigResetInput): TriggerFlowResult!
 	triggerResetToMetadataFlow: TriggerFlowResult!
-	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
+	cancelFlowRun(flowId: FlowID!): CancelFlowRunResult!
 }
 
 type DatasetFlowTriggers {
@@ -2229,7 +2229,7 @@ type FlowInvalidTriggerInputError implements SetFlowTriggerResult {
 	message: String!
 }
 
-type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
+type FlowNotFound implements GetFlowResult & CancelFlowRunResult {
 	flowId: FlowID!
 	message: String!
 }

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::Duration;
 use database_common_macros::transactional_method1;
 use dill::Catalog;
-use kamu_flow_system::{CancelScheduledTasksError, FlowID, FlowRunService};
+use kamu_flow_system::{CancelFlowRunError, FlowID, FlowRunService};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,9 +48,9 @@ impl ManualFlowAbortDriver {
     }
 
     #[transactional_method1(flow_run_service: Arc<dyn FlowRunService>)]
-    async fn send_abort_flow(&self) -> Result<(), CancelScheduledTasksError> {
+    async fn send_abort_flow(&self) -> Result<(), CancelFlowRunError> {
         flow_run_service
-            .cancel_scheduled_tasks(self.args.flow_id)
+            .cancel_flow_run(self.time_source.now(), self.args.flow_id)
             .await?;
         Ok(())
     }

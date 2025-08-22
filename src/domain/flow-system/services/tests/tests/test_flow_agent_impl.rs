@@ -5998,7 +5998,48 @@ async fn test_abort_flow_after_task_running_has_started() {
 
 #[test_log::test(tokio::test)]
 async fn test_abort_flow_after_task_finishes() {
-    let harness = FlowHarness::new();
+    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(2)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+
+    let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
+    let mut evaluation_seq = mockall::Sequence::new();
+    // bar: initially when enabling a trigger
+    mock_transform_flow_evaluator
+        .expect_evaluate_transform_status()
+        .times(1)
+        .in_sequence(&mut evaluation_seq)
+        .returning(|_| Ok(TransformStatus::UpToDate));
+    // bar: after foo finishes task 0
+    mock_transform_flow_evaluator
+        .expect_evaluate_transform_status()
+        .times(1)
+        .in_sequence(&mut evaluation_seq)
+        .returning(|_| {
+            Ok(TransformStatus::NewInputDataAvailable {
+                input_advancements: vec![odf::metadata::ExecuteTransformInput {
+                    dataset_id: odf::DatasetID::new_seeded_ed25519(b"foo"),
+                    new_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    prev_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                    prev_offset: Some(5),
+                    new_offset: Some(8),
+                }],
+            })
+        });
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_dataset_changes: Some(mock_dataset_changes),
+        mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
+        ..Default::default()
+    });
 
     // Create a "foo" root dataset, and configure ingestion schedule every 50ms
     let foo_id = harness
@@ -6008,6 +6049,17 @@ async fn test_abort_flow_after_task_finishes() {
         })
         .await;
 
+    // Create a "bar" derived dataset, and configure reactive trigger
+    let bar_id = harness
+        .create_derived_dataset(
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+
     harness
         .set_flow_trigger(
             harness.now_datetime(),
@@ -6015,6 +6067,15 @@ async fn test_abort_flow_after_task_finishes() {
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
+
+    harness
+        .set_flow_trigger(
+            harness.now_datetime(),
+            transform_dataset_binding(&bar_id),
+            FlowTriggerRule::Reactive(ReactiveRule::empty()),
+        )
+        .await;
+
     harness.eager_initialization().await;
 
     // Run scheduler concurrently with manual triggers script
@@ -6024,13 +6085,19 @@ async fn test_abort_flow_after_task_finishes() {
 
         // Run simulation script and task drivers
         _ = async {
-            // Task 0: start running at 10ms, finish at 30ms
+            // Task 0: "foo" start running at 10ms, finish at 20ms
             let foo_task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResultDatasetUpdate {
+                      pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                      },
+                    }.into_task_result()
+                  ))),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
@@ -6038,35 +6105,76 @@ async fn test_abort_flow_after_task_finishes() {
             });
             let foo_task0_handle = foo_task0_driver.run();
 
-            // Task 1: start running at 90ms, finish at 110ms
-            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+            // Task 1: "bar" start running at 30ms, finish at 70ms
+            let bar_task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((Duration::milliseconds(40), TaskOutcome::Success(TaskResult::empty()))),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
+            });
+            let bar_task1_handle = bar_task1_driver.run();
+
+            // Manual abort for "foo" at 50ms, which is after flow 0 has finished, and before flow 1 has started
+            // This should stop the trigger of "foo"
+            let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(2),
+                abort_since_start: Duration::milliseconds(50),
+            });
+            let abort0_handle = abort0_driver.run();
+
+            // Manual abort for "bar" at 50ms.
+            // This would only interrupt the "bar" task, but not it's reactive trigger
+            let abort1_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(1),
+                abort_since_start: Duration::milliseconds(50),
+            });
+            let abort1_handle = abort1_driver.run();
+
+
+            // Manual launch of "foo" at 130ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: ingest_dataset_binding(&foo_id),
+                run_since_start: Duration::milliseconds(130),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
+
+            // Task 2: "foo" start running at 140ms, finish at 150ms
+            let foo_task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                 dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::milliseconds(90),
-                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
+                run_since_start: Duration::milliseconds(140),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResultDatasetUpdate {
+                      pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
+                      },
+                    }.into_task_result()
+                  ))),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                   dataset_id: foo_id.clone(),
                   fetch_uncacheable: false
                 }.into_logical_plan(),
             });
-            let foo_task1_handle = foo_task1_driver.run();
+            let foo_task2_handle = foo_task2_driver.run();
 
-            // Manual abort for "foo" at 50ms, which is after flow 0 has finished, and before flow 1 has started
-            let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
-                flow_id: FlowID::new(0),
-                abort_since_start: Duration::milliseconds(50),
-            });
-            let abort0_handle = abort0_driver.run();
 
-            let sim_handle = harness.advance_time(Duration::milliseconds(150));
-            tokio::join!(foo_task0_handle, foo_task1_handle, abort0_handle, sim_handle)
+            let sim_handle = harness.advance_time(Duration::milliseconds(250));
+            tokio::join!(foo_task0_handle, bar_task1_handle, abort0_handle, abort1_handle, trigger0_handle, foo_task2_handle, sim_handle)
         } => Ok(())
     }
     .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -6083,25 +6191,73 @@ async fn test_abort_flow_after_task_finishes() {
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
-            #3: +30ms:
+            #3: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting Input(foo) Batching(0, until=20ms)
               "foo" Ingest:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=80ms)
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
-            #4: +80ms:
+            #4: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=20ms)
               "foo" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=80ms)
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
-            #5: +90ms:
-              "foo" Ingest:
+            #5: +30ms:
+              "bar" ExecuteTransform:
                 Flow ID = 1 Running(task=1)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
+                Flow ID = 0 Finished Success
+            
+            #6: +50ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Running(task=1)
+              "foo" Ingest:
+                Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #6: +110ms:
+            #7: +50ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Aborted
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
-                Flow ID = 1 Finished Success
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+            
+            #8: +130ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Aborted
+              "foo" Ingest:
+                Flow ID = 3 Waiting Manual Executor(task=2, since=130ms)
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #9: +140ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Aborted
+              "foo" Ingest:
+                Flow ID = 3 Running(task=2)
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+            
+            #10: +150ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting Input(foo) Batching(0, until=150ms)
+                Flow ID = 1 Finished Aborted
+              "foo" Ingest:
+                Flow ID = 3 Finished Success
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #11: +150ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting Input(foo) Executor(task=3, since=150ms)
+                Flow ID = 1 Finished Aborted
+              "foo" Ingest:
+                Flow ID = 3 Finished Success
+                Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
           "#
