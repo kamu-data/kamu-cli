@@ -15,7 +15,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowTriggerState {
     /// Flow binding
     pub flow_binding: FlowBinding,
@@ -23,6 +23,8 @@ pub struct FlowTriggerState {
     pub rule: FlowTriggerRule,
     /// Trigger status
     pub status: FlowTriggerStatus,
+    /// Auto-pause policy
+    pub auto_pause_policy: FlowTriggerAutoPausePolicy,
 }
 
 impl FlowTriggerState {
@@ -60,6 +62,7 @@ impl Projection for FlowTriggerState {
                     flow_binding,
                     paused,
                     rule,
+                    auto_pause_policy,
                     ..
                 }) => Ok(Self {
                     flow_binding,
@@ -69,6 +72,7 @@ impl Projection for FlowTriggerState {
                         FlowTriggerStatus::Active
                     },
                     rule,
+                    auto_pause_policy,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },

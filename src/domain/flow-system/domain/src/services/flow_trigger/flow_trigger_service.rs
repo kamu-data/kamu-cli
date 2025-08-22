@@ -31,6 +31,7 @@ pub trait FlowTriggerService: Sync + Send {
         flow_binding: FlowBinding,
         paused: bool,
         rule: FlowTriggerRule,
+        auto_pause_policy: FlowTriggerAutoPausePolicy,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
     /// Lists all flow triggers, which are currently enabled
@@ -69,6 +70,13 @@ pub trait FlowTriggerService: Sync + Send {
         &self,
         scopes: &[FlowScope],
     ) -> Result<bool, InternalError>;
+
+    /// Evaluates trigger auto-pause policy after a failure
+    async fn evaluate_auto_pause_policy(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

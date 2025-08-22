@@ -30,6 +30,8 @@ pub struct FlowTriggerEventCreated {
     pub flow_binding: FlowBinding,
     pub paused: bool,
     pub rule: FlowTriggerRule,
+    #[serde(default)]
+    pub auto_pause_policy: FlowTriggerAutoPausePolicy,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +42,8 @@ pub struct FlowTriggerEventModified {
     pub flow_binding: FlowBinding,
     pub paused: bool,
     pub rule: FlowTriggerRule,
+    #[serde(default)]
+    pub auto_pause_policy: FlowTriggerAutoPausePolicy,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

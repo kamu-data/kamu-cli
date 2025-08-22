@@ -1131,7 +1131,7 @@ type DatasetFlowTriggers {
 }
 
 type DatasetFlowTriggersMut {
-	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerInput: FlowTriggerInput!): SetFlowTriggerResult!
+	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerInput: FlowTriggerRuleInput!): SetFlowTriggerResult!
 	pauseFlow(datasetFlowType: DatasetFlowType!): Boolean!
 	pauseFlows: Boolean!
 	resumeFlow(datasetFlowType: DatasetFlowType!): Boolean!
@@ -2359,22 +2359,22 @@ enum FlowTriggerBreakingChangeRule {
 	RECOVER
 }
 
-input FlowTriggerInput @oneOf {
-	schedule: FlowTriggerScheduleInput
-	reactive: FlowTriggerReactiveInput
-}
-
-input FlowTriggerReactiveInput {
-	forNewData: FlowTriggerBatchingRuleInput!
-	forBreakingChange: FlowTriggerBreakingChangeRule!
-}
-
 type FlowTriggerReactiveRule {
 	forNewData: FlowTriggerBatchingRule!
 	forBreakingChange: FlowTriggerBreakingChangeRule!
 }
 
-input FlowTriggerScheduleInput @oneOf {
+input FlowTriggerRuleInput @oneOf {
+	schedule: FlowTriggerRuleScheduleInput
+	reactive: FlowTriggerRuleReactiveInput
+}
+
+input FlowTriggerRuleReactiveInput {
+	forNewData: FlowTriggerBatchingRuleInput!
+	forBreakingChange: FlowTriggerBreakingChangeRule!
+}
+
+input FlowTriggerRuleScheduleInput @oneOf {
 	timeDelta: TimeDeltaInput
 	"""
 	Supported CRON syntax: min hour dayOfMonth month dayOfWeek

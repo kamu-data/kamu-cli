@@ -19,30 +19,19 @@ use crate::MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn FlowTriggerService)]
+#[interface(dyn FlowScopeRemovalHandler)]
 pub struct FlowTriggerServiceImpl {
-    event_store: Arc<dyn FlowTriggerEventStore>,
+    flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
+    flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn FlowTriggerService)]
-#[interface(dyn FlowScopeRemovalHandler)]
 impl FlowTriggerServiceImpl {
-    pub fn new(
-        event_store: Arc<dyn FlowTriggerEventStore>,
-        time_source: Arc<dyn SystemTimeSource>,
-        outbox: Arc<dyn Outbox>,
-    ) -> Self {
-        Self {
-            event_store,
-            time_source,
-            outbox,
-        }
-    }
-
     async fn pause_given_trigger(
         &self,
         request_time: DateTime<Utc>,
@@ -50,7 +39,7 @@ impl FlowTriggerServiceImpl {
     ) -> Result<(), InternalError> {
         flow_trigger.pause(request_time).int_err()?;
         flow_trigger
-            .save(self.event_store.as_ref())
+            .save(self.flow_trigger_event_store.as_ref())
             .await
             .int_err()?;
 
@@ -67,7 +56,7 @@ impl FlowTriggerServiceImpl {
     ) -> Result<(), InternalError> {
         flow_trigger.resume(request_time).int_err()?;
         flow_trigger
-            .save(self.event_store.as_ref())
+            .save(self.flow_trigger_event_store.as_ref())
             .await
             .int_err()?;
 
@@ -101,9 +90,10 @@ impl FlowTriggerServiceImpl {
         tracing::trace!(?flow_bindings, "Removing flow bindings");
 
         for flow_binding in flow_bindings {
-            let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
-                .await
-                .int_err()?;
+            let maybe_flow_trigger =
+                FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
+                    .await
+                    .int_err()?;
 
             if let Some(mut flow_trigger) = maybe_flow_trigger {
                 flow_trigger
@@ -111,7 +101,7 @@ impl FlowTriggerServiceImpl {
                     .int_err()?;
 
                 flow_trigger
-                    .save(self.event_store.as_ref())
+                    .save(self.flow_trigger_event_store.as_ref())
                     .await
                     .int_err()?;
             }
@@ -129,9 +119,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowTriggerState>, InternalError> {
-        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
-            .await
-            .int_err()?;
+        let maybe_flow_trigger =
+            FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
+                .await
+                .int_err()?;
         Ok(maybe_flow_trigger.map(Into::into))
     }
 
@@ -141,6 +132,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         flow_binding: FlowBinding,
         paused: bool,
         rule: FlowTriggerRule,
+        auto_pause_policy: FlowTriggerAutoPausePolicy,
     ) -> Result<FlowTriggerState, SetFlowTriggerError> {
         tracing::info!(
             flow_binding = ?flow_binding,
@@ -149,25 +141,31 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         );
 
         let maybe_flow_trigger =
-            FlowTrigger::try_load(&flow_binding, self.event_store.as_ref()).await?;
+            FlowTrigger::try_load(&flow_binding, self.flow_trigger_event_store.as_ref()).await?;
 
         let mut flow_trigger = match maybe_flow_trigger {
             // Modification
             Some(mut flow_trigger) => {
                 flow_trigger
-                    .modify_rule(self.time_source.now(), paused, rule)
+                    .modify_rule(self.time_source.now(), paused, rule, auto_pause_policy)
                     .int_err()?;
 
                 flow_trigger
             }
             // New trigger
-            None => FlowTrigger::new(self.time_source.now(), flow_binding, paused, rule),
+            None => FlowTrigger::new(
+                self.time_source.now(),
+                flow_binding,
+                paused,
+                rule,
+                auto_pause_policy,
+            ),
         };
 
         // Skip saving and publishing events if nothing changed
         if flow_trigger.has_updates() {
             flow_trigger
-                .save(self.event_store.as_ref())
+                .save(self.flow_trigger_event_store.as_ref())
                 .await
                 .int_err()?;
 
@@ -181,9 +179,9 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     fn list_enabled_triggers(&self) -> FlowTriggerStateStream {
         Box::pin(async_stream::try_stream! {
             use futures::stream::{self, StreamExt, TryStreamExt};
-            let flow_bindings: Vec<_> = self.event_store.stream_all_active_flow_bindings().try_collect().await.int_err()?;
+            let flow_bindings: Vec<_> = self.flow_trigger_event_store.stream_all_active_flow_bindings().try_collect().await.int_err()?;
 
-            let flow_triggers = FlowTrigger::load_multi_simple(flow_bindings, self.event_store.as_ref()).await.int_err()?;
+            let flow_triggers = FlowTrigger::load_multi_simple(flow_bindings, self.flow_trigger_event_store.as_ref()).await.int_err()?;
             let stream = stream::iter(flow_triggers)
                 .map(|flow_trigger| Ok::<_, InternalError>(flow_trigger.into()));
 
@@ -198,9 +196,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
-        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
-            .await
-            .int_err()?;
+        let maybe_flow_trigger =
+            FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
+                .await
+                .int_err()?;
 
         if let Some(flow_trigger) = maybe_flow_trigger {
             self.pause_given_trigger(request_time, flow_trigger)
@@ -216,9 +215,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
-        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
-            .await
-            .int_err()?;
+        let maybe_flow_trigger =
+            FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
+                .await
+                .int_err()?;
 
         if let Some(flow_trigger) = maybe_flow_trigger {
             self.resume_given_trigger(request_time, flow_trigger)
@@ -238,15 +238,17 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         // but for now we just iterate over scopes
         for flow_scope in scopes {
             let flow_bindings = self
-                .event_store
+                .flow_trigger_event_store
                 .all_trigger_bindings_for_scope(flow_scope)
                 .await
                 .int_err()?;
 
-            let flow_triggers =
-                FlowTrigger::load_multi_simple(flow_bindings, self.event_store.as_ref())
-                    .await
-                    .int_err()?;
+            let flow_triggers = FlowTrigger::load_multi_simple(
+                flow_bindings,
+                self.flow_trigger_event_store.as_ref(),
+            )
+            .await
+            .int_err()?;
 
             for flow_trigger in flow_triggers {
                 self.pause_given_trigger(request_time, flow_trigger)
@@ -267,15 +269,17 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         // but for now we just iterate over scopes
         for flow_scope in scopes {
             let flow_bindings = self
-                .event_store
+                .flow_trigger_event_store
                 .all_trigger_bindings_for_scope(flow_scope)
                 .await
                 .int_err()?;
 
-            let flow_triggers =
-                FlowTrigger::load_multi_simple(flow_bindings, self.event_store.as_ref())
-                    .await
-                    .int_err()?;
+            let flow_triggers = FlowTrigger::load_multi_simple(
+                flow_bindings,
+                self.flow_trigger_event_store.as_ref(),
+            )
+            .await
+            .int_err()?;
 
             for flow_trigger in flow_triggers {
                 self.resume_given_trigger(request_time, flow_trigger)
@@ -294,9 +298,57 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     ) -> Result<bool, InternalError> {
         tracing::info!(?scopes, "Checking for active triggers for scopes");
 
-        self.event_store
+        self.flow_trigger_event_store
             .has_active_triggers_for_scopes(scopes)
             .await
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
+    async fn evaluate_auto_pause_policy(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+    ) -> Result<(), InternalError> {
+        // Find an active trigger end evaluate it's pause conditions
+        let maybe_active_trigger = self.find_trigger(flow_binding).await?;
+        if let Some(active_trigger) = maybe_active_trigger {
+            match active_trigger.auto_pause_policy {
+                FlowTriggerAutoPausePolicy::AfterConsecutiveFailures { failures_count } => {
+                    // Determine actual number of consecutive failures.
+                    // Note, if policy is set to 1, we can skip the query,
+                    // we know the flow has just failed.
+                    let actual_failures_count = if failures_count > 1 {
+                        self.flow_event_store
+                            .get_current_consecutive_flow_failures_count(flow_binding)
+                            .await?
+                    } else {
+                        1 /* this one */
+                    };
+                    if actual_failures_count >= failures_count {
+                        tracing::warn!(
+                            flow_binding = ?flow_binding,
+                            "Auto-pausing flow trigger after {} consecutive failure(s)",
+                            actual_failures_count
+                        );
+                        self.pause_flow_trigger(request_time, flow_binding)
+                            .await
+                            .int_err()?;
+                    } else {
+                        tracing::info!(
+                            flow_binding = ?flow_binding,
+                            "Flow has {} consecutive failures, but auto-pause threshold is {}, so keeping it active",
+                            actual_failures_count,
+                            failures_count
+                        );
+                    }
+                }
+                FlowTriggerAutoPausePolicy::Never => {
+                    // Do nothing
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -307,7 +359,7 @@ impl FlowScopeRemovalHandler for FlowTriggerServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(flow_scope = ?flow_scope))]
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let flow_bindings = self
-            .event_store
+            .flow_trigger_event_store
             .all_trigger_bindings_for_scope(flow_scope)
             .await?;
 

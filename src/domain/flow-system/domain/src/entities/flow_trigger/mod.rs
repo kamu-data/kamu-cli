@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod flow_trigger_auto_pause_policy;
 mod flow_trigger_event;
 mod flow_trigger_rule;
 mod flow_trigger_state;
 mod flow_trigger_status;
 
+pub use flow_trigger_auto_pause_policy::*;
 pub use flow_trigger_event::*;
 pub use flow_trigger_rule::*;
 pub use flow_trigger_state::*;

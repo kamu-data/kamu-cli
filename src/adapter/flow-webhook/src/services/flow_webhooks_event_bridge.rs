@@ -79,6 +79,10 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                                 fs::BatchingRule::immediate(),
                                 fs::BreakingChangeRule::Recover,
                             )),
+                            // TODO: externalize configuration
+                            fs::FlowTriggerAutoPausePolicy::AfterConsecutiveFailures {
+                                failures_count: 5,
+                            },
                         )
                         .await
                         .int_err()?;
@@ -100,6 +104,10 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                                 fs::BatchingRule::immediate(),
                                 fs::BreakingChangeRule::Recover,
                             )),
+                            // TODO: externalize configuration
+                            fs::FlowTriggerAutoPausePolicy::AfterConsecutiveFailures {
+                                failures_count: 5,
+                            },
                         )
                         .await
                         .int_err()?;

@@ -556,13 +556,18 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
                         if let Some(flow_outcome) = flow.outcome.as_ref() {
-                            // In case of failure after retries:
-                            //  - disable trigger
+                            // Handle flow failure if it reached a terminal state
                             if message.outcome.is_failed() {
+                                tracing::warn!(
+                                    flow_id = %flow.flow_id,
+                                    "Flow has reached a failed state after exhausting all retries"
+                                );
+
+                                // Trigger should make a decision about auto-pausing
                                 let flow_trigger_service =
                                     target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
                                 flow_trigger_service
-                                    .pause_flow_trigger(finish_time, &flow.flow_binding)
+                                    .evaluate_auto_pause_policy(finish_time, &flow.flow_binding)
                                     .await?;
                             }
 

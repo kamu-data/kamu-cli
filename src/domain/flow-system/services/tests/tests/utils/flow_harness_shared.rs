@@ -288,7 +288,13 @@ impl FlowHarness {
         trigger_rule: FlowTriggerRule,
     ) {
         self.flow_trigger_service
-            .set_trigger(request_time, flow_binding, false, trigger_rule)
+            .set_trigger(
+                request_time,
+                flow_binding,
+                false,
+                trigger_rule,
+                FlowTriggerAutoPausePolicy::default(),
+            )
             .await
             .unwrap();
     }
@@ -336,7 +342,13 @@ impl FlowHarness {
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_binding, true, current_trigger.rule)
+            .set_trigger(
+                request_time,
+                flow_binding,
+                true,
+                current_trigger.rule,
+                current_trigger.auto_pause_policy,
+            )
             .await
             .unwrap();
     }
@@ -350,7 +362,13 @@ impl FlowHarness {
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_binding, false, current_trigger.rule)
+            .set_trigger(
+                request_time,
+                flow_binding,
+                false,
+                current_trigger.rule,
+                current_trigger.auto_pause_policy,
+            )
             .await
             .unwrap();
     }

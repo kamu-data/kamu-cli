@@ -206,6 +206,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     flow_binding: foo_ingest_binding.clone(),
                     paused: false,
                     rule: FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
+                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
                 }
                 .into(),
             ],
@@ -6211,7 +6212,7 @@ async fn test_abort_flow_after_task_finishes() {
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
-            
+
             #6: +50ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Running(task=1)
@@ -6225,7 +6226,7 @@ async fn test_abort_flow_after_task_finishes() {
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #8: +130ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Aborted
@@ -6241,7 +6242,7 @@ async fn test_abort_flow_after_task_finishes() {
                 Flow ID = 3 Running(task=2)
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #10: +150ms:
               "bar" ExecuteTransform:
                 Flow ID = 4 Waiting Input(foo) Batching(0, until=150ms)
@@ -7407,14 +7408,11 @@ async fn test_disable_trigger_on_flow_fail() {
         .find_trigger(&foo_binding)
         .await
         .unwrap();
-    assert_eq!(
-        current_trigger,
-        Some(FlowTriggerState {
-            flow_binding: foo_binding,
-            status: FlowTriggerStatus::PausedTemporarily,
-            rule: trigger_rule,
-        })
-    );
+
+    let current_trigger = current_trigger.expect("Expected Some(FlowTriggerState)");
+    assert_eq!(current_trigger.flow_binding, foo_binding);
+    assert_eq!(current_trigger.status, FlowTriggerStatus::PausedTemporarily);
+    assert_eq!(current_trigger.rule, trigger_rule);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -45,7 +45,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        trigger_input: FlowTriggerInput,
+        trigger_input: FlowTriggerRuleInput,
     ) -> Result<SetFlowTriggerResult> {
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
@@ -77,7 +77,14 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         let res = flow_trigger_service
-            .set_trigger(Utc::now(), flow_binding, paused, trigger_rule)
+            .set_trigger(
+                Utc::now(),
+                flow_binding,
+                paused,
+                trigger_rule,
+                kamu_flow_system::FlowTriggerAutoPausePolicy::default(), /* TODO: expose as
+                                                                          * parameter */
+            )
             .await
             .int_err()?;
 
