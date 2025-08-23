@@ -381,7 +381,7 @@ async fn test_get_next_operation() {
             prev_offset: None,
             new_offset: Some(9),
             data_slices: vec![foo_slice.physical_hash.clone()],
-            schema: MetadataFactory::set_data_schema().build().schema_as_arrow().unwrap(),
+            schema: MetadataFactory::set_data_schema().build().schema_as_arrow(&odf::metadata::ToArrowSettings::default()).map(Arc::new).unwrap(),
             explicit_watermarks: vec![odf::metadata::Watermark {
                 system_time: foo_block.system_time,
                 event_time: Utc.with_ymd_and_hms(2020, 1, 1, 10, 0, 0).unwrap(),
