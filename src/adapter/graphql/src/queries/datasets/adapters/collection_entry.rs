@@ -76,6 +76,12 @@ impl CollectionEntry {
         })
         .unwrap()
     }
+
+    pub fn is_equivalent_record(&self, other: &Self) -> bool {
+        self.path == other.path
+            && self.reference == other.reference
+            && self.extra_data == other.extra_data
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

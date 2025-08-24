@@ -154,11 +154,18 @@ impl<'a> CollectionMut<'a> {
 
         for op in operations {
             if let Some(add) = op.add {
-                if let Some(existing) = current_entries.remove(&add.entry.path) {
+                let new_entry = CollectionEntry::from_input(add.entry);
+
+                if let Some(existing) = current_entries.remove(&new_entry.path) {
+                    if existing.is_equivalent_record(&new_entry) {
+                        // Undo and ignore the operation if new entry is identical to the existing
+                        current_entries.insert(new_entry.path, existing);
+                        continue;
+                    }
+
                     diff.push((Op::Retract, existing));
                 }
 
-                let new_entry = CollectionEntry::from_input(add.entry);
                 current_entries.insert(new_entry.path.clone(), new_entry.clone());
                 diff.push((Op::Append, new_entry));
             } else if let Some(remove) = op.remove {
@@ -180,7 +187,14 @@ impl<'a> CollectionMut<'a> {
                     new_entry.extra_data = extra_data;
                 }
 
+                if old_entry.is_equivalent_record(&new_entry) {
+                    // Undo and ignore the operation if new entry is identical to the existing
+                    current_entries.insert(new_entry.path, old_entry);
+                    continue;
+                }
+
                 if new_entry.path != old_entry.path {
+                    // Path is a PK, so when it changes we treat it as retraction + append
                     if let Some(collision) = current_entries.remove(&new_entry.path) {
                         diff.push((Op::Retract, collision));
                     }
@@ -188,6 +202,7 @@ impl<'a> CollectionMut<'a> {
                     diff.push((Op::Retract, old_entry));
                     diff.push((Op::Append, new_entry.clone()));
                 } else {
+                    // When path stays the same - we treat it as a correction
                     diff.push((Op::CorrectFrom, old_entry));
                     diff.push((Op::CorrectTo, new_entry.clone()));
                 }

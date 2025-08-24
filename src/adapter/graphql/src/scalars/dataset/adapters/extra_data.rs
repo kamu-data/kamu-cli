@@ -31,7 +31,7 @@ static EXTRA_DATA_JSONSCHEMA_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLo
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype::nutype(derive(AsRef, Clone, Debug, Into))]
+#[nutype::nutype(derive(AsRef, Clone, Debug, Into, PartialEq, Eq))]
 pub struct ExtraData(serde_json::Map<String, serde_json::Value>);
 
 impl Default for ExtraData {

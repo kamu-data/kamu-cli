@@ -12,6 +12,7 @@ use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::*;
 use kamu_datasets_services::*;
+use odf::dataset::MetadataChainExt;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -63,6 +64,34 @@ async fn test_collection_operations() {
             "extraData": {},
         }])
     );
+
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 4);
+
+    // Add duplicate entry - no new events should be generated
+    harness
+        .update_entries(
+            &did,
+            json!([{
+                "add": {
+                    "entry": {
+                        "path": "/foo",
+                        "ref": foo.dataset_handle.id,
+                    }
+                }
+            }]),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        harness.list_entries(&did).await,
+        json!([{
+            "path": "/foo",
+            "ref": foo.dataset_handle.id,
+            "extraData": {},
+        }])
+    );
+
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 4);
 
     // Add second entry
     harness
@@ -347,6 +376,42 @@ async fn test_collection_extra_data() {
             "extraData": {"foo": "bbb", "bar": 222}
         }])
     );
+
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 8);
+
+    // Redundant add does not produce a new event
+    harness
+        .update_entries(
+            &did,
+            json![{
+                "add": {
+                    "entry": {
+                        "path": "/bar",
+                        "ref": linked,
+                        "extraData": {"foo": "bbb", "bar": 222}
+                    }
+                }
+            }],
+        )
+        .await;
+
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 8);
+
+    // Move without changing anything does not produce a new event
+    harness
+        .update_entries(
+            &did,
+            json![{
+                "move": {
+                    "pathFrom": "/bar",
+                    "pathTo": "/bar",
+                    "extraData": {"foo": "bbb", "bar": 222}
+                }
+            }],
+        )
+        .await;
+
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 8);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -756,7 +821,7 @@ impl GraphQLDatasetsHarness {
         &self,
         alias: &str,
         extra_columns: Option<serde_json::Value>,
-    ) -> String {
+    ) -> odf::DatasetID {
         let res = self
             .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
@@ -787,13 +852,34 @@ impl GraphQLDatasetsHarness {
             .await;
 
         assert!(res.is_ok(), "{res:#?}");
-        res.data.into_json().unwrap()["datasets"]["createCollection"]["dataset"]["id"]
+        let id = res.data.into_json().unwrap()["datasets"]["createCollection"]["dataset"]["id"]
             .as_str()
             .unwrap()
-            .to_string()
+            .to_string();
+
+        odf::DatasetID::from_did_str(&id).unwrap()
     }
 
-    pub async fn list_entries(&self, did: &str) -> serde_json::Value {
+    pub async fn get_dataset(&self, dataset_id: &odf::DatasetID) -> ResolvedDataset {
+        let dataset_reg = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap();
+
+        dataset_reg.get_dataset_by_id(dataset_id).await.unwrap()
+    }
+
+    pub async fn get_metadata_chain_len(&self, dataset_id: &odf::DatasetID) -> usize {
+        let dataset = self.get_dataset(dataset_id).await;
+        let last_block = dataset
+            .as_metadata_chain()
+            .get_block_by_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap();
+        usize::try_from(last_block.sequence_number).unwrap() + 1
+    }
+
+    pub async fn list_entries(&self, did: &odf::DatasetID) -> serde_json::Value {
         let res = self
             .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
@@ -831,7 +917,7 @@ impl GraphQLDatasetsHarness {
 
     pub async fn list_entries_ext(
         &self,
-        did: &str,
+        did: &odf::DatasetID,
         path_prefix: Option<&str>,
         max_depth: Option<usize>,
     ) -> serde_json::Value {
@@ -874,7 +960,7 @@ impl GraphQLDatasetsHarness {
 
     pub fn add_entry_request(
         &self,
-        did: &str,
+        did: &odf::DatasetID,
         entry: &serde_json::Value,
         expected_head: Option<&odf::Multihash>,
     ) -> async_graphql::Request {
@@ -907,7 +993,7 @@ impl GraphQLDatasetsHarness {
         })))
     }
 
-    pub async fn update_entries(&self, did: &str, operations: serde_json::Value) {
+    pub async fn update_entries(&self, did: &odf::DatasetID, operations: serde_json::Value) {
         let res = self
             .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
@@ -943,7 +1029,7 @@ impl GraphQLDatasetsHarness {
         );
     }
 
-    pub async fn get_entry(&self, did: &str, path: &str) -> serde_json::Value {
+    pub async fn get_entry(&self, did: &odf::DatasetID, path: &str) -> serde_json::Value {
         let res = self
             .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
@@ -976,7 +1062,11 @@ impl GraphQLDatasetsHarness {
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["latest"]["entry"].clone()
     }
 
-    pub async fn entries_by_ref(&self, did: &str, refs: &[&odf::DatasetID]) -> serde_json::Value {
+    pub async fn entries_by_ref(
+        &self,
+        did: &odf::DatasetID,
+        refs: &[&odf::DatasetID],
+    ) -> serde_json::Value {
         let res = self
             .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
