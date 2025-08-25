@@ -975,10 +975,13 @@ impl FlowTriggerHarness {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    triggerInput: {
+                                    triggerRuleInput: {
                                         schedule: {
                                             timeDelta: { every: <every>, unit: "<unit>" }
                                         }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,

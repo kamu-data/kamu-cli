@@ -9,7 +9,7 @@
 
 use chrono::Utc;
 use kamu_adapter_flow_dataset::FlowScopeDataset;
-use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService};
+use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService, FlowTriggerStopPolicy};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -45,9 +45,10 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        trigger_input: FlowTriggerRuleInput,
+        trigger_rule_input: FlowTriggerRuleInput,
+        trigger_stop_policy_input: FlowTriggerStopPolicyInput,
     ) -> Result<SetFlowTriggerResult> {
-        if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
+        if let Err(err) = trigger_rule_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         }
 
@@ -57,9 +58,15 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }
 
-        let trigger_rule: FlowTriggerRule = match trigger_input.try_into() {
+        let trigger_rule: FlowTriggerRule = match trigger_rule_input.try_into() {
             Ok(rule) => rule,
-            Err(e) => return Ok(SetFlowTriggerResult::FlowInvalidTriggerInput(e)),
+            Err(e) => return Ok(SetFlowTriggerResult::InvalidTriggerInput(e)),
+        };
+
+        let triggest_stop_policy: FlowTriggerStopPolicy = match trigger_stop_policy_input.try_into()
+        {
+            Ok(policy) => policy,
+            Err(e) => return Ok(SetFlowTriggerResult::InvalidTriggerStopPolicyInput(e)),
         };
 
         if let Some(e) =
@@ -82,8 +89,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
                 flow_binding,
                 paused,
                 trigger_rule,
-                kamu_flow_system::FlowTriggerStopPolicy::default(), /* TODO: expose as
-                                                                     * parameter */
+                triggest_stop_policy,
             )
             .await
             .int_err()?;
@@ -171,7 +177,8 @@ enum SetFlowTriggerResult {
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     PreconditionsNotMet(FlowPreconditionsNotMet),
     TypeIsNotSupported(FlowTypeIsNotSupported),
-    FlowInvalidTriggerInput(FlowInvalidTriggerInputError),
+    InvalidTriggerInput(FlowInvalidTriggerInputError),
+    InvalidTriggerStopPolicyInput(FlowInvalidTriggerStopPolicyInputError),
 }
 
 #[derive(SimpleObject)]
@@ -195,6 +202,19 @@ pub struct FlowInvalidTriggerInputError {
 
 #[ComplexObject]
 impl FlowInvalidTriggerInputError {
+    pub async fn message(&self) -> String {
+        self.reason.clone()
+    }
+}
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct FlowInvalidTriggerStopPolicyInputError {
+    pub reason: String,
+}
+
+#[ComplexObject]
+impl FlowInvalidTriggerStopPolicyInputError {
     pub async fn message(&self) -> String {
         self.reason.clone()
     }

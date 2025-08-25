@@ -1131,7 +1131,7 @@ type DatasetFlowTriggers {
 }
 
 type DatasetFlowTriggersMut {
-	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerInput: FlowTriggerRuleInput!): SetFlowTriggerResult!
+	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerRuleInput: FlowTriggerRuleInput!, triggerStopPolicyInput: FlowTriggerStopPolicyInput!): SetFlowTriggerResult!
 	pauseFlow(datasetFlowType: DatasetFlowType!): Boolean!
 	pauseFlows: Boolean!
 	resumeFlow(datasetFlowType: DatasetFlowType!): Boolean!
@@ -2229,6 +2229,11 @@ type FlowInvalidTriggerInputError implements SetFlowTriggerResult {
 	message: String!
 }
 
+type FlowInvalidTriggerStopPolicyInputError implements SetFlowTriggerResult {
+	reason: String!
+	message: String!
+}
+
 type FlowNotFound implements GetFlowResult & CancelFlowRunResult {
 	flowId: FlowID!
 	message: String!
@@ -2327,6 +2332,7 @@ type FlowTrigger {
 	paused: Boolean!
 	schedule: FlowTriggerScheduleRule
 	reactive: FlowTriggerReactiveRule
+	stopPolicy: FlowTriggerStopPolicy!
 }
 
 union FlowTriggerBatchingRule = FlowTriggerBatchingRuleImmediate | FlowTriggerBatchingRuleBuffering
@@ -2383,6 +2389,29 @@ input FlowTriggerRuleScheduleInput @oneOf {
 }
 
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
+
+union FlowTriggerStopPolicy = FlowTriggerStopPolicyNever | FlowTriggerStopPolicyAfterConsecutiveFailures
+
+type FlowTriggerStopPolicyAfterConsecutiveFailures {
+	maxFailures: Int!
+}
+
+input FlowTriggerStopPolicyAfterConsecutiveFailuresInput {
+	maxFailures: Int!
+}
+
+input FlowTriggerStopPolicyInput @oneOf {
+	never: FlowTriggerStopPolicyNeverInput
+	afterConsecutiveFailures: FlowTriggerStopPolicyAfterConsecutiveFailuresInput
+}
+
+type FlowTriggerStopPolicyNever {
+	dummy: Boolean!
+}
+
+input FlowTriggerStopPolicyNeverInput {
+	dummy: Boolean!
+}
 
 type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 	message: String!

@@ -82,17 +82,23 @@ impl Projection for FlowTriggerState {
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(FlowTriggerEventModified { paused, rule, .. }) => {
+                    E::Modified(FlowTriggerEventModified {
+                        paused,
+                        rule,
+                        stop_policy,
+                        ..
+                    }) => {
                         // Note: when deleted scope is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowTriggerState {
+                            flow_binding: s.flow_binding,
                             status: if *paused {
                                 FlowTriggerStatus::PausedByUser
                             } else {
                                 FlowTriggerStatus::Active
                             },
                             rule: rule.clone(),
-                            ..s
+                            stop_policy: *stop_policy,
                         })
                     }
 
