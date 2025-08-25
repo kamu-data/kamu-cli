@@ -2902,6 +2902,20 @@ enum QueryDialect {
 	SQL_RISING_WAVE
 }
 
+interface ReactivateWebhookSubscriptionResult {
+	message: String!
+}
+
+type ReactivateWebhookSubscriptionResultSuccess implements ReactivateWebhookSubscriptionResult {
+	reactivated: Boolean!
+	message: String!
+}
+
+type ReactivateWebhookSubscriptionResultUnexpected implements ReactivateWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
+	message: String!
+}
+
 """
 Defines how raw data should be read into the structured form.
 
@@ -4122,6 +4136,7 @@ type WebhookSubscriptionMut {
 	update(input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
 	pause: PauseWebhookSubscriptionResult!
 	resume: ResumeWebhookSubscriptionResult!
+	reactivate: ReactivateWebhookSubscriptionResult!
 	remove: RemoveWebhookSubscriptionResult!
 }
 
