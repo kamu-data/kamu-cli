@@ -19,6 +19,7 @@ Recommendation: for ease of reading, use the following order:
     - bad status code in response
 ## Changed
 - Moved versioned file logic from GQL level to `use_case`
+- Collection datasets will ignore add and move operations that don't change the entry path, ref, or extra attributes and return `CollectionUpdateUpToDate`
 
 ## [0.246.1] - 2025-08-20
 ### Fixed
