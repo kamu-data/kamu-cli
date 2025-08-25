@@ -6891,6 +6891,7 @@ dependencies = [
  "kamu-task-system",
  "kamu-webhooks",
  "kamu-webhooks-inmem",
+ "kamu-webhooks-services",
  "messaging-outbox",
  "opendatafabric",
  "pretty_assertions",

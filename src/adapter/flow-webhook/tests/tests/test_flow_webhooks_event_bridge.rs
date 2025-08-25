@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
 use kamu_adapter_flow_webhook::{
@@ -24,15 +24,7 @@ use kamu_datasets::{
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
 };
 use kamu_datasets_services::testing::FakeDatasetEntryService;
-use kamu_flow_system::{
-    FlowActivationCause,
-    FlowActivationCauseAutoPolling,
-    FlowID,
-    FlowRunService,
-    FlowState,
-    FlowTimingRecords,
-    MockFlowRunService,
-};
+use kamu_flow_system::*;
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
@@ -46,13 +38,13 @@ async fn test_subscription_scheduled_on_dataset_update() {
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let mut mock_flow_run_service = MockFlowRunService::new();
-    TestWebhookDeliverySchedulerHarness::add_flow_trigger_expectation(
+    TestWebhooksEventBridgeHarness::add_flow_trigger_expectation(
         &mut mock_flow_run_service,
         &dataset_id,
         subscription_id,
     );
 
-    let harness = TestWebhookDeliverySchedulerHarness::new(mock_flow_run_service);
+    let harness = TestWebhooksEventBridgeHarness::new(mock_flow_run_service);
 
     harness.register_dataset_entry(&dataset_id, "foo");
 
@@ -90,19 +82,19 @@ async fn test_subscriptions_in_different_statuses() {
     let subscription_id_4 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let mut mock_flow_run_service = MockFlowRunService::new();
-    TestWebhookDeliverySchedulerHarness::add_flow_trigger_expectation(
+    TestWebhooksEventBridgeHarness::add_flow_trigger_expectation(
         &mut mock_flow_run_service,
         &dataset_id,
         subscription_id_1,
     );
-    TestWebhookDeliverySchedulerHarness::add_flow_trigger_expectation(
+    TestWebhooksEventBridgeHarness::add_flow_trigger_expectation(
         &mut mock_flow_run_service,
         &dataset_id,
         subscription_id_2,
     );
 
     // No task for subscriptions 3 and 4
-    let harness = TestWebhookDeliverySchedulerHarness::new(mock_flow_run_service);
+    let harness = TestWebhooksEventBridgeHarness::new(mock_flow_run_service);
 
     harness.register_dataset_entry(&dataset_id, "foo");
 
@@ -147,7 +139,7 @@ async fn test_update_in_wrong_dataset() {
     let subscription_id: WebhookSubscriptionID = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     // No tasks
-    let harness = TestWebhookDeliverySchedulerHarness::new(MockFlowRunService::new());
+    let harness = TestWebhooksEventBridgeHarness::new(MockFlowRunService::new());
 
     harness.register_dataset_entry(&dataset_id_1, "foo");
     harness.register_dataset_entry(&dataset_id_2, "bar");
@@ -184,7 +176,7 @@ async fn test_subscription_non_matching_event_type() {
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     // No tasks
-    let harness = TestWebhookDeliverySchedulerHarness::new(MockFlowRunService::new());
+    let harness = TestWebhooksEventBridgeHarness::new(MockFlowRunService::new());
 
     harness.register_dataset_entry(&dataset_id, "foo");
 
@@ -224,13 +216,75 @@ async fn test_subscription_non_matching_event_type() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct TestWebhookDeliverySchedulerHarness {
+#[test_log::test(tokio::test)]
+async fn test_subscription_marked_unreachable_on_trigger_stop() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+
+    let harness = TestWebhooksEventBridgeHarness::new(MockFlowRunService::new());
+
+    harness.register_dataset_entry(&dataset_id, "foo");
+
+    harness
+        .create_subscription(&dataset_id, subscription_id, true, false) // enabled
+        .await;
+
+    // The subscription should be in enabled initially
+
+    {
+        let subscription =
+            WebhookSubscription::load(subscription_id, harness.subscription_event_store.as_ref())
+                .await
+                .unwrap();
+
+        assert_eq!(subscription.status(), WebhookSubscriptionStatus::Enabled);
+    }
+
+    // Mimic the trigger was stopped by the system
+    harness
+        .outbox
+        .post_message(
+            MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
+            FlowTriggerUpdatedMessage {
+                event_time: Utc::now(),
+                flow_binding: webhook_deliver_binding(
+                    subscription_id,
+                    &WebhookEventTypeCatalog::dataset_ref_updated(),
+                    Some(&dataset_id),
+                ),
+                trigger_status: FlowTriggerStatus::StoppedAutomatically,
+                rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+                    every: Duration::days(1),
+                })),
+            },
+        )
+        .await
+        .unwrap();
+
+    // The subscription should be in unreachable state now
+
+    {
+        let subscription =
+            WebhookSubscription::load(subscription_id, harness.subscription_event_store.as_ref())
+                .await
+                .unwrap();
+
+        assert_eq!(
+            subscription.status(),
+            WebhookSubscriptionStatus::Unreachable
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct TestWebhooksEventBridgeHarness {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     outbox: Arc<dyn Outbox>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
 }
 
-impl TestWebhookDeliverySchedulerHarness {
+impl TestWebhooksEventBridgeHarness {
     fn new(mock_flow_run_service: MockFlowRunService) -> Self {
         let mut b = CatalogBuilder::new();
         b.add::<FlowWebhooksEventBridge>()
@@ -245,9 +299,16 @@ impl TestWebhookDeliverySchedulerHarness {
             .add_value(mock_flow_run_service)
             .bind::<dyn FlowRunService, MockFlowRunService>();
 
+        kamu_webhooks_services::register_dependencies(&mut b);
+
         register_message_dispatcher::<DatasetReferenceMessage>(
             &mut b,
             MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        );
+
+        register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         );
 
         let catalog = b.build();

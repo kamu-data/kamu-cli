@@ -11,13 +11,20 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{FlowBinding, FlowConfigurationRule, FlowID, FlowOutcome, FlowTriggerRule};
+use crate::{
+    FlowBinding,
+    FlowConfigurationRule,
+    FlowID,
+    FlowOutcome,
+    FlowTriggerRule,
+    FlowTriggerStatus,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const FLOW_AGENT_UPDATE_OUTBOX_VERSION: u32 = 1;
 const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 2;
-const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 2;
+const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 3;
 const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,8 +59,8 @@ pub struct FlowTriggerUpdatedMessage {
     /// The unique binding identifying the flow
     pub flow_binding: FlowBinding,
 
-    /// Indicates whether the trigger is paused
-    pub paused: bool,
+    /// Status of the trigger
+    pub trigger_status: FlowTriggerStatus,
 
     /// The updated trigger rule for the flow
     pub rule: FlowTriggerRule,

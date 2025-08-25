@@ -33,14 +33,7 @@ use messaging_outbox::{
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
-use crate::{
-    FlowAbortHelper,
-    FlowSchedulingHelper,
-    MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
+use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -637,12 +630,8 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
             return Ok(());
         }
 
-        if message.paused {
-            let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-            abort_helper
-                .deactivate_flow_trigger(target_catalog, &message.flow_binding)
-                .await?;
-        } else {
+        // Active trigger => activate it
+        if message.trigger_status.is_active() {
             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
             scheduling_helper
                 .activate_flow_trigger(
@@ -651,6 +640,12 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
                     &message.flow_binding,
                     message.rule.clone(),
                 )
+                .await?;
+        } else {
+            // Inactive trigger => abort it
+            let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
+            abort_helper
+                .deactivate_flow_trigger(target_catalog, &message.flow_binding)
                 .await?;
         }
 

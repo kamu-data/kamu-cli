@@ -25,7 +25,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_flow_system_services::{
+use kamu_flow_system::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
