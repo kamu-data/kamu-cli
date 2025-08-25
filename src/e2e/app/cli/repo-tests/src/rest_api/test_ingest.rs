@@ -49,13 +49,16 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                     setTrigger (
                                         datasetFlowType: $datasetFlowType,
                                         paused: false,
-                                        triggerInput: {
+                                        triggerRuleInput: {
                                             reactive: {
                                                 forNewData: {
                                                     immediate: { dummy: false }
                                                 },
                                                 forBreakingChange: "NO_ACTION"
                                             }
+                                        },
+                                        triggerStopPolicyInput: {
+                                            afterConsecutiveFailures: { maxFailures: 1 }
                                         }
                                     ) {
                                         __typename,

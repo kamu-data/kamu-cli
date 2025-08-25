@@ -1750,13 +1750,16 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                                     setTrigger (
                                         datasetFlowType: $datasetFlowType,
                                         paused: false,
-                                        triggerInput: {
+                                        triggerRuleInput: {
                                             reactive: {
                                                 forNewData: {
                                                     immediate: { dummy: false }
                                                 },
                                                 forBreakingChange: "NO_ACTION"
                                             }
+                                        },
+                                        triggerStopPolicyInput: {
+                                            never: { dummy: true }
                                         }
                                     ) {
                                         __typename,

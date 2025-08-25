@@ -1131,6 +1131,236 @@ async fn test_conditions_not_met_for_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_stop_policies() {
+    let harness = FlowTriggerHarness::make().await;
+
+    let create_root_result = harness.create_root_dataset().await;
+
+    //// Set ingest trigger stop policy with non-default consecutive failures
+
+    let mutation_code = indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            triggers {
+                                setTrigger (
+                                    datasetFlowType: "INGEST",
+                                    paused: false,
+                                    triggerRuleInput: {
+                                        schedule: {
+                                            timeDelta: { every: 1, unit: "DAYS" }
+                                        }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        afterConsecutiveFailures: { maxFailures: 3 }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowTriggerSuccess {
+                                        trigger {
+                                            __typename
+                                            stopPolicy {
+                                                __typename
+                                                ... on FlowTriggerStopPolicyAfterConsecutiveFailures {
+                                                    maxFailures
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &create_root_result.dataset_handle.id.to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "SetFlowTriggerSuccess",
+                                "message": "Success",
+                                "trigger": {
+                                    "__typename": "FlowTrigger",
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                        "maxFailures": 3
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Set another stop policy - never
+    let mutation_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        triggers {
+                            setTrigger (
+                                datasetFlowType: "INGEST",
+                                paused: false,
+                                triggerRuleInput: {
+                                    schedule: {
+                                        timeDelta: { every: 1, unit: "DAYS" }
+                                    }
+                                }
+                                triggerStopPolicyInput: {
+                                    never: { dummy: false }
+                                }
+                            ) {
+                                __typename,
+                                message
+                                ... on SetFlowTriggerSuccess {
+                                    trigger {
+                                        __typename
+                                        stopPolicy {
+                                            __typename
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_root_result.dataset_handle.id.to_string());
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "SetFlowTriggerSuccess",
+                                "message": "Success",
+                                "trigger": {
+                                    "__typename": "FlowTrigger",
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyNever",
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_stop_policies_validation() {
+    let harness = FlowTriggerHarness::make().await;
+
+    let create_root_result = harness.create_root_dataset().await;
+
+    //// Set ingest trigger stop policy with incorrect consecutive failures
+
+    let mutation_code = indoc!(
+        r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            triggers {
+                                setTrigger (
+                                    datasetFlowType: "INGEST",
+                                    paused: false,
+                                    triggerRuleInput: {
+                                        schedule: {
+                                            timeDelta: { every: 1, unit: "DAYS" }
+                                        }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        afterConsecutiveFailures: { maxFailures: 0 }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+    )
+    .replace("<id>", &create_root_result.dataset_handle.id.to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "FlowInvalidTriggerStopPolicyInputError",
+                                "message": "ConsecutiveFailuresCount is too small. The value must be greater or equal to 1.",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_setters_fail() {
     let harness = FlowTriggerHarness::make().await;
 
@@ -1300,10 +1530,13 @@ impl FlowTriggerHarness {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    triggerInput: {
+                                    triggerRuleInput: {
                                         schedule: {
                                             timeDelta: { every: <every>, unit: "<unit>" }
                                         }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,
@@ -1355,10 +1588,13 @@ impl FlowTriggerHarness {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    triggerInput: {
+                                    triggerRuleInput: {
                                         schedule: {
                                             cron5ComponentExpression: "<cron_expression>"
                                         }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,
@@ -1410,7 +1646,7 @@ impl FlowTriggerHarness {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    triggerInput: {
+                                    triggerRuleInput: {
                                         reactive: {
                                             forNewData: {
                                                 buffering: {
@@ -1420,6 +1656,9 @@ impl FlowTriggerHarness {
                                             },
                                             forBreakingChange: "<forBreakingChange>"
                                         }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,
@@ -1484,7 +1723,7 @@ impl FlowTriggerHarness {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    triggerInput: {
+                                    triggerRuleInput: {
                                         reactive: {
                                             forNewData: {
                                                 immediate: {
@@ -1493,6 +1732,9 @@ impl FlowTriggerHarness {
                                             },
                                             forBreakingChange: "<forBreakingChange>"
                                         }
+                                    },
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,
