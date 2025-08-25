@@ -42,6 +42,7 @@ use crate::{
 })]
 pub struct FlowWebhooksEventBridge {
     time_source: Arc<dyn SystemTimeSource>,
+    webhooks_config: Arc<WebhooksConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,9 +84,11 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                                 fs::BatchingRule::immediate(),
                                 fs::BreakingChangeRule::Recover,
                             )),
-                            // TODO: externalize configuration
                             fs::FlowTriggerStopPolicy::AfterConsecutiveFailures {
-                                failures_count: fs::ConsecutiveFailuresCount::try_new(5).unwrap(),
+                                failures_count: fs::ConsecutiveFailuresCount::try_new(
+                                    self.webhooks_config.max_consecutive_failures,
+                                )
+                                .unwrap(),
                             },
                         )
                         .await
@@ -108,9 +111,11 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                                 fs::BatchingRule::immediate(),
                                 fs::BreakingChangeRule::Recover,
                             )),
-                            // TODO: externalize configuration
                             fs::FlowTriggerStopPolicy::AfterConsecutiveFailures {
-                                failures_count: fs::ConsecutiveFailuresCount::try_new(5).unwrap(),
+                                failures_count: fs::ConsecutiveFailuresCount::try_new(
+                                    self.webhooks_config.max_consecutive_failures,
+                                )
+                                .unwrap(),
                             },
                         )
                         .await

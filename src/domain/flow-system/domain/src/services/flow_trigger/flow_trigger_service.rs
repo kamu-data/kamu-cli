@@ -16,6 +16,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowTriggerService: Sync + Send {
     /// Find current trigger of a certain type
@@ -35,7 +36,8 @@ pub trait FlowTriggerService: Sync + Send {
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
     /// Lists all flow triggers, which are currently enabled
-    fn list_enabled_triggers(&self) -> FlowTriggerStateStream;
+    #[allow(clippy::elidable_lifetime_names)] // due to mock
+    fn list_enabled_triggers<'a>(&'a self) -> FlowTriggerStateStream<'a>;
 
     /// Pauses particular flow trigger (user initiative)
     async fn pause_flow_trigger(
