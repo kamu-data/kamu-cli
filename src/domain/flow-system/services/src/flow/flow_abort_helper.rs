@@ -11,21 +11,10 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_flow_system::{
-    Flow,
-    FlowBinding,
-    FlowEventStore,
-    FlowProgressMessage,
-    FlowScope,
-    FlowScopeRemovalHandler,
-    FlowSensorDispatcher,
-    FlowStatus,
-};
+use kamu_flow_system::*;
 use kamu_task_system::TaskScheduler;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
-
-use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

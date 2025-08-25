@@ -58,6 +58,7 @@ kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
+kamu-webhooks-services = { workspace = true }
 
 pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

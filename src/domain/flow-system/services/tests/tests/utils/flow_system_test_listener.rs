@@ -28,10 +28,6 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_adapter_flow_webhook::{FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION, FlowScopeSubscription};
 use kamu_flow_system::*;
-use kamu_flow_system_services::{
-    MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-};
 use messaging_outbox::{
     InitialConsumerBoundary,
     MessageConsumer,

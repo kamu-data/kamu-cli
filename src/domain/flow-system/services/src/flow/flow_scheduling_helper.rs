@@ -16,8 +16,6 @@ use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
-use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]

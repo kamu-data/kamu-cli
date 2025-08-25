@@ -35,10 +35,6 @@ use kamu_datasets_services::testing::{
 };
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
-use kamu_flow_system_services::{
-    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
 use kamu_task_system::{self as ts, TaskError};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;

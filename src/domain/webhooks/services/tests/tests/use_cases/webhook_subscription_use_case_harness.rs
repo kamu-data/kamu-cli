@@ -161,8 +161,42 @@ impl WebhookSubscriptionUseCaseHarness {
                     let message: WebhookSubscriptionLifecycleMessage =
                         serde_json::from_value(message_as_json.clone()).unwrap();
 
-                    let WebhookSubscriptionLifecycleMessage::Deleted(e) = &message;
-                    e.dataset_id == dataset_id && e.event_types == event_types
+                    if let WebhookSubscriptionLifecycleMessage::Deleted(e) = &message {
+                        e.dataset_id == dataset_id && e.event_types == event_types
+                    } else {
+                        false
+                    }
+                }),
+                eq(1),
+            )
+            .returning(|_, _, _| Ok(()));
+    }
+
+    pub(crate) fn expect_webhook_subscription_marked_unreachable_message(
+        mock_outbox: &mut MockOutbox,
+        event_type: &WebhookEventType,
+        dataset_id: Option<&odf::DatasetID>,
+        times: usize,
+    ) {
+        use mockall::predicate::{eq, function};
+
+        let dataset_id = dataset_id.cloned();
+        let event_types = vec![event_type.clone()];
+
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(times)
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE),
+                function(move |message_as_json: &serde_json::Value| {
+                    let message: WebhookSubscriptionLifecycleMessage =
+                        serde_json::from_value(message_as_json.clone()).unwrap();
+
+                    if let WebhookSubscriptionLifecycleMessage::MarkedUnreachable(e) = &message {
+                        e.dataset_id == dataset_id && e.event_types == event_types
+                    } else {
+                        false
+                    }
                 }),
                 eq(1),
             )

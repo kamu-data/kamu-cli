@@ -15,8 +15,6 @@ use kamu_flow_system::{FlowTriggerEventStore, *};
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
-use crate::MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -87,7 +85,7 @@ impl FlowTriggerServiceImpl {
             event_time: request_time,
             flow_binding: state.flow_binding.clone(),
             rule: state.rule.clone(),
-            paused: !state.is_active(),
+            trigger_status: state.status,
         };
 
         self.outbox

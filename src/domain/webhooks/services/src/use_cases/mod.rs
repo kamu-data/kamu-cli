@@ -9,12 +9,14 @@
 
 mod create_webhook_subscription_use_case_impl;
 pub(crate) mod helpers;
+mod mark_webhook_subscription_unreachable_use_case_impl;
 mod pause_webhook_subscription_use_case_impl;
 mod remove_webhook_subscription_use_case_impl;
 mod resume_webhook_subscription_use_case_impl;
 mod update_webhook_subscription_use_case_impl;
 
 pub use create_webhook_subscription_use_case_impl::*;
+pub use mark_webhook_subscription_unreachable_use_case_impl::*;
 pub use pause_webhook_subscription_use_case_impl::*;
 pub use remove_webhook_subscription_use_case_impl::*;
 pub use resume_webhook_subscription_use_case_impl::*;

@@ -19,6 +19,7 @@ mod agents;
 mod aggregates;
 mod entities;
 mod jobs;
+mod messages;
 mod repos;
 mod services;
 
@@ -27,5 +28,6 @@ pub use aggregates::*;
 pub use entities::*;
 pub use flow_messages_types::*;
 pub use jobs::*;
+pub use messages::*;
 pub use repos::*;
 pub use services::*;

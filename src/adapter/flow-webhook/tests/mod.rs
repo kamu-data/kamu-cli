@@ -8,5 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![feature(assert_matches)]
+#![feature(duration_constructors)]
 
 mod tests;
