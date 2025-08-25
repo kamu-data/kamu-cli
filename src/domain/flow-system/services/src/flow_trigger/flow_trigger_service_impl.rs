@@ -36,34 +36,46 @@ impl FlowTriggerServiceImpl {
         &self,
         request_time: DateTime<Utc>,
         mut flow_trigger: FlowTrigger,
-    ) -> Result<(), InternalError> {
+    ) -> Result<FlowTriggerState, InternalError> {
         flow_trigger.pause(request_time).int_err()?;
-        flow_trigger
-            .save(self.flow_trigger_event_store.as_ref())
-            .await
-            .int_err()?;
+        self.save_trigger(request_time, flow_trigger).await
+    }
 
-        self.publish_flow_trigger_modified(&flow_trigger, request_time)
-            .await?;
-
-        Ok(())
+    async fn stop_given_trigger(
+        &self,
+        request_time: DateTime<Utc>,
+        mut flow_trigger: FlowTrigger,
+    ) -> Result<FlowTriggerState, InternalError> {
+        flow_trigger.stop(request_time).int_err()?;
+        self.save_trigger(request_time, flow_trigger).await
     }
 
     async fn resume_given_trigger(
         &self,
         request_time: DateTime<Utc>,
         mut flow_trigger: FlowTrigger,
-    ) -> Result<(), InternalError> {
+    ) -> Result<FlowTriggerState, InternalError> {
         flow_trigger.resume(request_time).int_err()?;
-        flow_trigger
-            .save(self.flow_trigger_event_store.as_ref())
-            .await
-            .int_err()?;
+        self.save_trigger(request_time, flow_trigger).await
+    }
 
-        self.publish_flow_trigger_modified(&flow_trigger, request_time)
-            .await?;
+    async fn save_trigger(
+        &self,
+        request_time: DateTime<Utc>,
+        mut flow_trigger: FlowTrigger,
+    ) -> Result<FlowTriggerState, InternalError> {
+        // Skip saving and publishing events if nothing changed
+        if flow_trigger.has_updates() {
+            flow_trigger
+                .save(self.flow_trigger_event_store.as_ref())
+                .await
+                .int_err()?;
 
-        Ok(())
+            self.publish_flow_trigger_modified(&flow_trigger, request_time)
+                .await?;
+        }
+
+        Ok(flow_trigger.into())
     }
 
     async fn publish_flow_trigger_modified(
@@ -132,7 +144,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         flow_binding: FlowBinding,
         paused: bool,
         rule: FlowTriggerRule,
-        auto_pause_policy: FlowTriggerAutoPausePolicy,
+        stop_policy: FlowTriggerStopPolicy,
     ) -> Result<FlowTriggerState, SetFlowTriggerError> {
         tracing::info!(
             flow_binding = ?flow_binding,
@@ -143,11 +155,11 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         let maybe_flow_trigger =
             FlowTrigger::try_load(&flow_binding, self.flow_trigger_event_store.as_ref()).await?;
 
-        let mut flow_trigger = match maybe_flow_trigger {
+        let flow_trigger = match maybe_flow_trigger {
             // Modification
             Some(mut flow_trigger) => {
                 flow_trigger
-                    .modify_rule(self.time_source.now(), paused, rule, auto_pause_policy)
+                    .modify_rule(self.time_source.now(), paused, rule, stop_policy)
                     .int_err()?;
 
                 flow_trigger
@@ -158,22 +170,14 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 flow_binding,
                 paused,
                 rule,
-                auto_pause_policy,
+                stop_policy,
             ),
         };
 
-        // Skip saving and publishing events if nothing changed
-        if flow_trigger.has_updates() {
-            flow_trigger
-                .save(self.flow_trigger_event_store.as_ref())
-                .await
-                .int_err()?;
-
-            self.publish_flow_trigger_modified(&flow_trigger, request_time)
-                .await?;
-        }
-
-        Ok(flow_trigger.into())
+        // Save trigger
+        self.save_trigger(request_time, flow_trigger)
+            .await
+            .map_err(Into::into)
     }
 
     fn list_enabled_triggers(&self) -> FlowTriggerStateStream {
@@ -304,16 +308,19 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
-    async fn evaluate_auto_pause_policy(
+    async fn evaluate_stop_policy(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
-        // Find an active trigger end evaluate it's pause conditions
-        let maybe_active_trigger = self.find_trigger(flow_binding).await?;
+        // Find an active trigger end evaluate it's stop policy
+        let maybe_active_trigger =
+            FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
+                .await
+                .int_err()?;
         if let Some(active_trigger) = maybe_active_trigger {
-            match active_trigger.auto_pause_policy {
-                FlowTriggerAutoPausePolicy::AfterConsecutiveFailures { failures_count } => {
+            match active_trigger.stop_policy {
+                FlowTriggerStopPolicy::AfterConsecutiveFailures { failures_count } => {
                     // Determine actual number of consecutive failures.
                     // Note, if policy is set to 1, we can skip the query,
                     // we know the flow has just failed.
@@ -328,22 +335,22 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                     if actual_failures_count >= failures_count_value {
                         tracing::warn!(
                             flow_binding = ?flow_binding,
-                            "Auto-pausing flow trigger after {} consecutive failure(s)",
-                            actual_failures_count
+                            %actual_failures_count,
+                            "Auto-stopping flow trigger after crossing consecutive failures threshold",
                         );
-                        self.pause_flow_trigger(request_time, flow_binding)
+                        self.stop_given_trigger(request_time, active_trigger)
                             .await
                             .int_err()?;
                     } else {
                         tracing::info!(
                             flow_binding = ?flow_binding,
-                            "Flow has {} consecutive failures, but auto-pause threshold is {}, so keeping it active",
-                            actual_failures_count,
-                            failures_count_value
+                            %actual_failures_count,
+                            %failures_count_value,
+                            "Flow has consecutive failures, but auto-stop threshold is not crossed yet",
                         );
                     }
                 }
-                FlowTriggerAutoPausePolicy::Never => {
+                FlowTriggerStopPolicy::Never => {
                     // Do nothing
                 }
             }

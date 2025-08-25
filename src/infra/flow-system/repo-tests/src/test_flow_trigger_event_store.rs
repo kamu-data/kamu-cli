@@ -77,14 +77,14 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         flow_binding: flow_binding_1.clone(),
         paused: false,
         rule: dummy_schedule(),
-        auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+        stop_policy: FlowTriggerStopPolicy::default(),
     };
     let event_1_2 = FlowTriggerEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
         paused: true,
         rule: dummy_schedule(),
-        auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+        stop_policy: FlowTriggerStopPolicy::default(),
     };
 
     event_store
@@ -108,7 +108,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         flow_binding: flow_binding_2.clone(),
         paused: false,
         rule: dummy_schedule_cron(),
-        auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+        stop_policy: FlowTriggerStopPolicy::default(),
     };
 
     event_store
@@ -126,7 +126,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         flow_binding: flow_binding_3.clone(),
         paused: false,
         rule: dummy_schedule(),
-        auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+        stop_policy: FlowTriggerStopPolicy::default(),
     };
 
     event_store
@@ -201,21 +201,21 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         flow_binding: flow_binding.clone(),
         paused: false,
         rule: dummy_schedule(),
-        auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+        stop_policy: FlowTriggerStopPolicy::default(),
     };
     let event_2 = FlowTriggerEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
         paused: false,
         rule: dummy_schedule(),
-        auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+        stop_policy: FlowTriggerStopPolicy::default(),
     };
     let event_3 = FlowTriggerEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
         paused: false,
         rule: dummy_schedule(),
-        auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+        stop_policy: FlowTriggerStopPolicy::default(),
     };
 
     let latest_event_id = event_store
@@ -309,7 +309,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_active.clone(),
                     paused: false,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
             ],
@@ -329,7 +329,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_paused.clone(),
                     paused: true,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
             ],
@@ -349,7 +349,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_modified_paused.clone(),
                     paused: false,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
                 FlowTriggerEventModified {
@@ -357,7 +357,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_modified_paused.clone(),
                     paused: true,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
             ],
@@ -377,7 +377,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_modified_active.clone(),
                     paused: true,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
                 FlowTriggerEventModified {
@@ -385,7 +385,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_modified_active.clone(),
                     paused: false,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
             ],
@@ -405,7 +405,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_removed.clone(),
                     paused: false,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
                 FlowTriggerEventScopeRemoved {
@@ -430,7 +430,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     flow_binding: flow_system.clone(),
                     paused: false,
                     rule: dummy_schedule(),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
             ],

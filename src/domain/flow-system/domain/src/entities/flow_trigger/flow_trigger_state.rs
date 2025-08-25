@@ -23,8 +23,8 @@ pub struct FlowTriggerState {
     pub rule: FlowTriggerRule,
     /// Trigger status
     pub status: FlowTriggerStatus,
-    /// Auto-pause policy
-    pub auto_pause_policy: FlowTriggerAutoPausePolicy,
+    /// Auto-stop policy
+    pub stop_policy: FlowTriggerStopPolicy,
 }
 
 impl FlowTriggerState {
@@ -62,17 +62,17 @@ impl Projection for FlowTriggerState {
                     flow_binding,
                     paused,
                     rule,
-                    auto_pause_policy,
+                    stop_policy,
                     ..
                 }) => Ok(Self {
                     flow_binding,
                     status: if paused {
-                        FlowTriggerStatus::PausedTemporarily
+                        FlowTriggerStatus::PausedByUser
                     } else {
                         FlowTriggerStatus::Active
                     },
                     rule,
-                    auto_pause_policy,
+                    stop_policy,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -87,7 +87,7 @@ impl Projection for FlowTriggerState {
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowTriggerState {
                             status: if *paused {
-                                FlowTriggerStatus::PausedTemporarily
+                                FlowTriggerStatus::PausedByUser
                             } else {
                                 FlowTriggerStatus::Active
                             },
@@ -96,12 +96,25 @@ impl Projection for FlowTriggerState {
                         })
                     }
 
+                    E::AutoStopped(_) => {
+                        if s.status == FlowTriggerStatus::ScopeRemoved {
+                            // This shouldn't happen. Even if the scope is re-added with the same
+                            // id, the trigger will go through Active status.
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowTriggerState {
+                                status: FlowTriggerStatus::StoppedAutomatically,
+                                ..s
+                            })
+                        }
+                    }
+
                     E::ScopeRemoved(_) => {
-                        if s.status == FlowTriggerStatus::StoppedPermanently {
+                        if s.status == FlowTriggerStatus::ScopeRemoved {
                             Ok(s) // idempotent DELETE
                         } else {
                             Ok(FlowTriggerState {
-                                status: FlowTriggerStatus::StoppedPermanently,
+                                status: FlowTriggerStatus::ScopeRemoved,
                                 ..s
                             })
                         }

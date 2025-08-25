@@ -286,16 +286,10 @@ impl FlowHarness {
         request_time: DateTime<Utc>,
         flow_binding: FlowBinding,
         trigger_rule: FlowTriggerRule,
-        auto_pause_policy: FlowTriggerAutoPausePolicy,
+        stop_policy: FlowTriggerStopPolicy,
     ) {
         self.flow_trigger_service
-            .set_trigger(
-                request_time,
-                flow_binding,
-                false,
-                trigger_rule,
-                auto_pause_policy,
-            )
+            .set_trigger(request_time, flow_binding, false, trigger_rule, stop_policy)
             .await
             .unwrap();
     }
@@ -359,7 +353,7 @@ impl FlowHarness {
                 flow_binding,
                 true,
                 current_trigger.rule,
-                current_trigger.auto_pause_policy,
+                current_trigger.stop_policy,
             )
             .await
             .unwrap();
@@ -379,7 +373,7 @@ impl FlowHarness {
                 flow_binding,
                 false,
                 current_trigger.rule,
-                current_trigger.auto_pause_policy,
+                current_trigger.stop_policy,
             )
             .await
             .unwrap();

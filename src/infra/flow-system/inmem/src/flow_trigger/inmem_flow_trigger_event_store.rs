@@ -110,7 +110,7 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
             let is_active = match event {
                 FlowTriggerEvent::Created(e) => !e.paused,
                 FlowTriggerEvent::Modified(e) => !e.paused,
-                FlowTriggerEvent::ScopeRemoved { .. } => false,
+                FlowTriggerEvent::AutoStopped(_) | FlowTriggerEvent::ScopeRemoved(_) => false,
             };
 
             if is_active {
@@ -180,8 +180,8 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
                             return Ok(true);
                         }
                     }
-                    FlowTriggerEvent::ScopeRemoved { .. } => {
-                        // permanently stopped — not active
+                    FlowTriggerEvent::AutoStopped(_) | FlowTriggerEvent::ScopeRemoved(_) => {
+                        // auto-stopped or permanently stopped — not active
                     }
                 }
             }
