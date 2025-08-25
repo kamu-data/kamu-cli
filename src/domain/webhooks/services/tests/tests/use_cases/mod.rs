@@ -10,6 +10,7 @@
 mod test_create_webhook_subscription_use_case;
 mod test_mark_webhook_subscription_unreachable_use_case;
 mod test_pause_webhook_subscription_use_case;
+mod test_reactivate_webhook_subscription_use_case;
 mod test_remove_webhook_subscription_use_case;
 mod test_resume_webhook_subscription_use_case;
 mod test_update_webhook_subscription_use_case;

@@ -404,7 +404,6 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_st,
-    extra_test_groups = "flaky",
     options = Options::default()
         .with_multi_tenant()
         .with_kamu_config(indoc::indoc!(
@@ -420,7 +419,7 @@ kamu_cli_run_api_server_e2e_test!(
                   checkingIntervalSecs: 1
             "#
         )),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion, flaky"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -428,7 +427,6 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_mt,
-    extra_test_groups = "flaky"
     options = Options::default()
         .with_multi_tenant()
         .with_kamu_config(indoc::indoc!(
@@ -444,7 +442,7 @@ kamu_cli_run_api_server_e2e_test!(
                   checkingIntervalSecs: 1
             "#
         )),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion, flaky"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
