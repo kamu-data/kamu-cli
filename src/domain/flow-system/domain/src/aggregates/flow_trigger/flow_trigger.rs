@@ -24,7 +24,7 @@ impl FlowTrigger {
         flow_binding: FlowBinding,
         paused: bool,
         rule: FlowTriggerRule,
-        auto_pause_policy: FlowTriggerAutoPausePolicy,
+        stop_policy: FlowTriggerStopPolicy,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -34,7 +34,7 @@ impl FlowTrigger {
                     flow_binding,
                     paused,
                     rule,
-                    auto_pause_policy,
+                    stop_policy,
                 },
             )
             .unwrap(),
@@ -47,13 +47,15 @@ impl FlowTrigger {
         now: DateTime<Utc>,
         paused: bool,
         new_rule: FlowTriggerRule,
-        auto_pause_policy: FlowTriggerAutoPausePolicy,
+        stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), ProjectionError<FlowTriggerState>> {
-        // Ignore if nothing changed
+        // Determine which value parts got modified
         let pause_affected = paused && self.is_active() || !paused && !self.is_active();
         let rule_affected = self.rule != new_rule;
-        let auto_pause_policy_affected = self.auto_pause_policy != auto_pause_policy;
-        if !pause_affected && !rule_affected && !auto_pause_policy_affected {
+        let stop_policy_affected = self.stop_policy != stop_policy;
+
+        // Ignore if nothing changed
+        if !pause_affected && !rule_affected && !stop_policy_affected {
             return Ok(());
         }
 
@@ -62,12 +64,12 @@ impl FlowTrigger {
             flow_binding: self.flow_binding.clone(),
             paused,
             rule: new_rule,
-            auto_pause_policy,
+            stop_policy,
         };
         self.apply(event)
     }
 
-    /// Pause trigger
+    /// Pause trigger (user initiative)
     pub fn pause(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<FlowTriggerState>> {
         if self.is_active() {
             let event = FlowTriggerEventModified {
@@ -75,7 +77,20 @@ impl FlowTrigger {
                 flow_binding: self.flow_binding.clone(),
                 paused: true,
                 rule: self.rule.clone(),
-                auto_pause_policy: self.auto_pause_policy,
+                stop_policy: self.stop_policy,
+            };
+            self.apply(event)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Stop trigger (system initiative)
+    pub fn stop(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<FlowTriggerState>> {
+        if self.is_active() {
+            let event = FlowTriggerEventAutoStopped {
+                event_time: now,
+                flow_binding: self.flow_binding.clone(),
             };
             self.apply(event)
         } else {
@@ -93,7 +108,7 @@ impl FlowTrigger {
                 flow_binding: self.flow_binding.clone(),
                 paused: false,
                 rule: self.rule.clone(),
-                auto_pause_policy: self.auto_pause_policy,
+                stop_policy: self.stop_policy,
             };
             self.apply(event)
         }

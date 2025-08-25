@@ -559,13 +559,13 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 let flow_trigger_service =
                                     target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
                                 flow_trigger_service
-                                    .evaluate_auto_pause_policy(finish_time, &flow.flow_binding)
+                                    .evaluate_stop_policy(finish_time, &flow.flow_binding)
                                     .await?;
                             }
 
                             // Try to schedule auto-polling flow, if applicable.
-                            // We don't care whether we failed or succeeded, that is determine with
-                            // auto-pause policy in the trigger.
+                            // We don't care whether we failed or succeeded,
+                            // that is determined with the stop policy in the trigger.
                             scheduling_helper
                                 .try_schedule_auto_polling_flow_if_enabled(
                                     finish_time,

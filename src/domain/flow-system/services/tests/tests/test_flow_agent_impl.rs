@@ -82,7 +82,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness.eager_initialization().await;
@@ -207,7 +207,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     flow_binding: foo_ingest_binding.clone(),
                     paused: false,
                     rule: FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
-                    auto_pause_policy: FlowTriggerAutoPausePolicy::default(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
                 }
                 .into(),
             ],
@@ -381,7 +381,7 @@ async fn test_cron_config() {
                             source_5component_cron_expression: String::from("<irrelevant>"),
                             cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
                           })),
-                          FlowTriggerAutoPausePolicy::default(),
+                          FlowTriggerStopPolicy::default(),
                         )
                         .await;
                     test_flow_listener
@@ -459,7 +459,7 @@ async fn test_manual_trigger() {
             harness.now_datetime(),
             foo_flow_binding.clone(),
             FlowTriggerRule::Schedule(Duration::milliseconds(90).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness.eager_initialization().await;
@@ -657,7 +657,7 @@ async fn test_ingest_trigger_with_ingest_config() {
             harness.now_datetime(),
             foo_flow_binding.clone(),
             FlowTriggerRule::Schedule(Duration::milliseconds(90).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness.eager_initialization().await;
@@ -1216,7 +1216,7 @@ async fn test_reset_trigger_derivatives_reactively() {
                 for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -1229,7 +1229,7 @@ async fn test_reset_trigger_derivatives_reactively() {
                 for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::NoAction,
             }),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -1522,7 +1522,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
                 for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -1535,7 +1535,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
                 for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::NoAction,
             }),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -1722,7 +1722,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                 for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -1734,7 +1734,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                 for_new_data: BatchingRule::immediate(),
                 for_breaking_change: BreakingChangeRule::Recover,
             }),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -2057,7 +2057,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             harness.now_datetime(),
             ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness
@@ -2065,7 +2065,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -2130,7 +2130,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                   start_time + Duration::milliseconds(80),
                   ingest_dataset_binding(&bar_id),
                   FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
-                  FlowTriggerAutoPausePolicy::default(),
+                  FlowTriggerStopPolicy::default(),
                 ).await;
                 test_flow_listener
                     .make_a_snapshot(start_time + Duration::milliseconds(80))
@@ -2266,7 +2266,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             harness.now_datetime(),
             ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness
@@ -2274,7 +2274,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -2473,7 +2473,7 @@ async fn test_dataset_deleted() {
             harness.now_datetime(),
             ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness
@@ -2481,7 +2481,7 @@ async fn test_dataset_deleted() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -2650,7 +2650,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 harness.now_datetime(),
                 ingest_dataset_binding(dataset_id),
                 FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
-                FlowTriggerAutoPausePolicy::default(),
+                FlowTriggerStopPolicy::default(),
             )
             .await;
     }
@@ -2864,7 +2864,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -2876,7 +2876,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 BatchingRule::try_buffering(1, Duration::seconds(1)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -3091,7 +3091,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -3103,7 +3103,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 BatchingRule::try_buffering(1, Duration::seconds(1)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -3488,7 +3488,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             harness.now_datetime(),
             ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(150).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -3497,7 +3497,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -3509,7 +3509,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 BatchingRule::try_buffering(1, Duration::hours(24)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -4013,7 +4013,7 @@ async fn test_batching_condition_records_reached() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -4025,7 +4025,7 @@ async fn test_batching_condition_records_reached() {
                 BatchingRule::try_buffering(10, Duration::milliseconds(120)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -4443,7 +4443,7 @@ async fn test_batching_condition_timeout() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -4455,7 +4455,7 @@ async fn test_batching_condition_timeout() {
                 BatchingRule::try_buffering(10, Duration::milliseconds(150)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -4720,7 +4720,7 @@ async fn test_batching_condition_watermark() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -4732,7 +4732,7 @@ async fn test_batching_condition_watermark() {
                 BatchingRule::try_buffering(10, Duration::milliseconds(200)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -5040,7 +5040,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(120).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -5049,7 +5049,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -5061,7 +5061,7 @@ async fn test_batching_condition_with_2_inputs() {
                 BatchingRule::try_buffering(26, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -5784,7 +5784,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness.eager_initialization().await;
@@ -5876,7 +5876,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness.eager_initialization().await;
@@ -5973,7 +5973,7 @@ async fn test_abort_flow_after_task_running_has_started() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
     harness.eager_initialization().await;
@@ -6111,7 +6111,7 @@ async fn test_abort_flow_after_task_finishes() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -6120,7 +6120,7 @@ async fn test_abort_flow_after_task_finishes() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::empty()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -6332,7 +6332,7 @@ async fn test_respect_last_success_time_for_root_dataset_when_activate_configura
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -6510,7 +6510,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -6522,7 +6522,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                 BatchingRule::try_buffering(1, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -6842,7 +6842,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(300).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -6854,7 +6854,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 BatchingRule::try_buffering(100, Duration::milliseconds(100)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -7106,7 +7106,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -7119,7 +7119,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
             )),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -7367,7 +7367,7 @@ async fn test_disable_trigger_on_flow_fail_default() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             trigger_rule.clone(),
-            FlowTriggerAutoPausePolicy::default(), // Default policy is to pause on first failure
+            FlowTriggerStopPolicy::default(), // Default policy is to pause on first failure
         )
         .await;
     harness.eager_initialization().await;
@@ -7459,7 +7459,10 @@ async fn test_disable_trigger_on_flow_fail_default() {
     // The trigger should be paused after first failure
     let foo_binding = ingest_dataset_binding(&foo_id);
     let trigger_status = harness.get_flow_trigger_status(&foo_binding).await;
-    assert_eq!(trigger_status, Some(FlowTriggerStatus::PausedTemporarily));
+    assert_eq!(
+        trigger_status,
+        Some(FlowTriggerStatus::StoppedAutomatically)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -7493,7 +7496,7 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             trigger_rule.clone(),
-            FlowTriggerAutoPausePolicy::AfterConsecutiveFailures {
+            FlowTriggerStopPolicy::AfterConsecutiveFailures {
                 failures_count: ConsecutiveFailuresCount::try_new(3).unwrap(),
             },
         )
@@ -7656,7 +7659,10 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
     // The trigger should be paused after 3 consecutive failures
     let foo_binding = ingest_dataset_binding(&foo_id);
     let trigger_status = harness.get_flow_trigger_status(&foo_binding).await;
-    assert_eq!(trigger_status, Some(FlowTriggerStatus::PausedTemporarily));
+    assert_eq!(
+        trigger_status,
+        Some(FlowTriggerStatus::StoppedAutomatically)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -7690,7 +7696,7 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             trigger_rule.clone(),
-            FlowTriggerAutoPausePolicy::Never,
+            FlowTriggerStopPolicy::Never,
         )
         .await;
     harness.eager_initialization().await;
@@ -7984,7 +7990,7 @@ async fn test_trigger_enable_during_flow_throttling() {
                 harness.now_datetime(),
                 ingest_dataset_binding(&foo_id),
                 FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
-                FlowTriggerAutoPausePolicy::default(),
+                FlowTriggerStopPolicy::default(),
             )
             .await;
 
@@ -8113,7 +8119,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
             harness.now_datetime(),
             ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 
@@ -8122,7 +8128,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
             harness.now_datetime(),
             transform_dataset_binding(&bar_id),
             FlowTriggerRule::Reactive(ReactiveRule::empty()),
-            FlowTriggerAutoPausePolicy::default(),
+            FlowTriggerStopPolicy::default(),
         )
         .await;
 

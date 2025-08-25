@@ -19,6 +19,7 @@ use crate::*;
 pub enum FlowTriggerEvent {
     Created(FlowTriggerEventCreated),
     Modified(FlowTriggerEventModified),
+    AutoStopped(FlowTriggerEventAutoStopped),
     ScopeRemoved(FlowTriggerEventScopeRemoved),
 }
 
@@ -31,7 +32,7 @@ pub struct FlowTriggerEventCreated {
     pub paused: bool,
     pub rule: FlowTriggerRule,
     #[serde(default)]
-    pub auto_pause_policy: FlowTriggerAutoPausePolicy,
+    pub stop_policy: FlowTriggerStopPolicy,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +44,15 @@ pub struct FlowTriggerEventModified {
     pub paused: bool,
     pub rule: FlowTriggerRule,
     #[serde(default)]
-    pub auto_pause_policy: FlowTriggerAutoPausePolicy,
+    pub stop_policy: FlowTriggerStopPolicy,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowTriggerEventAutoStopped {
+    pub event_time: DateTime<Utc>,
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +70,7 @@ impl FlowTriggerEvent {
         match self {
             Self::Created(_) => "FlowTriggerEventCreated",
             Self::Modified(_) => "FlowTriggerEventModified",
+            Self::AutoStopped(_) => "FlowTriggerEventAutoStopped",
             Self::ScopeRemoved(_) => "FlowTriggerEventScopeRemoved",
         }
     }
@@ -69,6 +79,7 @@ impl FlowTriggerEvent {
         match self {
             Self::Created(e) => &e.flow_binding,
             Self::Modified(e) => &e.flow_binding,
+            Self::AutoStopped(e) => &e.flow_binding,
             Self::ScopeRemoved(e) => &e.flow_binding,
         }
     }
@@ -77,6 +88,7 @@ impl FlowTriggerEvent {
         match self {
             Self::Created(e) => e.event_time,
             Self::Modified(e) => e.event_time,
+            Self::AutoStopped(e) => e.event_time,
             Self::ScopeRemoved(e) => e.event_time,
         }
     }
@@ -87,6 +99,7 @@ impl FlowTriggerEvent {
 impl_enum_with_variants!(FlowTriggerEvent);
 impl_enum_variant!(FlowTriggerEvent::Created(FlowTriggerEventCreated));
 impl_enum_variant!(FlowTriggerEvent::Modified(FlowTriggerEventModified));
+impl_enum_variant!(FlowTriggerEvent::AutoStopped(FlowTriggerEventAutoStopped));
 impl_enum_variant!(FlowTriggerEvent::ScopeRemoved(FlowTriggerEventScopeRemoved));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

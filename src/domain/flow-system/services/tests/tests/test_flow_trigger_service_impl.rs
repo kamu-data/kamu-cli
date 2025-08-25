@@ -110,10 +110,7 @@ async fn test_pause_resume_individual_dataset_flows() {
     let flow_trigger_state = harness
         .get_flow_trigger_from_store(&binding_foo_ingest)
         .await;
-    assert_eq!(
-        flow_trigger_state.status,
-        FlowTriggerStatus::PausedTemporarily
-    );
+    assert_eq!(flow_trigger_state.status, FlowTriggerStatus::PausedByUser);
     assert_eq!(flow_trigger_state.rule, foo_ingest_trigger.clone());
 
     // Now, resume the trigger
@@ -176,7 +173,7 @@ async fn test_pause_resume_all_dataset_flows() {
         .await;
     assert_eq!(
         flow_trigger_ingest_state.status,
-        FlowTriggerStatus::PausedTemporarily
+        FlowTriggerStatus::PausedByUser
     );
     assert_eq!(flow_trigger_ingest_state.rule, foo_ingest_trigger.clone());
 
@@ -185,7 +182,7 @@ async fn test_pause_resume_all_dataset_flows() {
         .await;
     assert_eq!(
         flow_trigger_compaction_state.status,
-        FlowTriggerStatus::PausedTemporarily
+        FlowTriggerStatus::PausedByUser
     );
     assert_eq!(
         flow_trigger_compaction_state.rule,
@@ -237,10 +234,7 @@ async fn test_pause_resume_individual_system_flows() {
 
     // Still, we should see it's state as paused in the repository directly
     let flow_trigger_state = harness.get_flow_trigger_from_store(&binding_gc).await;
-    assert_eq!(
-        flow_trigger_state.status,
-        FlowTriggerStatus::PausedTemporarily
-    );
+    assert_eq!(flow_trigger_state.status, FlowTriggerStatus::PausedByUser);
     assert_eq!(
         flow_trigger_state.rule,
         FlowTriggerRule::Schedule(gc_schedule.clone())
@@ -369,7 +363,7 @@ impl FlowTriggerHarness {
                 FlowBinding::new(system_flow_type, FlowScope::make_system_scope()),
                 false,
                 FlowTriggerRule::Schedule(schedule),
-                FlowTriggerAutoPausePolicy::default(),
+                FlowTriggerStopPolicy::default(),
             )
             .await?;
         Ok(())
@@ -382,7 +376,7 @@ impl FlowTriggerHarness {
                 flow_binding,
                 false,
                 trigger_rule,
-                FlowTriggerAutoPausePolicy::default(),
+                FlowTriggerStopPolicy::default(),
             )
             .await
             .unwrap();

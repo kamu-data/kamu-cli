@@ -82,8 +82,8 @@ impl<'a> DatasetFlowTriggersMut<'a> {
                 flow_binding,
                 paused,
                 trigger_rule,
-                kamu_flow_system::FlowTriggerAutoPausePolicy::default(), /* TODO: expose as
-                                                                          * parameter */
+                kamu_flow_system::FlowTriggerStopPolicy::default(), /* TODO: expose as
+                                                                     * parameter */
             )
             .await
             .int_err()?;

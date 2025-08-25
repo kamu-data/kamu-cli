@@ -80,7 +80,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                                 fs::BreakingChangeRule::Recover,
                             )),
                             // TODO: externalize configuration
-                            fs::FlowTriggerAutoPausePolicy::AfterConsecutiveFailures {
+                            fs::FlowTriggerStopPolicy::AfterConsecutiveFailures {
                                 failures_count: ConsecutiveFailuresCount::try_new(5).unwrap(),
                             },
                         )
@@ -105,7 +105,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                                 fs::BreakingChangeRule::Recover,
                             )),
                             // TODO: externalize configuration
-                            fs::FlowTriggerAutoPausePolicy::AfterConsecutiveFailures {
+                            fs::FlowTriggerStopPolicy::AfterConsecutiveFailures {
                                 failures_count: ConsecutiveFailuresCount::try_new(5).unwrap(),
                             },
                         )

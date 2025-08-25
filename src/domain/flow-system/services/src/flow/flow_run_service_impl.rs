@@ -109,7 +109,7 @@ impl FlowRunService for FlowRunServiceImpl {
         // Abort current flow and it's scheduled tasks
         self.flow_abort_helper.abort_flow(&mut flow).await?;
 
-        // Find a trigger and stop it if it's periodic
+        // Find a trigger and pause it if it's periodic
         let maybe_active_schedule = self
             .flow_trigger_service
             .try_get_flow_active_schedule_rule(&flow.flow_binding)
@@ -117,7 +117,7 @@ impl FlowRunService for FlowRunServiceImpl {
         if maybe_active_schedule.is_some() {
             // TODO: avoid double-loading the trigger
             self.flow_trigger_service
-                .pause_flow_trigger(cancellation_time, &flow.flow_binding)
+                .pause_flow_trigger(cancellation_time, &flow.flow_binding) // pause (user), not stop (system)
                 .await
                 .int_err()?;
         }

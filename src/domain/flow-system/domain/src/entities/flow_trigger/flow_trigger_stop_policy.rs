@@ -13,14 +13,14 @@ use serde::{Deserialize, Serialize};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum FlowTriggerAutoPausePolicy {
+pub enum FlowTriggerStopPolicy {
     AfterConsecutiveFailures {
         failures_count: ConsecutiveFailuresCount,
     },
     Never,
 }
 
-impl Default for FlowTriggerAutoPausePolicy {
+impl Default for FlowTriggerStopPolicy {
     fn default() -> Self {
         Self::AfterConsecutiveFailures {
             failures_count: ConsecutiveFailuresCount::default(),
