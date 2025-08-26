@@ -361,7 +361,6 @@ impl FlowTriggerHarness {
             .set_trigger(
                 Utc::now(),
                 FlowBinding::new(system_flow_type, FlowScope::make_system_scope()),
-                false,
                 FlowTriggerRule::Schedule(schedule),
                 FlowTriggerStopPolicy::default(),
             )
@@ -374,7 +373,6 @@ impl FlowTriggerHarness {
             .set_trigger(
                 Utc::now(),
                 flow_binding,
-                false,
                 trigger_rule,
                 FlowTriggerStopPolicy::default(),
             )

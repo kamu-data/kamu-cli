@@ -79,7 +79,6 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                         .set_trigger(
                             self.time_source.now(),
                             flow_binding,
-                            false, // Enabled
                             fs::FlowTriggerRule::Reactive(fs::ReactiveRule::new(
                                 fs::BatchingRule::immediate(),
                                 fs::BreakingChangeRule::Recover,
@@ -103,21 +102,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                         message.dataset_id.as_ref(),
                     );
                     flow_trigger_service
-                        .set_trigger(
-                            self.time_source.now(),
-                            flow_binding,
-                            true, // Paused
-                            fs::FlowTriggerRule::Reactive(fs::ReactiveRule::new(
-                                fs::BatchingRule::immediate(),
-                                fs::BreakingChangeRule::Recover,
-                            )),
-                            fs::FlowTriggerStopPolicy::AfterConsecutiveFailures {
-                                failures_count: fs::ConsecutiveFailuresCount::try_new(
-                                    self.webhooks_config.max_consecutive_failures,
-                                )
-                                .unwrap(),
-                            },
-                        )
+                        .pause_flow_trigger(self.time_source.now(), &flow_binding)
                         .await
                         .int_err()?;
                 }

@@ -44,7 +44,6 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        paused: bool,
         trigger_rule_input: FlowTriggerRuleInput,
         trigger_stop_policy_input: FlowTriggerStopPolicyInput,
     ) -> Result<SetFlowTriggerResult> {
@@ -84,13 +83,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         let res = flow_trigger_service
-            .set_trigger(
-                Utc::now(),
-                flow_binding,
-                paused,
-                trigger_rule,
-                triggest_stop_policy,
-            )
+            .set_trigger(Utc::now(), flow_binding, trigger_rule, triggest_stop_policy)
             .await
             .int_err()?;
 

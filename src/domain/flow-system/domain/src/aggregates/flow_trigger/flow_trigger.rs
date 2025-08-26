@@ -22,7 +22,6 @@ impl FlowTrigger {
     pub fn new(
         now: DateTime<Utc>,
         flow_binding: FlowBinding,
-        paused: bool,
         rule: FlowTriggerRule,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Self {
@@ -32,7 +31,7 @@ impl FlowTrigger {
                 FlowTriggerEventCreated {
                     event_time: now,
                     flow_binding,
-                    paused,
+                    paused: false,
                     rule,
                     stop_policy,
                 },
@@ -45,12 +44,11 @@ impl FlowTrigger {
     pub fn modify_rule(
         &mut self,
         now: DateTime<Utc>,
-        paused: bool,
         new_rule: FlowTriggerRule,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), ProjectionError<FlowTriggerState>> {
         // Determine which value parts got modified
-        let pause_affected = paused && self.is_active() || !paused && !self.is_active();
+        let pause_affected = !self.is_active();
         let rule_affected = self.rule != new_rule;
         let stop_policy_affected = self.stop_policy != stop_policy;
 
@@ -62,7 +60,7 @@ impl FlowTrigger {
         let event = FlowTriggerEventModified {
             event_time: now,
             flow_binding: self.flow_binding.clone(),
-            paused,
+            paused: false,
             rule: new_rule,
             stop_policy,
         };

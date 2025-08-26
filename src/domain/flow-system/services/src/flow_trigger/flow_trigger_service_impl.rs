@@ -63,7 +63,6 @@ impl FlowTriggerServiceImpl {
         mut flow_trigger: FlowTrigger,
     ) -> Result<FlowTriggerState, InternalError> {
         // Skip saving and publishing events if nothing changed
-        println!("Has updates: {}", flow_trigger.has_updates());
         if flow_trigger.has_updates() {
             flow_trigger
                 .save(self.flow_trigger_event_store.as_ref())
@@ -73,8 +72,6 @@ impl FlowTriggerServiceImpl {
             self.publish_flow_trigger_modified(&flow_trigger, request_time)
                 .await?;
         }
-
-        println!("Flow trigger stop policy: {:?}", flow_trigger.stop_policy);
 
         Ok(flow_trigger.into())
     }
@@ -143,13 +140,11 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         &self,
         request_time: DateTime<Utc>,
         flow_binding: FlowBinding,
-        paused: bool,
         rule: FlowTriggerRule,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<FlowTriggerState, SetFlowTriggerError> {
         tracing::info!(
             flow_binding = ?flow_binding,
-            %paused,
             rule = ?rule,
             stop_policy = ?stop_policy,
             "Setting flow trigger"
@@ -162,19 +157,13 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             // Modification
             Some(mut flow_trigger) => {
                 flow_trigger
-                    .modify_rule(self.time_source.now(), paused, rule, stop_policy)
+                    .modify_rule(self.time_source.now(), rule, stop_policy)
                     .int_err()?;
 
                 flow_trigger
             }
             // New trigger
-            None => FlowTrigger::new(
-                self.time_source.now(),
-                flow_binding,
-                paused,
-                rule,
-                stop_policy,
-            ),
+            None => FlowTrigger::new(self.time_source.now(), flow_binding, rule, stop_policy),
         };
 
         // Save trigger

@@ -48,7 +48,6 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                                 triggers {
                                     setTrigger (
                                         datasetFlowType: $datasetFlowType,
-                                        paused: false,
                                         triggerRuleInput: {
                                             reactive: {
                                                 forNewData: {

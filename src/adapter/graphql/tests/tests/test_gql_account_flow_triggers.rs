@@ -292,7 +292,6 @@ async fn test_pause_resume_account_flows() {
     let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
         &foo_create_result.dataset_handle.id,
         "INGEST",
-        false,
         1,
         "DAYS",
     );
@@ -492,7 +491,6 @@ async fn test_account_triggers_all_paused() {
     let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
         &bar_create_result.dataset_handle.id,
         "INGEST",
-        false,
         1,
         "DAYS",
     );
@@ -961,7 +959,6 @@ impl FlowTriggerHarness {
     fn set_ingest_trigger_time_delta_mutation(
         id: &odf::DatasetID,
         dataset_flow_type: &str,
-        paused: bool,
         every: u64,
         unit: &str,
     ) -> String {
@@ -974,7 +971,6 @@ impl FlowTriggerHarness {
                             triggers {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
-                                    paused: <paused>,
                                     triggerRuleInput: {
                                         schedule: {
                                             timeDelta: { every: <every>, unit: "<unit>" }
@@ -1012,7 +1008,6 @@ impl FlowTriggerHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<paused>", if paused { "true" } else { "false" })
         .replace("<every>", every.to_string().as_str())
         .replace("<unit>", unit)
     }

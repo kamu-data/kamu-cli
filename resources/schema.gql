@@ -1131,7 +1131,7 @@ type DatasetFlowTriggers {
 }
 
 type DatasetFlowTriggersMut {
-	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerRuleInput: FlowTriggerRuleInput!, triggerStopPolicyInput: FlowTriggerStopPolicyInput!): SetFlowTriggerResult!
+	setTrigger(datasetFlowType: DatasetFlowType!, triggerRuleInput: FlowTriggerRuleInput!, triggerStopPolicyInput: FlowTriggerStopPolicyInput!): SetFlowTriggerResult!
 	pauseFlow(datasetFlowType: DatasetFlowType!): Boolean!
 	pauseFlows: Boolean!
 	resumeFlow(datasetFlowType: DatasetFlowType!): Boolean!

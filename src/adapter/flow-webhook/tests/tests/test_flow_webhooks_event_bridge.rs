@@ -228,21 +228,10 @@ async fn test_flow_trigger_paused_on_subscription_pause() {
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let mut mock_flow_trigger_service = MockFlowTriggerService::new();
-    TestWebhooksEventBridgeHarness::add_flow_set_trigger_expectation(
+    TestWebhooksEventBridgeHarness::add_flow_pause_trigger_expectation(
         &mut mock_flow_trigger_service,
         &dataset_id,
         subscription_id,
-        true, // expect paused trigger
-        FlowTriggerRule::Reactive(ReactiveRule::new(
-            BatchingRule::Immediate,
-            BreakingChangeRule::Recover,
-        )),
-        FlowTriggerStopPolicy::AfterConsecutiveFailures {
-            failures_count: ConsecutiveFailuresCount::try_new(
-                DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES,
-            )
-            .unwrap(),
-        },
     );
 
     let harness = TestWebhooksEventBridgeHarness::new(TestWebhooksEventBridgeHarnessOverrides {
@@ -294,7 +283,6 @@ async fn test_flow_trigger_resumed_on_subscription_resume() {
         &mut mock_flow_trigger_service,
         &dataset_id,
         subscription_id,
-        false, // expect active trigger
         FlowTriggerRule::Reactive(ReactiveRule::new(
             BatchingRule::Immediate,
             BreakingChangeRule::Recover,
@@ -515,19 +503,16 @@ impl TestWebhooksEventBridgeHarness {
             .unwrap();
     }
 
-    fn add_flow_set_trigger_expectation(
+    fn add_flow_pause_trigger_expectation(
         mock_flow_trigger_service: &mut MockFlowTriggerService,
         dataset_id: &odf::DatasetID,
         subscription_id: WebhookSubscriptionID,
-        expect_paused: bool,
-        expect_rule: FlowTriggerRule,
-        expect_stop_policy: FlowTriggerStopPolicy,
     ) {
         let dataset_id_clone = dataset_id.clone();
 
         mock_flow_trigger_service
-            .expect_set_trigger()
-            .withf(move |_, flow_binding, paused, rule, stop_policy| {
+            .expect_pause_flow_trigger()
+            .withf(move |_, flow_binding| {
                 let webhook_scope = FlowScopeSubscription::new(&flow_binding.scope);
                 assert_eq!(flow_binding.flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
                 assert_eq!(
@@ -536,21 +521,41 @@ impl TestWebhooksEventBridgeHarness {
                 );
                 assert_eq!(webhook_scope.subscription_id(), subscription_id);
 
-                assert_eq!(*paused, expect_paused);
+                true
+            })
+            .returning(|_, _| Ok(()));
+    }
+
+    fn add_flow_set_trigger_expectation(
+        mock_flow_trigger_service: &mut MockFlowTriggerService,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+        expect_rule: FlowTriggerRule,
+        expect_stop_policy: FlowTriggerStopPolicy,
+    ) {
+        let dataset_id_clone = dataset_id.clone();
+
+        mock_flow_trigger_service
+            .expect_set_trigger()
+            .withf(move |_, flow_binding, rule, stop_policy| {
+                let webhook_scope = FlowScopeSubscription::new(&flow_binding.scope);
+                assert_eq!(flow_binding.flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
+                assert_eq!(
+                    webhook_scope.maybe_dataset_id(),
+                    Some(dataset_id_clone.clone())
+                );
+                assert_eq!(webhook_scope.subscription_id(), subscription_id);
+
                 assert_eq!(*rule, expect_rule);
                 assert_eq!(*stop_policy, expect_stop_policy);
 
                 true
             })
-            .returning(|_, flow_binding, paused, rule, stop_policy| {
+            .returning(|_, flow_binding, rule, stop_policy| {
                 Ok(FlowTriggerState {
                     flow_binding,
                     rule,
-                    status: if paused {
-                        FlowTriggerStatus::PausedByUser
-                    } else {
-                        FlowTriggerStatus::Active
-                    },
+                    status: FlowTriggerStatus::Active,
                     stop_policy,
                 })
             });

@@ -2120,12 +2120,12 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             let main_handle = async {
                 // 50ms: Pause both flow triggers in between completion 2 first tasks and queuing
                 harness.advance_time(Duration::milliseconds(50)).await;
-                harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&foo_id)).await;
-                harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&bar_id)).await;
+                harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&foo_id)).await;
+                harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&bar_id)).await;
 
                 // 80ms: Wake up after initially planned "foo" scheduling but before planned "bar" scheduling
                 harness.advance_time(Duration::milliseconds(30)).await;
-                harness.resume_flow(start_time + Duration::milliseconds(80), ingest_dataset_binding(&foo_id)).await;
+                harness.resume_flow(start_time + Duration::milliseconds(80), &ingest_dataset_binding(&foo_id)).await;
                 harness.set_flow_trigger(
                   start_time + Duration::milliseconds(80),
                   ingest_dataset_binding(&bar_id),
@@ -2331,13 +2331,13 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
           let main_handle = async {
               // 50ms: Pause flow config before next flow runs
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&foo_id)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&bar_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&foo_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&bar_id)).await;
 
               // 100ms: Wake up after initially planned "bar" scheduling but before planned "foo" scheduling
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), ingest_dataset_binding(&foo_id)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), ingest_dataset_binding(&bar_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(100), &ingest_dataset_binding(&foo_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(100), &ingest_dataset_binding(&bar_id)).await;
 
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::milliseconds(100))
@@ -6374,11 +6374,11 @@ async fn test_respect_last_success_time_for_root_dataset_when_activate_configura
           let main_handle = async {
               // 50ms: Pause flow config before next flow runs
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&foo_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&foo_id)).await;
 
               // 100ms: Wake up before planned "foo" scheduling
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), ingest_dataset_binding(&foo_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(100), &ingest_dataset_binding(&foo_id)).await;
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::milliseconds(100))
                   .await;
@@ -6622,11 +6622,11 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
           let main_handle = async {
               // 60ms: Pause flow config before next "foo" runs
               harness.advance_time(Duration::milliseconds(60)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(60), transform_dataset_binding(&bar_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(60), &transform_dataset_binding(&bar_id)).await;
 
               // 170ms: Wake up after planned "foo" run
               harness.advance_time(Duration::milliseconds(110)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(170), transform_dataset_binding(&bar_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(170), &transform_dataset_binding(&bar_id)).await;
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::milliseconds(170))
                   .await;
@@ -6926,22 +6926,22 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
           let main_handle = async {
               // 50ms: Pause "bar" flow config before next "foo" runs
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), transform_dataset_binding(&bar_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), &transform_dataset_binding(&bar_id)).await;
 
               // 80ms: Wake up "bar"
               harness.advance_time(Duration::milliseconds(80)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(80), transform_dataset_binding(&bar_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(80), &transform_dataset_binding(&bar_id)).await;
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::milliseconds(80))
                   .await;
 
               // 120ms: Pause "bar" again
               harness.advance_time(Duration::milliseconds(40)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(120), transform_dataset_binding(&bar_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(120), &transform_dataset_binding(&bar_id)).await;
 
               // 170ms: Resume "bar"
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(170), transform_dataset_binding(&bar_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(170), &transform_dataset_binding(&bar_id)).await;
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::milliseconds(170))
                   .await;

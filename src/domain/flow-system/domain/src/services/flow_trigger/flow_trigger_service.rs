@@ -30,7 +30,6 @@ pub trait FlowTriggerService: Sync + Send {
         &self,
         request_time: DateTime<Utc>,
         flow_binding: FlowBinding,
-        paused: bool,
         rule: FlowTriggerRule,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
