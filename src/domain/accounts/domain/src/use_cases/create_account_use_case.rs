@@ -21,9 +21,9 @@ use crate::{Account, CreateAccountError, Password};
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(
         &self,
-        creator_account: &Account,
+        creator_account: Option<&Account>,
         account_name: &odf::AccountName,
-        options: CreateAccountUseCaseOptions,
+        options: PredefinedAccountFields,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_multi_wallet_accounts(
@@ -35,9 +35,13 @@ pub trait CreateAccountUseCase: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(bon::Builder, Default)]
-pub struct CreateAccountUseCaseOptions {
+pub struct PredefinedAccountFields {
     pub email: Option<Email>,
     pub password: Option<Password>,
+    pub display_name: Option<String>,
+    pub provider: Option<String>,
+    pub id: Option<odf::AccountID>,
+    pub avatar_url: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

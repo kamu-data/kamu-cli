@@ -32,10 +32,12 @@ use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AccountServiceImpl,
     AuthenticationServiceImpl,
+    CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
+    UpdateInnerAccountUseCaseImpl,
 };
 use kamu_adapter_http::platform::UploadServiceS3;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -93,6 +95,8 @@ impl Harness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
                 .add::<InMemoryRebacRepository>()
+                .add::<UpdateInnerAccountUseCaseImpl>()
+                .add::<CreateAccountUseCaseImpl>()
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()

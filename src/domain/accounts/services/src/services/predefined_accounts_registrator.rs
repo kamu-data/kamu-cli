@@ -20,18 +20,19 @@ use kamu_auth_rebac_services::DefaultAccountProperties;
 use messaging_outbox::OutboxExt;
 use odf::AccountID;
 
-use crate::LoginPasswordAuthProvider;
+use crate::UpdateInnerAccountUseCaseImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A service that aims to register accounts on a one-time basis
 pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-    login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
+    update_account_use_case: Arc<UpdateInnerAccountUseCaseImpl>,
+    create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
 
 #[component(pub)]
@@ -44,19 +45,21 @@ pub struct PredefinedAccountsRegistrator {
 impl PredefinedAccountsRegistrator {
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
         account_service: Arc<dyn AccountService>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
         outbox: Arc<dyn messaging_outbox::Outbox>,
+        update_account_use_case: Arc<UpdateInnerAccountUseCaseImpl>,
+        create_account_use_case: Arc<dyn CreateAccountUseCase>,
     ) -> Self {
         Self {
             predefined_accounts_config,
-            login_password_auth_provider,
             account_service,
             rebac_service,
             default_account_properties,
             outbox,
+            update_account_use_case,
+            create_account_use_case,
         }
     }
 
@@ -91,18 +94,23 @@ impl PredefinedAccountsRegistrator {
         &self,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
-        let account = account_config.into();
+        let account: Account = account_config.into();
 
-        self.account_service
-            .save_account(&account)
+        self.create_account_use_case
+            .execute(
+                None,
+                &account.account_name,
+                PredefinedAccountFields::builder()
+                    .email(account.email.clone())
+                    .maybe_password(Some(account_config.password.clone()))
+                    .display_name(account.display_name.clone())
+                    .provider(account.provider)
+                    .maybe_avatar_url(account.avatar_url)
+                    .id(account.id)
+                    .build(),
+            )
             .await
             .int_err()?;
-
-        if account_config.provider == <&'static str>::from(AccountProvider::Password) {
-            self.login_password_auth_provider
-                .save_password(&account, &account_config.password)
-                .await?;
-        }
 
         Ok(())
     }
@@ -144,8 +152,8 @@ impl PredefinedAccountsRegistrator {
             );
             let new_account_name = updated_account.account_name.clone();
 
-            self.account_service
-                .update_account(&updated_account)
+            self.update_account_use_case
+                .execute_inner(&account, &updated_account)
                 .await
                 .int_err()?;
 

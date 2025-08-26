@@ -10,33 +10,44 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, AccountErrorDuplicate};
+use crate::{Account, AccountErrorDuplicate, AccountNotFoundByIdError, UpdateAccountError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait UpdateAccountUseCase: Send + Sync {
-    async fn execute(&self, account: &Account) -> Result<(), UpdateAccountError>;
+    async fn execute(&self, account: &Account) -> Result<(), UpdateAccountUseCaseError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Errors
+
+#[derive(Debug, Error)]
+pub enum UpdateAccountUseCaseError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    NotFound(AccountNotFoundByIdError),
+
+    #[error(transparent)]
+    Duplicate(AccountErrorDuplicate),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[derive(Debug, Error)]
-// pub enum UpdateAccountError {
-//     #[error(transparent)]
-//     Duplicate(AccountErrorDuplicate),
-
-//     #[error(transparent)]
-//     Access(
-//         #[from]
-//         #[backtrace]
-//         odf::AccessError,
-//     ),
-
-//     #[error(transparent)]
-//     Internal(#[from] InternalError),
-// }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+impl From<UpdateAccountError> for UpdateAccountUseCaseError {
+    fn from(err: UpdateAccountError) -> Self {
+        match err {
+            UpdateAccountError::NotFound(e) => UpdateAccountUseCaseError::NotFound(e),
+            UpdateAccountError::Duplicate(e) => UpdateAccountUseCaseError::Duplicate(e),
+            UpdateAccountError::Internal(e) => UpdateAccountUseCaseError::Internal(e),
+        }
+    }
+}

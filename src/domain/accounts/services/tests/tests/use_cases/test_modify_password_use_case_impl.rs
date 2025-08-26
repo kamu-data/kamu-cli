@@ -15,13 +15,13 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     AccountService,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
     DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
     ModifyAccountPasswordWithConfirmationError,
     Password,
+    PredefinedAccountFields,
     TEST_PASSWORD,
     VerifyPasswordError,
 };
@@ -260,9 +260,9 @@ impl ModifyAccountPasswordUseCaseImplHarness {
 
         self.create_use_case
             .execute(
-                &creator_account,
+                Some(&creator_account),
                 &account_name,
-                CreateAccountUseCaseOptions::builder()
+                PredefinedAccountFields::builder()
                     .password(password)
                     .build(),
             )

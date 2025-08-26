@@ -6686,6 +6686,7 @@ name = "kamu-accounts-services"
 version = "0.246.1"
 dependencies = [
  "async-trait",
+ "bon",
  "chrono",
  "common-macros",
  "crypto-utils",

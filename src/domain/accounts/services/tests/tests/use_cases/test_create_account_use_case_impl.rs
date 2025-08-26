@@ -18,9 +18,9 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     AccountService,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
     DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    PredefinedAccountFields,
     PredefinedAccountsConfig,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -29,6 +29,7 @@ use kamu_accounts_services::{
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
+    UpdateInnerAccountUseCaseImpl,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
@@ -86,9 +87,9 @@ async fn test_create_account() {
         harness
             .use_case
             .execute(
-                &creator_account,
+                Some(&creator_account),
                 &new_account_name_with_email,
-                CreateAccountUseCaseOptions::builder().email(new_account_email.clone()).build())
+                PredefinedAccountFields::builder().email(new_account_email.clone()).build())
             .await,
         Ok(account)
             if account.email == new_account_email
@@ -100,9 +101,9 @@ async fn test_create_account() {
         harness
             .use_case
             .execute(
-                &creator_account,
+                Some(&creator_account),
                 &new_account_name_without_email,
-                CreateAccountUseCaseOptions::default()
+                PredefinedAccountFields::default()
             )
             .await,
         Ok(account)
@@ -188,6 +189,7 @@ impl CreateAccountUseCaseImplHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<LoginPasswordAuthProvider>()
             .add::<RebacServiceImpl>()
+            .add::<UpdateInnerAccountUseCaseImpl>()
             .add::<InMemoryRebacRepository>()
             .add_value(DidSecretEncryptionConfig::sample())
             .add::<InMemoryDidSecretKeyRepository>()

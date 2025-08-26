@@ -59,6 +59,7 @@ mockall = { optional = true, version = "0.13", default-features = false }
 
 
 [dev-dependencies]
+bon = { version = "3", default-features = false }
 kamu-accounts = { workspace = true, default-features = false, features = [
     "testing",
 ] }

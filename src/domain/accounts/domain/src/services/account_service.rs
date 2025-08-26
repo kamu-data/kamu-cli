@@ -23,7 +23,6 @@ use crate::{
     GetAccountByNameError,
     ModifyAccountPasswordError,
     Password,
-    RenameAccountError,
     SearchAccountsByNamePatternFilters,
     UpdateAccountError,
 };
@@ -74,20 +73,7 @@ pub trait AccountService: Sync + Send {
         pagination: PaginationOpts,
     ) -> AccountPageStream<'a>;
 
-    async fn create_password_account(
-        &self,
-        account_name: &odf::AccountName,
-        password: Password,
-        email: email_utils::Email,
-    ) -> Result<Account, CreateAccountError>;
-
     async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError>;
-
-    async fn rename_account(
-        &self,
-        account: &Account,
-        new_name: odf::AccountName,
-    ) -> Result<(), RenameAccountError>;
 
     async fn delete_account_by_name(
         &self,

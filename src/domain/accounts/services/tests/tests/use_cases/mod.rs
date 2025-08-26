@@ -10,5 +10,4 @@
 mod test_create_account_use_case_impl;
 mod test_delete_account_use_case_impl;
 mod test_modify_password_use_case_impl;
-mod test_rename_account_use_case_impl;
-mod test_update_account_email_use_case_impl;
+mod test_update_account_use_case_impl;

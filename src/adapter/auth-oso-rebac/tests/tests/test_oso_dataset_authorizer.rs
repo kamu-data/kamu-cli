@@ -23,8 +23,10 @@ use kamu_accounts::{
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
+    CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
+    UpdateInnerAccountUseCaseImpl,
 };
 use kamu_auth_rebac::AccountPropertyName;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -679,6 +681,8 @@ impl DatasetAuthorizerHarness {
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
                 .add::<kamu_auth_rebac_services::RebacDatasetLifecycleMessageConsumer>()
+                .add::<UpdateInnerAccountUseCaseImpl>()
+                .add::<CreateAccountUseCaseImpl>()
                 .add::<InMemoryRebacRepository>()
                 .add_builder(
                     OutboxImmediateImpl::builder()
