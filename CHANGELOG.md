@@ -20,7 +20,7 @@ Recommendation: for ease of reading, use the following order:
 ## Changed
 - Refactoring:
   - Added new `UpdateAccountUseCase` and replace usage of similar methods
-  - PredefinedAccountRegistrator now uses `use_case` methods instead of service methods
+  - `PredefinedAccountRegistrator` now uses `UpdateAccountUseCase` methods instead of `AccountService` methods
 - Moved versioned file logic from GQL level to `use_case`
 - Collection datasets will ignore add and move operations that don't change the entry path, ref, or extra attributes and return `CollectionUpdateUpToDate`
 

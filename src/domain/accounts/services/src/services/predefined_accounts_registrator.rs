@@ -17,7 +17,6 @@ use internal_error::*;
 use kamu_accounts::*;
 use kamu_auth_rebac::{AccountPropertyName, RebacService, boolean_property_value};
 use kamu_auth_rebac_services::DefaultAccountProperties;
-use messaging_outbox::OutboxExt;
 use odf::AccountID;
 
 use crate::UpdateInnerAccountUseCaseImpl;
@@ -30,7 +29,6 @@ pub struct PredefinedAccountsRegistrator {
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
-    outbox: Arc<dyn messaging_outbox::Outbox>,
     update_account_use_case: Arc<UpdateInnerAccountUseCaseImpl>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
@@ -48,7 +46,6 @@ impl PredefinedAccountsRegistrator {
         account_service: Arc<dyn AccountService>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
-        outbox: Arc<dyn messaging_outbox::Outbox>,
         update_account_use_case: Arc<UpdateInnerAccountUseCaseImpl>,
         create_account_use_case: Arc<dyn CreateAccountUseCase>,
     ) -> Self {
@@ -57,7 +54,6 @@ impl PredefinedAccountsRegistrator {
             account_service,
             rebac_service,
             default_account_properties,
-            outbox,
             update_account_use_case,
             create_account_use_case,
         }
@@ -150,7 +146,6 @@ impl PredefinedAccountsRegistrator {
             tracing::info!(
                 "Updating modified predefined account: old: {account:?}, new: {updated_account:?}",
             );
-            let new_account_name = updated_account.account_name.clone();
 
             self.update_account_use_case
                 .execute_inner(&account, &updated_account)
