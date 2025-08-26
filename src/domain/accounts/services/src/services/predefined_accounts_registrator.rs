@@ -156,28 +156,6 @@ impl PredefinedAccountsRegistrator {
                 .execute_inner(&account, &updated_account)
                 .await
                 .int_err()?;
-
-            // Renaming is a bit special event, and we have associated handlers for it
-            if account.account_name != new_account_name {
-                tracing::info!(
-                    "Detected rename of predefined account from '{}' to '{}'",
-                    account.account_name,
-                    new_account_name
-                );
-
-                self.outbox
-                    .post_message(
-                        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                        AccountLifecycleMessage::renamed(
-                            account.id.clone(),
-                            account.email.clone(),
-                            account.account_name.clone(),
-                            new_account_name,
-                            account.display_name.clone(),
-                        ),
-                    )
-                    .await?;
-            }
         }
 
         Ok(())

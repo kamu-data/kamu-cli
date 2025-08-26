@@ -41,6 +41,11 @@ impl UpdateInnerAccountUseCaseImpl {
         use messaging_outbox::OutboxExt;
 
         if original_account.account_name != account.account_name {
+            tracing::info!(
+                "Detected rename of predefined account from '{}' to '{}'",
+                original_account.account_name,
+                account.account_name
+            );
             self.outbox
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
