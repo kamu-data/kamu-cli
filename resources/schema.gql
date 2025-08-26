@@ -1328,7 +1328,8 @@ type DatasetMetadata {
 	currentVocab: SetVocab
 	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
 	"""
-	Experimental: Current archetype as per `kamu.dev/archetype` annotation, if any
+	Experimental: Current archetype as per `kamu.dev/archetype` annotation,
+	if any
 	"""
 	currentArchetype: DatasetArchetype
 }
