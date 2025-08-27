@@ -717,6 +717,7 @@ impl FlowTriggerHarness {
                                             reason {
                                                 ...on TaskFailureReasonGeneral {
                                                     message
+                                                    recoverable
                                                 }
                                                 ...on TaskFailureReasonInputDatasetCompacted {
                                                     message
@@ -813,6 +814,7 @@ impl FlowTriggerHarness {
                                                   reason {
                                                     ...on TaskFailureReasonGeneral {
                                                         message
+                                                        recoverable
                                                     }
                                                     ...on TaskFailureReasonInputDatasetCompacted {
                                                           message
@@ -863,6 +865,7 @@ impl FlowTriggerHarness {
                                                   reason {
                                                     ...on TaskFailureReasonGeneral {
                                                         message
+                                                        recoverable
                                                     }
                                                   }
                                               }

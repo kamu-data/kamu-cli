@@ -3656,6 +3656,7 @@ union TaskFailureReason = TaskFailureReasonGeneral | TaskFailureReasonInputDatas
 
 type TaskFailureReasonGeneral {
 	message: String!
+	recoverable: Boolean!
 }
 
 type TaskFailureReasonInputDatasetCompacted {

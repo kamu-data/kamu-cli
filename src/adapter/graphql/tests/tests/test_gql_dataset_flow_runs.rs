@@ -4618,6 +4618,7 @@ impl FlowRunsHarness {
                                                 reason {
                                                     ...on TaskFailureReasonGeneral {
                                                         message
+                                                        recoverable
                                                     }
                                                     ...on TaskFailureReasonInputDatasetCompacted {
                                                         message
@@ -4821,6 +4822,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                }
@@ -4865,6 +4867,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                         ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
@@ -4928,6 +4931,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                         ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
@@ -4980,6 +4984,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                 }
@@ -5033,6 +5038,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                 }
@@ -5079,6 +5085,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                 }
@@ -5125,6 +5132,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                         ...on TaskFailureReasonInputDatasetCompacted {
                                                             message

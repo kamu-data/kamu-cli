@@ -79,6 +79,7 @@ pub enum TaskFailureReason {
 #[derive(SimpleObject, Debug)]
 pub struct TaskFailureReasonGeneral {
     message: String,
+    recoverable: bool,
 }
 
 #[derive(SimpleObject, Debug)]
@@ -102,6 +103,7 @@ impl TaskFailureReason {
             ts::TaskError::TASK_ERROR_EMPTY => {
                 TaskFailureReason::General(TaskFailureReasonGeneral {
                     message: "FAILED".to_owned(),
+                    recoverable: e.recoverable,
                 })
             }
 
@@ -136,6 +138,7 @@ impl TaskFailureReason {
                     TaskErrorDatasetReset::ResetHeadNotFound => {
                         TaskFailureReason::General(TaskFailureReasonGeneral {
                             message: "New head hash to reset not found".to_owned(),
+                            recoverable: e.recoverable,
                         })
                     }
                 }
@@ -170,6 +173,7 @@ impl TaskFailureReason {
                 tracing::error!("Unexpected task error type: {}", e.error_type,);
                 TaskFailureReason::General(TaskFailureReasonGeneral {
                     message: "Unexpected task error type".to_owned(),
+                    recoverable: e.recoverable,
                 })
             }
         })
