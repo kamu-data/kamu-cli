@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs, kamu_task_system as ts};
 
@@ -21,6 +21,7 @@ use crate::queries::Account;
 pub struct Flow {
     flow_state: Box<fs::FlowState>,
     flow_task_states: Vec<ts::TaskState>,
+    maybe_related_flow_trigger_state: Option<Box<fs::FlowTriggerState>>,
     description: FlowDescription,
 }
 
@@ -38,8 +39,11 @@ impl Flow {
             FlowDescriptionBuilder::prepare(ctx, &flow_states).await?;
 
         // Load task states associated with the flows
-        let mut flow_task_states_by_id =
-            Self::load_flow_task_states(flow_states.clone(), ctx).await?;
+        let mut flow_task_states_by_id = Self::load_flow_task_states(&flow_states, ctx).await?;
+
+        // Load triggers associated with the flows
+        let mut flow_related_trigger_states_by_id =
+            Self::load_flow_related_triggers(&flow_states, ctx).await?;
 
         for flow_state in flow_states {
             // Extract task states associated with the flow
@@ -49,10 +53,18 @@ impl Flow {
                 .filter_map(|task_id| flow_task_states_by_id.remove(task_id))
                 .collect::<Vec<_>>();
 
+            // We could possibly have an associated triger as well
+            let maybe_related_flow_trigger_state =
+                flow_related_trigger_states_by_id.remove(&flow_state.flow_binding);
+
+            // Construct flow description
             let flow_description = flow_description_builder.build(ctx, &flow_state).await?;
+
+            // Finally, compose all values
             result.push(Self {
                 flow_state: Box::new(flow_state),
                 flow_task_states,
+                maybe_related_flow_trigger_state: maybe_related_flow_trigger_state.map(Box::new),
                 description: flow_description,
             });
         }
@@ -62,7 +74,7 @@ impl Flow {
 
     #[graphql(skip)]
     async fn load_flow_task_states(
-        flow_states: Vec<fs::FlowState>,
+        flow_states: &[fs::FlowState],
         ctx: &Context<'_>,
     ) -> Result<HashMap<ts::TaskID, ts::TaskState>> {
         let task_event_store = from_catalog_n!(ctx, dyn ts::TaskEventStore);
@@ -83,6 +95,43 @@ impl Flow {
             .into_iter()
             .map(|task_state| (task_state.task_id, task_state))
             .collect::<HashMap<_, _>>())
+    }
+
+    #[graphql(skip)]
+    async fn load_flow_related_triggers(
+        flow_states: &[fs::FlowState],
+        ctx: &Context<'_>,
+    ) -> Result<HashMap<fs::FlowBinding, fs::FlowTriggerState>> {
+        let flow_trigger_event_store = from_catalog_n!(ctx, dyn fs::FlowTriggerEventStore);
+
+        let unique_bindings = flow_states
+            .iter()
+            .map(|flow_state| &flow_state.flow_binding)
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let flow_triggers_res =
+            fs::FlowTrigger::load_multi(unique_bindings, flow_trigger_event_store.as_ref())
+                .await
+                .map_err(|e| match e {
+                    fs::GetEventsError::Internal(e) => e,
+                })?;
+
+        let mut result = HashMap::new();
+        for res in flow_triggers_res {
+            match res {
+                Ok(trigger_state) => {
+                    result.insert(trigger_state.flow_binding.clone(), trigger_state.into());
+                }
+                Err(fs::LoadError::NotFound(_)) => { /* skip */ }
+                Err(fs::LoadError::Internal(e)) => return Err(e.into()),
+                Err(e) => return Err(e.int_err().into()),
+            }
+        }
+
+        Ok(result)
     }
 
     /// Unique identifier of the flow
@@ -212,6 +261,16 @@ impl Flow {
     /// Flow retry policy
     async fn retry_policy(&self) -> Option<FlowRetryPolicy> {
         self.flow_state.retry_policy.map(Into::into)
+    }
+
+    /// Associated flow trigger
+    #[allow(clippy::unused_async)]
+    async fn related_trigger(&self) -> Result<Option<FlowTrigger>, InternalError> {
+        Ok(self
+            .maybe_related_flow_trigger_state
+            .as_ref()
+            .map(|trigger_state| trigger_state.as_ref().clone())
+            .map(Into::into))
     }
 }
 

@@ -1952,6 +1952,10 @@ type Flow {
 	Flow retry policy
 	"""
 	retryPolicy: FlowRetryPolicy
+	"""
+	Associated flow trigger
+	"""
+	relatedTrigger: FlowTrigger
 }
 
 type FlowAbortedResult {
