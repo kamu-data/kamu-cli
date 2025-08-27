@@ -432,6 +432,8 @@ Shows the dataset schema
 
 * `-o`, `--output-format <FMT>` — Format of the output
 
+  Default value: `odf-yaml`
+
   Possible values: `arrow-json`, `ddl`, `odf-json`, `odf-yaml`, `parquet`, `parquet-json`
 
 
