@@ -15,13 +15,13 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     AccountService,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
     ModifyAccountPasswordWithConfirmationError,
     Password,
-    PredefinedAccountFields,
     TEST_PASSWORD,
     VerifyPasswordError,
 };
@@ -259,10 +259,10 @@ impl ModifyAccountPasswordUseCaseImplHarness {
         let account_name = odf::AccountName::new_unchecked("new-account");
 
         self.create_use_case
-            .execute(
-                Some(&creator_account),
+            .execute_derived(
+                &creator_account,
                 &account_name,
-                PredefinedAccountFields::builder()
+                CreateAccountUseCaseOptions::builder()
                     .password(password)
                     .build(),
             )

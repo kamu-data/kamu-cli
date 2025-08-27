@@ -21,13 +21,13 @@ use kamu_accounts::{
     AccountService,
     AnonymousAccountReason,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     CurrentAccountSubject,
     DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-    PredefinedAccountFields,
     PredefinedAccountsConfig,
+    UpdateAccountError,
     UpdateAccountUseCase,
-    UpdateAccountUseCaseError,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::{AccountAuthorizationHelper, MockAccountAuthorizationHelper};
@@ -35,7 +35,6 @@ use kamu_accounts_services::{
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     UpdateAccountUseCaseImpl,
-    UpdateInnerAccountUseCaseImpl,
 };
 use messaging_outbox::{MockOutbox, Outbox};
 use time_source::SystemTimeSourceDefault;
@@ -109,7 +108,7 @@ async fn test_update_account_email_duplicate_error() {
 
     assert_matches!(
         harness.update_use_case.execute(&account_to_update).await,
-        Err(UpdateAccountUseCaseError::Duplicate(_))
+        Err(UpdateAccountError::Duplicate(_))
     );
 }
 
@@ -180,11 +179,9 @@ async fn test_duplicate_name() {
 
     assert_matches!(
         harness.update_use_case.execute(&account_to_update).await,
-        Err(UpdateAccountUseCaseError::Duplicate(
-            AccountErrorDuplicate {
-                account_field: AccountDuplicateField::Name
-            }
-        ))
+        Err(UpdateAccountError::Duplicate(AccountErrorDuplicate {
+            account_field: AccountDuplicateField::Name
+        }))
     );
 
     account_to_update.account_name = odf::AccountName::new_unchecked(REGULAR_USER);
@@ -265,7 +262,7 @@ async fn test_anonymous_try_to_rename_account() {
 
     assert_matches!(
         harness.update_use_case.execute(&account_to_update).await,
-        Err(UpdateAccountUseCaseError::Access(_))
+        Err(UpdateAccountError::Access(_))
     );
 }
 
@@ -295,7 +292,7 @@ async fn test_non_admin_try_to_rename_other_account() {
 
     assert_matches!(
         harness.update_use_case.execute(&account_to_update).await,
-        Err(UpdateAccountUseCaseError::Access(_))
+        Err(UpdateAccountError::Access(_))
     );
 }
 
@@ -328,7 +325,6 @@ impl UpdateAccountUseCaseImplHarness {
         b.bind::<dyn Outbox, MockOutbox>();
 
         b.add::<UpdateAccountUseCaseImpl>();
-        b.add::<UpdateInnerAccountUseCaseImpl>();
         if let Some(current_account_subject) = current_account_subject {
             b.add_value(current_account_subject);
         }
@@ -365,10 +361,10 @@ impl UpdateAccountUseCaseImplHarness {
         let creator_account = Account::dummy();
 
         self.create_use_case
-            .execute(
-                Some(&creator_account),
+            .execute_derived(
+                &creator_account,
                 account_name,
-                PredefinedAccountFields::default(),
+                CreateAccountUseCaseOptions::default(),
             )
             .await
             .unwrap()

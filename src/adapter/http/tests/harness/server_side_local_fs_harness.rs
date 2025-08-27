@@ -174,7 +174,7 @@ impl ServerSideLocalFsHarness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
-                .add::<UpdateInnerAccountUseCaseImpl>()
+                .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<InMemoryRebacRepository>()
                 .add_value(DefaultAccountProperties::default())

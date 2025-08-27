@@ -25,7 +25,7 @@ use kamu_accounts_services::{
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
-    UpdateInnerAccountUseCaseImpl,
+    UpdateAccountUseCaseImpl,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
@@ -158,7 +158,7 @@ async fn make_catalog() -> dill::Catalog {
         .add::<SystemTimeSourceDefault>()
         .add::<LoginPasswordAuthProvider>()
         .add::<RebacServiceImpl>()
-        .add::<UpdateInnerAccountUseCaseImpl>()
+        .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()
         .add::<InMemoryRebacRepository>()
         .add_value(DidSecretEncryptionConfig::sample())

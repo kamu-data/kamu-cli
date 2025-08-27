@@ -19,8 +19,6 @@ use kamu_auth_rebac::{AccountPropertyName, RebacService, boolean_property_value}
 use kamu_auth_rebac_services::DefaultAccountProperties;
 use odf::AccountID;
 
-use crate::UpdateInnerAccountUseCaseImpl;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A service that aims to register accounts on a one-time basis
@@ -29,7 +27,7 @@ pub struct PredefinedAccountsRegistrator {
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
-    update_account_use_case: Arc<UpdateInnerAccountUseCaseImpl>,
+    update_account_use_case: Arc<dyn UpdateAccountUseCase>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
 
@@ -46,7 +44,7 @@ impl PredefinedAccountsRegistrator {
         account_service: Arc<dyn AccountService>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
-        update_account_use_case: Arc<UpdateInnerAccountUseCaseImpl>,
+        update_account_use_case: Arc<dyn UpdateAccountUseCase>,
         create_account_use_case: Arc<dyn CreateAccountUseCase>,
     ) -> Self {
         Self {
@@ -93,18 +91,7 @@ impl PredefinedAccountsRegistrator {
         let account: Account = account_config.into();
 
         self.create_account_use_case
-            .execute(
-                None,
-                &account.account_name,
-                PredefinedAccountFields::builder()
-                    .email(account.email.clone())
-                    .maybe_password(Some(account_config.password.clone()))
-                    .display_name(account.display_name.clone())
-                    .provider(account.provider)
-                    .maybe_avatar_url(account.avatar_url)
-                    .id(account.id)
-                    .build(),
-            )
+            .execute(&account, &account_config.password)
             .await
             .int_err()?;
 
@@ -148,7 +135,7 @@ impl PredefinedAccountsRegistrator {
             );
 
             self.update_account_use_case
-                .execute_inner(&account, &updated_account)
+                .execute_internal(&updated_account, &account)
                 .await
                 .int_err()?;
         }

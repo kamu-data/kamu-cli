@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountLifecycleMessage,
@@ -17,8 +17,8 @@ use kamu_accounts::{
     AccountProvider,
     AccountService,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    UpdateAccountError,
     UpdateAccountUseCase,
-    UpdateAccountUseCaseError,
 };
 use messaging_outbox::Outbox;
 
@@ -27,12 +27,14 @@ use crate::utils;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-pub struct UpdateInnerAccountUseCaseImpl {
+#[dill::interface(dyn UpdateAccountUseCase)]
+pub struct UpdateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn Outbox>,
+    account_authorization_helper: dill::Lazy<Arc<dyn utils::AccountAuthorizationHelper>>,
 }
 
-impl UpdateInnerAccountUseCaseImpl {
+impl UpdateAccountUseCaseImpl {
     async fn notify_account_updated(
         &self,
         account: &Account,
@@ -62,12 +64,37 @@ impl UpdateInnerAccountUseCaseImpl {
 
         Ok(())
     }
+}
 
-    pub async fn execute_inner(
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
+    async fn execute(&self, account: &Account) -> Result<(), UpdateAccountError> {
+        let Ok(original_account) = self.account_service.get_account_by_id(&account.id).await else {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: account.id.clone(),
+            }));
+        };
+
+        let account_authorization_helper = self.account_authorization_helper.get().int_err()?;
+        if !account_authorization_helper
+            .can_modify_account(&original_account.account_name)
+            .await?
+        {
+            return Err(UpdateAccountError::Access(odf::AccessError::Unauthorized(
+                format!("Cannot update account {}", account.account_name).into(),
+            )));
+        }
+
+        self.execute_internal(account, &original_account).await
+    }
+
+    async fn execute_internal(
         &self,
         account: &Account,
         original_account: &Account,
-    ) -> Result<(), UpdateAccountUseCaseError> {
+    ) -> Result<(), UpdateAccountError> {
         let mut account_to_update = account.clone();
         if original_account.account_name != account.account_name
             && account.provider == AccountProvider::Password.to_string()
@@ -83,47 +110,6 @@ impl UpdateInnerAccountUseCaseImpl {
             .await?;
 
         Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[dill::component(pub)]
-#[dill::interface(dyn UpdateAccountUseCase)]
-pub struct UpdateAccountUseCaseImpl {
-    account_service: Arc<dyn AccountService>,
-    account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
-    update_inner_use_case: Arc<UpdateInnerAccountUseCaseImpl>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
-    async fn execute(&self, account: &Account) -> Result<(), UpdateAccountUseCaseError> {
-        let Ok(original_account) = self.account_service.get_account_by_id(&account.id).await else {
-            return Err(UpdateAccountUseCaseError::NotFound(
-                AccountNotFoundByIdError {
-                    account_id: account.id.clone(),
-                },
-            ));
-        };
-
-        if !self
-            .account_authorization_helper
-            .can_modify_account(&original_account.account_name)
-            .await?
-        {
-            return Err(UpdateAccountUseCaseError::Access(
-                odf::AccessError::Unauthorized(
-                    format!("Cannot update account {}", account.account_name).into(),
-                ),
-            ));
-        }
-
-        self.update_inner_use_case
-            .execute_inner(account, &original_account)
-            .await
     }
 }
 

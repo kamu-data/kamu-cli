@@ -49,10 +49,10 @@ impl AccountMut {
             Ok(_) => Ok(RenameAccountResult::Success(RenameAccountSuccess {
                 new_name: account_to_update.account_name.to_string(),
             })),
-            Err(UpdateAccountUseCaseError::Duplicate(_)) => Ok(RenameAccountResult::NonUniqueName(
+            Err(UpdateAccountError::Duplicate(_)) => Ok(RenameAccountResult::NonUniqueName(
                 RenameAccountNameNotUnique::default(),
             )),
-            Err(UpdateAccountUseCaseError::Access(access_error)) => Err(access_error.into()),
+            Err(UpdateAccountError::Access(access_error)) => Err(access_error.into()),
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -74,10 +74,10 @@ impl AccountMut {
             Ok(_) => Ok(UpdateEmailResult::Success(UpdateEmailSuccess {
                 new_email: account_to_update.email.as_ref().to_string(),
             })),
-            Err(UpdateAccountUseCaseError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
+            Err(UpdateAccountError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
                 UpdateEmailNonUnique::default(),
             )),
-            Err(UpdateAccountUseCaseError::Access(_)) => {
+            Err(UpdateAccountError::Access(_)) => {
                 Err(GqlError::gql_extended("Account access error", |eev| {
                     eev.set("account_name", self.account.account_name.to_string());
                 }))

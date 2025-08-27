@@ -18,9 +18,9 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     AccountService,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-    PredefinedAccountFields,
     PredefinedAccountsConfig,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -29,7 +29,7 @@ use kamu_accounts_services::{
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
-    UpdateInnerAccountUseCaseImpl,
+    UpdateAccountUseCaseImpl,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
@@ -86,10 +86,10 @@ async fn test_create_account() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                Some(&creator_account),
+            .execute_derived(
+                &creator_account,
                 &new_account_name_with_email,
-                PredefinedAccountFields::builder().email(new_account_email.clone()).build())
+                CreateAccountUseCaseOptions::builder().email(new_account_email.clone()).build())
             .await,
         Ok(account)
             if account.email == new_account_email
@@ -100,10 +100,10 @@ async fn test_create_account() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                Some(&creator_account),
+            .execute_derived(
+                &creator_account,
                 &new_account_name_without_email,
-                PredefinedAccountFields::default()
+                CreateAccountUseCaseOptions::default()
             )
             .await,
         Ok(account)
@@ -189,7 +189,7 @@ impl CreateAccountUseCaseImplHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<LoginPasswordAuthProvider>()
             .add::<RebacServiceImpl>()
-            .add::<UpdateInnerAccountUseCaseImpl>()
+            .add::<UpdateAccountUseCaseImpl>()
             .add::<InMemoryRebacRepository>()
             .add_value(DidSecretEncryptionConfig::sample())
             .add::<InMemoryDidSecretKeyRepository>()

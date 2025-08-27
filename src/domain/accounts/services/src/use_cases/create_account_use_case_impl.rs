@@ -20,6 +20,7 @@ use kamu_accounts::{
     AccountType,
     CreateAccountError,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     CreateMultiWalletAccountsError,
     DidEntity,
     DidSecretEncryptionConfig,
@@ -27,7 +28,6 @@ use kamu_accounts::{
     DidSecretKeyRepository,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     Password,
-    PredefinedAccountFields,
 };
 use odf::metadata::DidPkh;
 use secrecy::{ExposeSecret, SecretString};
@@ -67,15 +67,9 @@ impl CreateAccountUseCaseImpl {
     }
 
     fn generate_email(
-        creator_account: Option<&Account>,
+        creator_account: &Account,
         account_name: &odf::AccountName,
     ) -> Result<Email, InternalError> {
-        assert!(
-            creator_account.is_some(),
-            "Cannot generate email without creator account"
-        );
-
-        let creator_account = creator_account.unwrap();
         let parent_host = creator_account.email.host();
         let email_str = format!(
             "{}+{}@{}",
@@ -95,6 +89,22 @@ impl CreateAccountUseCaseImpl {
         );
 
         Password::try_new(random_password).int_err()
+    }
+
+    async fn save_account(
+        &self,
+        account: &Account,
+        password: &Password,
+    ) -> Result<(), CreateAccountError> {
+        self.account_service.save_account(account).await?;
+
+        if account.provider == AccountProvider::Password.to_string() {
+            self.account_service
+                .save_account_password(account, password)
+                .await?;
+        }
+
+        Ok(())
     }
 
     async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
@@ -119,28 +129,33 @@ impl CreateAccountUseCaseImpl {
 impl CreateAccountUseCase for CreateAccountUseCaseImpl {
     async fn execute(
         &self,
-        creator_account: Option<&Account>,
-        account_name: &odf::AccountName,
-        predefined_fields: PredefinedAccountFields,
+        account: &Account,
+        password: &Password,
     ) -> Result<Account, CreateAccountError> {
-        let email = if let Some(email) = predefined_fields.email {
+        self.save_account(account, password).await?;
+
+        Ok(account.clone())
+    }
+
+    async fn execute_derived(
+        &self,
+        creator_account: &Account,
+        account_name: &odf::AccountName,
+        options: CreateAccountUseCaseOptions,
+    ) -> Result<Account, CreateAccountError> {
+        let email = if let Some(email) = options.email {
             email
         } else {
             Self::generate_email(creator_account, account_name)?
         };
 
-        let password = if let Some(password) = predefined_fields.password {
+        let password = if let Some(password) = options.password {
             password
         } else {
             Self::generate_password()?
         };
 
-        let (account_id, account_key) = if let Some(predefined_id) = predefined_fields.id {
-            (predefined_id, None)
-        } else {
-            let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
-            (account_id, Some(account_key))
-        };
+        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
 
         let account = Account {
             id: account_id,
@@ -148,25 +163,15 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             email,
             display_name: account_name.to_string(),
             account_type: AccountType::User,
-            avatar_url: predefined_fields.avatar_url,
+            avatar_url: None,
             registered_at: self.time_source.now(),
             provider: AccountProvider::Password.to_string(),
             provider_identity_key: String::from(account_name.as_str()),
         };
 
-        // 1. Save an account
-        self.account_service.save_account(&account).await?;
+        self.save_account(&account, &password).await?;
 
-        if account.provider == AccountProvider::Password.to_string() {
-            // 2. Save a password
-            self.account_service
-                .save_account_password(&account, &password)
-                .await?;
-        }
-
-        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key
-            && let Some(account_key) = account_key
-        {
+        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
             use odf::metadata::AsStackString;
 
             let account_id = account.id.as_stack_string();
@@ -185,11 +190,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
                 .int_err()?;
         }
 
-        // Notify about account creation only if account was created by another account
-        // otherwise created account via predefined registration will skip notification
-        if creator_account.is_some() {
-            self.notify_account_created(&account).await?;
-        }
+        self.notify_account_created(&account).await?;
 
         Ok(account)
     }

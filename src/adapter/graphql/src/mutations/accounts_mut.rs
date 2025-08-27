@@ -13,8 +13,8 @@ use kamu_accounts::{
     AccountServiceExt,
     CreateAccountError,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     CurrentAccountSubject,
-    PredefinedAccountFields,
 };
 
 use crate::mutations::AccountMut;
@@ -81,10 +81,10 @@ impl AccountsMut {
             .int_err()?;
 
         match create_account_use_case
-            .execute(
-                Some(&logged_account),
+            .execute_derived(
+                &logged_account,
                 account_name.as_ref(),
-                PredefinedAccountFields::builder()
+                CreateAccountUseCaseOptions::builder()
                     .maybe_email(email.map(Into::into))
                     .build(),
             )

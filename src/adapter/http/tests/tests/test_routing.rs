@@ -22,7 +22,7 @@ use kamu_accounts_services::{
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
-    UpdateInnerAccountUseCaseImpl,
+    UpdateAccountUseCaseImpl,
 };
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -89,7 +89,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<InMemoryDatasetEntryRepository>()
         .add::<InMemoryDatasetKeyBlockRepository>()
         .add::<AccountServiceImpl>()
-        .add::<UpdateInnerAccountUseCaseImpl>()
+        .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()
         .add::<InMemoryAccountRepository>()
         .add::<PredefinedAccountsRegistrator>()

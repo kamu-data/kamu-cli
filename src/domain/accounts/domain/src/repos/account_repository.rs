@@ -248,6 +248,13 @@ pub enum FindAccountIdByNameError {
 #[derive(Debug, Error)]
 pub enum UpdateAccountError {
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
     NotFound(AccountNotFoundByIdError),
 
     #[error(transparent)]

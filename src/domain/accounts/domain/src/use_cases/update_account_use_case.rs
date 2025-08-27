@@ -7,47 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-use thiserror::Error;
-
-use crate::{Account, AccountErrorDuplicate, AccountNotFoundByIdError, UpdateAccountError};
+use crate::{Account, UpdateAccountError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait UpdateAccountUseCase: Send + Sync {
-    async fn execute(&self, account: &Account) -> Result<(), UpdateAccountUseCaseError>;
+    async fn execute(&self, account: &Account) -> Result<(), UpdateAccountError>;
+
+    async fn execute_internal(
+        &self,
+        account: &Account,
+        original_account: &Account,
+    ) -> Result<(), UpdateAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum UpdateAccountUseCaseError {
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
-
-    #[error(transparent)]
-    NotFound(AccountNotFoundByIdError),
-
-    #[error(transparent)]
-    Duplicate(AccountErrorDuplicate),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<UpdateAccountError> for UpdateAccountUseCaseError {
-    fn from(err: UpdateAccountError) -> Self {
-        match err {
-            UpdateAccountError::NotFound(e) => UpdateAccountUseCaseError::NotFound(e),
-            UpdateAccountError::Duplicate(e) => UpdateAccountUseCaseError::Duplicate(e),
-            UpdateAccountError::Internal(e) => UpdateAccountUseCaseError::Internal(e),
-        }
-    }
-}
