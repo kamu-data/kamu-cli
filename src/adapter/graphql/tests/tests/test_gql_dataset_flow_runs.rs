@@ -155,7 +155,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -229,7 +230,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -304,7 +306,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -396,7 +399,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -555,7 +559,8 @@ async fn test_trigger_reset_root_dataset_flow() {
                                                 "newHeadHash": &root_dataset_blocks[1].0,
                                             },
                                             "oldHeadHash": &root_dataset_blocks[0].0,
-                                        }
+                                        },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -778,7 +783,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -884,7 +890,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1004,7 +1011,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1073,7 +1081,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1141,7 +1150,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1232,7 +1242,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1346,7 +1357,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1415,7 +1427,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1483,7 +1496,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1574,7 +1588,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3301,6 +3316,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "maxSliceRecords": 10000,
                                             "maxSliceSize": 1_000_000,
                                         },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3440,7 +3456,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3602,6 +3619,7 @@ async fn test_config_snapshot_returned_correctly() {
                                             "maxSliceRecords": 10000,
                                             "maxSliceSize": 1_000_000,
                                         },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3808,7 +3826,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "configSnapshot": {
                                             "fetchUncacheable": false,
                                             "__typename": "FlowConfigRuleIngest",
-                                        }
+                                        },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3900,7 +3919,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "configSnapshot": {
                                             "fetchUncacheable": false,
                                             "__typename": "FlowConfigRuleIngest",
-                                        }
+                                        },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -4092,6 +4112,127 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                             "nextAttemptAt": null
                                         }
                                     ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_trigger_flow_automatically_via_schedule() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
+                updated_watermark: None,
+            },
+        )),
+    })
+    .await;
+
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::set_daily_ingest_schedule_trigger(&create_result.dataset_handle.id);
+
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "SetFlowTriggerSuccess",
+                                "message": "Success",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+
+    println!("{:?}", response.data);
+
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "ingestResult": null,
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
+                                        },
+                                        "status": "WAITING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": schedule_time.to_rfc3339(),
+                                            "awaitingExecutorSince": null,
+                                            "runningSince": null,
+                                            "lastAttemptFinishedAt": null,
+                                        },
+                                        "taskIds": [],
+                                        "initiator": null,
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseAutoPolling",
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": null,
+                                        "relatedTrigger": {
+                                            "paused": false,
+                                            "schedule": {
+                                                "__typename": "TimeDelta"
+                                            }
+                                        },
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
                                 }
                             }
                         }
@@ -4562,6 +4703,12 @@ impl FlowRunsHarness {
                                                 maxSliceSize
                                             }
                                         }
+                                        relatedTrigger {
+                                            paused
+                                            schedule {
+                                                __typename
+                                            }
+                                        }
                                     }
                                     pageInfo {
                                         hasPreviousPage
@@ -5000,6 +5147,38 @@ impl FlowRunsHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<flow_id>", flow_id)
+    }
+
+    fn set_daily_ingest_schedule_trigger(id: &odf::DatasetID) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            triggers {
+                                setTrigger(
+                                    datasetFlowType: "INGEST",
+                                    triggerRuleInput: {
+                                        schedule: {
+                                            timeDelta: { every: 1, unit: "DAYS" }
+                                        }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
     }
 
     fn set_ingest_config_with_retries(
