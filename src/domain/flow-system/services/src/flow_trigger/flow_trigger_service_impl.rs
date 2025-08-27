@@ -299,51 +299,67 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
-    async fn evaluate_stop_policy(
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_binding, %unrecoverable))]
+    async fn evaluate_trigger_on_failure(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
+        unrecoverable: bool,
     ) -> Result<(), InternalError> {
-        // Find an active trigger end evaluate it's stop policy
+        // Find an active trigger
         let maybe_active_trigger =
             FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
                 .await
                 .int_err()?;
+
         if let Some(active_trigger) = maybe_active_trigger {
-            match active_trigger.stop_policy {
-                FlowTriggerStopPolicy::AfterConsecutiveFailures { failures_count } => {
-                    // Determine actual number of consecutive failures.
-                    // Note, if policy is set to 1, we can skip the query,
-                    // we know the flow has just failed.
-                    let failures_count_value = failures_count.into();
-                    let actual_failures_count = if failures_count_value > 1 {
-                        self.flow_event_store
-                            .get_current_consecutive_flow_failures_count(flow_binding)
-                            .await?
-                    } else {
-                        1 /* this one */
-                    };
-                    if actual_failures_count >= failures_count_value {
-                        tracing::warn!(
-                            flow_binding = ?flow_binding,
-                            %actual_failures_count,
-                            "Auto-stopping flow trigger after crossing consecutive failures threshold",
-                        );
-                        self.stop_given_trigger(request_time, active_trigger)
-                            .await
-                            .int_err()?;
-                    } else {
-                        tracing::info!(
-                            flow_binding = ?flow_binding,
-                            %actual_failures_count,
-                            %failures_count_value,
-                            "Flow has consecutive failures, but auto-stop threshold is not crossed yet",
-                        );
+            // We got the trigger.
+            // The failure is either:
+            //  - unrecoverable => no sense to continue attempts until user fixes the issue
+            //  - recoverable   => evaluate stop policy
+            if unrecoverable {
+                tracing::warn!(
+                    flow_binding = ?flow_binding,
+                    "Auto-stopping flow trigger after unrecoverable failure",
+                );
+                self.stop_given_trigger(request_time, active_trigger)
+                    .await
+                    .int_err()?;
+            } else {
+                match active_trigger.stop_policy {
+                    FlowTriggerStopPolicy::AfterConsecutiveFailures { failures_count } => {
+                        // Determine actual number of consecutive failures.
+                        // Note, if policy is set to 1, we can skip the query,
+                        // we know the flow has just failed.
+                        let failures_count_value = failures_count.into();
+                        let actual_failures_count = if failures_count_value > 1 {
+                            self.flow_event_store
+                                .get_current_consecutive_flow_failures_count(flow_binding)
+                                .await?
+                        } else {
+                            1 /* this one */
+                        };
+                        if actual_failures_count >= failures_count_value {
+                            tracing::warn!(
+                                flow_binding = ?flow_binding,
+                                %actual_failures_count,
+                                "Auto-stopping flow trigger after crossing consecutive failures threshold",
+                            );
+                            self.stop_given_trigger(request_time, active_trigger)
+                                .await
+                                .int_err()?;
+                        } else {
+                            tracing::info!(
+                                flow_binding = ?flow_binding,
+                                %actual_failures_count,
+                                %failures_count_value,
+                                "Flow has consecutive failures, but auto-stop threshold is not crossed yet",
+                            );
+                        }
                     }
-                }
-                FlowTriggerStopPolicy::Never => {
-                    // Do nothing
+                    FlowTriggerStopPolicy::Never => {
+                        // Do nothing
+                    }
                 }
             }
         }

@@ -3765,7 +3765,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             flow_task_id,
             flow_task_metadata.clone(),
             complete_time_0,
-            ts::TaskOutcome::Failed(TaskError::empty()),
+            ts::TaskOutcome::Failed(TaskError::empty_recoverable()),
         )
         .await;
 
@@ -3859,7 +3859,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             flow_task_id,
             flow_task_metadata.clone(),
             complete_time_1,
-            ts::TaskOutcome::Failed(TaskError::empty()),
+            ts::TaskOutcome::Failed(TaskError::empty_recoverable()),
         )
         .await;
 

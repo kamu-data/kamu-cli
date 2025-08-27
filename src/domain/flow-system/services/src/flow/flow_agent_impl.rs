@@ -542,17 +542,29 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // If the flow is still retrying, await for the result of the next task
                         if let Some(flow_outcome) = flow.outcome.as_ref() {
                             // Handle flow failure if it reached a terminal state
-                            if message.outcome.is_failed() {
-                                tracing::warn!(
-                                    flow_id = %flow.flow_id,
-                                    "Flow has reached a failed state after exhausting all retries"
-                                );
+                            if message.outcome.is_failure() {
+                                let recoverable = message.outcome.is_recoverable_failure();
+                                if recoverable {
+                                    tracing::warn!(
+                                        flow_id = %flow.flow_id,
+                                        "Flow has reached a failed state after exhausting all retries"
+                                    );
+                                } else {
+                                    tracing::warn!(
+                                        flow_id = %flow.flow_id,
+                                        "Flow has reached a failed state after unrecoverable failure"
+                                    );
+                                }
 
-                                // Trigger should make a decision about auto-pausing
+                                // Trigger should make a decision about auto-stopping
                                 let flow_trigger_service =
                                     target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
                                 flow_trigger_service
-                                    .evaluate_stop_policy(finish_time, &flow.flow_binding)
+                                    .evaluate_trigger_on_failure(
+                                        finish_time,
+                                        &flow.flow_binding,
+                                        !recoverable,
+                                    )
                                     .await?;
                             }
 

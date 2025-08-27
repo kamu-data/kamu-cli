@@ -2691,7 +2691,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                   dataset_id: bar_id.clone(),
                   fetch_uncacheable: false
@@ -7399,7 +7399,7 @@ async fn test_disable_trigger_on_flow_fail_default() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -7530,7 +7530,7 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -7544,7 +7544,7 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(130),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -7558,7 +7558,7 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(170),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -7728,7 +7728,7 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -7742,7 +7742,7 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(130),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -7756,7 +7756,7 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(170),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -7867,6 +7867,139 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
     let foo_binding = ingest_dataset_binding(&foo_id);
     let trigger_status = harness.get_flow_trigger_status(&foo_binding).await;
     assert_eq!(trigger_status, Some(FlowTriggerStatus::Active));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_disable_trigger_on_flow_fail_ignores_stop_policy_for_unrecoverable_error() {
+    let harness = FlowHarness::new();
+
+    // Create a "foo" root dataset, and configure ingestion schedule every 60ms
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    harness
+        .set_dataset_flow_ingest(
+            ingest_dataset_binding(&foo_id),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+            },
+            None, // No retry policy
+        )
+        .await;
+
+    let trigger_rule = FlowTriggerRule::Schedule(Duration::milliseconds(60).into());
+
+    // Consecutive 3 failures as a policy
+    harness
+        .set_flow_trigger(
+            harness.now_datetime(),
+            ingest_dataset_binding(&foo_id),
+            trigger_rule.clone(),
+            FlowTriggerStopPolicy::AfterConsecutiveFailures {
+                failures_count: ConsecutiveFailuresCount::try_new(3).unwrap(),
+            },
+        )
+        .await;
+    harness.eager_initialization().await;
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_agent.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                // Task 0: start running at 10ms, finish at 20ms
+                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::milliseconds(10),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
+                });
+                let foo_task0_handle = foo_task0_driver.run();
+
+                // Task 1: start running at 90ms, finish at 100ms
+                let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(1),
+                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::milliseconds(90),
+                    // Important: unrecoverable error in the result
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_unrecoverable()))),
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
+                });
+                let foo_task1_handle = foo_task1_driver.run();
+
+                let sim_handle = harness.advance_time(Duration::milliseconds(300));
+                tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=80ms)
+                Flow ID = 0 Finished Success
+
+            #4: +80ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=80ms)
+                Flow ID = 0 Finished Success
+
+            #5: +90ms:
+              "foo" Ingest:
+                Flow ID = 1 Running(task=1)
+                Flow ID = 0 Finished Success
+
+            #6: +100ms:
+              "foo" Ingest:
+                Flow ID = 1 Finished Failed
+                Flow ID = 0 Finished Success
+
+            "#
+        )
+    );
+
+    // The trigger should be paused after 1st failure (as error is unrecoverable)
+    let foo_binding = ingest_dataset_binding(&foo_id);
+    let trigger_status = harness.get_flow_trigger_status(&foo_binding).await;
+    assert_eq!(
+        trigger_status,
+        Some(FlowTriggerStatus::StoppedAutomatically)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -8343,7 +8476,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(30),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -8357,7 +8490,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                   dataset_id: Some(foo_id.clone()),
                   run_since_start: Duration::milliseconds(1040),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                   expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -8491,7 +8624,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(30),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
                       fetch_uncacheable: false
@@ -8505,7 +8638,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                   dataset_id: Some(foo_id.clone()),
                   run_since_start: Duration::milliseconds(1040),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                   expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -8519,7 +8652,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                   dataset_id: Some(foo_id.clone()),
                   run_since_start: Duration::milliseconds(2050),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                   expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -8575,6 +8708,103 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
                 Flow ID = 0 Running(task=0,1,2)
 
             #9: +2060ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Failed
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_manual_ingest_with_retry_policy_ignored_on_unrecoverable_error() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+            },
+            Some(RetryPolicy {
+                max_attempts: 2,
+                min_delay_seconds: 1,
+                backoff_type: RetryBackoffType::Fixed,
+            }),
+        )
+        .await;
+
+    harness.eager_initialization().await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_agent.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                // Manual trigger for "foo" at 20ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                    flow_binding: foo_flow_binding,
+                    run_since_start: Duration::milliseconds(20),
+                    initiator_id: None,
+                    maybe_forced_flow_config_rule: None,
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Task 0: "foo" start running at 30ms, fail at 40ms
+                let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::milliseconds(30),
+                    // IMPORTANT: unrecoverable error in the results
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_unrecoverable()))),
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
+                });
+                let task0_handle = task0_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    harness.advance_time(Duration::milliseconds(200)).await;
+                };
+
+                tokio::join!(task0_handle, trigger0_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #2: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +40ms:
               "foo" Ingest:
                 Flow ID = 0 Finished Failed
 

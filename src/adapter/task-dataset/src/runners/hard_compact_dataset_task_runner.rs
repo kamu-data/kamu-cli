@@ -78,7 +78,7 @@ impl HardCompactDatasetTaskRunner {
                     "Hard compaction failed",
                 );
 
-                Ok(TaskOutcome::Failed(TaskError::empty()))
+                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
             }
         }
     }

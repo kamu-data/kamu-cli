@@ -73,10 +73,11 @@ pub trait FlowTriggerService: Sync + Send {
     ) -> Result<bool, InternalError>;
 
     /// Evaluates trigger stop policy after a failure
-    async fn evaluate_stop_policy(
+    async fn evaluate_trigger_on_failure(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
+        unrecoverable: bool,
     ) -> Result<(), InternalError>;
 }
 

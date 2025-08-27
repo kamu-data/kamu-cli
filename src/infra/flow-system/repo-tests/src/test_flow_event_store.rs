@@ -1283,7 +1283,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Now finish the flow with failure
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     // Stats got updated: success stayed as previously, attempt refreshed
@@ -1396,7 +1396,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Now finish the flow with failure
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     // Stats got updated: success stayed as previously, attempt refreshed
@@ -1565,7 +1565,10 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     // Compact finishes with failure
     flow_generator
-        .finish_running_flow(flow_id_compact, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(
+            flow_id_compact,
+            TaskOutcome::Failed(TaskError::empty_recoverable()),
+        )
         .await;
 
     let res = flow_event_store
@@ -2443,7 +2446,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
         // Simulate a failure
         let flow = flow_generator
-            .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+            .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
             .await;
 
         // Check flow status and timing properties
@@ -2545,7 +2548,7 @@ pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
         )
         .await;
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     assert_eq!(
@@ -2567,7 +2570,7 @@ pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
         )
         .await;
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     assert_eq!(
@@ -2609,7 +2612,7 @@ pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
         )
         .await;
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     assert_eq!(
@@ -2650,7 +2653,7 @@ pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
         )
         .await;
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     assert_eq!(

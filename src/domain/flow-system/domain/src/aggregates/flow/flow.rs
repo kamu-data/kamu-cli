@@ -149,7 +149,7 @@ impl Flow {
         task_outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<FlowState>> {
         // Compute if there will be a next attempt and when
-        let next_attempt_at = if task_outcome.is_failed()
+        let next_attempt_at = if task_outcome.is_recoverable_failure()
             && let Some(retry_policy) = &self.retry_policy
         {
             retry_policy.next_attempt_at(u32::try_from(self.task_ids.len()).unwrap(), now)

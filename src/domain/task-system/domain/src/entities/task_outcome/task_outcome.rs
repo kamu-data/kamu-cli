@@ -30,8 +30,12 @@ impl TaskOutcome {
         matches!(self, Self::Success(_))
     }
 
-    pub fn is_failed(&self) -> bool {
+    pub fn is_failure(&self) -> bool {
         matches!(self, Self::Failed(_))
+    }
+
+    pub fn is_recoverable_failure(&self) -> bool {
+        matches!(self, Self::Failed(e) if e.recoverable)
     }
 }
 
