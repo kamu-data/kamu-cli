@@ -137,12 +137,12 @@ pub enum CompressionFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO
+/// Represents a named field (column) in a root or nested struct schema
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datafield-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DataField {
-    /// TODO
+    /// Name of the field
     pub name: String,
     /// Logical type of the field that defines its semantic behavior and value
     /// ranges
@@ -153,7 +153,7 @@ pub struct DataField {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// This schema is aims to be a human-friendly variant of Arrow. Arrow currently specifies only the [flatbuffer format](https://github.com/apache/arrow/blob/f9301c0ba8a7ed1b0b63275cfdd4c44c26b04675/format/Schema.fbs) which has many legacy to it and is not suited to be defined by humans, so we had to define our own schema format. While inspired by Arrow - this format makes a clear separation between logical data types and encoding (physical layout) of data in the chunks.
+/// This schema aims to be a human-friendly variant of Arrow. Arrow currently specifies only the [flatbuffer format](https://github.com/apache/arrow/blob/f9301c0ba8a7ed1b0b63275cfdd4c44c26b04675/format/Schema.fbs) which has many legacy to it and is not suited to be defined by humans, so we had to define our own schema format. While inspired by Arrow - this format makes a clear separation between logical data types and encoding (physical layout) of data in the chunks.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataschema-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1607,7 +1607,7 @@ pub struct TemporalTable {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO
+/// Defines the unit of measurement of time
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#timeunit-schema
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

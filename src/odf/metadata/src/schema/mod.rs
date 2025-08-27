@@ -7,7 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub use super::dtos::{DataField, DataSchema, DataType, ExtraAttributes, TimeUnit};
+pub use super::dtos::{
+    DataField,
+    DataSchema,
+    DataType,
+    DataTypeBinary,
+    DataTypeBool,
+    DataTypeDate,
+    DataTypeDecimal,
+    DataTypeDuration,
+    DataTypeFloat16,
+    DataTypeFloat32,
+    DataTypeFloat64,
+    DataTypeInt16,
+    DataTypeInt32,
+    DataTypeInt64,
+    DataTypeInt8,
+    DataTypeList,
+    DataTypeMap,
+    DataTypeNull,
+    DataTypeOption,
+    DataTypeString,
+    DataTypeStruct,
+    DataTypeTime,
+    DataTypeTimestamp,
+    DataTypeUInt16,
+    DataTypeUInt32,
+    DataTypeUInt64,
+    DataTypeUInt8,
+    ExtraAttributes,
+    TimeUnit,
+};
 
 mod arrow_conversions;
 mod arrow_encoding;
