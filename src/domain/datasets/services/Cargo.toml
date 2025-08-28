@@ -52,7 +52,7 @@ datafusion = { version = "49", default-features = false }
 dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false }
 nutype = { version = "0.6", default-features = false }
-petgraph = { version = "0.7", default-features = false, features = [
+petgraph = { version = "0.8", default-features = false, features = [
     "stable_graph",
 ] }
 secrecy = "0.10"

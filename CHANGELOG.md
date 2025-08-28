@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.247.0] - 2025-08-28
 ## Added
 - Extended support for webhook delivery errors, differentiating between:
     - connection failure

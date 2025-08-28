@@ -81,7 +81,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 serde = "1"
 serde_json = "1"
 serde_with = { version = "3", default-features = false }
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 tar = "0.4"
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [] }
@@ -91,7 +91,7 @@ tokio-util = { version = "0.7", default-features = false, features = [
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.26", features = ["url"] }
+tokio-tungstenite = { version = "0.27", features = ["url"] }
 tower = "0.5"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }

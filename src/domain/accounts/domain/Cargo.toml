@@ -41,7 +41,7 @@ async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }
 bon = { version = "3", default-features = false }
 chrono = { version = "0.4", default-features = false }
-crc32fast = { version = "1.4.2" }
+crc32fast = { version = "1.5" }
 futures = { version = "0.3", default-features = false }
 jsonwebtoken = "9"
 merge = "0.1"
@@ -52,7 +52,7 @@ reusable = "0.1"
 secrecy = "0.10"
 serde = "1"
 serde_with = { version = "3", default-features = false }
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 uuid = { version = "1", default-features = false, features = ["v4"] }
 

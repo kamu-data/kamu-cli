@@ -28,7 +28,7 @@ internal-error = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 bon = { version = "3", default-features = false }
 dill = { version = "0.14", default-features = false }
-petgraph = { version = "0.7", default-features = false, features = [
+petgraph = { version = "0.8", default-features = false, features = [
     "stable_graph",
 ] }
 thiserror = { version = "2", default-features = false, features = ["std"] }

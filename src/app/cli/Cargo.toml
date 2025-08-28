@@ -140,15 +140,15 @@ rumqttc = { optional = true, version = "0.24", default-features = false, feature
 sqlx = { version = "0.8", default-features = false, features = [
     "tls-rustls-aws-lc-rs",
 ] }
-tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.27", features = ["rustls-tls-webpki-roots"] }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
 clap = "4"
 clap_complete = "4"
-console = "0.15"                                                  # Terminal colors
+console = "0.16"                                                  # Terminal colors
 humansize = "2"                                                   # Human readable data sizes
-indicatif = "0.17"                                                # Progress bars and spinners
+indicatif = "0.18"                                                # Progress bars and spinners
 minus = { version = "5", features = ["static_output", "search"] }
 num-format = "0.4"                                                # Human-readable number formatting
 prettytable-rs = "0.10"                                           # ASCII table formatting
@@ -184,7 +184,7 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # Tracing / logging / telemetry / metrics
-prometheus = { version = "0.13", default-features = false }
+prometheus = { version = "0.14", default-features = false }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-perfetto = { workspace = true }
@@ -221,8 +221,8 @@ tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
-whoami = "1.5"
-strum = { version = "0.26", features = ["derive"] }
+whoami = "1.6"
+strum = { version = "0.27", features = ["derive"] }
 
 
 [target.'cfg(unix)'.dependencies]

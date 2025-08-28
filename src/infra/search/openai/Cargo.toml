@@ -25,7 +25,7 @@ doctest = false
 kamu-search = { workspace = true }
 internal-error = { workspace = true }
 
-async-openai = { version = "0.28", default-features = false }
+async-openai = { version = "0.29", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.14", default-features = false }
 tracing = { version = "0.1", default-features = false }

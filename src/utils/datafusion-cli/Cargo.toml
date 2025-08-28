@@ -50,7 +50,7 @@ log = "0.4"
 object_store = { version = "0.12", features = ["aws", "gcp", "http"] }
 parking_lot = { version = "0.12" }
 parquet = { version = "55", default-features = false }
-rustyline = "15.0"
+rustyline = "17"
 tokio = { version = "1", features = [
     "macros",
     "rt",

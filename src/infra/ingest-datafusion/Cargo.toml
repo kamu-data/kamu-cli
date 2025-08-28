@@ -35,9 +35,9 @@ geojson = { version = "0.24", default-features = false, features = [
 glob = "0.3"
 serde = { version = "1" }
 serde_json = "1"
-shapefile = { version = "0.6", features = ["geo-types"] }
+shapefile = { version = "0.7", features = ["geo-types"] }
 walkdir = "2"
-zip = { version = "2", default-features = false, features = [
+zip = { version = "3", default-features = false, features = [
     "deflate",
     "bzip2",
     "zstd",
@@ -58,7 +58,7 @@ tracing = "0.1"
 [dev-dependencies]
 odf = { workspace = true, features = ["testing"] }
 
-criterion = { version = "0.5", features = ["async_tokio"] }
+criterion = { version = "0.7", features = ["async_tokio"] }
 indoc = "2"
 pretty_assertions = "1"
 rand = "0.8"
