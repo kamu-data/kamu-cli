@@ -492,3 +492,25 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

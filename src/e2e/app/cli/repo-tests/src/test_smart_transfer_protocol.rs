@@ -132,6 +132,25 @@ pub async fn test_smart_push_trigger_dependent_dataset_update_mt(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql_st(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql(
+        kamu_api_server_client,
+        false,
+    )
+    .await;
+}
+
+pub async fn test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql_mt(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql(kamu_api_server_client, true)
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2045,3 +2064,128 @@ async fn test_smart_push_smart_pull_force_overwrite_seed_block(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_push_workspace_multi_tenant: bool,
+) {
+    let dataset_alias = odf::DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
+    );
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_odf_endpoint(&dataset_alias);
+
+    // 1. Grub a token
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    {
+        let kamu_in_push_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
+
+        // 2.1. Add datasets
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        kamu_in_push_workspace
+            .execute_with_input(
+                ["add", "--stdin"],
+                DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+            )
+            .await
+            .success();
+
+        // 2.2. Login to the API server
+        kamu_in_push_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        //2.2 Push derived dataset
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
+                ],
+                None,
+                Some([r#"1 dataset\(s\) pushed"#]),
+            )
+            .await;
+
+        //2.3 Get dataset with set transform inputs
+        kamu_api_server_client
+            .graphql_api_call_assert(
+                indoc::indoc!(
+                    r#"
+                query {
+                    datasets {
+                        byOwnerAndName (accountName: $accountName, datasetName: $datasetName) {
+                            metadata {
+                                currentTransform {
+                                    inputs {
+                                        alias
+                                        inputDataset {
+                                            message
+                                            ... on TransformInputDatasetAccessible {
+                                                message
+                                            }
+                                            ... on TransformInputDatasetNotAccessible {
+                                                message
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+                )
+                .replace(
+                    "$accountName",
+                    &format!("\"{}\"", dataset_alias.account_name.unwrap()),
+                )
+                .replace(
+                    "$datasetName",
+                    &format!("\"{}\"", dataset_alias.dataset_name),
+                )
+                .as_str(),
+                Ok(indoc::indoc!(
+                    r#"
+                {
+                  "datasets": {
+                    "byOwnerAndName": {
+                      "metadata": {
+                        "currentTransform": {
+                          "inputs": [
+                            {
+                              "alias": "player_scores",
+                              "inputDataset": {
+                                "message": "Not Accessible"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+                )),
+            )
+            .await;
+    }
+}
