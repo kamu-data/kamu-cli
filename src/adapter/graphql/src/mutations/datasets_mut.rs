@@ -259,11 +259,20 @@ impl DatasetsMut {
             Err(Err(err)) => return Err(err),
         };
 
-        let snapshot = crate::queries::VersionedFile::dataset_snapshot(
+        let snapshot = match crate::queries::VersionedFile::dataset_snapshot(
             dataset_alias.into(),
             extra_columns.unwrap_or_default(),
             extra_events_parsed,
-        );
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                return Ok(CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot {
+                        message: e.to_string(),
+                    },
+                ));
+            }
+        };
 
         self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
             .await
@@ -299,11 +308,20 @@ impl DatasetsMut {
             Err(Err(err)) => return Err(err),
         };
 
-        let snapshot = crate::queries::Collection::dataset_shapshot(
+        let snapshot = match crate::queries::Collection::dataset_snapshot(
             dataset_alias.into(),
             extra_columns.unwrap_or_default(),
             extra_events_parsed,
-        );
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                return Ok(CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot {
+                        message: e.to_string(),
+                    },
+                ));
+            }
+        };
 
         self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
             .await

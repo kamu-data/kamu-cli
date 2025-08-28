@@ -169,7 +169,7 @@ async fn test_check_remotes_status_remote_diverge() {
 
     let diverge_schema_block = MetadataFactory::metadata_block(
         MetadataFactory::set_data_schema()
-            .schema(&Schema::new(vec![Field::new(
+            .schema_from_arrow(&Schema::new(vec![Field::new(
                 "city",
                 DataType::Utf8,
                 false,

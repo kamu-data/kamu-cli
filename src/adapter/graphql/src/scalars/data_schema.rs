@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use odf::utils::schema::{convert, format};
 
 use crate::prelude::*;
@@ -17,89 +19,93 @@ use crate::prelude::*;
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataSchemaFormat {
+    ArrowJson,
+    OdfJson,
+    OdfYaml,
     Parquet,
     ParquetJson,
-    ArrowJson,
 }
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataSchema {
+    pub schema: Arc<odf::schema::DataSchema>,
     pub format: DataSchemaFormat,
-    pub content: String,
 }
 
 impl DataSchema {
-    pub fn empty(format: DataSchemaFormat) -> Self {
-        Self::from_arrow_schema(&datafusion::arrow::datatypes::Schema::empty(), format)
+    pub fn new(schema: Arc<odf::schema::DataSchema>, format: DataSchemaFormat) -> Self {
+        Self { schema, format }
     }
 
-    pub fn from_arrow_schema(
+    pub fn new_empty(format: DataSchemaFormat) -> Self {
+        Self {
+            schema: Arc::new(odf::schema::DataSchema::new_empty()),
+            format,
+        }
+    }
+
+    pub fn new_from_arrow_stripped(
         schema: &datafusion::arrow::datatypes::Schema,
         format: DataSchemaFormat,
-    ) -> Self {
-        match format {
-            DataSchemaFormat::ArrowJson => {
-                let mut buf = Vec::new();
-                format::write_schema_arrow_json(&mut buf, schema).unwrap();
-
-                DataSchema {
-                    format,
-                    content: String::from_utf8(buf).unwrap(),
-                }
-            }
-            DataSchemaFormat::Parquet | DataSchemaFormat::ParquetJson => {
-                let parquet_schema = convert::arrow_schema_to_parquet_schema(schema);
-                Self::from_parquet_schema(&parquet_schema, format)
-            }
-        }
-    }
-
-    pub fn from_parquet_schema(
-        schema: &datafusion::parquet::schema::types::Type,
-        format: DataSchemaFormat,
-    ) -> Self {
-        let mut buf = Vec::new();
-
-        match format {
-            DataSchemaFormat::Parquet => {
-                format::write_schema_parquet(&mut buf, schema).unwrap();
-            }
-            DataSchemaFormat::ParquetJson => {
-                format::write_schema_parquet_json(&mut buf, schema).unwrap();
-            }
-            _ => unreachable!(),
-        }
-        Self {
+    ) -> Result<Self> {
+        // NOTE: We strip encoding as we are only interested in logical types
+        let schema_odf = odf::schema::DataSchema::new_from_arrow(schema)
+            .int_err()?
+            .strip_encoding();
+        Ok(Self {
+            schema: Arc::new(schema_odf),
             format,
-            content: String::from_utf8(buf).unwrap(),
-        }
+        })
     }
 
-    pub fn from_data_frame_schema(
+    pub fn new_from_data_frame_schema_stripped(
         schema: &datafusion::common::DFSchema,
         format: DataSchemaFormat,
-    ) -> Result<DataSchema> {
-        let mut buf = Vec::new();
-        match format {
-            DataSchemaFormat::Parquet => format::write_schema_parquet(
-                &mut buf,
-                convert::dataframe_schema_to_parquet_schema(schema).as_ref(),
-            ),
-            DataSchemaFormat::ParquetJson => format::write_schema_parquet_json(
-                &mut buf,
-                convert::dataframe_schema_to_parquet_schema(schema).as_ref(),
-            ),
-            DataSchemaFormat::ArrowJson => {
-                let arrow_schema = datafusion::arrow::datatypes::Schema::from(schema);
-                format::write_schema_arrow_json(&mut buf, &arrow_schema)
+    ) -> Result<Self> {
+        Self::new_from_arrow_stripped(schema.inner(), format)
+    }
+
+    pub(crate) fn content_impl(&self) -> Result<String> {
+        match self.format {
+            DataSchemaFormat::ArrowJson => Ok(format::format_schema_arrow_json(
+                &self
+                    .schema
+                    .to_arrow(&odf::metadata::ToArrowSettings::default())
+                    .int_err()?,
+            )),
+            DataSchemaFormat::OdfJson => Ok(format::format_schema_odf_json(&self.schema)),
+            DataSchemaFormat::OdfYaml => Ok(format::format_schema_odf_yaml(&self.schema)),
+            DataSchemaFormat::Parquet => {
+                let parquet_schema = convert::arrow_schema_to_parquet_schema(
+                    &self
+                        .schema
+                        .to_arrow(&odf::metadata::ToArrowSettings::default())
+                        .int_err()?,
+                );
+                Ok(format::format_schema_parquet(&parquet_schema))
+            }
+            DataSchemaFormat::ParquetJson => {
+                let parquet_schema = convert::arrow_schema_to_parquet_schema(
+                    &self
+                        .schema
+                        .to_arrow(&odf::metadata::ToArrowSettings::default())
+                        .int_err()?,
+                );
+                Ok(format::format_schema_parquet_json(&parquet_schema))
             }
         }
-        .int_err()?;
+    }
+}
 
-        Ok(DataSchema {
-            format,
-            content: String::from_utf8(buf).unwrap(),
-        })
+#[Object]
+impl DataSchema {
+    pub async fn format(&self) -> DataSchemaFormat {
+        self.format
+    }
+
+    #[expect(clippy::unused_async)]
+    pub async fn content(&self) -> Result<String> {
+        self.content_impl()
     }
 }
 
@@ -144,9 +150,9 @@ mod test {
     async fn test_data_schema_parquet() {
         let df = get_test_df().await;
 
-        let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::Parquet);
-
-        let data_schema = result.unwrap();
+        let data_schema =
+            DataSchema::new_from_data_frame_schema_stripped(df.schema(), DataSchemaFormat::Parquet)
+                .unwrap();
 
         assert_eq!(data_schema.format, DataSchemaFormat::Parquet);
 
@@ -159,26 +165,28 @@ mod test {
             "#
         );
 
-        let actual_content = data_schema.content.as_str();
+        let actual_content = data_schema.content_impl().unwrap();
 
-        assert_eq!(actual_content, expected_content);
+        pretty_assertions::assert_eq!(actual_content, expected_content);
     }
 
     #[test_log::test(tokio::test)]
     async fn test_data_schema_parquet_json() {
         let df = get_test_df().await;
 
-        let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::ParquetJson);
-
-        let data_schema = result.unwrap();
+        let data_schema = DataSchema::new_from_data_frame_schema_stripped(
+            df.schema(),
+            DataSchemaFormat::ParquetJson,
+        )
+        .unwrap();
 
         assert_eq!(data_schema.format, DataSchemaFormat::ParquetJson);
 
-        let schema_content = data_schema.content;
+        let schema_content = data_schema.content_impl().unwrap();
 
         let data_schema_json = serde_json::from_str::<Value>(schema_content.as_str()).unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             data_schema_json,
             serde_json::json!({
                 "fields": [{
@@ -212,18 +220,19 @@ mod test {
         ctx.register_batch("t", batch).unwrap();
         let df = ctx.table("t").await.unwrap();
 
-        let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::ParquetJson);
-
-        let data_schema = result.unwrap();
+        let data_schema = DataSchema::new_from_data_frame_schema_stripped(
+            df.schema(),
+            DataSchemaFormat::ParquetJson,
+        )
+        .unwrap();
 
         assert_eq!(data_schema.format, DataSchemaFormat::ParquetJson);
 
-        let schema_content = data_schema.content;
+        let schema_content = data_schema.content_impl().unwrap();
 
         let data_schema_json = serde_json::from_str::<Value>(schema_content.as_str()).unwrap();
 
-        assert_eq!(
-            data_schema_json,
+        pretty_assertions::assert_eq!(
             serde_json::json!({
                 "fields": [{
                     "logicalType": "STRING",
@@ -233,7 +242,8 @@ mod test {
                 }],
                 "name": "arrow_schema",
                 "type": "struct"
-            })
+            }),
+            data_schema_json,
         );
     }
 
@@ -241,16 +251,18 @@ mod test {
     async fn test_data_schema_arrow_json() {
         let df = get_test_df().await;
 
-        let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::ArrowJson);
+        let data_schema = DataSchema::new_from_data_frame_schema_stripped(
+            df.schema(),
+            DataSchemaFormat::ArrowJson,
+        )
+        .unwrap();
 
-        let data_schema = result.unwrap();
-        let schema_content = data_schema.content;
+        let schema_content = data_schema.content_impl().unwrap();
 
         let data_schema_json =
             serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();
 
-        assert_eq!(
-            data_schema_json,
+        pretty_assertions::assert_eq!(
             serde_json::json!({
                 "fields": [{
                     "data_type": "Utf8",
@@ -268,8 +280,67 @@ mod test {
                     "nullable": false
                 }],
                 "metadata": {}
-            })
+            }),
+            data_schema_json,
         );
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_data_schema_odf_json() {
+        let df = get_test_df().await;
+
+        let data_schema =
+            DataSchema::new_from_data_frame_schema_stripped(df.schema(), DataSchemaFormat::OdfJson)
+                .unwrap();
+
+        let schema_content = data_schema.content_impl().unwrap();
+
+        let data_schema_json =
+            serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();
+
+        pretty_assertions::assert_eq!(
+            serde_json::json!({
+                "fields": [{
+                    "name": "a",
+                    "type": {
+                        "kind": "String",
+                    },
+                }, {
+                    "name": "b",
+                    "type": {
+                        "kind": "Int32",
+                    },
+                }]
+            }),
+            data_schema_json,
+        );
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_data_schema_odf_yaml() {
+        let df = get_test_df().await;
+
+        let data_schema =
+            DataSchema::new_from_data_frame_schema_stripped(df.schema(), DataSchemaFormat::OdfYaml)
+                .unwrap();
+
+        assert_eq!(data_schema.format, DataSchemaFormat::OdfYaml);
+
+        let expected_content = indoc::indoc!(
+            r#"
+            fields:
+            - name: a
+              type:
+                kind: String
+            - name: b
+              type:
+                kind: Int32
+            "#
+        );
+
+        let actual_content = data_schema.content_impl().unwrap();
+
+        pretty_assertions::assert_eq!(actual_content, expected_content);
     }
 
     async fn get_test_df() -> DataFrame {

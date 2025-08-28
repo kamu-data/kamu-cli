@@ -9,6 +9,7 @@
 
 use chrono::prelude::*;
 use digest::Digest;
+use opendatafabric_metadata::schema::ext::*;
 use opendatafabric_metadata::serde::flatbuffers::*;
 use opendatafabric_metadata::serde::*;
 use opendatafabric_metadata::*;
@@ -220,14 +221,64 @@ fn test_serializer_stability() {
 #[cfg(feature = "arrow")]
 #[test]
 fn serde_set_data_schema() {
+    use opendatafabric_metadata::ext::{AttrArchetype, AttrType, DataTypeExt};
+
+    let expected_schema = DataSchema::new(vec![
+        DataField::string("city").encoding(ArrowBufferEncoding::View {
+            offset_bit_width: Some(32),
+        }),
+        DataField::u64("population"),
+        DataField::string("census")
+            .optional()
+            .extra(&AttrType::new(DataTypeExt::object_link(
+                DataTypeExt::multihash(),
+            ))),
+        DataField::list("links", DataType::string()),
+    ])
+    .extra(&AttrArchetype::new(DatasetArchetype::Collection));
+
+    let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
+
+    let expected_block = wrap_into_block(event);
+
+    let buffer = FlatbuffersMetadataBlockSerializer
+        .write_manifest(&expected_block)
+        .unwrap();
+
+    let actual_block = FlatbuffersMetadataBlockDeserializer
+        .read_manifest(&buffer)
+        .unwrap();
+
+    assert_eq!(expected_block, actual_block);
+
+    let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+    let hash_expected = "33d0a65cfb9853f14830fc84e443767d9acfedd24d13c3c22bdc82f3be1b507f";
+
+    assert_eq!(hash_actual, hash_expected);
+
+    let actual_schema = actual_block
+        .event
+        .as_variant::<SetDataSchema>()
+        .unwrap()
+        .schema
+        .clone()
+        .unwrap();
+
+    assert_eq!(expected_schema, actual_schema);
+}
+
+#[cfg(feature = "arrow")]
+#[test]
+#[expect(deprecated)]
+fn serde_set_data_schema_legacy() {
     use arrow::datatypes::*;
 
-    let expected_schema = SchemaRef::new(Schema::new(vec![
+    let expected_schema = Schema::new(vec![
         Field::new("a", DataType::Int64, false),
         Field::new("b", DataType::Boolean, false),
-    ]));
+    ]);
 
-    let event: MetadataEvent = SetDataSchema::new(&expected_schema).into();
+    let event: MetadataEvent = SetDataSchema::new_legacy_raw_arrow(&expected_schema).into();
 
     let expected_block = wrap_into_block(event);
 
@@ -250,7 +301,7 @@ fn serde_set_data_schema() {
         .event
         .as_variant::<SetDataSchema>()
         .unwrap()
-        .schema_as_arrow()
+        .schema_as_arrow(&ToArrowSettings::default())
         .unwrap();
 
     assert_eq!(expected_schema, actual_schema);

@@ -847,9 +847,11 @@ type DataSchema {
 }
 
 enum DataSchemaFormat {
+	ARROW_JSON
+	ODF_JSON
+	ODF_YAML
 	PARQUET
 	PARQUET_JSON
-	ARROW_JSON
 }
 
 """
@@ -984,6 +986,11 @@ enum DatasetAccessRole {
 }
 
 scalar DatasetAlias
+
+enum DatasetArchetype {
+	COLLECTION
+	VERSIONED_FILE
+}
 
 type DatasetCollaboration {
 	"""
@@ -1245,6 +1252,11 @@ type DatasetMetadata {
 	"""
 	currentVocab: SetVocab
 	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
+	"""
+	Experimental: Current archetype as per `kamu.dev/archetype` annotation,
+	if any
+	"""
+	currentArchetype: DatasetArchetype
 }
 
 type DatasetMetadataMut {

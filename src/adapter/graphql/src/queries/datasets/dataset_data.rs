@@ -98,14 +98,14 @@ impl<'a> DatasetData<'a> {
 
         let Some(df) = query_res.df else {
             return Ok(DataQueryResult::success(
-                DataSchema::empty(schema_format),
+                DataSchema::new_empty(schema_format),
                 DataBatch::empty(data_format),
                 state,
                 limit,
             ));
         };
 
-        let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
+        let schema = DataSchema::new_from_data_frame_schema_stripped(df.schema(), schema_format)?;
         let record_batches = match df.collect().await {
             Ok(rb) => rb,
             Err(err) => return DataQueryResult::from_query_error(err.into()),
