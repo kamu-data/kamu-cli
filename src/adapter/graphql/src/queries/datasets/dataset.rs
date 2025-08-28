@@ -45,10 +45,10 @@ impl Dataset {
             Err(e) => {
                 use RebacDatasetRefUnresolvedError as E;
                 match e {
-                    E::Access(_) => {
+                    E::Access(_) | E::NotFound(_) => {
                         return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()));
                     }
-                    e @ (E::NotFound(_) | E::Internal(_)) => Err(e.int_err()),
+                    E::Internal(_) => Err(e.int_err()),
                 }
             }
         }?;
