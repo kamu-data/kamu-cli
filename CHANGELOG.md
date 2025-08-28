@@ -11,6 +11,18 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+## Added
+- GQL: `currentArchetype` endpoint
+## Changed
+- Introducing ODF Schema per [ODF RFC-016](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/016-odf-schema.md)
+  - `inspect schema` now defaults to ODF schema instead of DDL
+  - `SetDataSchema` events are now populated with ODF schema, with raw arrow schema deprecated
+  - New schema format is supported in GQL and REST endpoints
+- `VersionedFile` and `Collection` dataset archetypes are now created with pre-defined schema that uses new `Did` and `ObjectLink` logical types
+- GQL: `asVersionedFile` and `asCollection` endpoints now use `kamu.dev/archetype` annotation to check the dataset archetype
+  - COMPATIBILITY: The existing datasets need to be migrated by applying new schema via commit API in order to be correctly recognized
+
 ## [0.247.0] - 2025-08-28
 ## Added
 - Extended support for webhook delivery errors, differentiating between:
