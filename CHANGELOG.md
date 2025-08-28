@@ -42,6 +42,8 @@ Recommendation: for ease of reading, use the following order:
   - `PredefinedAccountRegistrator` now uses `UpdateAccountUseCase` methods instead of `AccountService` methods
 - Moved versioned file logic from GQL level to `use_case`
 - Collection datasets will ignore add and move operations that don't change the entry path, ref, or extra attributes and return `CollectionUpdateUpToDate`
+### Fixed
+- Derived datasets transform event correctly resolved with unaccessible inputs
 
 ## [0.246.1] - 2025-08-20
 ### Fixed
