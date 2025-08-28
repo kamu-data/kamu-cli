@@ -1283,7 +1283,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Now finish the flow with failure
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     // Stats got updated: success stayed as previously, attempt refreshed
@@ -1396,7 +1396,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Now finish the flow with failure
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
         .await;
 
     // Stats got updated: success stayed as previously, attempt refreshed
@@ -1565,7 +1565,10 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     // Compact finishes with failure
     flow_generator
-        .finish_running_flow(flow_id_compact, TaskOutcome::Failed(TaskError::empty()))
+        .finish_running_flow(
+            flow_id_compact,
+            TaskOutcome::Failed(TaskError::empty_recoverable()),
+        )
         .await;
 
     let res = flow_event_store
@@ -2412,7 +2415,7 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
 pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    // Create a dataset and schedule multiple flows
+    // Create a dataset
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
 
@@ -2443,7 +2446,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
         // Simulate a failure
         let flow = flow_generator
-            .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
+            .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
             .await;
 
         // Check flow status and timing properties
@@ -2489,6 +2492,177 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(pending_flows.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    // Create a dataset
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let flow_binding = ingest_dataset_binding(&dataset_id);
+
+    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
+    });
+
+    // Initially we are not failing
+    assert_eq!(
+        0,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
+
+    // Have a successful flow
+    flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Finished,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    // Still no failures, after success
+    assert_eq!(
+        0,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
+
+    // Fail once
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Running,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+    flow_generator
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    assert_eq!(
+        1,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
+
+    // Fail one more time
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Running,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+    flow_generator
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    assert_eq!(
+        2,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
+
+    // Abort the next flow - should not count as failure
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Running,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+    flow_generator.abort_flow(flow_id).await;
+
+    assert_eq!(
+        2,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
+
+    // Have another failure
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Running,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+    flow_generator
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    assert_eq!(
+        3,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
+
+    // Finally have a success - should reset the count
+    flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Finished,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    assert_eq!(
+        0,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
+
+    // Fail again - should be counted from zero
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Running,
+            automatic_cause,
+            None,
+            None,
+        )
+        .await;
+    flow_generator
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    assert_eq!(
+        1,
+        flow_event_store
+            .get_current_consecutive_flow_failures_count(&flow_binding)
+            .await
+            .unwrap()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2790,6 +2964,17 @@ impl<'a> DatasetFlowGenerator<'a> {
 
         flow.save(self.flow_event_store.as_ref()).await.unwrap();
         flow
+    }
+
+    async fn abort_flow(&self, flow_id: FlowID) {
+        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+            .await
+            .unwrap();
+        assert_ne!(flow.status(), FlowStatus::Finished);
+
+        flow.abort(Utc::now()).unwrap();
+
+        flow.save(self.flow_event_store.as_ref()).await.unwrap();
     }
 }
 

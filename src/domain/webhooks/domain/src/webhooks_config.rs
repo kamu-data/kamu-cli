@@ -9,18 +9,29 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_task_system::task_error_enum! {
-    pub enum TaskErrorDatasetUpdate {
-        InputDatasetCompacted(InputDatasetCompactedError),
-    }
-    => "UpdateDatasetError", recoverable: false
-}
+pub const DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES: u32 = 5;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InputDatasetCompactedError {
-    pub dataset_id: odf::DatasetID,
+#[derive(Debug)]
+pub struct WebhooksConfig {
+    pub max_consecutive_failures: u32,
+}
+
+impl WebhooksConfig {
+    pub fn new(max_consecutive_failures: u32) -> Self {
+        Self {
+            max_consecutive_failures,
+        }
+    }
+}
+
+impl Default for WebhooksConfig {
+    fn default() -> Self {
+        Self {
+            max_consecutive_failures: DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

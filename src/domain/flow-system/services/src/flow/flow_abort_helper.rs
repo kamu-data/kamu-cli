@@ -11,23 +11,10 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_flow_system::{
-    Flow,
-    FlowBinding,
-    FlowEventStore,
-    FlowID,
-    FlowProgressMessage,
-    FlowScope,
-    FlowScopeRemovalHandler,
-    FlowSensorDispatcher,
-    FlowState,
-    FlowStatus,
-};
+use kamu_flow_system::*;
 use kamu_task_system::TaskScheduler;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
-
-use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,12 +32,8 @@ pub(crate) struct FlowAbortHelper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowAbortHelper {
-    pub(crate) async fn abort_flow(&self, flow_id: FlowID) -> Result<FlowState, InternalError> {
+    pub(crate) async fn abort_flow(&self, flow: &mut Flow) -> Result<(), InternalError> {
         // Mark flow as aborted
-        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-            .await
-            .int_err()?;
-
         match flow.status() {
             FlowStatus::Waiting | FlowStatus::Retrying | FlowStatus::Running => {
                 // Abort flow itself
@@ -80,7 +63,7 @@ impl FlowAbortHelper {
             }
         }
 
-        Ok(flow.into())
+        Ok(())
     }
 
     pub(crate) async fn deactivate_flow_trigger(
@@ -96,7 +79,11 @@ impl FlowAbortHelper {
         };
 
         if let Some(flow_id) = maybe_pending_flow_id {
-            self.abort_flow(flow_id).await?;
+            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                .await
+                .int_err()?;
+
+            self.abort_flow(&mut flow).await?;
         }
 
         self.flow_sensor_dispatcher
@@ -119,9 +106,15 @@ impl FlowScopeRemovalHandler for FlowAbortHelper {
             .try_get_all_scope_pending_flows(flow_scope)
             .await?;
 
+        // Load these flows
+        let flows_2_abort: Vec<Flow> =
+            Flow::load_multi_simple(flow_ids_2_abort, flow_event_store.as_ref())
+                .await
+                .int_err()?;
+
         // Abort matched flows
-        for flow_id in flow_ids_2_abort {
-            self.abort_flow(flow_id).await?;
+        for mut flow in flows_2_abort {
+            self.abort_flow(&mut flow).await?;
         }
 
         Ok(())

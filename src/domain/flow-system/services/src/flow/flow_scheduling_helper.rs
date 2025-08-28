@@ -16,8 +16,6 @@ use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
-use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
@@ -86,7 +84,7 @@ impl FlowSchedulingHelper {
     ) -> Result<(), InternalError> {
         let maybe_active_schedule = self
             .flow_trigger_service
-            .try_get_flow_schedule_rule(flow_binding)
+            .try_get_flow_active_schedule_rule(flow_binding)
             .await
             .int_err()?;
 

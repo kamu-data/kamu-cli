@@ -151,6 +151,34 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    async fn reactivate(&self, ctx: &Context<'_>) -> Result<ReactivateWebhookSubscriptionResult> {
+        let reactivate_webhook_subscription_use_case =
+            from_catalog_n!(ctx, dyn kamu_webhooks::ReactivateWebhookSubscriptionUseCase);
+
+        let mut subscription = self.webhook_subscription.lock().await;
+
+        match reactivate_webhook_subscription_use_case
+            .execute(&mut subscription)
+            .await
+        {
+            Ok(_) => Ok(ReactivateWebhookSubscriptionResult::Success(
+                ReactivateWebhookSubscriptionResultSuccess { reactivated: true },
+            )),
+
+            Err(kamu_webhooks::ReactivateWebhookSubscriptionError::ReactivateUnexpected(e)) => {
+                Ok(ReactivateWebhookSubscriptionResult::ReactivateUnexpected(
+                    ReactivateWebhookSubscriptionResultUnexpected {
+                        status: e.status.into(),
+                    },
+                ))
+            }
+
+            Err(kamu_webhooks::ReactivateWebhookSubscriptionError::Internal(e)) => {
+                Err(GqlError::Internal(e))
+            }
+        }
+    }
+
     async fn remove(&self, ctx: &Context<'_>) -> Result<RemoveWebhookSubscriptionResult> {
         let remove_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::RemoveWebhookSubscriptionUseCase);
@@ -277,6 +305,41 @@ pub struct ResumeWebhookSubscriptionResultUnexpected {
 impl ResumeWebhookSubscriptionResultUnexpected {
     async fn message(&self) -> String {
         "Resuming webhook subscription is unexpected at this state".to_string()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum ReactivateWebhookSubscriptionResult {
+    Success(ReactivateWebhookSubscriptionResultSuccess),
+    ReactivateUnexpected(ReactivateWebhookSubscriptionResultUnexpected),
+}
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct ReactivateWebhookSubscriptionResultSuccess {
+    reactivated: bool,
+}
+
+#[ComplexObject]
+impl ReactivateWebhookSubscriptionResultSuccess {
+    async fn message(&self) -> String {
+        "Success".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct ReactivateWebhookSubscriptionResultUnexpected {
+    status: WebhookSubscriptionStatus,
+}
+
+#[ComplexObject]
+impl ReactivateWebhookSubscriptionResultUnexpected {
+    async fn message(&self) -> String {
+        "Reactivating webhook subscription is unexpected at this state".to_string()
     }
 }
 

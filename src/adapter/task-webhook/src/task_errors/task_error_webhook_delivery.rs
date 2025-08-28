@@ -21,7 +21,7 @@ kamu_task_system::task_error_enum! {
         ConnectionTimeout(WebhookSendConnectionTimeoutError),
         UnsuccessfulResponse(WebhookUnsuccessfulResponseError),
     }
-    => "WebhookDeliveryError"
+    => "WebhookDeliveryError", recoverable: true
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

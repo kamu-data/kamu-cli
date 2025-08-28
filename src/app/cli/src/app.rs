@@ -25,7 +25,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_flow_system_services::{
+use kamu_flow_system::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
@@ -986,7 +986,17 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
         Duration::seconds(i64::from(task_agent_config.checking_interval_secs.unwrap())),
     ));
-    //
+
+    // Webhooks configuration
+    let webhooks_config = config.webhooks.clone().unwrap();
+    {
+        let max_consecutive_failures = webhooks_config.max_consecutive_failures.unwrap();
+        assert!(
+            max_consecutive_failures > 0,
+            "Webhooks max_consecutive_failures must be > 0"
+        );
+        catalog_builder.add_value(kamu_webhooks::WebhooksConfig::new(max_consecutive_failures));
+    }
 
     // Search configuration
     let config::SearchConfig {

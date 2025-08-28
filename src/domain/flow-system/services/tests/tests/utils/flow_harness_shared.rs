@@ -286,11 +286,23 @@ impl FlowHarness {
         request_time: DateTime<Utc>,
         flow_binding: FlowBinding,
         trigger_rule: FlowTriggerRule,
+        stop_policy: FlowTriggerStopPolicy,
     ) {
         self.flow_trigger_service
-            .set_trigger(request_time, flow_binding, false, trigger_rule)
+            .set_trigger(request_time, flow_binding, trigger_rule, stop_policy)
             .await
             .unwrap();
+    }
+
+    pub async fn get_flow_trigger_status(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Option<FlowTriggerStatus> {
+        self.flow_trigger_service
+            .find_trigger(flow_binding)
+            .await
+            .unwrap()
+            .map(|t| t.status)
     }
 
     pub async fn set_dataset_flow_ingest(
@@ -327,30 +339,16 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn pause_flow(&self, request_time: DateTime<Utc>, flow_binding: FlowBinding) {
-        let current_trigger = self
-            .flow_trigger_service
-            .find_trigger(&flow_binding)
-            .await
-            .unwrap()
-            .unwrap();
-
+    pub async fn pause_flow(&self, request_time: DateTime<Utc>, flow_binding: &FlowBinding) {
         self.flow_trigger_service
-            .set_trigger(request_time, flow_binding, true, current_trigger.rule)
+            .pause_flow_trigger(request_time, flow_binding)
             .await
             .unwrap();
     }
 
-    pub async fn resume_flow(&self, request_time: DateTime<Utc>, flow_binding: FlowBinding) {
-        let current_trigger = self
-            .flow_trigger_service
-            .find_trigger(&flow_binding)
-            .await
-            .unwrap()
-            .unwrap();
-
+    pub async fn resume_flow(&self, request_time: DateTime<Utc>, flow_binding: &FlowBinding) {
         self.flow_trigger_service
-            .set_trigger(request_time, flow_binding, false, current_trigger.rule)
+            .resume_flow_trigger(request_time, flow_binding)
             .await
             .unwrap();
     }

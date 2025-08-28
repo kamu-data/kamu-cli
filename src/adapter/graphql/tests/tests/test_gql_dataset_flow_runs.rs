@@ -35,10 +35,6 @@ use kamu_datasets_services::testing::{
 };
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
-use kamu_flow_system_services::{
-    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
 use kamu_task_system::{self as ts, TaskError};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
@@ -159,7 +155,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -233,7 +230,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -308,7 +306,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -400,7 +399,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -559,7 +559,8 @@ async fn test_trigger_reset_root_dataset_flow() {
                                                 "newHeadHash": &root_dataset_blocks[1].0,
                                             },
                                             "oldHeadHash": &root_dataset_blocks[0].0,
-                                        }
+                                        },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -782,7 +783,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -888,7 +890,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1008,7 +1011,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1077,7 +1081,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1145,7 +1150,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1236,7 +1242,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1350,7 +1357,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1419,7 +1427,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             "__typename": "FlowStartConditionExecutor",
                                             "taskId": "0",
                                         },
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1487,7 +1496,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1578,7 +1588,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -2326,8 +2337,8 @@ async fn test_cancel_ingest_root_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2401,8 +2412,8 @@ async fn test_cancel_running_transform_derived_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2473,8 +2484,8 @@ async fn test_cancel_hard_compaction_root_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2522,7 +2533,7 @@ async fn test_cancel_wrong_flow_id_fails() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
+                            "cancelFlowRun": {
                                 "__typename": "FlowNotFound",
                                 "message": "Flow '5' was not found",
                             }
@@ -2581,7 +2592,7 @@ async fn test_cancel_foreign_flow_fails() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
+                            "cancelFlowRun": {
                                 "__typename": "FlowNotFound",
                                 "message": "Flow '0' was not found",
                             }
@@ -2641,8 +2652,8 @@ async fn test_cancel_waiting_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2724,8 +2735,8 @@ async fn test_cancel_already_aborted_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -2802,8 +2813,8 @@ async fn test_cancel_already_succeeded_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelScheduledTasks": {
-                                "__typename": "CancelScheduledTasksSuccess",
+                            "cancelFlowRun": {
+                                "__typename": "CancelFlowRunSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -3305,6 +3316,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "maxSliceRecords": 10000,
                                             "maxSliceSize": 1_000_000,
                                         },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3444,7 +3456,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             }
                                         },
                                         "startCondition": null,
-                                        "configSnapshot": null
+                                        "configSnapshot": null,
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3606,6 +3619,7 @@ async fn test_config_snapshot_returned_correctly() {
                                             "maxSliceRecords": 10000,
                                             "maxSliceSize": 1_000_000,
                                         },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3751,7 +3765,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             flow_task_id,
             flow_task_metadata.clone(),
             complete_time_0,
-            ts::TaskOutcome::Failed(TaskError::empty()),
+            ts::TaskOutcome::Failed(TaskError::empty_recoverable()),
         )
         .await;
 
@@ -3812,7 +3826,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "configSnapshot": {
                                             "fetchUncacheable": false,
                                             "__typename": "FlowConfigRuleIngest",
-                                        }
+                                        },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -3844,7 +3859,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             flow_task_id,
             flow_task_metadata.clone(),
             complete_time_1,
-            ts::TaskOutcome::Failed(TaskError::empty()),
+            ts::TaskOutcome::Failed(TaskError::empty_recoverable()),
         )
         .await;
 
@@ -3904,7 +3919,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "configSnapshot": {
                                             "fetchUncacheable": false,
                                             "__typename": "FlowConfigRuleIngest",
-                                        }
+                                        },
+                                        "relatedTrigger": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -4096,6 +4112,127 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                             "nextAttemptAt": null
                                         }
                                     ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_trigger_flow_automatically_via_schedule() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
+                updated_watermark: None,
+            },
+        )),
+    })
+    .await;
+
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::set_daily_ingest_schedule_trigger(&create_result.dataset_handle.id);
+
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "SetFlowTriggerSuccess",
+                                "message": "Success",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+
+    println!("{:?}", response.data);
+
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "ingestResult": null,
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
+                                        },
+                                        "status": "WAITING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "firstAttemptScheduledAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": schedule_time.to_rfc3339(),
+                                            "awaitingExecutorSince": null,
+                                            "runningSince": null,
+                                            "lastAttemptFinishedAt": null,
+                                        },
+                                        "taskIds": [],
+                                        "initiator": null,
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseAutoPolling",
+                                        },
+                                        "startCondition": null,
+                                        "configSnapshot": null,
+                                        "relatedTrigger": {
+                                            "paused": false,
+                                            "schedule": {
+                                                "__typename": "TimeDelta"
+                                            }
+                                        },
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
                                 }
                             }
                         }
@@ -4481,6 +4618,7 @@ impl FlowRunsHarness {
                                                 reason {
                                                     ...on TaskFailureReasonGeneral {
                                                         message
+                                                        recoverable
                                                     }
                                                     ...on TaskFailureReasonInputDatasetCompacted {
                                                         message
@@ -4564,6 +4702,12 @@ impl FlowRunsHarness {
                                                 __typename
                                                 maxSliceRecords
                                                 maxSliceSize
+                                            }
+                                        }
+                                        relatedTrigger {
+                                            paused
+                                            schedule {
+                                                __typename
                                             }
                                         }
                                     }
@@ -4678,6 +4822,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                }
@@ -4722,6 +4867,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                         ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
@@ -4785,6 +4931,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                         ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
@@ -4837,6 +4984,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                 }
@@ -4890,6 +5038,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                 }
@@ -4936,6 +5085,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                     }
                                                 }
@@ -4961,12 +5111,12 @@ impl FlowRunsHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             runs {
-                                cancelScheduledTasks (
+                                cancelFlowRun (
                                     flowId: "<flow_id>",
                                 ) {
                                     __typename,
                                     message
-                                    ... on CancelScheduledTasksSuccess {
+                                    ... on CancelFlowRunSuccess {
                                         flow {
                                             __typename
                                             flowId
@@ -4982,6 +5132,7 @@ impl FlowRunsHarness {
                                                     reason {
                                                         ...on TaskFailureReasonGeneral {
                                                             message
+                                                            recoverable
                                                         }
                                                         ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
@@ -5004,6 +5155,38 @@ impl FlowRunsHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<flow_id>", flow_id)
+    }
+
+    fn set_daily_ingest_schedule_trigger(id: &odf::DatasetID) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            triggers {
+                                setTrigger(
+                                    datasetFlowType: "INGEST",
+                                    triggerRuleInput: {
+                                        schedule: {
+                                            timeDelta: { every: 1, unit: "DAYS" }
+                                        }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
     }
 
     fn set_ingest_config_with_retries(

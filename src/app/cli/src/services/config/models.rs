@@ -44,6 +44,10 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub flow_system: Option<FlowSystemConfig>,
 
+    /// Configuration for webhooks
+    #[merge(strategy = merge_recursive)]
+    pub webhooks: Option<WebhooksConfig>,
+
     /// Data access and visualization configuration
     #[merge(strategy = merge_recursive)]
     pub frontend: Option<FrontendConfig>,
@@ -87,6 +91,7 @@ impl CLIConfig {
             dataset_env_vars: None,
             engine: None,
             flow_system: None,
+            webhooks: None,
             frontend: None,
             identity: None,
             outbox: None,
@@ -109,6 +114,7 @@ impl CLIConfig {
             dataset_env_vars: Some(DatasetEnvVarsConfig::sample()),
             engine: Some(EngineConfig::sample()),
             flow_system: Some(FlowSystemConfig::sample()),
+            webhooks: Some(WebhooksConfig::sample()),
             frontend: Some(FrontendConfig::sample()),
             identity: Some(IdentityConfig::sample()),
             outbox: Some(OutboxConfig::sample()),
@@ -129,6 +135,7 @@ impl Default for CLIConfig {
             dataset_env_vars: Some(DatasetEnvVarsConfig::default()),
             engine: Some(EngineConfig::default()),
             flow_system: Some(FlowSystemConfig::default()),
+            webhooks: Some(WebhooksConfig::default()),
             frontend: Some(FrontendConfig::default()),
             identity: Some(IdentityConfig::default()),
             outbox: Some(OutboxConfig::default()),
@@ -1299,14 +1306,6 @@ pub struct FlowAgentConfig {
 }
 
 impl FlowAgentConfig {
-    pub fn new() -> Self {
-        Self {
-            awaiting_step_secs: None,
-            mandatory_throttling_period_secs: None,
-            default_retry_policies: None,
-        }
-    }
-
     fn sample() -> Self {
         Self::default()
     }
@@ -1349,12 +1348,6 @@ pub struct TaskAgentConfig {
 }
 
 impl TaskAgentConfig {
-    pub fn new() -> Self {
-        Self {
-            checking_interval_secs: None,
-        }
-    }
-
     fn sample() -> Self {
         Self::default()
     }
@@ -1364,6 +1357,30 @@ impl Default for TaskAgentConfig {
     fn default() -> Self {
         Self {
             checking_interval_secs: Some(1),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct WebhooksConfig {
+    pub max_consecutive_failures: Option<u32>,
+}
+
+impl WebhooksConfig {
+    pub fn sample() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for WebhooksConfig {
+    fn default() -> Self {
+        Self {
+            max_consecutive_failures: Some(5),
         }
     }
 }

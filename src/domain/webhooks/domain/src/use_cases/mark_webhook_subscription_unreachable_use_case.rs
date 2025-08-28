@@ -7,47 +7,42 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use internal_error::InternalError;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{CompactionListener, CompactionPlan, ResolvedDataset};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait CompactionExecutor: Send + Sync {
-    /// Executes the compacting accordingly to the plan.
-    /// Does not set the new HEAD, only writes the compacted block
+pub trait MarkWebhookSubscriptionUnreachableUseCase: Send + Sync {
     async fn execute(
         &self,
-        target: ResolvedDataset,
-        plan: CompactionPlan,
-        maybe_listener: Option<Arc<dyn CompactionListener>>,
-    ) -> Result<CompactionResult, CompactionExecutionError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum CompactionResult {
-    NothingToDo,
-    Success {
-        old_head: odf::Multihash,
-        new_head: odf::Multihash,
-        old_num_blocks: usize,
-        new_num_blocks: usize,
-    },
+        subscription: &mut WebhookSubscription,
+    ) -> Result<(), MarkWebhookSubscriptionUnreachableError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum CompactionExecutionError {
+pub enum MarkWebhookSubscriptionUnreachableError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    MarkUnreachableUnexpected(#[from] MarkWebhookSubscriptionUnreachableUnexpectedError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Webhook subscription is not in a state that allows marking as unreachable: {status:?}")]
+pub struct MarkWebhookSubscriptionUnreachableUnexpectedError {
+    pub status: WebhookSubscriptionStatus,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

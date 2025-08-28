@@ -16,27 +16,29 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowTriggerService: Sync + Send {
     /// Find current trigger of a certain type
     async fn find_trigger(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<FlowTriggerState>, FindFlowTriggerError>;
+    ) -> Result<Option<FlowTriggerState>, InternalError>;
 
     /// Set or modify flow trigger
     async fn set_trigger(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: FlowBinding,
-        paused: bool,
         rule: FlowTriggerRule,
+        stop_policy: FlowTriggerStopPolicy,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
     /// Lists all flow triggers, which are currently enabled
-    fn list_enabled_triggers(&self) -> FlowTriggerStateStream;
+    #[allow(clippy::elidable_lifetime_names)] // due to mock
+    fn list_enabled_triggers<'a>(&'a self) -> FlowTriggerStateStream<'a>;
 
-    /// Pauses particular flow trigger
+    /// Pauses particular flow trigger (user initiative)
     async fn pause_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
@@ -69,29 +71,37 @@ pub trait FlowTriggerService: Sync + Send {
         &self,
         scopes: &[FlowScope],
     ) -> Result<bool, InternalError>;
+
+    /// Evaluates trigger stop policy after a failure
+    async fn evaluate_trigger_on_failure(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+        unrecoverable: bool,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FlowTriggerServiceExt {
-    async fn try_get_flow_schedule_rule(
+    async fn try_get_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<Schedule>, FindFlowTriggerError>;
+    ) -> Result<Option<Schedule>, InternalError>;
 
-    async fn try_get_flow_reactive_rule(
+    async fn try_get_flow_active_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<ReactiveRule>, FindFlowTriggerError>;
+    ) -> Result<Option<ReactiveRule>, InternalError>;
 }
 
 #[async_trait::async_trait]
 impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
-    async fn try_get_flow_schedule_rule(
+    async fn try_get_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<Schedule>, FindFlowTriggerError> {
+    ) -> Result<Option<Schedule>, InternalError> {
         let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
@@ -104,10 +114,10 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
         )
     }
 
-    async fn try_get_flow_reactive_rule(
+    async fn try_get_flow_active_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<ReactiveRule>, FindFlowTriggerError> {
+    ) -> Result<Option<ReactiveRule>, InternalError> {
         let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
@@ -129,27 +139,12 @@ pub enum SetFlowTriggerError {
     Internal(#[from] InternalError),
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum FindFlowTriggerError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type FlowTriggerStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowTriggerState, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<TryLoadError<FlowTriggerState>> for FindFlowTriggerError {
-    fn from(value: TryLoadError<FlowTriggerState>) -> Self {
-        match value {
-            TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
-            TryLoadError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
 
 impl From<TryLoadError<FlowTriggerState>> for SetFlowTriggerError {
     fn from(value: TryLoadError<FlowTriggerState>) -> Self {

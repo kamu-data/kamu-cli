@@ -15,7 +15,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowTriggerState {
     /// Flow binding
     pub flow_binding: FlowBinding,
@@ -23,6 +23,8 @@ pub struct FlowTriggerState {
     pub rule: FlowTriggerRule,
     /// Trigger status
     pub status: FlowTriggerStatus,
+    /// Auto-stop policy
+    pub stop_policy: FlowTriggerStopPolicy,
 }
 
 impl FlowTriggerState {
@@ -60,15 +62,17 @@ impl Projection for FlowTriggerState {
                     flow_binding,
                     paused,
                     rule,
+                    stop_policy,
                     ..
                 }) => Ok(Self {
                     flow_binding,
                     status: if paused {
-                        FlowTriggerStatus::PausedTemporarily
+                        FlowTriggerStatus::PausedByUser
                     } else {
                         FlowTriggerStatus::Active
                     },
                     rule,
+                    stop_policy,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -78,26 +82,45 @@ impl Projection for FlowTriggerState {
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(FlowTriggerEventModified { paused, rule, .. }) => {
+                    E::Modified(FlowTriggerEventModified {
+                        paused,
+                        rule,
+                        stop_policy,
+                        ..
+                    }) => {
                         // Note: when deleted scope is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowTriggerState {
+                            flow_binding: s.flow_binding,
                             status: if *paused {
-                                FlowTriggerStatus::PausedTemporarily
+                                FlowTriggerStatus::PausedByUser
                             } else {
                                 FlowTriggerStatus::Active
                             },
                             rule: rule.clone(),
-                            ..s
+                            stop_policy: *stop_policy,
                         })
                     }
 
+                    E::AutoStopped(_) => {
+                        if s.status == FlowTriggerStatus::ScopeRemoved {
+                            // This shouldn't happen. Even if the scope is re-added with the same
+                            // id, the trigger will go through Active status.
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowTriggerState {
+                                status: FlowTriggerStatus::StoppedAutomatically,
+                                ..s
+                            })
+                        }
+                    }
+
                     E::ScopeRemoved(_) => {
-                        if s.status == FlowTriggerStatus::StoppedPermanently {
+                        if s.status == FlowTriggerStatus::ScopeRemoved {
                             Ok(s) // idempotent DELETE
                         } else {
                             Ok(FlowTriggerState {
-                                status: FlowTriggerStatus::StoppedPermanently,
+                                status: FlowTriggerStatus::ScopeRemoved,
                                 ..s
                             })
                         }

@@ -74,7 +74,7 @@ impl DeliverWebhookTaskRunner {
                     }
                     WebhookDeliveryError::SendError(WebhookSendError::Internal(_))
                     | WebhookDeliveryError::Internal(_) => {
-                        Ok(TaskOutcome::Failed(TaskError::empty()))
+                        Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
                     }
                 }
             }

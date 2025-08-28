@@ -33,14 +33,7 @@ use messaging_outbox::{
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
-use crate::{
-    FlowAbortHelper,
-    FlowSchedulingHelper,
-    MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
+use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -537,17 +530,9 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
 
                         // In case of success:
                         //  - schedule next flow, if we had any late activation cause
-                        //  - schedule next auto-polling flow, if schedule is enabled
                         if message.outcome.is_success() {
                             scheduling_helper
                                 .try_schedule_late_flow_activations(&flow)
-                                .await?;
-
-                            scheduling_helper
-                                .try_schedule_auto_polling_flow_if_enabled(
-                                    finish_time,
-                                    &flow.flow_binding,
-                                )
                                 .await?;
                         }
 
@@ -556,15 +541,42 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
                         if let Some(flow_outcome) = flow.outcome.as_ref() {
-                            // In case of failure after retries:
-                            //  - disable trigger
-                            if message.outcome.is_failed() {
+                            // Handle flow failure if it reached a terminal state
+                            if message.outcome.is_failure() {
+                                let recoverable = message.outcome.is_recoverable_failure();
+                                if recoverable {
+                                    tracing::warn!(
+                                        flow_id = %flow.flow_id,
+                                        "Flow has reached a failed state after exhausting all retries"
+                                    );
+                                } else {
+                                    tracing::warn!(
+                                        flow_id = %flow.flow_id,
+                                        "Flow has reached a failed state after unrecoverable failure"
+                                    );
+                                }
+
+                                // Trigger should make a decision about auto-stopping
                                 let flow_trigger_service =
                                     target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
                                 flow_trigger_service
-                                    .pause_flow_trigger(finish_time, &flow.flow_binding)
+                                    .evaluate_trigger_on_failure(
+                                        finish_time,
+                                        &flow.flow_binding,
+                                        !recoverable,
+                                    )
                                     .await?;
                             }
+
+                            // Try to schedule auto-polling flow, if applicable.
+                            // We don't care whether we failed or succeeded,
+                            // that is determined with the stop policy in the trigger.
+                            scheduling_helper
+                                .try_schedule_auto_polling_flow_if_enabled(
+                                    finish_time,
+                                    &flow.flow_binding,
+                                )
+                                .await?;
 
                             // Notify about finished flow
                             outbox
@@ -630,12 +642,8 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
             return Ok(());
         }
 
-        if message.paused {
-            let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-            abort_helper
-                .deactivate_flow_trigger(target_catalog, &message.flow_binding)
-                .await?;
-        } else {
+        // Active trigger => activate it
+        if message.trigger_status.is_active() {
             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
             scheduling_helper
                 .activate_flow_trigger(
@@ -644,6 +652,12 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
                     &message.flow_binding,
                     message.rule.clone(),
                 )
+                .await?;
+        } else {
+            // Inactive trigger => abort it
+            let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
+            abort_helper
+                .deactivate_flow_trigger(target_catalog, &message.flow_binding)
                 .await?;
         }
 

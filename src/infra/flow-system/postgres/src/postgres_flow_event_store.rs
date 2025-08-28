@@ -421,7 +421,6 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(maybe_flow_id.map(|id| FlowID::try_from(id).unwrap()))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
     async fn try_get_all_scope_pending_flows(
         &self,
         flow_scope: &FlowScope,
@@ -511,6 +510,56 @@ impl FlowEventStore for PostgresFlowEventStore {
             last_attempt_time: maybe_attempt_result,
             last_success_time: maybe_success_result,
         })
+    }
+
+    async fn get_current_consecutive_flow_failures_count(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<u32, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let flow_type = flow_binding.flow_type.as_str();
+        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+
+        let consecutive_failures_count = sqlx::query!(
+            r#"
+            WITH finished AS (
+                SELECT
+                    e.event_id,
+                    (e.event_payload #>> '{TaskFinished,task_outcome,Success}') IS NOT NULL AS is_success,
+                    (e.event_payload #>> '{TaskFinished,task_outcome,Failed}') IS NOT NULL AS is_failed
+                FROM flow_events e
+                JOIN flows f ON f.flow_id = e.flow_id
+                WHERE
+                    e.event_type = 'FlowEventTaskFinished'
+                    AND f.flow_type = $1
+                AND f.scope_data = $2
+            ),
+            last_success AS (
+                SELECT event_id
+                FROM finished
+                WHERE is_success
+                ORDER BY event_id DESC
+                LIMIT 1
+            )
+            SELECT COUNT(*)::bigint AS consecutive_failures
+            FROM finished
+            WHERE is_failed AND event_id > COALESCE((SELECT event_id FROM last_success), 0);
+            "#,
+            flow_type,
+            &scope_data_json,
+        )
+        .map(|event_row| event_row.consecutive_failures)
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        let failures_count: u32 = consecutive_failures_count
+            .and_then(|c| u32::try_from(c).ok())
+            .unwrap_or(0);
+
+        Ok(failures_count)
     }
 
     /// Returns nearest time when one or more flows are scheduled for activation

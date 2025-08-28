@@ -495,7 +495,6 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_flow_id.map(|id| FlowID::try_from(id).unwrap()))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
     async fn try_get_all_scope_pending_flows(
         &self,
         flow_scope: &FlowScope,
@@ -592,7 +591,58 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
-    /// Returns nearest time when one or more flows are scheduled for activation
+    async fn get_current_consecutive_flow_failures_count(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<u32, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let flow_type = flow_binding.flow_type.as_str();
+
+        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
+
+        let consecutive_failures_count = sqlx::query!(
+            r#"
+            WITH finished AS (
+                SELECT
+                    e.event_id,
+                    json_extract(e.event_payload, '$.TaskFinished.task_outcome.Success') IS NOT NULL AS is_success,
+                    json_extract(e.event_payload, '$.TaskFinished.task_outcome.Failed')  IS NOT NULL AS is_failed
+                FROM flow_events e
+                JOIN flows f ON f.flow_id = e.flow_id
+                WHERE
+                    e.event_type = 'FlowEventTaskFinished'
+                    AND f.flow_type = $1
+                    AND f.scope_data = $2
+            ),
+            last_success AS (
+                SELECT event_id
+                FROM finished
+                WHERE is_success
+                ORDER BY event_id DESC
+                LIMIT 1
+            )
+            SELECT
+                COUNT(*) AS consecutive_failures
+            FROM finished
+            WHERE
+                is_failed AND event_id > IFNULL((SELECT event_id FROM last_success), 0);
+            "#,
+            flow_type,
+            scope_json_str,
+        )
+        .map(|event_row| event_row.consecutive_failures)
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        let failures_count: u32 = consecutive_failures_count.try_into().int_err()?;
+
+        Ok(failures_count)
+    }
+
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
@@ -627,7 +677,6 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_activation_time)
     }
 
-    /// Returns flows scheduled for activation at the given time
     async fn get_flows_scheduled_for_activation_at(
         &self,
         scheduled_for_activation_at: DateTime<Utc>,

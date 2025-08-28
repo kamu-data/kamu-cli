@@ -377,6 +377,39 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .unwrap_or_default())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
+    async fn get_current_consecutive_flow_failures_count(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<u32, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        let count = g
+            .events
+            .iter()
+            .rev()
+            .filter(|event| {
+                if let FlowEvent::TaskFinished(e) = event {
+                    let a_flow_binding = g
+                        .flow_binding_by_flow_id
+                        .get(&e.flow_id)
+                        .expect("Previously unseen flow ID");
+                    a_flow_binding == flow_binding
+                } else {
+                    false
+                }
+            })
+            .take_while(|event| {
+                if let FlowEvent::TaskFinished(e) = event {
+                    !e.task_outcome.is_success()
+                } else {
+                    false
+                }
+            })
+            .count();
+        Ok(u32::try_from(count).unwrap())
+    }
+
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let state = self.inner.as_state();

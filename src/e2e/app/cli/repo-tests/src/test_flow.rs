@@ -465,6 +465,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     reason {
                       ... on TaskFailureReasonGeneral {
                         message
+                        recoverable
                         __typename
                       }
                       ... on TaskFailureReasonInputDatasetCompacted {
@@ -1344,7 +1345,7 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
         "alias",
         "add",
         &dataset_alias.dataset_name,
-        "http://foo",
+        "http://foo", // Invalid URL to trigger recoverable failure
         "--pull",
     ])
     .await
@@ -1401,7 +1402,8 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                     "__typename": "FlowFailedError",
                                     "reason": {
                                       "__typename": "TaskFailureReasonGeneral",
-                                      "message": "FAILED"
+                                      "message": "FAILED",
+                                      "recoverable": true
                                     }
                                   },
                                   "startCondition": null,
@@ -1434,7 +1436,8 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                   "__typename": "FlowFailedError",
                                   "reason": {
                                     "__typename": "TaskFailureReasonGeneral",
-                                    "message": "FAILED"
+                                    "message": "FAILED",
+                                    "recoverable": true
                                   }
                                 },
                                 "startCondition": null,
@@ -1466,7 +1469,8 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                   "__typename": "FlowFailedError",
                                   "reason": {
                                     "__typename": "TaskFailureReasonGeneral",
-                                    "message": "FAILED"
+                                    "message": "FAILED",
+                                    "recoverable": true
                                   }
                                 },
                                 "status": "FINISHED",
@@ -1854,6 +1858,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
             reason {
               ... on TaskFailureReasonGeneral {
                 message
+                recoverable
                 __typename
               }
               ... on TaskFailureReasonInputDatasetCompacted {

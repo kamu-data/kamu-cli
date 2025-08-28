@@ -45,11 +45,13 @@ pub trait FlowRunService: Sync + Send {
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError>;
 
-    /// Attempts to cancel the tasks already scheduled for the given flow
-    async fn cancel_scheduled_tasks(
+    /// Attempts to cancel the tasks already scheduled for the given flow.
+    /// Will result in auto-stopping a flow trigger for periodic flows.
+    async fn cancel_flow_run(
         &self,
+        cancellation_time: DateTime<Utc>,
         flow_id: FlowID,
-    ) -> Result<FlowState, CancelScheduledTasksError>;
+    ) -> Result<FlowState, CancelFlowRunError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,16 +65,17 @@ pub enum RunFlowError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum CancelScheduledTasksError {
+pub enum CancelFlowRunError {
     #[error(transparent)]
     NotFound(#[from] FlowNotFoundError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<LoadError<FlowState>> for CancelScheduledTasksError {
+impl From<LoadError<FlowState>> for CancelFlowRunError {
     fn from(value: LoadError<FlowState>) -> Self {
         match value {
             LoadError::NotFound(err) => Self::NotFound(FlowNotFoundError { flow_id: err.query }),

@@ -21,10 +21,23 @@ const WEBHOOK_SUBSCRIPTION_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 /// Represents messages related to the lifecycle of a webhook subscription
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WebhookSubscriptionLifecycleMessage {
+    MarkedUnreachable(WebhookSubscriptionLifecycleMessageMarkedUnreachable),
     Deleted(WebhookSubscriptionLifecycleMessageDeleted),
 }
 
 impl WebhookSubscriptionLifecycleMessage {
+    pub fn marked_unreachable(
+        webhook_subscription_id: WebhookSubscriptionID,
+        dataset_id: Option<odf::DatasetID>,
+        event_types: Vec<WebhookEventType>,
+    ) -> Self {
+        Self::MarkedUnreachable(WebhookSubscriptionLifecycleMessageMarkedUnreachable {
+            webhook_subscription_id,
+            dataset_id,
+            event_types,
+        })
+    }
+
     pub fn deleted(
         webhook_subscription_id: WebhookSubscriptionID,
         dataset_id: Option<odf::DatasetID>,
@@ -42,6 +55,15 @@ impl Message for WebhookSubscriptionLifecycleMessage {
     fn version() -> u32 {
         WEBHOOK_SUBSCRIPTION_LIFECYCLE_OUTBOX_VERSION
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebhookSubscriptionLifecycleMessageMarkedUnreachable {
+    pub webhook_subscription_id: WebhookSubscriptionID,
+    pub dataset_id: Option<odf::DatasetID>,
+    pub event_types: Vec<WebhookEventType>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
