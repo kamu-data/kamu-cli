@@ -17,7 +17,26 @@ Recommendation: for ease of reading, use the following order:
     - connection failure
     - response timeout
     - bad status code in response
+- Improved handling of task failures in the flow system:
+    - differentiating between Paused (by user) and Stopped (automatically) flow triggers
+    - a flow trigger is stopped after a failed task, if a configured stop policy is violated:
+        - N consecutive failures (N >= 1)
+        - never (schedules next flow regardless of failures count)
+    - GQL API to define stop policy for a flow trigger
+    - webhook subscriptions are automatically marked as Unreachable if a related flow trigger is stopped
+    - GQL API to reactive webhook subscription after becoming Unreachable
+    - task errors can be classified as "recoverable" and "unrecoverable":
+        - retry policy is not applicable when encountering an unrecoverable error
+        - similarly, flow trigger is immediately disabled when encountering an 
+          unrecoverable error, regardless of stop policy associated
+        - recoverable errors are normally related to infrastructural and environment issues 
+            (i.e., unreachable polling source address, failing to pull image, webhook delivery issue)
+        - unrecoverable errors are related to logical issues, and require user corrections
+            (i.e. bad SQL in a query, bad schema, referencing unexisting secret variable)
 ## Changed
+- Revised meaning of flow abortion:
+    - flows with scheduled trigger abort both the current flow run, and pause the trigger
+    - flows with reactive trigger abort current run only
 - Refactoring:
   - Added new `UpdateAccountUseCase` and replace usage of similar methods
   - `PredefinedAccountRegistrator` now uses `UpdateAccountUseCase` methods instead of `AccountService` methods
