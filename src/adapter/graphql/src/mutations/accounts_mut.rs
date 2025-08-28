@@ -81,7 +81,7 @@ impl AccountsMut {
             .int_err()?;
 
         match create_account_use_case
-            .execute(
+            .execute_derived(
                 &logged_account,
                 account_name.as_ref(),
                 CreateAccountUseCaseOptions::builder()

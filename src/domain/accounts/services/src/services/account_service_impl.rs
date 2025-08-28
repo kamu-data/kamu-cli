@@ -17,16 +17,11 @@ use email_utils::Email;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use odf::metadata::DidPkh;
-use secrecy::{ExposeSecret, SecretString};
-use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountServiceImpl {
-    did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     account_repo: Arc<dyn AccountRepository>,
-    time_source: Arc<dyn SystemTimeSource>,
-    did_secret_encryption_key: Option<SecretString>,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
     password_hashing_mode: PasswordHashingMode,
 }
@@ -36,23 +31,13 @@ pub struct AccountServiceImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn AccountService)]
 impl AccountServiceImpl {
-    #[expect(clippy::needless_pass_by_value)]
     fn new(
-        did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
         account_repo: Arc<dyn AccountRepository>,
-        time_source: Arc<dyn SystemTimeSource>,
-        did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
         password_hash_repository: Arc<dyn PasswordHashRepository>,
         maybe_password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
-            did_secret_key_repo,
             account_repo,
-            time_source,
-            did_secret_encryption_key: did_secret_encryption_config
-                .encryption_key
-                .as_ref()
-                .map(|encryption_key| SecretString::from(encryption_key.clone())),
             password_hash_repository,
             // When hashing mode is unspecified, safely assume the default mode.
             // Higher security by default is better than forgetting to configure
@@ -158,54 +143,6 @@ impl AccountService for AccountServiceImpl {
             .search_accounts_by_name_pattern(name_pattern, filters, pagination)
     }
 
-    async fn create_password_account(
-        &self,
-        account_name: &odf::AccountName,
-        password: Password,
-        email: Email,
-    ) -> Result<Account, CreateAccountError> {
-        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
-        let account = Account {
-            id: account_id,
-            account_name: account_name.clone(),
-            email,
-            display_name: account_name.to_string(),
-            account_type: AccountType::User,
-            avatar_url: None,
-            registered_at: self.time_source.now(),
-            provider: AccountProvider::Password.to_string(),
-            provider_identity_key: String::from(account_name.as_str()),
-        };
-
-        // 1. Save an account
-        self.account_repo.save_account(&account).await?;
-
-        // 2. Save an account password
-        self.save_account_password(&account, &password).await?;
-
-        // 3. Save a DID secret key
-        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
-            use odf::metadata::AsStackString;
-
-            let account_id = account.id.as_stack_string();
-            let did_secret_key = DidSecretKey::try_new(
-                &account_key.into(),
-                did_secret_encryption_key.expose_secret(),
-            )
-            .int_err()?;
-
-            self.did_secret_key_repo
-                .save_did_secret_key(
-                    &DidEntity::new_account(account_id.as_str()),
-                    &did_secret_key,
-                )
-                .await
-                .int_err()?;
-        }
-
-        Ok(account)
-    }
-
     async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError> {
         let wallet_address = did_pkh.wallet_address();
         let new_account = Account {
@@ -223,25 +160,6 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.save_account(&new_account).await?;
 
         Ok(new_account)
-    }
-
-    async fn rename_account(
-        &self,
-        account: &Account,
-        new_name: odf::AccountName,
-    ) -> Result<(), RenameAccountError> {
-        let mut updated_account = account.clone();
-        updated_account.account_name = new_name;
-        if updated_account.provider == AccountProvider::Password.to_string() {
-            updated_account.provider_identity_key = updated_account.account_name.to_string();
-        }
-
-        match self.account_repo.update_account(&updated_account).await {
-            Ok(_) => Ok(()),
-            Err(UpdateAccountError::Duplicate(e)) => Err(RenameAccountError::Duplicate(e)),
-            Err(UpdateAccountError::NotFound(e)) => Err(RenameAccountError::Internal(e.int_err())),
-            Err(UpdateAccountError::Internal(e)) => Err(RenameAccountError::Internal(e)),
-        }
     }
 
     async fn delete_account_by_name(

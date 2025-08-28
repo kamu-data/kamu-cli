@@ -17,7 +17,6 @@ use kamu_accounts::{
     LoggedAccountExt,
     ModifyAccountPasswordError,
     ModifyAccountPasswordWithConfirmationError,
-    RenameAccountError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,11 +46,6 @@ pub trait AccountAuthorizationHelper: Send + Sync {
     ) -> Result<(), EnsureNotAuthorizedError>;
 
     async fn ensure_account_can_be_deleted(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), EnsureNotAuthorizedError>;
-
-    async fn ensure_account_can_be_renamed(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError>;
@@ -141,25 +135,6 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
 
         Ok(())
     }
-
-    async fn ensure_account_can_be_renamed(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), EnsureNotAuthorizedError> {
-        if !self.can_modify_account(account_name).await? {
-            return Err(EnsureNotAuthorizedError::Access(
-                odf::AccessError::Unauthenticated(
-                    NotAuthorizedError::rename_account(
-                        self.current_account_subject.maybe_account_name().cloned(),
-                        account_name.clone(),
-                    )
-                    .into(),
-                ),
-            ));
-        }
-
-        Ok(())
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,8 +151,6 @@ impl MockAccountAuthorizationHelper {
         mock.expect_ensure_account_password_with_confirmation_can_be_modified()
             .returning(|_| Ok(()));
         mock.expect_ensure_account_can_be_deleted()
-            .returning(|_| Ok(()));
-        mock.expect_ensure_account_can_be_renamed()
             .returning(|_| Ok(()));
 
         mock
@@ -225,20 +198,6 @@ impl MockAccountAuthorizationHelper {
                 Err(EnsureNotAuthorizedError::Access(
                     odf::AccessError::Unauthenticated(
                         NotAuthorizedError::delete_account(
-                            Some(subject_account_clone.clone()),
-                            account_name.clone(),
-                        )
-                        .into(),
-                    ),
-                ))
-            });
-
-        let subject_account_clone = subject_account.clone();
-        mock.expect_ensure_account_can_be_renamed()
-            .returning(move |account_name| {
-                Err(EnsureNotAuthorizedError::Access(
-                    odf::AccessError::Unauthenticated(
-                        NotAuthorizedError::rename_account(
                             Some(subject_account_clone.clone()),
                             account_name.clone(),
                         )
@@ -298,17 +257,6 @@ impl NotAuthorizedError {
         }
     }
 
-    fn rename_account(
-        subject_account: Option<odf::AccountName>,
-        object_account: odf::AccountName,
-    ) -> Self {
-        Self {
-            kind: NotAuthorizedErrorKind::RenameAccount,
-            subject_account,
-            object_account,
-        }
-    }
-
     fn delete_account(
         subject_account: Option<odf::AccountName>,
         object_account: odf::AccountName,
@@ -325,7 +273,6 @@ impl NotAuthorizedError {
 pub enum NotAuthorizedErrorKind {
     ModifyAccountPassword,
     ModifyAccountPasswordWithConfirmation,
-    RenameAccount,
     DeleteAccount,
 }
 
@@ -336,7 +283,6 @@ impl NotAuthorizedErrorKind {
             Self::ModifyAccountPasswordWithConfirmation => {
                 "modify account's password with confirmation"
             }
-            Self::RenameAccount => "rename account",
             Self::DeleteAccount => "delete account",
         }
     }
@@ -385,17 +331,6 @@ impl From<EnsureNotAuthorizedError> for ModifyAccountPasswordError {
 }
 
 impl From<EnsureNotAuthorizedError> for ModifyAccountPasswordWithConfirmationError {
-    fn from(e: EnsureNotAuthorizedError) -> Self {
-        use EnsureNotAuthorizedError as E;
-
-        match e {
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
-    }
-}
-
-impl From<EnsureNotAuthorizedError> for RenameAccountError {
     fn from(e: EnsureNotAuthorizedError) -> Self {
         use EnsureNotAuthorizedError as E;
 

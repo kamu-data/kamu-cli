@@ -1160,7 +1160,7 @@ async fn test_anonymous_try_to_rename_account() {
                 .data(harness.catalog_anonymous),
         )
         .await;
-    assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Unauthorized"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1191,7 +1191,7 @@ async fn test_non_admin_try_to_rename_other_account() {
         )
         .await;
 
-    assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Unauthorized"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1374,8 +1374,7 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
             .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
             .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
-            .add::<kamu_accounts_services::UpdateAccountEmailUseCaseImpl>()
-            .add::<kamu_accounts_services::RenameAccountUseCaseImpl>()
+            .add::<kamu_accounts_services::UpdateAccountUseCaseImpl>()
             .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
             .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
             .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()

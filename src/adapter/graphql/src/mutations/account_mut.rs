@@ -39,20 +39,21 @@ impl AccountMut {
         // This operation is not allowed in single-tenant mode
         utils::check_multi_tenant_config(ctx)?;
 
-        let rename_account_use_case = from_catalog_n!(ctx, dyn RenameAccountUseCase);
+        let update_account_use_case = from_catalog_n!(ctx, dyn UpdateAccountUseCase);
+        let account_to_update = Account {
+            account_name: new_name.into(),
+            ..self.account.clone()
+        };
 
-        match rename_account_use_case
-            .execute(&self.account, new_name.clone().into())
-            .await
-        {
+        match update_account_use_case.execute(&account_to_update).await {
             Ok(_) => Ok(RenameAccountResult::Success(RenameAccountSuccess {
-                new_name: new_name.as_ref().to_string(),
+                new_name: account_to_update.account_name.to_string(),
             })),
-            Err(RenameAccountError::Duplicate(_)) => Ok(RenameAccountResult::NonUniqueName(
+            Err(UpdateAccountError::Duplicate(_)) => Ok(RenameAccountResult::NonUniqueName(
                 RenameAccountNameNotUnique::default(),
             )),
-            Err(RenameAccountError::Access(access_error)) => Err(access_error.into()),
-            Err(e @ RenameAccountError::Internal(_)) => Err(e.int_err().into()),
+            Err(UpdateAccountError::Access(access_error)) => Err(access_error.into()),
+            Err(e) => Err(e.int_err().into()),
         }
     }
 
@@ -63,24 +64,25 @@ impl AccountMut {
         ctx: &Context<'_>,
         new_email: Email<'_>,
     ) -> Result<UpdateEmailResult> {
-        let update_account_email_use_case = from_catalog_n!(ctx, dyn UpdateAccountEmailUseCase);
+        let update_account_use_case = from_catalog_n!(ctx, dyn UpdateAccountUseCase);
+        let account_to_update = Account {
+            email: new_email.into(),
+            ..self.account.clone()
+        };
 
-        match update_account_email_use_case
-            .execute(&self.account, new_email.clone().into())
-            .await
-        {
+        match update_account_use_case.execute(&account_to_update).await {
             Ok(_) => Ok(UpdateEmailResult::Success(UpdateEmailSuccess {
-                new_email: new_email.as_ref().to_string(),
+                new_email: account_to_update.email.as_ref().to_string(),
             })),
-            Err(UpdateAccountEmailError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
+            Err(UpdateAccountError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
                 UpdateEmailNonUnique::default(),
             )),
-            Err(UpdateAccountEmailError::Internal(e)) => Err(e.int_err().into()),
-            Err(UpdateAccountEmailError::Access(_)) => {
+            Err(UpdateAccountError::Access(_)) => {
                 Err(GqlError::gql_extended("Account access error", |eev| {
                     eev.set("account_name", self.account.account_name.to_string());
                 }))
             }
+            Err(e) => Err(e.int_err().into()),
         }
     }
 

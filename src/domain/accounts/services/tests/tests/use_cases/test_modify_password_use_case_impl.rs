@@ -259,7 +259,7 @@ impl ModifyAccountPasswordUseCaseImplHarness {
         let account_name = odf::AccountName::new_unchecked("new-account");
 
         self.create_use_case
-            .execute(
+            .execute_derived(
                 &creator_account,
                 &account_name,
                 CreateAccountUseCaseOptions::builder()

@@ -19,8 +19,10 @@ use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, Predefined
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
+    CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
+    UpdateAccountUseCaseImpl,
 };
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -87,6 +89,8 @@ async fn setup_repo() -> RepoFixture {
         .add::<InMemoryDatasetEntryRepository>()
         .add::<InMemoryDatasetKeyBlockRepository>()
         .add::<AccountServiceImpl>()
+        .add::<UpdateAccountUseCaseImpl>()
+        .add::<CreateAccountUseCaseImpl>()
         .add::<InMemoryAccountRepository>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
