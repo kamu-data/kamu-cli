@@ -173,6 +173,14 @@ impl DataField {
         }
     }
 
+    pub fn description(self, description: impl Into<String>) -> Self {
+        self.extra(&crate::schema::ext::AttrDescription::new(description))
+    }
+
+    pub fn type_ext(self, typ: impl Into<crate::schema::ext::DataTypeExt>) -> Self {
+        self.extra(&crate::schema::ext::AttrType::new(typ.into()))
+    }
+
     pub fn encoding(self, enc: impl Into<ArrowEncoding>) -> Self {
         let enc = enc.into();
         let mut extra = self.extra.unwrap_or_default();
