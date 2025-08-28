@@ -39,10 +39,13 @@ impl Collection {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time"),
-                odf::schema::DataField::string("path"),
-                odf::schema::DataField::string("ref").extra(&odf::schema::ext::AttrType::new(
-                    odf::schema::ext::DataTypeExt::did(),
-                )),
+                odf::schema::DataField::string("path").description(
+                    "HTTP-like path to a collection entry. Paths start with `/` and can be \
+                     nested, with individual path segments url-encoded (e.g. `/foo/bar%20baz`)",
+                ),
+                odf::schema::DataField::string("ref")
+                    .type_ext(odf::schema::ext::DataTypeExt::did())
+                    .description("DID that references another dataset"),
             ]
             .into_iter()
             .chain(extra_columns_schema.fields)

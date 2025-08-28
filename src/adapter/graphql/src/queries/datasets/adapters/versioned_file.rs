@@ -43,14 +43,19 @@ impl VersionedFile {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time"),
-                odf::schema::DataField::i32("version"),
-                odf::schema::DataField::string("content_hash").extra(
-                    &odf::schema::ext::AttrType::new(odf::schema::ext::DataTypeExt::object_link(
-                        odf::schema::ext::DataTypeExt::multihash(),
-                    )),
+                odf::schema::DataField::i32("version").description(
+                    "Sequential identifier assigned to each entry as new versions are uploaded",
                 ),
-                odf::schema::DataField::i64("content_length"),
-                odf::schema::DataField::string("content_type").optional(),
+                odf::schema::DataField::string("content_hash")
+                    .type_ext(odf::schema::ext::DataTypeExt::object_link(
+                        odf::schema::ext::DataTypeExt::multihash(),
+                    ))
+                    .description("Hash that references the externally-stored object content"),
+                odf::schema::DataField::i64("content_length")
+                    .description("Size of the linked object in bytes"),
+                odf::schema::DataField::string("content_type")
+                    .optional()
+                    .description("Media type associated with the linked object"),
             ]
             .into_iter()
             .chain(extra_columns_schema.fields)
