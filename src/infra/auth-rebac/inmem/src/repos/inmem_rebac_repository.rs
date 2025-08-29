@@ -272,6 +272,25 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(res)
     }
 
+    async fn get_subject_entities_relations(
+        &self,
+        subject_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
+        let subject_entities_set = subject_entities.iter().collect::<HashSet<_>>();
+
+        let res = self
+            .get_rows(|row| {
+                if subject_entities_set.contains(&row.subject_entity) {
+                    Some(row.clone_owned())
+                } else {
+                    None
+                }
+            })
+            .await;
+
+        Ok(res)
+    }
+
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,

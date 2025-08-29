@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Added
+- GQL: `Auth::relations()` for getting ReBAC triplets for debugging purposes.
+
 ## [0.247.0] - 2025-08-28
 ## Added
 - Extended support for webhook delivery errors, differentiating between:
