@@ -202,7 +202,8 @@ async fn resolve_transform_inputs(
     dataset_ref_vec.sort_unstable();
     let duplicate_inputs: Vec<_> = dataset_ref_vec
         .windows(2)
-        .filter_map(|w| (w[0] == w[1]).then(|| w[0].clone()))
+        .filter(|&dataset_ref| (dataset_ref[0] == dataset_ref[1]))
+        .map(|dataset_ref| dataset_ref[0].clone())
         .collect();
 
     if !duplicate_inputs.is_empty() {
