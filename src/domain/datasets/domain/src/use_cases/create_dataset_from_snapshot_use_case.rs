@@ -47,6 +47,9 @@ pub enum CreateDatasetFromSnapshotError {
     MissingInputs(#[from] odf::dataset::MissingInputsError),
 
     #[error(transparent)]
+    DuplicateInputs(#[from] odf::dataset::DuplicateInputsError),
+
+    #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
 
     #[error(transparent)]
@@ -100,6 +103,9 @@ impl From<odf::dataset::ValidateDatasetSnapshotError> for CreateDatasetFromSnaps
             }
             odf::dataset::ValidateDatasetSnapshotError::MissingInputs(e) => {
                 CreateDatasetFromSnapshotError::MissingInputs(e)
+            }
+            odf::dataset::ValidateDatasetSnapshotError::DuplicateInputs(e) => {
+                CreateDatasetFromSnapshotError::DuplicateInputs(e)
             }
             odf::dataset::ValidateDatasetSnapshotError::Internal(e) => {
                 CreateDatasetFromSnapshotError::Internal(e)

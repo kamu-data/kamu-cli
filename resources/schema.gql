@@ -719,6 +719,12 @@ interface CreateDatasetResult {
 	message: String!
 }
 
+type CreateDatasetResultDuplicateInputs implements CreateDatasetFromSnapshotResult {
+	duplicateInputs: [String!]!
+	isSuccess: Boolean!
+	message: String!
+}
+
 type CreateDatasetResultInvalidSnapshot implements CreateDatasetFromSnapshotResult {
 	message: String!
 	isSuccess: Boolean!

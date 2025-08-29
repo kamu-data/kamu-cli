@@ -129,7 +129,8 @@ impl DatasetsMut {
             CreateDatasetFromSnapshotResult::InvalidSnapshot(_)
             | CreateDatasetFromSnapshotResult::Malformed(_)
             | CreateDatasetFromSnapshotResult::UnsupportedVersion(_)
-            | CreateDatasetFromSnapshotResult::MissingInputs(_) => unreachable!(),
+            | CreateDatasetFromSnapshotResult::MissingInputs(_)
+            | CreateDatasetFromSnapshotResult::DuplicateInputs(_) => unreachable!(),
         }
     }
 
@@ -221,6 +222,17 @@ impl DatasetsMut {
                         .map(|r| r.to_string())
                         .collect(),
                 })
+            }
+            Err(CreateDatasetFromSnapshotError::DuplicateInputs(e)) => {
+                CreateDatasetFromSnapshotResult::DuplicateInputs(
+                    CreateDatasetResultDuplicateInputs {
+                        duplicate_inputs: e
+                            .duplicate_inputs
+                            .into_iter()
+                            .map(|r| r.to_string())
+                            .collect(),
+                    },
+                )
             }
             Err(CreateDatasetFromSnapshotError::CASFailed(e)) => return Err(e.int_err().into()),
             Err(CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
@@ -338,6 +350,7 @@ pub enum CreateDatasetFromSnapshotResult<'a> {
     // TODO: This error should probably be generalized along with other
     // errors that can occur during the metadata evolution
     MissingInputs(CreateDatasetResultMissingInputs),
+    DuplicateInputs(CreateDatasetResultDuplicateInputs),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -411,6 +424,27 @@ impl CreateDatasetResultMissingInputs {
         format!(
             "Dataset is referencing non-existing inputs: {}",
             self.missing_inputs.join(", ")
+        )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct CreateDatasetResultDuplicateInputs {
+    pub duplicate_inputs: Vec<String>,
+}
+
+#[ComplexObject]
+impl CreateDatasetResultDuplicateInputs {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+    pub async fn message(&self) -> String {
+        format!(
+            "Dataset contains duplicate inputs: {}",
+            self.duplicate_inputs.join(", ")
         )
     }
 }
