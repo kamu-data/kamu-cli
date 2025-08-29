@@ -185,7 +185,7 @@ fn normalize_transform(transform: &mut Transform) -> Result<(), InvalidSnapshotE
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves dataset references in transform intputs and ensures that:
+/// Resolves dataset references in transform inputs and ensures that:
 /// - input datasets are always references by unique IDs
 /// - that query alias is populated (manually or from the initial reference)
 async fn resolve_transform_inputs(
@@ -194,6 +194,25 @@ async fn resolve_transform_inputs(
     output_dataset_alias: &DatasetAlias,
 ) -> Result<(), ValidateDatasetSnapshotError> {
     let mut missing_inputs = Vec::new();
+
+    let mut dataset_ref_vec = inputs
+        .iter()
+        .map(|i| i.dataset_ref.clone())
+        .collect::<Vec<_>>();
+    dataset_ref_vec.sort_unstable();
+    let duplicate_inputs: Vec<_> = dataset_ref_vec
+        .windows(2)
+        .filter_map(|w| (w[0] == w[1]).then(|| w[0].clone()))
+        .collect();
+
+    if !duplicate_inputs.is_empty() {
+        return Err(ValidateDatasetSnapshotError::DuplicateInputs(
+            DuplicateInputsError {
+                dataset_ref: output_dataset_alias.into(),
+                duplicate_inputs,
+            },
+        ));
+    }
 
     for input in inputs.iter_mut() {
         let hdl = match dataset_handle_resolver
@@ -219,15 +238,15 @@ async fn resolve_transform_inputs(
     }
 
     if !missing_inputs.is_empty() {
-        Err(ValidateDatasetSnapshotError::MissingInputs(
+        return Err(ValidateDatasetSnapshotError::MissingInputs(
             MissingInputsError {
                 dataset_ref: output_dataset_alias.into(),
                 missing_inputs,
             },
-        ))
-    } else {
-        Ok(())
+        ));
     }
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -239,6 +258,9 @@ pub enum ValidateDatasetSnapshotError {
 
     #[error(transparent)]
     MissingInputs(#[from] MissingInputsError),
+
+    #[error(transparent)]
+    DuplicateInputs(#[from] DuplicateInputsError),
 
     #[error(transparent)]
     Internal(
@@ -280,6 +302,31 @@ impl std::fmt::Display for MissingInputsError {
             self.dataset_ref
         )?;
         for (i, h) in self.missing_inputs.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{h}")?;
+        }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+pub struct DuplicateInputsError {
+    pub dataset_ref: DatasetRef,
+    pub duplicate_inputs: Vec<DatasetRef>,
+}
+
+impl std::fmt::Display for DuplicateInputsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Dataset {} contains duplicate transform inputs: ",
+            self.dataset_ref
+        )?;
+        for (i, h) in self.duplicate_inputs.iter().enumerate() {
             if i != 0 {
                 write!(f, ", ")?;
             }

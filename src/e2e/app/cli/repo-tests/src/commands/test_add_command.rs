@@ -254,3 +254,37 @@ pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_with_duplicate_dependencies(kamu: KamuCliPuppet) {
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("with-duplicates")
+        .kind(odf::DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["plain", "plain"])
+                .build(),
+        )
+        .build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(kamu.workspace_path().join("with-duplicates.yaml"), manifest).unwrap();
+
+    kamu.assert_failure_command_execution(
+        ["-v", "add", "with-duplicates.yaml"],
+        None,
+        Some(["Dataset with-duplicates contains duplicate transform inputs: plain"]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert!(dataset_names.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
