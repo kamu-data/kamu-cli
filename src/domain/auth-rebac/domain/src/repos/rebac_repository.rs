@@ -78,6 +78,11 @@ pub trait RebacRepository: Send + Sync {
         object_entities: &[Entity],
     ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError>;
 
+    async fn get_subject_entities_relations(
+        &self,
+        subject_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError>;
+
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,

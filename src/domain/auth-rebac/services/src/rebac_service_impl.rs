@@ -392,6 +392,49 @@ impl RebacService for RebacServiceImpl {
         Ok(object_entities)
     }
 
+    async fn get_authorized_datasets_by_account_ids(
+        &self,
+        account_ids: &[odf::AccountID],
+    ) -> Result<HashMap<odf::AccountID, Vec<AuthorizedDataset>>, GetObjectEntityRelationsError>
+    {
+        let account_entities = account_ids
+            .iter()
+            .map(|id| Entity::new_account(id.to_string()))
+            .collect::<Vec<_>>();
+
+        let entities_with_relations = self
+            .rebac_repo
+            .get_subject_entities_relations(&account_entities[..])
+            .await
+            .int_err()?;
+
+        let mut account_datasets_relation_map = HashMap::new();
+
+        for entities_with_relation in entities_with_relations {
+            let EntitiesWithRelation {
+                subject_entity,
+                relation,
+                object_entity,
+            } = entities_with_relation;
+
+            let account_id = odf::AccountID::from_did_str(&subject_entity.entity_id).int_err()?;
+            let dataset_id = odf::DatasetID::from_did_str(&object_entity.entity_id).int_err()?;
+
+            match relation {
+                Relation::AccountToDataset(role) => {
+                    let authorized_datasets = account_datasets_relation_map
+                        .entry(account_id)
+                        .or_insert_with(Vec::new);
+                    let authorized_dataset = AuthorizedDataset { dataset_id, role };
+
+                    authorized_datasets.push(authorized_dataset);
+                }
+            }
+        }
+
+        Ok(account_datasets_relation_map)
+    }
+
     async fn get_authorized_accounts(
         &self,
         dataset_id: &odf::DatasetID,

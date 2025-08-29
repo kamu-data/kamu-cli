@@ -12,8 +12,9 @@ use std::num::NonZeroUsize;
 
 use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_tuple_list_2};
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::*;
+use sqlx::sqlite::SqliteRow;
 use sqlx::{QueryBuilder, Row};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +30,19 @@ impl SqliteRebacRepository {
         Self {
             transaction: transaction.into(),
         }
+    }
+
+    fn map_entity_row(row: &SqliteRow) -> Result<EntitiesWithRelation<'static>, InternalError> {
+        let raw_entity = EntitiesWithRelationRowModel {
+            subject_entity_type: row.get(0),
+            subject_entity_id: row.get(1),
+            relationship: row.get(2),
+            object_entity_type: row.get(3),
+            object_entity_id: row.get(4),
+        };
+        let entity = raw_entity.try_into()?;
+
+        Ok(entity)
     }
 }
 
@@ -374,19 +388,55 @@ impl RebacRepository for SqliteRebacRepository {
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
         let rows = raw_rows
-            .into_iter()
-            .map(|row| {
-                let raw_entity = EntitiesWithRelationRowModel {
-                    subject_entity_type: row.get(0),
-                    subject_entity_id: row.get(1),
-                    relationship: row.get(2),
-                    object_entity_type: row.get(3),
-                    object_entity_id: row.get(4),
-                };
-                let entity = raw_entity.try_into()?;
+            .iter()
+            .map(Self::map_entity_row)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(GetObjectEntityRelationsError::Internal)?;
 
-                Ok(entity)
-            })
+        Ok(rows)
+    }
+
+    async fn get_subject_entities_relations(
+        &self,
+        subject_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
+        if subject_entities.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            SELECT subject_entity_type,
+                   subject_entity_id,
+                   relationship,
+                   object_entity_type,
+                   object_entity_id
+            FROM auth_rebac_relations
+            WHERE (subject_entity_type, subject_entity_id) IN ({})
+            ORDER BY subject_entity_id, object_entity_id
+            "#,
+            sqlite_generate_placeholders_tuple_list_2(
+                subject_entities.len(),
+                NonZeroUsize::new(1).unwrap()
+            )
+        );
+
+        let mut query = sqlx::query(&query_str);
+        for entity in subject_entities {
+            query = query.bind(entity.entity_type);
+            query = query.bind(&entity.entity_id);
+        }
+
+        let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
+        let rows = raw_rows
+            .iter()
+            .map(Self::map_entity_row)
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetObjectEntityRelationsError::Internal)?;
 
