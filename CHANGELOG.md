@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## Unreleased
+### Added
+- GQL: `Auth::relations()` for getting ReBAC triplets for debugging purposes.
 ### Changed
 - dep: `ringbug` updated from `0.3` to `0.4`.
 

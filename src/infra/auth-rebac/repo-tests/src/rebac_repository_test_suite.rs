@@ -14,7 +14,7 @@ use std::vec;
 
 use dill::Catalog;
 use kamu_auth_rebac::*;
-use pretty_assertions::assert_matches;
+use pretty_assertions::{assert_eq, assert_matches};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -151,7 +151,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
                 expected_properties.sort();
                 actual_properties.sort();
 
-                pretty_assertions::assert_eq!(expected_properties, actual_properties);
+                assert_eq!(expected_properties, actual_properties);
             }
             Err(e) => {
                 panic!("A successful result was expected, but an error was received: {e}");
@@ -175,7 +175,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
                 expected_properties.sort();
                 actual_properties.sort();
 
-                pretty_assertions::assert_eq!(expected_properties, actual_properties);
+                assert_eq!(expected_properties, actual_properties);
             }
             Err(e) => {
                 panic!("A successful result was expected, but an error was received: {e}");
@@ -247,7 +247,7 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             expected_properties.sort();
             actual_properties.sort();
 
-            pretty_assertions::assert_eq!(expected_properties, actual_properties);
+            assert_eq!(expected_properties, actual_properties);
         }
         Err(e) => {
             panic!("A successful result was expected, but an error was received: {e}");
@@ -267,7 +267,7 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             expected_properties.sort();
             actual_properties.sort();
 
-            pretty_assertions::assert_eq!(expected_properties, actual_properties);
+            assert_eq!(expected_properties, actual_properties);
         }
         Err(e) => {
             panic!("A successful result was expected, but an error was received: {e}");
@@ -901,7 +901,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
         use EntityWithRelation as E;
 
         // dataset_1
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             [
                 E::new_account("account1", reader),
                 E::new_account("account2", editor),
@@ -911,7 +911,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
             *get_object_entity_relations_sorted!(&rebac_repo, &dataset_1)
         );
         // dataset_2
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             [
                 E::new_account("account2", maintainer),
                 E::new_account("account3", maintainer),
@@ -919,7 +919,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
             *get_object_entity_relations_sorted!(&rebac_repo, &dataset_2)
         );
         // dataset_3
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             *Vec::<E>::new(),
             *get_object_entity_relations_sorted!(&rebac_repo, &dataset_3)
         );
@@ -941,7 +941,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
         use EntitiesWithRelation as E;
 
         // [dataset1]
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             [
                 E::new_account_dataset_relation("account1", reader, "dataset1"),
                 E::new_account_dataset_relation("account2", editor, "dataset1"),
@@ -951,7 +951,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
             *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_1.clone()]),
         );
         // [dataset2]
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             [
                 E::new_account_dataset_relation("account2", maintainer, "dataset2"),
                 E::new_account_dataset_relation("account3", maintainer, "dataset2"),
@@ -959,12 +959,12 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
             *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_2.clone()]),
         );
         // [dataset3]
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             *Vec::<E>::new(),
             *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_3.clone()]),
         );
         // [dataset1, dataset3]
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             [
                 E::new_account_dataset_relation("account1", reader, "dataset1"),
                 E::new_account_dataset_relation("account2", editor, "dataset1"),
@@ -974,7 +974,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
             *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_1.clone(), dataset_3]),
         );
         // [dataset1, dataset2]
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             [
                 E::new_account_dataset_relation("account1", reader, "dataset1"),
                 E::new_account_dataset_relation("account2", editor, "dataset1"),
@@ -984,6 +984,64 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
                 E::new_account_dataset_relation("account4", maintainer, "dataset1"),
             ],
             *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_1, dataset_2]),
+        );
+    }
+
+    // get_subject_entities_relations
+
+    {
+        macro_rules! get_subject_entities_relations_sorted {
+            ($repo: expr, $objects: expr) => {{
+                let r = $repo.get_subject_entities_relations($objects).await;
+                assert_matches!(r, Ok(_));
+                let mut r = r.unwrap();
+                r.sort();
+                r
+            }};
+        }
+
+        use EntitiesWithRelation as E;
+
+        // [account1]
+        assert_eq!(
+            [E::new_account_dataset_relation(
+                "account1", reader, "dataset1"
+            )],
+            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_1.clone()]),
+        );
+        // [account2]
+        assert_eq!(
+            [
+                E::new_account_dataset_relation("account2", editor, "dataset1"),
+                E::new_account_dataset_relation("account2", maintainer, "dataset2"),
+            ],
+            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_2.clone()]),
+        );
+        // [account3]
+        assert_eq!(
+            [
+                E::new_account_dataset_relation("account3", reader, "dataset1"),
+                E::new_account_dataset_relation("account3", maintainer, "dataset2"),
+            ],
+            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_3.clone()]),
+        );
+        // [account1, account2]
+        assert_eq!(
+            [
+                E::new_account_dataset_relation("account1", reader, "dataset1"),
+                E::new_account_dataset_relation("account2", editor, "dataset1"),
+                E::new_account_dataset_relation("account2", maintainer, "dataset2"),
+            ],
+            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_1.clone(), account_2]),
+        );
+        // [account1, account3]
+        assert_eq!(
+            [
+                E::new_account_dataset_relation("account1", reader, "dataset1"),
+                E::new_account_dataset_relation("account3", reader, "dataset1"),
+                E::new_account_dataset_relation("account3", maintainer, "dataset2"),
+            ],
+            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_1, account_3]),
         );
     }
 }
@@ -1007,12 +1065,10 @@ async fn assert_get_relations(
             Ok(mut actual_res) => {
                 actual_res.sort();
 
-                pretty_assertions::assert_eq!(
-                    object_entities,
-                    actual_res,
+                assert_eq!(
+                    object_entities, actual_res,
                     "[{}] AccountID: {}",
-                    tag,
-                    state.account_id
+                    tag, state.account_id
                 );
             }
             unexpected_res => {
@@ -1031,12 +1087,10 @@ async fn assert_get_relations(
                 Ok(mut actual_res) => {
                     actual_res.sort();
 
-                    pretty_assertions::assert_eq!(
-                        object_entities,
-                        actual_res,
+                    assert_eq!(
+                        object_entities, actual_res,
                         "[{}] AccountID: {}",
-                        tag,
-                        state.account_id
+                        tag, state.account_id
                     );
                 }
                 unexpected_res => {
@@ -1070,12 +1124,10 @@ async fn assert_get_relations(
                 Ok(actual_relation) => {
                     let expected_relation = relation_map.get(dataset_id).unwrap();
 
-                    pretty_assertions::assert_eq!(
-                        expected_relation,
-                        &actual_relation,
+                    assert_eq!(
+                        expected_relation, &actual_relation,
                         "[{}] AccountID: {}",
-                        tag,
-                        state.account_id
+                        tag, state.account_id
                     );
                 }
                 unexpected_res => {

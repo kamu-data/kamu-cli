@@ -371,6 +371,7 @@ type AttachmentsEmbedded {
 
 type Auth {
 	enabledProviders: [AccountProvider!]!
+	relations(accountIds: [AccountID!]!): [AuthRelation!]!
 }
 
 type AuthMut {
@@ -380,6 +381,12 @@ type AuthMut {
 	web3: AuthWeb3Mut!
 	login(loginMethod: AccountProvider!, loginCredentialsJson: String!, deviceCode: DeviceCode): LoginResponse!
 	accountDetails(accessToken: String!): Account!
+}
+
+type AuthRelation {
+	account: Account!
+	role: DatasetAccessRole!
+	dataset: Dataset!
 }
 
 type AuthWeb3Mut {
