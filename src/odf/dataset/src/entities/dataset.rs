@@ -91,7 +91,8 @@ pub struct CommitOpts<'a> {
     /// Compare-and-swap semantics to ensure there were no concurrent updates
     pub prev_block_hash: Option<Option<&'a Multihash>>,
     /// Whether to check for the presence of linked objects like data and
-    /// checkpoints in the respective repos
+    /// checkpoints in the respective repos. Does NOT check referrential
+    /// integrity of linked objects.
     pub check_object_refs: bool,
     // Whether to reset head to new committed block
     pub update_block_ref: bool,
@@ -159,17 +160,25 @@ pub enum CommitError {
 pub struct AddDataParams {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
     pub prev_checkpoint: Option<Multihash>,
+
     /// Last offset of the previous data slice, if any. Must be equal to the
     /// last non-empty `newData.offsetInterval.end`.
     pub prev_offset: Option<u64>,
+
     /// Offset interval of the output data written during this transaction, if
     /// any.
     pub new_offset_interval: Option<OffsetInterval>,
+
+    /// Summary of linked object referenced by output data of this transaction,
+    /// if any
+    pub new_linked_objects: Option<schema::ext::LinkedObjectsSummary>,
+
     /// Last watermark of the output data stream, if any. Initial blocks may not
     /// have watermarks, but once watermark is set - all subsequent blocks
     /// should either carry the same watermark or specify a new (greater) one.
     /// Thus, watermarks are monotonically non-decreasing.
     pub new_watermark: Option<DateTime<Utc>>,
+
     /// The state of the source the data was added from to allow fast resuming.
     /// If the state did not change but is still relevant for subsequent runs it
     /// should be carried, i.e. only the last state per source is considered

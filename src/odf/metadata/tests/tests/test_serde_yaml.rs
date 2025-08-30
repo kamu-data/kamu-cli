@@ -138,12 +138,10 @@ fn serde_set_data_schema() {
         DataField::u64("population"),
         DataField::string("census")
             .optional()
-            .extra(&AttrType::new(DataTypeExt::object_link(
-                DataTypeExt::multihash(),
-            ))),
+            .extra(DataTypeExt::object_link(DataTypeExt::multihash())),
         DataField::list("links", DataType::string()),
     ])
-    .extra(&AttrArchetype::new(DatasetArchetype::Collection));
+    .extra(DatasetArchetype::Collection);
 
     let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
 

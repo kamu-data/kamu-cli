@@ -17,6 +17,22 @@ pub trait Attribute: ::serde::Serialize + ::serde::de::DeserializeOwned {
     const KEYS: &[&str];
 }
 
+pub trait IntoAttribute {
+    type Output: Attribute;
+    fn into_attribute(self) -> Self::Output;
+}
+
+impl<T> IntoAttribute for T
+where
+    T: Attribute,
+{
+    type Output = Self;
+
+    fn into_attribute(self) -> Self::Output {
+        self
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ExtraAttributes {
@@ -56,8 +72,9 @@ impl ExtraAttributes {
         Ok(Some(val))
     }
 
-    pub fn insert<T: Attribute>(&mut self, value: &T) {
-        let serde_json::Value::Object(mut other) = serde_json::to_value(value).unwrap() else {
+    pub fn insert<T: IntoAttribute>(&mut self, value: T) {
+        let attr = value.into_attribute();
+        let serde_json::Value::Object(mut other) = serde_json::to_value(attr).unwrap() else {
             panic!(
                 "{} must serialize to object to use merge",
                 std::any::type_name::<T>()
@@ -67,12 +84,22 @@ impl ExtraAttributes {
         self.attributes.append(&mut other);
     }
 
+    pub fn with<T: IntoAttribute>(mut self, value: T) -> Self {
+        self.insert(value);
+        self
+    }
+
     pub fn insert_json(&mut self, value: serde_json::Value) {
         let serde_json::Value::Object(mut other) = value else {
             panic!("Value must be an object");
         };
 
         self.attributes.append(&mut other);
+    }
+
+    pub fn remove<T: Attribute>(&mut self) {
+        self.attributes
+            .retain(|k, _| !T::KEYS.contains(&k.as_str()));
     }
 
     pub fn retain<F>(mut self, fun: F) -> Self

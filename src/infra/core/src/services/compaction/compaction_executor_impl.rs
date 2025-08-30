@@ -151,6 +151,7 @@ impl CompactionExecutorImpl {
                         prev_checkpoint: data_slice_batch_info.lower_bound.prev_checkpoint.clone(),
                         prev_offset: data_slice_batch_info.lower_bound.prev_offset,
                         new_offset_interval: Some(new_offset_interval),
+                        new_linked_objects: data_slice_batch_info.linked_objects.clone(),
                         new_source_state: data_slice_batch_info
                             .upper_bound
                             .new_source_state

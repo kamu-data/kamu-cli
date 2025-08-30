@@ -2701,6 +2701,118 @@ impl core::fmt::Debug for SourceState<'_> {
         ds.finish()
     }
 }
+pub enum ExtraAttributesOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct ExtraAttributes<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ExtraAttributes<'a> {
+    type Inner = ExtraAttributes<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> ExtraAttributes<'a> {
+    pub const VT_ATTRIBUTES: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        ExtraAttributes { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args ExtraAttributesArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ExtraAttributes<'bldr>> {
+        let mut builder = ExtraAttributesBuilder::new(_fbb);
+        if let Some(x) = args.attributes {
+            builder.add_attributes(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn attributes(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ExtraAttributes::VT_ATTRIBUTES, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for ExtraAttributes<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "attributes",
+                Self::VT_ATTRIBUTES,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct ExtraAttributesArgs<'a> {
+    pub attributes: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for ExtraAttributesArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        ExtraAttributesArgs { attributes: None }
+    }
+}
+
+pub struct ExtraAttributesBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ExtraAttributesBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_attributes(&mut self, attributes: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExtraAttributes::VT_ATTRIBUTES,
+            attributes,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> ExtraAttributesBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        ExtraAttributesBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<ExtraAttributes<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for ExtraAttributes<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("ExtraAttributes");
+        ds.field("attributes", &self.attributes());
+        ds.finish()
+    }
+}
 pub enum AddDataOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -2726,6 +2838,7 @@ impl<'a> AddData<'a> {
     pub const VT_NEW_CHECKPOINT: flatbuffers::VOffsetT = 10;
     pub const VT_NEW_WATERMARK: flatbuffers::VOffsetT = 12;
     pub const VT_NEW_SOURCE_STATE: flatbuffers::VOffsetT = 14;
+    pub const VT_EXTRA: flatbuffers::VOffsetT = 16;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -2739,6 +2852,9 @@ impl<'a> AddData<'a> {
         let mut builder = AddDataBuilder::new(_fbb);
         if let Some(x) = args.prev_offset {
             builder.add_prev_offset(x);
+        }
+        if let Some(x) = args.extra {
+            builder.add_extra(x);
         }
         if let Some(x) = args.new_source_state {
             builder.add_new_source_state(x);
@@ -2817,6 +2933,16 @@ impl<'a> AddData<'a> {
             )
         }
     }
+    #[inline]
+    pub fn extra(&self) -> Option<ExtraAttributes<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ExtraAttributes>>(AddData::VT_EXTRA, None)
+        }
+    }
 }
 
 impl flatbuffers::Verifiable for AddData<'_> {
@@ -2849,6 +2975,11 @@ impl flatbuffers::Verifiable for AddData<'_> {
                 Self::VT_NEW_SOURCE_STATE,
                 false,
             )?
+            .visit_field::<flatbuffers::ForwardsUOffset<ExtraAttributes>>(
+                "extra",
+                Self::VT_EXTRA,
+                false,
+            )?
             .finish();
         Ok(())
     }
@@ -2860,6 +2991,7 @@ pub struct AddDataArgs<'a> {
     pub new_checkpoint: Option<flatbuffers::WIPOffset<Checkpoint<'a>>>,
     pub new_watermark: Option<&'a Timestamp>,
     pub new_source_state: Option<flatbuffers::WIPOffset<SourceState<'a>>>,
+    pub extra: Option<flatbuffers::WIPOffset<ExtraAttributes<'a>>>,
 }
 impl<'a> Default for AddDataArgs<'a> {
     #[inline]
@@ -2871,6 +3003,7 @@ impl<'a> Default for AddDataArgs<'a> {
             new_checkpoint: None,
             new_watermark: None,
             new_source_state: None,
+            extra: None,
         }
     }
 }
@@ -2925,6 +3058,11 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AddDataBuilder<'a, 'b, A> {
             );
     }
     #[inline]
+    pub fn add_extra(&mut self, extra: flatbuffers::WIPOffset<ExtraAttributes<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ExtraAttributes>>(AddData::VT_EXTRA, extra);
+    }
+    #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> AddDataBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
         AddDataBuilder {
@@ -2948,6 +3086,7 @@ impl core::fmt::Debug for AddData<'_> {
         ds.field("new_checkpoint", &self.new_checkpoint());
         ds.field("new_watermark", &self.new_watermark());
         ds.field("new_source_state", &self.new_source_state());
+        ds.field("extra", &self.extra());
         ds.finish()
     }
 }
@@ -11540,118 +11679,6 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeStringBuilder<'a, 'b, A
 impl core::fmt::Debug for DataTypeString<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("DataTypeString");
-        ds.finish()
-    }
-}
-pub enum ExtraAttributesOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct ExtraAttributes<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExtraAttributes<'a> {
-    type Inner = ExtraAttributes<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExtraAttributes<'a> {
-    pub const VT_ATTRIBUTES: flatbuffers::VOffsetT = 4;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExtraAttributes { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args ExtraAttributesArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExtraAttributes<'bldr>> {
-        let mut builder = ExtraAttributesBuilder::new(_fbb);
-        if let Some(x) = args.attributes {
-            builder.add_attributes(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn attributes(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(ExtraAttributes::VT_ATTRIBUTES, None)
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for ExtraAttributes<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "attributes",
-                Self::VT_ATTRIBUTES,
-                false,
-            )?
-            .finish();
-        Ok(())
-    }
-}
-pub struct ExtraAttributesArgs<'a> {
-    pub attributes: Option<flatbuffers::WIPOffset<&'a str>>,
-}
-impl<'a> Default for ExtraAttributesArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        ExtraAttributesArgs { attributes: None }
-    }
-}
-
-pub struct ExtraAttributesBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ExtraAttributesBuilder<'a, 'b, A> {
-    #[inline]
-    pub fn add_attributes(&mut self, attributes: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExtraAttributes::VT_ATTRIBUTES,
-            attributes,
-        );
-    }
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> ExtraAttributesBuilder<'a, 'b, A> {
-        let start = _fbb.start_table();
-        ExtraAttributesBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExtraAttributes<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExtraAttributes<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExtraAttributes");
-        ds.field("attributes", &self.attributes());
         ds.finish()
     }
 }

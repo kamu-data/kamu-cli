@@ -64,6 +64,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddData {
         let new_data_offset = self.new_data.as_ref().map(|v| v.serialize(fb));
         let new_checkpoint_offset = self.new_checkpoint.as_ref().map(|v| v.serialize(fb));
         let new_source_state_offset = self.new_source_state.as_ref().map(|v| v.serialize(fb));
+        let extra_offset = self.extra.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::AddDataBuilder::new(fb);
         prev_checkpoint_offset.map(|off| builder.add_prev_checkpoint(off));
         self.prev_offset.map(|v| builder.add_prev_offset(v));
@@ -72,6 +73,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddData {
         self.new_watermark
             .map(|v| builder.add_new_watermark(&datetime_to_fb(&v)));
         new_source_state_offset.map(|off| builder.add_new_source_state(off));
+        extra_offset.map(|off| builder.add_extra(off));
         builder.finish()
     }
 }
@@ -91,6 +93,7 @@ impl<'fb> FlatbuffersDeserializable<fb::AddData<'fb>> for odf::AddData {
             new_source_state: proxy
                 .new_source_state()
                 .map(|v| odf::SourceState::deserialize(v)),
+            extra: proxy.extra().map(|v| odf::ExtraAttributes::deserialize(v)),
         }
     }
 }

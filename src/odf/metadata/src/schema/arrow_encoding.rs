@@ -182,7 +182,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&arrow_encoding.unwrap());
+        attrs.insert(arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({
@@ -218,7 +218,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&arrow_encoding.unwrap());
+        attrs.insert(arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({
@@ -253,7 +253,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&arrow_encoding.unwrap());
+        attrs.insert(arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({
@@ -285,7 +285,7 @@ mod test {
         );
 
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&arrow_encoding.unwrap());
+        attrs.insert(arrow_encoding.unwrap());
         pretty_assertions::assert_eq!(
             attrs.into_json(),
             json!({

@@ -51,9 +51,7 @@ impl Collection {
             .chain(extra_columns_schema.fields)
             .collect(),
         )
-        .extra(&odf::schema::ext::AttrArchetype::new(
-            odf::schema::ext::DatasetArchetype::Collection,
-        ));
+        .extra(odf::schema::ext::DatasetArchetype::Collection);
 
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),

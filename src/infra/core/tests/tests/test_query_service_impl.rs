@@ -124,6 +124,7 @@ async fn create_test_dataset(
                         start: start_offset,
                         end: end_offset,
                     }),
+                    new_linked_objects: None,
                     new_watermark: None,
                     new_source_state: None,
                 },

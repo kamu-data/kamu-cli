@@ -73,6 +73,18 @@ table SourceState {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ExtraAttributes
+// Container for custom key-value extension attributes. Every key must be in the form of `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully disambiguate the value in the face of multiple extensions. Values may be any valid JSON including nested objects.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ExtraAttributes {
+  // JSON encoded
+  attributes: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AddData
 // Indicates that data has been ingested into a root dataset.
 //
@@ -92,6 +104,8 @@ table AddData {
   new_watermark: Timestamp;
   // The state of the source the data was added from to allow fast resuming. If the state did not change but is still relevant for subsequent runs it should be carried, i.e. only the last state per source is considered when resuming.
   new_source_state: SourceState;
+  // ODF extensions.
+  extra: ExtraAttributes;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -807,18 +821,6 @@ table DataTypeTimestamp {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DataTypeString {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ExtraAttributes
-// Container for custom key-value extension attributes. Every key must be in the form of `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully disambiguate the value in the face of multiple extensions. Values may be any valid JSON including nested objects.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ExtraAttributes {
-  // JSON encoded
-  attributes: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

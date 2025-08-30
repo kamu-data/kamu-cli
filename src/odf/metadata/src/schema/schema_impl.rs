@@ -30,7 +30,7 @@ impl DataSchema {
     }
 
     /// Serializes custom attribute and merges with existing
-    pub fn extra<T: Attribute>(self, attr: &T) -> Self {
+    pub fn extra<T: IntoAttribute>(self, attr: T) -> Self {
         let mut extra = self.extra.unwrap_or_default();
         extra.insert(attr);
         Self {
@@ -154,7 +154,7 @@ impl DataField {
     }
 
     /// Serializes custom attribute and merges with existing
-    pub fn extra<T: Attribute>(self, attr: &T) -> Self {
+    pub fn extra<T: IntoAttribute>(self, attr: T) -> Self {
         let mut extra = self.extra.unwrap_or_default();
         extra.insert(attr);
         Self {
@@ -173,18 +173,29 @@ impl DataField {
         }
     }
 
+    pub fn get_extra<T>(&self) -> Result<Option<T>, serde_json::Error>
+    where
+        T: Attribute,
+    {
+        if let Some(extra) = self.extra.as_ref() {
+            extra.get()
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn description(self, description: impl Into<String>) -> Self {
-        self.extra(&crate::schema::ext::AttrDescription::new(description))
+        self.extra(crate::schema::ext::AttrDescription::new(description))
     }
 
     pub fn type_ext(self, typ: impl Into<crate::schema::ext::DataTypeExt>) -> Self {
-        self.extra(&crate::schema::ext::AttrType::new(typ.into()))
+        self.extra(crate::schema::ext::AttrType::new(typ.into()))
     }
 
     pub fn encoding(self, enc: impl Into<ArrowEncoding>) -> Self {
         let enc = enc.into();
         let mut extra = self.extra.unwrap_or_default();
-        extra.insert(&enc);
+        extra.insert(enc);
         Self {
             extra: extra.map_empty(),
             ..self

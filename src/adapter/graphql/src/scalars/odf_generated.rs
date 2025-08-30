@@ -50,6 +50,8 @@ pub struct AddData {
     /// should be carried, i.e. only the last state per source is considered
     /// when resuming.
     pub new_source_state: Option<SourceState>,
+    /// ODF extensions.
+    pub extra: Option<ExtraAttributes>,
 }
 
 impl From<odf::metadata::AddData> for AddData {
@@ -61,6 +63,7 @@ impl From<odf::metadata::AddData> for AddData {
             new_checkpoint: v.new_checkpoint.map(Into::into),
             new_watermark: v.new_watermark.map(Into::into),
             new_source_state: v.new_source_state.map(Into::into),
+            extra: v.extra.map(Into::into),
         }
     }
 }
