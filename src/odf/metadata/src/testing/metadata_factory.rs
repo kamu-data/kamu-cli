@@ -510,6 +510,7 @@ impl AddDataBuilder {
                 new_checkpoint: None,
                 new_watermark: None,
                 new_source_state: None,
+                extra: None,
             },
         }
     }

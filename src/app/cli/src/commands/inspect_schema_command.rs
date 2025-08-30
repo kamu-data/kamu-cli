@@ -201,7 +201,7 @@ impl InspectSchemaCommand {
             }
             DataType::Null(DataTypeNull {}) => println!("{}", console::style("Null").cyan()),
             DataType::Option(DataTypeOption { inner }) => {
-                println!("{}", console::style("Option").magenta());
+                println!("{}", console::style("Option").blue());
 
                 self.indent(depth);
                 println!("{}", console::style("inner:").dim());
@@ -251,10 +251,21 @@ impl InspectSchemaCommand {
     ) {
         self.indent(depth);
         println!("{}", console::style("extra:").dim());
-        for (k, v) in &extra.attributes {
-            self.indent(depth + 1);
-            println!("{k}: {v}");
+
+        let mut buf = Vec::new();
+        let mut serializer = serde_yaml::Serializer::new(&mut buf);
+        odf::metadata::serde::yaml::ExtraAttributesDef::serialize(extra, &mut serializer).unwrap();
+        let yaml_string = String::from_utf8(buf).unwrap();
+
+        let mut sep = String::new();
+        sep.push('\n');
+        for _ in 0..((depth + 1) * 2) {
+            sep.push(' ');
         }
+        let yaml_string = yaml_string.replace('\n', &sep);
+
+        self.indent(depth + 1);
+        println!("{}", console::style(yaml_string.trim_end()).magenta());
     }
 
     fn print_schema_ddl(&self, schema: &Type) {

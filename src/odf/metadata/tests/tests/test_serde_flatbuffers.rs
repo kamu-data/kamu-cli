@@ -16,7 +16,7 @@ use opendatafabric_metadata::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_test_events() -> [(MetadataEvent, &'static str); 8] {
+fn get_test_events() -> [(MetadataEvent, &'static str); 9] {
     [
         (
             MetadataEvent::AddData(AddData {
@@ -26,6 +26,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 8] {
                 new_checkpoint: None,
                 new_watermark: None,
                 new_source_state: None,
+                extra: None,
             }),
             "73e2977b8beae4aef53670067c1173b9d68e69721908d080b84286ab366d1e14",
         ),
@@ -37,6 +38,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 8] {
                 new_checkpoint: None,
                 new_watermark: None,
                 new_source_state: None,
+                extra: None,
             }),
             "32516689d582e02e77778af75a71b6d131a640d0bebed99b99d96b385cee915f",
         ),
@@ -48,6 +50,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 8] {
                 new_checkpoint: None,
                 new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
                 new_source_state: None,
+                extra: None,
             }),
             "1ad91cabca81e1f1771f28070980bfdcf409e5f8a877b3976b611401d2998189",
         ),
@@ -64,6 +67,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 8] {
                 new_checkpoint: None,
                 new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
                 new_source_state: None,
+                extra: None,
             }),
             "ec1d3f6aa39bb256fcae16d79a95705f614e26d9a86d393b6f9e6b19a60d0df6",
         ),
@@ -114,8 +118,33 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 8] {
                     kind: "kamu/kafka-offset".to_owned(),
                     value: "SOME_OFFSET".to_owned(),
                 }),
+                extra: None,
             }),
             "db5044313bbd596fb54bef9387ad61a18206d1e93e833db4d1159d20cd3cac58",
+        ),
+        (
+            MetadataEvent::AddData(AddData {
+                prev_checkpoint: Some(Multihash::from_digest_sha3_256(b"checkpoint")),
+                prev_offset: Some(9),
+                new_data: Some(DataSlice {
+                    logical_hash: Multihash::from_digest_sha3_256(b"logical"),
+                    physical_hash: Multihash::from_digest_sha3_256(b"physical"),
+                    offset_interval: OffsetInterval { start: 10, end: 99 },
+                    size: 100,
+                }),
+                new_checkpoint: None,
+                new_watermark: None,
+                new_source_state: Some(SourceState {
+                    source_name: "push-source-1".to_owned(),
+                    kind: "kamu/kafka-offset".to_owned(),
+                    value: "SOME_OFFSET".to_owned(),
+                }),
+                extra: Some(ExtraAttributes::new().with(LinkedObjectsSummary {
+                    num_objects_naive: 10,
+                    size_naive: 100,
+                })),
+            }),
+            "00b4cf8b3b22ff71931696f13cc5c06f80eb3360b6d7dccdd3a3b4fb1b5d943c",
         ),
         (
             MetadataEvent::SetTransform(SetTransform {
@@ -221,7 +250,7 @@ fn test_serializer_stability() {
 #[cfg(feature = "arrow")]
 #[test]
 fn serde_set_data_schema() {
-    use opendatafabric_metadata::ext::{AttrArchetype, AttrType, DataTypeExt};
+    use opendatafabric_metadata::ext::DataTypeExt;
 
     let expected_schema = DataSchema::new(vec![
         DataField::string("city").encoding(ArrowBufferEncoding::View {
@@ -230,12 +259,10 @@ fn serde_set_data_schema() {
         DataField::u64("population"),
         DataField::string("census")
             .optional()
-            .extra(&AttrType::new(DataTypeExt::object_link(
-                DataTypeExt::multihash(),
-            ))),
+            .extra(DataTypeExt::object_link(DataTypeExt::multihash())),
         DataField::list("links", DataType::string()),
     ])
-    .extra(&AttrArchetype::new(DatasetArchetype::Collection));
+    .extra(DatasetArchetype::Collection);
 
     let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
 

@@ -80,7 +80,7 @@ impl DataField {
 
         let mut extra = ExtraAttributes::new();
         if let Some(encoding) = encoding {
-            extra.insert(&encoding);
+            extra.insert(encoding);
         }
 
         Ok(Self {

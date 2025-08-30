@@ -53,6 +53,8 @@ pub struct AddData {
     /// should be carried, i.e. only the last state per source is considered
     /// when resuming.
     pub new_source_state: Option<SourceState>,
+    /// ODF extensions.
+    pub extra: Option<ExtraAttributes>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

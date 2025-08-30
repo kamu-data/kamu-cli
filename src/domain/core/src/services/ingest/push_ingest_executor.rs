@@ -128,6 +128,13 @@ pub enum PushIngestError {
     ),
 
     #[error(transparent)]
+    DataValidation(
+        #[from]
+        #[backtrace]
+        DataValidationError,
+    ),
+
+    #[error(transparent)]
     CommitError(
         #[from]
         #[backtrace]

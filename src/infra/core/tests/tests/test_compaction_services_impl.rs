@@ -301,6 +301,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
                 prev_checkpoint: None,
                 prev_offset: Some(2),
                 new_offset_interval: None,
+                new_linked_objects: None,
                 new_watermark: Some(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap()),
                 new_source_state: None,
             },
@@ -333,6 +334,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
                 prev_checkpoint: None,
                 prev_offset: Some(5),
                 new_offset_interval: None,
+                new_linked_objects: None,
                 new_watermark: Some(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap()),
                 new_source_state: Some(odf::metadata::SourceState {
                     source_name: "src".to_string(),

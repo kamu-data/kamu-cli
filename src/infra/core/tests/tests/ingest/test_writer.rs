@@ -1143,14 +1143,14 @@ async fn test_data_writer_schema_evolution_from_inferred() {
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time")
                     .optional()
-                    .extra(&odf::metadata::ext::AttrDescription::new(
+                    .extra(odf::metadata::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     )),
-                odf::schema::DataField::string("city").optional().extra(
-                    &odf::metadata::ext::AttrDescription::new("Name of the city"),
-                ),
+                odf::schema::DataField::string("city")
+                    .optional()
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
                 odf::schema::DataField::i64("population").optional().extra(
-                    &odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
                 ),
             ]),
         ))
@@ -1183,14 +1183,14 @@ async fn test_data_writer_schema_evolution_from_inferred() {
             odf::schema::DataField::timestamp_millis_utc("system_time"),
             odf::schema::DataField::timestamp_millis_utc("event_time")
                 .optional()
-                .extra(&odf::metadata::ext::AttrDescription::new(
+                .extra(odf::metadata::ext::AttrDescription::new(
                     "Date the census was done rounded to a year mark",
                 )),
-            odf::schema::DataField::string("city").optional().extra(
-                &odf::metadata::ext::AttrDescription::new("Name of the city"),
-            ),
+            odf::schema::DataField::string("city")
+                .optional()
+                .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
             odf::schema::DataField::i64("population").optional().extra(
-                &odf::metadata::ext::AttrDescription::new("Estimated population"),
+                odf::metadata::ext::AttrDescription::new("Estimated population"),
             ),
         ]),
     );
@@ -1227,15 +1227,14 @@ async fn test_data_writer_schema_evolution_from_explicit() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                    &odf::metadata::ext::AttrDescription::new(
+                    odf::metadata::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     ),
                 ),
-                odf::schema::DataField::string("city").extra(
-                    &odf::metadata::ext::AttrDescription::new("Name of the city"),
-                ),
+                odf::schema::DataField::string("city")
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
                 odf::schema::DataField::i64("population").extra(
-                    &odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
                 ),
             ]),
         ))
@@ -1424,6 +1423,125 @@ async fn test_data_writer_schema_evolution_from_legacy() {
         ),
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ObjectLink
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_object_link() {
+    let mut harness = Harness::new(vec![]).await;
+
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+                odf::schema::DataField::string("census_hash").type_ext(
+                    odf::schema::ext::DataTypeExt::object_link(
+                        odf::schema::ext::DataTypeExt::multihash(),
+                    ),
+                ),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // Round 1: Valid links
+    let repo = harness.dataset.as_data_repo();
+
+    repo.insert_bytes(b"census_a", Default::default())
+        .await
+        .unwrap();
+    repo.insert_bytes(b"census_b", Default::default())
+        .await
+        .unwrap();
+    repo.insert_bytes(b"census_c", Default::default())
+        .await
+        .unwrap();
+
+    harness
+        .write(
+            &indoc::formatdoc!(
+                r#"
+                city,population,census_hash
+                A,1000,{hash_a}
+                B,2000,{hash_b}
+                C,3000,{hash_c}
+                "#,
+                hash_a = odf::Multihash::from_digest_sha3_256(b"census_a"),
+                hash_b = odf::Multihash::from_digest_sha3_256(b"census_b"),
+                hash_c = odf::Multihash::from_digest_sha3_256(b"census_c"),
+            ),
+            "city STRING, population BIGINT, census_hash STRING",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+-----------------------------------------------------------------------+
+            | offset | op | system_time          | event_time           | city | population | census_hash                                                           |
+            +--------+----+----------------------+----------------------+------+------------+-----------------------------------------------------------------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       | f1620ffd8538233905b7fb9a9c7bff1315bbb3f9eaecd1746c6562426328835785dcb |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       | f162068c16896aced6b7498e338dc150640a07a7330c0f158bcb3365795c3f4418976 |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       | f16200846676d7d1ef6da1f516eca9e656d4c1a7058a5f6ba1559d7a2ef1c729303ed |
+            +--------+----+----------------------+----------------------+------+------------+-----------------------------------------------------------------------+
+            "#
+        ),
+    )
+    .await;
+
+    // Round 2: Dangling reference
+    let res = harness
+        .write(
+            &indoc::formatdoc!(
+                r#"
+                city,population,census_hash
+                D,4000,{hash_d}
+                "#,
+                hash_d = odf::Multihash::from_digest_sha3_256(b"census_d"),
+            ),
+            "city STRING, population BIGINT, census_hash STRING",
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(WriteDataError::DataValidation(
+            DataValidationError::DanglingReference(_)
+        ))
+    );
+
+    // Round 3: Invalid value
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,population,census_hash
+                D,4000,not-a-multihash
+                "#,
+            ),
+            "city STRING, population BIGINT, census_hash STRING",
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(WriteDataError::DataValidation(
+            DataValidationError::InvalidValue(_)
+        ))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

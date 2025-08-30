@@ -346,6 +346,10 @@ type AddData {
 	when resuming.
 	"""
 	newSourceState: SourceState
+	"""
+	ODF extensions.
+	"""
+	extra: ExtraAttributes
 }
 
 """
@@ -1866,6 +1870,8 @@ type ExecuteTransformInput {
 	"""
 	newOffset: Int
 }
+
+scalar ExtraAttributes
 
 scalar ExtraData
 

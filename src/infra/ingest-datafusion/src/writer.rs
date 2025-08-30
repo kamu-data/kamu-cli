@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::arrow::array::Array;
+use datafusion::arrow::array::{Array, AsArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
 use datafusion::config::{ParquetColumnOptions, ParquetOptions, TableParquetOptions};
@@ -663,6 +663,164 @@ impl DataWriterDataFusion {
         Ok((offset_interval, output_watermark))
     }
 
+    /// Reads output file back to collect sizes of all linked objects, verifying
+    /// referrential integrity at the same time
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn compute_linked_objects_summary(
+        &self,
+        path: &Path,
+        schema: &odf::schema::DataSchema,
+        data_repo: &dyn odf::storage::ObjectRepository,
+    ) -> Result<Option<odf::schema::ext::LinkedObjectsSummary>, StageDataError> {
+        use futures::stream::TryStreamExt;
+
+        let mut link_columns = Vec::new();
+        for f in &schema.fields {
+            Self::collect_link_columns(f, &mut link_columns)?;
+        }
+
+        if link_columns.is_empty() {
+            return Ok(None);
+        }
+
+        let df = self
+            .ctx
+            .read_parquet(
+                path.to_str().unwrap(),
+                ParquetReadOptions {
+                    schema: None,
+                    file_sort_order: Vec::new(),
+                    file_extension: path.extension().unwrap_or_default().to_str().unwrap(),
+                    table_partition_cols: Vec::new(),
+                    parquet_pruning: None,
+                    skip_metadata: None,
+                    file_decryption_properties: None,
+                },
+            )
+            .await
+            .int_err()?
+            .select(link_columns)
+            .int_err()?;
+
+        let mut stream = df.execute_stream().await.int_err()?;
+
+        let mut num_objects_naive = 0;
+        let mut size_naive = 0;
+
+        while let Some(batch) = stream.try_next().await.int_err()? {
+            let mut object_links = Vec::new();
+
+            for c in 0..batch.columns().len() {
+                let col = batch.column(c);
+
+                // TODO: Unify with a wrapper type
+                if let Some(array) = col.as_string_view_opt() {
+                    object_links.extend(array.into_iter().flatten());
+                } else if let Some(array) = col.as_string_opt::<i32>() {
+                    object_links.extend(array.into_iter().flatten());
+                } else if let Some(array) = col.as_string_opt::<i64>() {
+                    object_links.extend(array.into_iter().flatten());
+                } else {
+                    unreachable!(
+                        "ObjectLink column is expected to be Utf8 or Utf8View, but got: {:?}",
+                        col.data_type()
+                    );
+                }
+            }
+
+            num_objects_naive += u64::try_from(object_links.len()).unwrap();
+
+            // Avoid repeated calls to object store for duplicates, but only within a batch
+            let mut known_objects = std::collections::BTreeMap::new();
+
+            for link in &object_links {
+                if let Some(size) = known_objects.get(*link) {
+                    size_naive += size;
+                    continue;
+                }
+
+                let hash = odf::Multihash::from_multibase(link).map_err(|e| {
+                    StageDataError::DataValidation(InvalidValueError::new(e.to_string()).into())
+                })?;
+
+                match data_repo.get_size(&hash).await {
+                    Ok(size) => {
+                        size_naive += size;
+                        known_objects.insert(*link, size);
+                    }
+                    Err(odf::storage::GetError::NotFound(_)) => {
+                        return Err(StageDataError::DataValidation(
+                            DanglingReferenceError::new(hash).into(),
+                        ));
+                    }
+                    Err(err) => {
+                        return Err(err.int_err().into());
+                    }
+                }
+            }
+        }
+
+        Ok(Some(odf::schema::ext::LinkedObjectsSummary {
+            num_objects_naive,
+            size_naive,
+        }))
+    }
+
+    fn collect_link_columns(
+        field: &odf::schema::DataField,
+        cols: &mut Vec<Expr>,
+    ) -> Result<(), InternalError> {
+        use odf::schema::ext::*;
+        use odf::schema::*;
+
+        match &field.r#type {
+            DataType::Option(DataTypeOption { inner }) => {
+                // TODO: Avoid cloning
+                let f = DataField {
+                    r#type: inner.as_ref().clone(),
+                    name: field.name.clone(),
+                    extra: field.extra.clone(),
+                };
+                Self::collect_link_columns(&f, cols)
+            }
+            DataType::String(_) => match field.get_extra::<AttrType>().int_err()? {
+                Some(AttrType {
+                    r#type:
+                        odf::schema::ext::DataTypeExt::ObjectLink(DataTypeExtObjectLink { link_type }),
+                }) => match link_type.as_ref() {
+                    DataTypeExt::Multihash(_) => {
+                        cols.push(col(Column::from_name(&field.name)));
+                        Ok(())
+                    }
+                    DataTypeExt::Did(_) | DataTypeExt::ObjectLink(_) | DataTypeExt::Core(_) => {
+                        Err(format!("Unsupported link type: {link_type:?}").int_err())
+                    }
+                },
+                _ => Ok(()),
+            },
+            DataType::Binary(_)
+            | DataType::Bool(_)
+            | DataType::Date(_)
+            | DataType::Decimal(_)
+            | DataType::Duration(_)
+            | DataType::Float16(_)
+            | DataType::Float32(_)
+            | DataType::Float64(_)
+            | DataType::Int8(_)
+            | DataType::Int16(_)
+            | DataType::Int32(_)
+            | DataType::Int64(_)
+            | DataType::UInt8(_)
+            | DataType::UInt16(_)
+            | DataType::UInt32(_)
+            | DataType::UInt64(_)
+            | DataType::Null(_)
+            | DataType::Time(_)
+            | DataType::Timestamp(_) => Ok(()),
+            DataType::List(_) | DataType::Map(_) | DataType::Struct(_) => unimplemented!(),
+        }
+    }
+
     fn merge_strategy_for(
         conf: odf::metadata::MergeStrategy,
         vocab: &odf::metadata::DatasetVocabulary,
@@ -721,6 +879,7 @@ impl DataWriter for DataWriterDataFusion {
             prev_checkpoint: self.meta.prev_checkpoint.clone(),
             prev_offset: self.meta.prev_offset,
             new_offset_interval: None,
+            new_linked_objects: None,
             new_watermark: Some(new_watermark),
             new_source_state: opts.new_source_state,
         };
@@ -784,6 +943,12 @@ impl DataWriter for DataWriterDataFusion {
                 Self::validate_output_schema_equivalence(&prev_schema_arrow, &new_schema_arrow)?;
             }
 
+            // NOTE: We strip encoding to store only logical representation of schema in the
+            // event
+            let new_schema = odf::schema::DataSchema::new_from_arrow(&new_schema_arrow)
+                .int_err()?
+                .strip_encoding();
+
             // Write output
             let data_file = self.write_output(opts.data_staging_path, df).await?;
 
@@ -800,10 +965,11 @@ impl DataWriter for DataWriterDataFusion {
                         prev_checkpoint,
                         prev_offset,
                         new_offset_interval: None,
+                        new_linked_objects: None,
                         new_watermark: opts.new_watermark.or(prev_watermark),
                         new_source_state,
                     },
-                    Some(new_schema_arrow),
+                    Some(new_schema),
                     None,
                 )
             } else {
@@ -814,15 +980,24 @@ impl DataWriter for DataWriterDataFusion {
                     )
                     .await?;
 
+                let new_linked_objects = self
+                    .compute_linked_objects_summary(
+                        data_file.as_ref().unwrap().as_path(),
+                        self.meta.schema.as_ref().unwrap_or(&new_schema),
+                        self.target.as_data_repo(),
+                    )
+                    .await?;
+
                 (
                     odf::dataset::AddDataParams {
                         prev_checkpoint,
                         prev_offset,
                         new_offset_interval: Some(new_offset_interval),
+                        new_linked_objects,
                         new_watermark: opts.new_watermark.or(new_watermark_from_data),
                         new_source_state,
                     },
-                    Some(new_schema_arrow),
+                    Some(new_schema),
                     data_file,
                 )
             }
@@ -832,6 +1007,7 @@ impl DataWriter for DataWriterDataFusion {
                 prev_checkpoint: self.meta.prev_checkpoint.clone(),
                 prev_offset: self.meta.prev_offset,
                 new_offset_interval: None,
+                new_linked_objects: None,
                 new_watermark: self.meta.prev_watermark,
                 new_source_state: opts.new_source_state,
             };
@@ -879,13 +1055,7 @@ impl DataWriter for DataWriterDataFusion {
 
         // Commit `SetDataSchema` event
         if let Some(new_schema) = staged.new_schema {
-            // NOTE: We strip encoding to store only logical representation of schema in the
-            // event
-            let new_schema_odf = odf::schema::DataSchema::new_from_arrow(&new_schema)
-                .int_err()?
-                .strip_encoding();
-
-            let set_data_schema = odf::metadata::SetDataSchema::new(new_schema_odf.clone());
+            let set_data_schema = odf::metadata::SetDataSchema::new(new_schema.clone());
 
             let commit_schema_result = self
                 .target
@@ -903,7 +1073,7 @@ impl DataWriter for DataWriterDataFusion {
 
             // Update state
             self.meta.head = commit_schema_result.new_head;
-            self.meta.schema = Some(new_schema_odf);
+            self.meta.schema = Some(new_schema);
         }
 
         // Commit `AddData` event

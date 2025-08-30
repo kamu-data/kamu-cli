@@ -72,6 +72,9 @@ pub struct AddDataDef {
     #[serde_as(as = "Option<SourceStateDef>")]
     #[serde(default)]
     pub new_source_state: Option<SourceState>,
+    #[serde_as(as = "Option<ExtraAttributesDef>")]
+    #[serde(default)]
+    pub extra: Option<ExtraAttributes>,
 }
 
 implement_serde_as!(AddData, AddDataDef, "AddDataDef");

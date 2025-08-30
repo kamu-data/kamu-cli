@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::DataTypeExt;
-use crate::Attribute;
+use crate::{Attribute, IntoAttribute};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,6 +54,61 @@ impl AttrType {
     }
 }
 
+impl IntoAttribute for DataTypeExt {
+    type Output = AttrType;
+
+    fn into_attribute(self) -> Self::Output {
+        AttrType::new(self)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_with::serde_as]
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttrLinkedObjects {
+    #[serde(rename = "opendatafabric.org/linkedObjects")]
+    pub linked_objects: LinkedObjectsSummary,
+}
+
+impl Attribute for AttrLinkedObjects {
+    const KEYS: &[&str] = &["opendatafabric.org/linkedObjects"];
+}
+
+impl AttrLinkedObjects {
+    pub fn new(linked_objects: LinkedObjectsSummary) -> Self {
+        Self { linked_objects }
+    }
+}
+
+#[serde_with::serde_as]
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct LinkedObjectsSummary {
+    /// Number of linked objects referenced by the associated data chunk,
+    /// without accounting for duplicates. In other words, every non-null
+    /// reference will be counted as a distinct object.
+    pub num_objects_naive: u64,
+
+    /// Total size of linked objects in bytes, without accounting for
+    /// duplicates. In other words, every reference to a hash is counted as a
+    /// distinct object, which is likely to provide invalid size estimates in
+    /// scenarios where multiple records may link to the same object.
+    pub size_naive: u64,
+}
+
+impl IntoAttribute for LinkedObjectsSummary {
+    type Output = AttrLinkedObjects;
+
+    fn into_attribute(self) -> Self::Output {
+        AttrLinkedObjects::new(self)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[serde_with::serde_as]
@@ -87,6 +142,14 @@ pub enum DatasetArchetype {
     VersionedFile,
 }
 
+impl IntoAttribute for DatasetArchetype {
+    type Output = AttrArchetype;
+
+    fn into_attribute(self) -> Self::Output {
+        AttrArchetype::new(self)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
@@ -107,7 +170,7 @@ mod test {
         });
 
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&attr);
+        attrs.insert(attr.clone());
 
         pretty_assertions::assert_eq!(attrs.clone().into_json(), json);
 
@@ -131,7 +194,7 @@ mod test {
         });
 
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&attr);
+        attrs.insert(attr.clone());
 
         pretty_assertions::assert_eq!(attrs.clone().into_json(), json);
 
@@ -160,7 +223,7 @@ mod test {
         });
 
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&attr);
+        attrs.insert(attr.clone());
 
         pretty_assertions::assert_eq!(attrs.clone().into_json(), json);
 
@@ -180,9 +243,9 @@ mod test {
 
     #[test]
     fn test_attr_archetype() {
-        let desc = AttrArchetype::new(DatasetArchetype::Collection);
+        let attr = AttrArchetype::new(DatasetArchetype::Collection);
         let mut attrs = ExtraAttributes::new();
-        attrs.insert(&desc);
+        attrs.insert(attr.clone());
 
         pretty_assertions::assert_eq!(
             attrs.clone().into_json(),
@@ -192,9 +255,9 @@ mod test {
         );
 
         let attrs2 = ExtraAttributes::new_from_json(attrs.into_json()).unwrap();
-        let desc2 = attrs2.get::<AttrArchetype>().unwrap();
+        let attr2 = attrs2.get::<AttrArchetype>().unwrap();
 
-        assert_eq!(desc2, Some(desc));
+        assert_eq!(attr2, Some(attr));
 
         let attrs = ExtraAttributes::new_from_json(json!({
             "kamu.dev/archetype": "Foobar",

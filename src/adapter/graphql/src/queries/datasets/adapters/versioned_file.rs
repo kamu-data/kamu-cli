@@ -61,9 +61,7 @@ impl VersionedFile {
             .chain(extra_columns_schema.fields)
             .collect(),
         )
-        .extra(&odf::schema::ext::AttrArchetype::new(
-            odf::schema::ext::DatasetArchetype::VersionedFile,
-        ));
+        .extra(odf::schema::ext::DatasetArchetype::VersionedFile);
 
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
