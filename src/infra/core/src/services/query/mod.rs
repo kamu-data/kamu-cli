@@ -327,11 +327,12 @@ impl KamuTable {
             .await;
 
         let options = ParquetReadOptions {
-            // TODO: PERF: Schema here comes from the metadata chain and will contain logical types
-            // without encoding. This may force Datafusion to use less efficient Utf8/Binary types
-            // when reading Parquet instead of zero-copy Utf8View/BinaryView
+            // NOTE: Here we use Arrow schema that was reconstructed from ODF schema in metadata
+            // chain to avoid schema inference step. We must be careful that all Parquet files can
+            // actually be coerced into this schema and it is the most efficient representation for
+            // querying (e.g. uses zero-copy `View` types).
             schema: Some(&schema),
-            // TODO: PERF: potential speedup if we specify `offset`?
+            // TODO: PERF: potential speedup if we specify `offset` and `system_time`?
             file_sort_order: Vec::new(),
             file_extension: "",
             table_partition_cols: Vec::new(),
