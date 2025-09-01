@@ -223,15 +223,9 @@ impl DatasetsMut {
                         .collect(),
                 })
             }
-            Err(CreateDatasetFromSnapshotError::DuplicateInputs(e)) => {
-                CreateDatasetFromSnapshotResult::DuplicateInputs(
-                    CreateDatasetResultDuplicateInputs {
-                        duplicate_inputs: e
-                            .duplicate_inputs
-                            .into_iter()
-                            .map(|r| r.to_string())
-                            .collect(),
-                    },
+            Err(CreateDatasetFromSnapshotError::InvalidBlock(e)) => {
+                CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot { message: e.message },
                 )
             }
             Err(CreateDatasetFromSnapshotError::CASFailed(e)) => return Err(e.int_err().into()),

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 use odf_dataset::*;
 use odf_metadata::*;
@@ -449,6 +451,25 @@ impl ValidateSetTransformVisitor {
             // Ensure has inputs
             if e.inputs.is_empty() {
                 invalid_event!(e.clone(), "Transform must have at least one input");
+            }
+
+            let mut duplicate_inputs_id = HashSet::new();
+            let mut processed_inputs_id = HashSet::new();
+
+            e.inputs.iter().for_each(|i| {
+                if !processed_inputs_id.insert(i.dataset_ref.id()) {
+                    duplicate_inputs_id.insert(i.dataset_ref.clone());
+                }
+            });
+
+            if !duplicate_inputs_id.is_empty() {
+                invalid_event!(
+                    e.clone(),
+                    format!(
+                        "Dataset contains duplicate inputs: {:?}",
+                        duplicate_inputs_id
+                    )
+                );
             }
 
             // Ensure inputs are resolved to IDs and aliases are specified

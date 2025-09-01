@@ -195,26 +195,6 @@ async fn resolve_transform_inputs(
 ) -> Result<(), ValidateDatasetSnapshotError> {
     let mut missing_inputs = Vec::new();
 
-    let mut dataset_ref_vec = inputs
-        .iter()
-        .map(|i| i.dataset_ref.clone())
-        .collect::<Vec<_>>();
-    dataset_ref_vec.sort_unstable();
-    let duplicate_inputs: Vec<_> = dataset_ref_vec
-        .windows(2)
-        .filter(|&dataset_ref| (dataset_ref[0] == dataset_ref[1]))
-        .map(|dataset_ref| dataset_ref[0].clone())
-        .collect();
-
-    if !duplicate_inputs.is_empty() {
-        return Err(ValidateDatasetSnapshotError::DuplicateInputs(
-            DuplicateInputsError {
-                dataset_ref: output_dataset_alias.into(),
-                duplicate_inputs,
-            },
-        ));
-    }
-
     for input in inputs.iter_mut() {
         let hdl = match dataset_handle_resolver
             .resolve_dataset_handle_by_ref(&input.dataset_ref)
@@ -261,9 +241,6 @@ pub enum ValidateDatasetSnapshotError {
     MissingInputs(#[from] MissingInputsError),
 
     #[error(transparent)]
-    DuplicateInputs(#[from] DuplicateInputsError),
-
-    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -303,31 +280,6 @@ impl std::fmt::Display for MissingInputsError {
             self.dataset_ref
         )?;
         for (i, h) in self.missing_inputs.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{h}")?;
-        }
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-pub struct DuplicateInputsError {
-    pub dataset_ref: DatasetRef,
-    pub duplicate_inputs: Vec<DatasetRef>,
-}
-
-impl std::fmt::Display for DuplicateInputsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Dataset {} contains duplicate transform inputs: ",
-            self.dataset_ref
-        )?;
-        for (i, h) in self.duplicate_inputs.iter().enumerate() {
             if i != 0 {
                 write!(f, ", ")?;
             }
