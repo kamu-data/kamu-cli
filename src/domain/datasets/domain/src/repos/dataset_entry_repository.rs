@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
@@ -86,6 +86,12 @@ pub type DatasetEntryStream<'a> = std::pin::Pin<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum DatasetResolution {
+    Resolved(DatasetEntry),
+    Unresolved,
+}
+
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct DatasetEntriesResolution {
     pub resolved_entries: Vec<DatasetEntry>,
@@ -100,6 +106,24 @@ impl DatasetEntriesResolution {
                 acc.insert(entry.owner_id.clone());
                 acc
             })
+    }
+
+    pub fn into_resolution_map(self) -> HashMap<odf::DatasetID, DatasetResolution> {
+        let mut map =
+            HashMap::with_capacity(self.resolved_entries.len() + self.unresolved_entries.len());
+        for entry in self.resolved_entries {
+            let has_no_duplicate = map
+                .insert(entry.id.clone(), DatasetResolution::Resolved(entry))
+                .is_none();
+            debug_assert!(has_no_duplicate);
+        }
+        for dataset_id in self.unresolved_entries {
+            let has_no_duplicate = map
+                .insert(dataset_id, DatasetResolution::Unresolved)
+                .is_none();
+            debug_assert!(has_no_duplicate);
+        }
+        map
     }
 }
 

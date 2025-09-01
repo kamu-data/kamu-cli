@@ -40,6 +40,14 @@ impl DatasetEntry {
             kind,
         }
     }
+
+    pub fn handle(&self) -> odf::DatasetHandle {
+        odf::DatasetHandle {
+            id: self.id.clone(),
+            alias: odf::DatasetAlias::new(Some(self.owner_name.clone()), self.name.clone()),
+            kind: self.kind,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
