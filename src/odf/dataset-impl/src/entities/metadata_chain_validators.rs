@@ -466,7 +466,7 @@ impl ValidateSetTransformVisitor {
                 invalid_event!(
                     e.clone(),
                     format!(
-                        "Dataset contains duplicate inputs: {:?}",
+                        "Transform contains duplicate inputs: {:?}",
                         duplicate_inputs_id
                     )
                 );
