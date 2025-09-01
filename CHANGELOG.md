@@ -11,8 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Changed
+- dep: `ringbug` updated from `0.3` to `0.4`.
+
 ## [0.247.0] - 2025-08-28
-## Added
+### Added
 - Extended support for webhook delivery errors, differentiating between:
     - connection failure
     - response timeout
@@ -33,7 +37,7 @@ Recommendation: for ease of reading, use the following order:
             (i.e., unreachable polling source address, failing to pull image, webhook delivery issue)
         - unrecoverable errors are related to logical issues, and require user corrections
             (i.e. bad SQL in a query, bad schema, referencing unexisting secret variable)
-## Changed
+### Changed
 - Revised meaning of flow abortion:
     - flows with scheduled trigger abort both the current flow run, and pause the trigger
     - flows with reactive trigger abort current run only
