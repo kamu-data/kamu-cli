@@ -371,7 +371,7 @@ type AttachmentsEmbedded {
 
 type Auth {
 	enabledProviders: [AccountProvider!]!
-	relations(accountIds: [AccountID!]!): [AuthRelation!]!
+	relations(accountIds: [AccountID!]!, page: Int, perPage: Int): AuthRelationConnection!
 }
 
 type AuthMut {
@@ -387,6 +387,26 @@ type AuthRelation {
 	account: Account!
 	role: DatasetAccessRole!
 	dataset: Dataset!
+}
+
+type AuthRelationConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [AuthRelation!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [AuthRelationEdge!]!
+}
+
+type AuthRelationEdge {
+	node: AuthRelation!
 }
 
 type AuthWeb3Mut {
