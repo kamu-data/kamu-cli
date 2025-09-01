@@ -23,6 +23,8 @@ pub struct Auth;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Auth {
+    const DEFAULT_ENTRIES_PER_PAGE: usize = 100;
+
     #[allow(clippy::unused_async)]
     #[tracing::instrument(level = "info", name = Auth_enabled_providers, skip_all)]
     async fn enabled_providers(&self, ctx: &Context<'_>) -> Result<Vec<AccountProvider>> {
@@ -48,7 +50,12 @@ impl Auth {
         &self,
         ctx: &Context<'_>,
         account_ids: Vec<AccountID<'_>>,
-    ) -> Result<Vec<AuthRelation>> {
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<AuthRelationConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
+
         let (rebac_service, account_service, dataset_entry_service) = from_catalog_n!(
             ctx,
             dyn RebacService,
@@ -126,8 +133,24 @@ impl Auth {
             }
         }
 
-        Ok(auth_relations)
+        let total_count = auth_relations.len();
+        let nodes = auth_relations
+            .into_iter()
+            .skip(page * per_page)
+            .take(per_page)
+            .collect();
+
+        Ok(AuthRelationConnection::new(
+            nodes,
+            page,
+            per_page,
+            total_count,
+        ))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+page_based_connection!(AuthRelation, AuthRelationConnection, AuthRelationEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
