@@ -162,11 +162,11 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
                 (
                     fs::FlowActivationCauseResourceUpdate {
                         activation_time: self.time_source.now(),
-                        changes: fs::ResourceChanges::NewData {
+                        changes: fs::ResourceChanges::NewData(fs::ResourceDataChanges {
                             blocks_added: increment.num_blocks,
                             records_added: increment.num_records,
                             new_watermark: increment.updated_watermark,
-                        },
+                        }),
                         resource_type: DATASET_RESOURCE_TYPE.to_string(),
                         details: serde_json::to_value(DatasetResourceUpdateDetails {
                             dataset_id: ingest_message.dataset_id.clone(),
@@ -193,11 +193,11 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
                     Ok(increment) => (
                         fs::FlowActivationCauseResourceUpdate {
                             activation_time: self.time_source.now(),
-                            changes: fs::ResourceChanges::NewData {
+                            changes: fs::ResourceChanges::NewData(fs::ResourceDataChanges {
                                 blocks_added: increment.num_blocks,
                                 records_added: increment.num_records,
                                 new_watermark: increment.updated_watermark,
-                            },
+                            }),
                             resource_type: DATASET_RESOURCE_TYPE.to_string(),
                             details: serde_json::to_value(DatasetResourceUpdateDetails {
                                 dataset_id: sync_message.dataset_id.clone(),

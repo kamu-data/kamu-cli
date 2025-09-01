@@ -83,6 +83,31 @@ impl FlowState {
     pub fn can_schedule(&self) -> bool {
         matches!(self.status(), FlowStatus::Waiting | FlowStatus::Retrying)
     }
+
+    pub fn get_reactive_data_increment(
+        &self,
+        last_activation_cause_index: usize,
+    ) -> ResourceDataChanges {
+        // Start from zero increment
+        let mut total_increment = ResourceDataChanges::default();
+
+        // For each dataset activation cause, add accumulated changes since the initial
+        let last_activation_cause_index =
+            last_activation_cause_index.min(self.activation_causes.len().saturating_sub(1));
+        for activation_cause in &self.activation_causes[0..=last_activation_cause_index] {
+            if let FlowActivationCause::ResourceUpdate(update_cause) = activation_cause
+                && let ResourceChanges::NewData(changes) = update_cause.changes
+            {
+                total_increment += ResourceDataChanges {
+                    blocks_added: changes.blocks_added,
+                    records_added: changes.records_added,
+                    new_watermark: changes.new_watermark,
+                };
+            }
+        }
+
+        total_increment
+    }
 }
 
 impl Projection for FlowState {

@@ -51,10 +51,8 @@ impl FlowEvent {
                 Self::Initiated(FlowEventInitiated::build(event_id, e, ctx).await?)
             }
             fs::FlowEvent::StartConditionUpdated(e) => {
-                let start_condition = FlowStartCondition::create_from_raw_flow_data(
-                    &e.start_condition,
-                    &flow_state.activation_causes[0..e.last_activation_cause_index],
-                );
+                let start_condition =
+                    FlowStartCondition::create_from_raw_flow_data(flow_state, &e.start_condition);
                 Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(
                     event_id,
                     e.event_time,

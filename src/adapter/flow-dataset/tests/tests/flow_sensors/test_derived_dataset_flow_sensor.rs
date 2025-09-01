@@ -224,11 +224,11 @@ async fn test_sensor_sensitization_got_new_data() {
             &ingest_dataset_binding(&bar_id),
             &DerivedDatasetFlowSensorHarness::make_input_activation_cause(
                 &bar_id,
-                ResourceChanges::NewData {
+                ResourceChanges::NewData(ResourceDataChanges {
                     blocks_added: 1,
                     records_added: 5,
                     new_watermark: None,
-                },
+                }),
             ),
         )
         .await

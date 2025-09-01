@@ -134,11 +134,11 @@ async fn test_sensor_sensitization_got_new_data() {
             &ingest_dataset_binding(&dataset_id),
             &DatasetUpdatedWebhookSensorHarness::make_input_activation_cause(
                 &dataset_id,
-                ResourceChanges::NewData {
+                ResourceChanges::NewData(ResourceDataChanges {
                     blocks_added: 1,
                     records_added: 5,
                     new_watermark: None,
-                },
+                }),
             ),
         )
         .await
