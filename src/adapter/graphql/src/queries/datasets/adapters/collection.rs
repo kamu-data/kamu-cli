@@ -11,20 +11,21 @@ use kamu::domain;
 
 use super::{CollectionEntry, CollectionEntryConnection};
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct Collection {
-    dataset: domain::ResolvedDataset,
+pub struct Collection<'a> {
+    state: &'a DatasetRequestState,
 }
 
-impl Collection {
+impl Collection<'_> {
     pub fn dataset_snapshot(
         alias: odf::DatasetAlias,
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
-    ) -> Result<odf::DatasetSnapshot, odf::schema::UnsupportedSchema> {
+    ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
         let extra_columns_ddl: Vec<String> = extra_columns
             .into_iter()
             .map(|c| format!("{} {}", c.name, c.data_type.ddl))
@@ -33,12 +34,9 @@ impl Collection {
         let extra_columns_schema =
             odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
 
-        let schema = odf::schema::DataSchema::new(
-            [
-                odf::schema::DataField::i64("offset"),
-                odf::schema::DataField::i32("op"),
-                odf::schema::DataField::timestamp_millis_utc("system_time"),
-                odf::schema::DataField::timestamp_millis_utc("event_time"),
+        let schema = odf::schema::DataSchema::builder()
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default())
+            .extend([
                 odf::schema::DataField::string("path").description(
                     "HTTP-like path to a collection entry. Paths start with `/` and can be \
                      nested, with individual path segments url-encoded (e.g. `/foo/bar%20baz`)",
@@ -46,12 +44,10 @@ impl Collection {
                 odf::schema::DataField::string("ref")
                     .type_ext(odf::schema::ext::DataTypeExt::did())
                     .description("DID that references another dataset"),
-            ]
-            .into_iter()
-            .chain(extra_columns_schema.fields)
-            .collect(),
-        )
-        .extra(odf::schema::ext::DatasetArchetype::Collection);
+            ])
+            .extend(extra_columns_schema.fields)
+            .extra(odf::schema::ext::DatasetArchetype::Collection)
+            .build()?;
 
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
@@ -89,43 +85,43 @@ impl Collection {
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl Collection {
+impl<'a> Collection<'a> {
     #[graphql(skip)]
-    pub fn new(dataset: domain::ResolvedDataset) -> Self {
-        Self { dataset }
+    pub fn new(state: &'a DatasetRequestState) -> Self {
+        Self { state }
     }
 
     /// Latest state projection of the state of a collection
     #[tracing::instrument(level = "info", name = Collection_latest, skip_all)]
     pub async fn latest(&self) -> CollectionProjection {
-        CollectionProjection::new(self.dataset.clone(), None)
+        CollectionProjection::new(self.state, None)
     }
 
     /// State projection of the state of a collection at the specified point in
     /// time
     #[tracing::instrument(level = "info", name = Collection_as_of, skip_all)]
     pub async fn as_of(&self, block_hash: Multihash<'static>) -> CollectionProjection {
-        CollectionProjection::new(self.dataset.clone(), Some(block_hash.into()))
+        CollectionProjection::new(self.state, Some(block_hash.into()))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct CollectionProjection {
-    dataset: domain::ResolvedDataset,
+pub struct CollectionProjection<'a> {
+    state: &'a DatasetRequestState,
     as_of: Option<odf::Multihash>,
 }
 
-impl CollectionProjection {
-    pub fn new(dataset: domain::ResolvedDataset, as_of: Option<odf::Multihash>) -> Self {
-        Self { dataset, as_of }
+impl<'a> CollectionProjection<'a> {
+    pub fn new(state: &'a DatasetRequestState, as_of: Option<odf::Multihash>) -> Self {
+        Self { state, as_of }
     }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl CollectionProjection {
+impl CollectionProjection<'_> {
     const DEFAULT_ENTRIES_PER_PAGE: usize = 100;
 
     /// Returns an entry at the specified path
@@ -141,7 +137,7 @@ impl CollectionProjection {
 
         let Some(df) = query_svc
             .get_data(
-                &self.dataset.get_handle().as_local_ref(),
+                &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -199,7 +195,7 @@ impl CollectionProjection {
 
         let df = query_svc
             .get_data(
-                &self.dataset.get_handle().as_local_ref(),
+                &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -273,7 +269,7 @@ impl CollectionProjection {
 
         let Some(df) = query_svc
             .get_data(
-                &self.dataset.get_handle().as_local_ref(),
+                &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },

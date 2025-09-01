@@ -12,27 +12,10 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "odf::schema::ext::DatasetArchetype")]
 pub enum DatasetArchetype {
     Collection,
     VersionedFile,
-}
-
-impl From<odf::schema::ext::DatasetArchetype> for DatasetArchetype {
-    fn from(value: odf::schema::ext::DatasetArchetype) -> Self {
-        match value {
-            odf::schema::ext::DatasetArchetype::Collection => Self::Collection,
-            odf::schema::ext::DatasetArchetype::VersionedFile => Self::VersionedFile,
-        }
-    }
-}
-
-impl From<DatasetArchetype> for odf::schema::ext::DatasetArchetype {
-    fn from(value: DatasetArchetype) -> Self {
-        match value {
-            DatasetArchetype::Collection => Self::Collection,
-            DatasetArchetype::VersionedFile => Self::VersionedFile,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

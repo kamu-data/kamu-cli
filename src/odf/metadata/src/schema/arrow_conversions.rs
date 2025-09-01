@@ -996,34 +996,37 @@ mod test {
 
     #[test]
     fn test_schema_strip_encoding() {
-        let odf_schema_orig = DataSchema::new(vec![
-            DataField::string("utf8")
-                .encoding(ArrowBufferEncoding::Contiguous {
-                    offset_bit_width: Some(32),
-                })
-                .extra_json(json!({"foo.com/foo": "a"})),
-            DataField::string("utf8_view")
-                .encoding(ArrowBufferEncoding::View {
-                    offset_bit_width: Some(32),
-                })
-                .extra_json(json!({"foo.com/foo": "b"})),
-            DataField::date("date")
-                .encoding(ArrowDateEncoding {
-                    unit: ArrowDateUnit::Day,
-                })
-                .extra_json(json!({"foo.com/foo": "c"})),
-            DataField::date("date_millis")
-                .encoding(ArrowDateEncoding {
-                    unit: ArrowDateUnit::Millisecond,
-                })
-                .extra_json(json!({"foo.com/foo": "d"})),
-            DataField::decimal("decimal", 10, 5)
-                .encoding(ArrowDecimalEncoding { bit_width: 256 })
-                .extra_json(json!({"foo.com/foo": "e"})),
-        ])
-        .extra_json(json!({
-            "foo.com/bar": "x",
-        }));
+        let odf_schema_orig = DataSchema::new_with_attrs(
+            vec![
+                DataField::string("utf8")
+                    .encoding(ArrowBufferEncoding::Contiguous {
+                        offset_bit_width: Some(32),
+                    })
+                    .extra_json(json!({"foo.com/foo": "a"})),
+                DataField::string("utf8_view")
+                    .encoding(ArrowBufferEncoding::View {
+                        offset_bit_width: Some(32),
+                    })
+                    .extra_json(json!({"foo.com/foo": "b"})),
+                DataField::date("date")
+                    .encoding(ArrowDateEncoding {
+                        unit: ArrowDateUnit::Day,
+                    })
+                    .extra_json(json!({"foo.com/foo": "c"})),
+                DataField::date("date_millis")
+                    .encoding(ArrowDateEncoding {
+                        unit: ArrowDateUnit::Millisecond,
+                    })
+                    .extra_json(json!({"foo.com/foo": "d"})),
+                DataField::decimal("decimal", 10, 5)
+                    .encoding(ArrowDecimalEncoding { bit_width: 256 })
+                    .extra_json(json!({"foo.com/foo": "e"})),
+            ],
+            ExtraAttributes::new_from_json(json!({
+                "foo.com/bar": "x",
+            }))
+            .unwrap(),
+        );
 
         pretty_assertions::assert_eq!(
             DataSchema {

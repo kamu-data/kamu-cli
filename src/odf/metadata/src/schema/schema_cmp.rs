@@ -190,7 +190,10 @@ mod test {
         assert_eq!(
             DataSchema::compare(
                 &DataSchema::new(vec![]),
-                &DataSchema::new(vec![]).extra_json(json!({"foo.com/bar": "a"})),
+                &DataSchema::new_with_attrs(
+                    vec![],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "a"})).unwrap()
+                ),
                 DataSchemaCmpOptions::default(),
             ),
             DataSchemaCmp::Incompatible
@@ -198,7 +201,10 @@ mod test {
         assert_eq!(
             DataSchema::compare(
                 &DataSchema::new(vec![]),
-                &DataSchema::new(vec![]).extra_json(json!({"foo.com/bar": "a"})),
+                &DataSchema::new_with_attrs(
+                    vec![],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "a"})).unwrap()
+                ),
                 DataSchemaCmpOptions {
                     ignore_attributes: true,
                     ..Default::default()
@@ -240,10 +246,14 @@ mod test {
         // Identical: attrs
         assert_eq!(
             DataSchema::compare(
-                &DataSchema::new(vec![DataField::u32("foo")])
-                    .extra_json(json!({"foo.com/bar": "a"})),
-                &DataSchema::new(vec![DataField::u32("foo")])
-                    .extra_json(json!({"foo.com/bar": "a"})),
+                &DataSchema::new_with_attrs(
+                    vec![DataField::u32("foo")],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "a"})).unwrap()
+                ),
+                &DataSchema::new_with_attrs(
+                    vec![DataField::u32("foo")],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "a"})).unwrap()
+                ),
                 DataSchemaCmpOptions::default(),
             ),
             DataSchemaCmp::Identical
@@ -252,20 +262,28 @@ mod test {
         // Different: attrs
         assert_eq!(
             DataSchema::compare(
-                &DataSchema::new(vec![DataField::u32("foo")])
-                    .extra_json(json!({"foo.com/bar": "a"})),
-                &DataSchema::new(vec![DataField::u32("foo")])
-                    .extra_json(json!({"foo.com/bar": "b"})),
+                &DataSchema::new_with_attrs(
+                    vec![DataField::u32("foo")],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "a"})).unwrap()
+                ),
+                &DataSchema::new_with_attrs(
+                    vec![DataField::u32("foo")],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "b"})).unwrap()
+                ),
                 DataSchemaCmpOptions::default(),
             ),
             DataSchemaCmp::Incompatible
         );
         assert_eq!(
             DataSchema::compare(
-                &DataSchema::new(vec![DataField::u32("foo")])
-                    .extra_json(json!({"foo.com/bar": "a"})),
-                &DataSchema::new(vec![DataField::u32("foo")])
-                    .extra_json(json!({"foo.com/bar": "b"})),
+                &DataSchema::new_with_attrs(
+                    vec![DataField::u32("foo")],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "a"})).unwrap()
+                ),
+                &DataSchema::new_with_attrs(
+                    vec![DataField::u32("foo")],
+                    ExtraAttributes::new_from_json(json!({"foo.com/bar": "b"})).unwrap()
+                ),
                 DataSchemaCmpOptions {
                     ignore_attributes: true,
                     ..Default::default()
