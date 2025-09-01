@@ -280,7 +280,7 @@ pub async fn test_add_with_duplicate_dependencies(kamu: KamuCliPuppet) {
         ["-v", "add", "plain.yaml", "with-duplicates.yaml"],
         None,
         Some([
-            "Failed to add dataset with-duplicates: Invalid snapshot: Invalid event: Dataset \
+            "Failed to add dataset with-duplicates: Invalid snapshot: Invalid event: Transform \
              contains duplicate inputs",
         ]),
     )

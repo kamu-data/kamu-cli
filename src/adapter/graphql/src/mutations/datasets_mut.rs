@@ -437,7 +437,7 @@ impl CreateDatasetResultDuplicateInputs {
     }
     pub async fn message(&self) -> String {
         format!(
-            "Dataset contains duplicate inputs: {}",
+            "Transform contains duplicate inputs: {}",
             self.duplicate_inputs.join(", ")
         )
     }
