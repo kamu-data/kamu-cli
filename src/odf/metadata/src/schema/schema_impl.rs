@@ -15,6 +15,10 @@ use crate::schema::ArrowEncoding;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataSchema {
+    pub fn builder() -> DataSchemaBuilder {
+        DataSchemaBuilder::new()
+    }
+
     pub fn new_empty() -> Self {
         Self {
             fields: Vec::new(),
@@ -29,24 +33,68 @@ impl DataSchema {
         }
     }
 
-    /// Serializes custom attribute and merges with existing
-    pub fn extra<T: IntoAttribute>(self, attr: T) -> Self {
-        let mut extra = self.extra.unwrap_or_default();
-        extra.insert(attr);
+    pub fn new_with_attrs(fields: Vec<DataField>, extra: ExtraAttributes) -> Self {
         Self {
+            fields,
             extra: extra.map_empty(),
-            ..self
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DataSchemaBuilder
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default)]
+pub struct DataSchemaBuilder {
+    fields: Vec<DataField>,
+    extra: ExtraAttributes,
+}
+
+impl DataSchemaBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_changelog_system_fields(mut self, vocab: DatasetVocabulary) -> Self {
+        assert_eq!(self.fields.len(), 0);
+
+        self.fields.extend([
+            DataField::i64(vocab.offset_column),
+            DataField::i32(vocab.operation_type_column),
+            DataField::timestamp_millis_utc(vocab.system_time_column),
+            DataField::timestamp_millis_utc(vocab.event_time_column),
+        ]);
+
+        self
+    }
+
+    pub fn extend<I>(mut self, fields: I) -> Self
+    where
+        I: IntoIterator<Item = DataField>,
+    {
+        self.fields.extend(fields);
+        self
+    }
+
+    /// Serializes custom attribute and merges with existing
+    pub fn extra<T: IntoAttribute>(mut self, attr: T) -> Self {
+        self.extra.insert(attr);
+        self
     }
 
     /// Merges JSON object with existing attributes
-    pub fn extra_json(self, attrs: serde_json::Value) -> Self {
-        let mut extra = self.extra.unwrap_or_default();
-        extra.insert_json(attrs);
-        Self {
-            extra: extra.map_empty(),
-            ..self
-        }
+    pub fn extra_json(mut self, attrs: serde_json::Value) -> Self {
+        self.extra.insert_json(attrs);
+        self
+    }
+
+    pub fn build(self) -> Result<DataSchema, InvalidSchema> {
+        // TODO: Add validation
+        // - duplicate fields
+        // - system columns
+        // - field types sanity
+        Ok(DataSchema::new_with_attrs(self.fields, self.extra))
     }
 }
 
@@ -311,6 +359,29 @@ impl DataType {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidSchema {
+    #[error(transparent)]
+    Malformed(#[from] MalformedSchema),
+
+    #[error(transparent)]
+    Unsupported(#[from] UnsupportedSchema),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct MalformedSchema {
+    message: String,
+}
+
+impl MalformedSchema {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]

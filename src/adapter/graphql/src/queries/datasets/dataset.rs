@@ -9,8 +9,7 @@
 
 use chrono::prelude::*;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{ResolvedDataset, ServerUrlConfig, auth};
-use odf::dataset::MetadataChainExt;
+use kamu_core::{ServerUrlConfig, auth};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -68,26 +67,6 @@ impl Dataset {
             dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
                 .with_owner(owner),
         }
-    }
-
-    pub(crate) async fn get_archetype(
-        dataset: &ResolvedDataset,
-    ) -> Result<Option<odf::schema::ext::DatasetArchetype>> {
-        let Some(schema) = dataset
-            .as_metadata_chain()
-            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
-            .await
-            .int_err()?
-            .into_event()
-            .and_then(|e| e.schema)
-        else {
-            return Ok(None);
-        };
-
-        let extra = schema.extra.unwrap_or_default();
-        let attr = extra.get::<odf::schema::ext::AttrArchetype>().int_err()?;
-
-        Ok(attr.map(|attr| attr.archetype))
     }
 }
 
@@ -290,27 +269,25 @@ impl Dataset {
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = Dataset_as_versioned_file, skip_all)]
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
-        let dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let archetype = Self::get_archetype(dataset).await?;
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
 
         if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
             return Ok(None);
         }
 
-        Ok(Some(VersionedFile::new(dataset.clone())))
+        Ok(Some(VersionedFile::new(&self.dataset_request_state)))
     }
 
     /// Downcast a dataset to a collection interface
     #[tracing::instrument(level = "info", name = Dataset_as_collection, skip_all)]
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection>> {
-        let dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let archetype = Self::get_archetype(dataset).await?;
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
 
         if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {
             return Ok(None);
         }
 
-        Ok(Some(Collection::new(dataset.clone())))
+        Ok(Some(Collection::new(&self.dataset_request_state)))
     }
 }
 

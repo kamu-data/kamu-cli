@@ -131,17 +131,20 @@ fn serde_string_enum_names() {
 
 #[test]
 fn serde_set_data_schema() {
-    let expected_schema = DataSchema::new(vec![
-        DataField::string("city").encoding(ArrowBufferEncoding::View {
-            offset_bit_width: Some(32),
-        }),
-        DataField::u64("population"),
-        DataField::string("census")
-            .optional()
-            .extra(DataTypeExt::object_link(DataTypeExt::multihash())),
-        DataField::list("links", DataType::string()),
-    ])
-    .extra(DatasetArchetype::Collection);
+    let expected_schema = DataSchema::builder()
+        .extend(vec![
+            DataField::string("city").encoding(ArrowBufferEncoding::View {
+                offset_bit_width: Some(32),
+            }),
+            DataField::u64("population"),
+            DataField::string("census")
+                .optional()
+                .extra(DataTypeExt::object_link(DataTypeExt::multihash())),
+            DataField::list("links", DataType::string()),
+        ])
+        .extra(DatasetArchetype::Collection)
+        .build()
+        .unwrap();
 
     let event: MetadataEvent = SetDataSchema::new(expected_schema.clone()).into();
 

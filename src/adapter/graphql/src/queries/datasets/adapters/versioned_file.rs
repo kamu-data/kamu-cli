@@ -11,24 +11,25 @@ use kamu::domain;
 
 use super::{FileVersion, VersionedFileEntry, VersionedFileEntryConnection};
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct VersionedFile {
-    dataset: domain::ResolvedDataset,
+pub struct VersionedFile<'a> {
+    state: &'a DatasetRequestState,
 }
 
-impl VersionedFile {
-    pub fn new(dataset: domain::ResolvedDataset) -> Self {
-        Self { dataset }
+impl<'a> VersionedFile<'a> {
+    pub fn new(state: &'a DatasetRequestState) -> Self {
+        Self { state }
     }
 
     pub fn dataset_snapshot(
         alias: odf::DatasetAlias,
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
-    ) -> Result<odf::DatasetSnapshot, odf::schema::UnsupportedSchema> {
+    ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
         let extra_columns_ddl: Vec<String> = extra_columns
             .into_iter()
             .map(|c| format!("{} {}", c.name, c.data_type.ddl))
@@ -37,12 +38,9 @@ impl VersionedFile {
         let extra_columns_schema =
             odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
 
-        let schema = odf::schema::DataSchema::new(
-            [
-                odf::schema::DataField::i64("offset"),
-                odf::schema::DataField::i32("op"),
-                odf::schema::DataField::timestamp_millis_utc("system_time"),
-                odf::schema::DataField::timestamp_millis_utc("event_time"),
+        let schema = odf::schema::DataSchema::builder()
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default())
+            .extend([
                 odf::schema::DataField::i32("version").description(
                     "Sequential identifier assigned to each entry as new versions are uploaded",
                 ),
@@ -56,12 +54,10 @@ impl VersionedFile {
                 odf::schema::DataField::string("content_type")
                     .optional()
                     .description("Media type associated with the linked object"),
-            ]
-            .into_iter()
-            .chain(extra_columns_schema.fields)
-            .collect(),
-        )
-        .extra(odf::schema::ext::DatasetArchetype::VersionedFile);
+            ])
+            .extend(extra_columns_schema.fields)
+            .extra(odf::schema::ext::DatasetArchetype::VersionedFile)
+            .build()?;
 
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
@@ -108,7 +104,7 @@ impl VersionedFile {
         let query_res = if let Some(block_hash) = as_of_block_hash {
             query_svc
                 .tail(
-                    &self.dataset.get_handle().as_local_ref(),
+                    &self.state.dataset_handle().as_local_ref(),
                     0,
                     1,
                     domain::GetDataOptions {
@@ -121,7 +117,7 @@ impl VersionedFile {
 
             query_svc
                 .get_data(
-                    &self.dataset.get_handle().as_local_ref(),
+                    &self.state.dataset_handle().as_local_ref(),
                     domain::GetDataOptions::default(),
                 )
                 .await
@@ -135,7 +131,7 @@ impl VersionedFile {
         } else {
             query_svc
                 .tail(
-                    &self.dataset.get_handle().as_local_ref(),
+                    &self.state.dataset_handle().as_local_ref(),
                     0,
                     1,
                     domain::GetDataOptions::default(),
@@ -154,17 +150,18 @@ impl VersionedFile {
         }
 
         assert_eq!(records.len(), 1);
-        let entry = VersionedFileEntry::from_json(
-            self.dataset.clone(),
-            records.into_iter().next().unwrap(),
-        )?;
+
+        let dataset = self.state.resolved_dataset(ctx).await?;
+        let entry =
+            VersionedFileEntry::from_json(dataset.clone(), records.into_iter().next().unwrap())?;
+
         Ok(Some(entry))
     }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl VersionedFile {
+impl VersionedFile<'_> {
     const DEFAULT_VERSIONS_PER_PAGE: usize = 100;
 
     /// Returns list of versions in reverse chronological order
@@ -185,7 +182,7 @@ impl VersionedFile {
 
         let query_res = query_svc
             .get_data(
-                &self.dataset.get_handle().as_local_ref(),
+                &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
@@ -217,9 +214,10 @@ impl VersionedFile {
 
         let records = df.collect_json_aos().await.int_err()?;
 
+        let dataset = self.state.resolved_dataset(ctx).await?;
         let nodes = records
             .into_iter()
-            .map(|r| VersionedFileEntry::from_json(self.dataset.clone(), r))
+            .map(|r| VersionedFileEntry::from_json(dataset.clone(), r))
             .collect::<Result<_, _>>()?;
 
         Ok(VersionedFileEntryConnection::new(
