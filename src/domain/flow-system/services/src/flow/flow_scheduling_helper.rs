@@ -362,8 +362,8 @@ impl FlowSchedulingHelper {
         for activation_cause in &flow.activation_causes {
             if let FlowActivationCause::ResourceUpdate(activation_cause) = activation_cause {
                 match activation_cause.changes {
-                    ResourceChanges::NewData { records_added, .. } => {
-                        accumulated_records_count += records_added;
+                    ResourceChanges::NewData(changes) => {
+                        accumulated_records_count += changes.records_added;
                         accumulated_something = true;
                     }
                     ResourceChanges::Breaking => {
@@ -391,20 +391,16 @@ impl FlowSchedulingHelper {
             && (accumulated_records_count >= batching_rule.min_records_to_await()
                 || evaluation_time >= batching_deadline);
 
-        // Set reactive condition data, but only during the first rule evaluation.
-        if !matches!(
-            flow.start_condition.as_ref(),
-            Some(FlowStartCondition::Reactive(_))
-        ) {
-            flow.set_relevant_start_condition(
-                self.time_source.now(),
-                FlowStartCondition::Reactive(FlowStartConditionReactive {
-                    active_rule: *reactive_rule,
-                    batching_deadline,
-                }),
-            )
-            .int_err()?;
-        }
+        // Set reactive condition data always, so that progress can be tracked
+        flow.set_relevant_start_condition(
+            self.time_source.now(),
+            FlowStartCondition::Reactive(FlowStartConditionReactive {
+                active_rule: *reactive_rule,
+                batching_deadline,
+                last_activation_cause_index: flow.activation_causes.len() - 1,
+            }),
+        )
+        .int_err()?;
 
         //  If we accumulated at least something (records or watermarks),
         //   the upper bound of potential finish time for batching is known

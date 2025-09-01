@@ -245,8 +245,8 @@ impl Flow {
             .as_ref()
             .map(|start_condition| {
                 FlowStartCondition::create_from_raw_flow_data(
+                    self.flow_state.as_ref(),
                     start_condition,
-                    &self.flow_state.activation_causes,
                 )
             });
 

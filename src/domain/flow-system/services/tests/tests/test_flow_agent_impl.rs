@@ -2992,7 +2992,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
 
             #6: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 2 Waiting Input(foo) Batching(1, until=1120ms)
+                Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1120ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3206,7 +3206,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
             r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting ExternallyDetectedChange Batching(1, until=1000ms)
+                Flow ID = 1 Waiting ExternallyDetectedChange Batching(3/1, until=1000ms)
               "foo" Ingest:
                 Flow ID = 0 Waiting AutoPolling
 
@@ -3259,7 +3259,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
 
             #8: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Waiting Input(foo) Batching(1, until=1120ms)
+                Flow ID = 3 Waiting Input(foo) Batching(3/1, until=1120ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
@@ -3688,7 +3688,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               "bar" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "baz" ExecuteTransform:
-                Flow ID = 2 Waiting Input(foo) Batching(1, until=86400020ms)
+                Flow ID = 2 Waiting Input(foo) Batching(7/1, until=86400020ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
                 Flow ID = 0 Finished Success
@@ -4215,28 +4215,28 @@ async fn test_batching_condition_records_reached() {
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=140ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/10, until=140ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
             #4: +70ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=140ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/10, until=140ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=1, since=70ms)
                 Flow ID = 0 Finished Success
 
             #5: +80ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=140ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/10, until=140ms)
               "foo" Ingest:
                 Flow ID = 2 Running(task=1)
                 Flow ID = 0 Finished Success
 
             #6: +90ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=140ms)
+                Flow ID = 1 Waiting Input(foo) Batching(12/10, until=140ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=140ms)
                 Flow ID = 2 Finished Success
@@ -4284,7 +4284,7 @@ async fn test_batching_condition_records_reached() {
 
             #12: +160ms:
               "bar" ExecuteTransform:
-                Flow ID = 4 Waiting Input(foo) Batching(10, until=280ms)
+                Flow ID = 4 Waiting Input(foo) Batching(5/10, until=280ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 5 Waiting AutoPolling Schedule(wakeup=210ms)
@@ -4294,7 +4294,7 @@ async fn test_batching_condition_records_reached() {
 
             #13: +210ms:
               "bar" ExecuteTransform:
-                Flow ID = 4 Waiting Input(foo) Batching(10, until=280ms)
+                Flow ID = 4 Waiting Input(foo) Batching(5/10, until=280ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 5 Waiting AutoPolling Executor(task=4, since=210ms)
@@ -4304,7 +4304,7 @@ async fn test_batching_condition_records_reached() {
 
             #14: +210ms:
               "bar" ExecuteTransform:
-                Flow ID = 4 Waiting Input(foo) Batching(10, until=280ms)
+                Flow ID = 4 Waiting Input(foo) Batching(5/10, until=280ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 5 Running(task=4)
@@ -4314,7 +4314,7 @@ async fn test_batching_condition_records_reached() {
 
             #15: +220ms:
               "bar" ExecuteTransform:
-                Flow ID = 4 Waiting Input(foo) Batching(10, until=280ms)
+                Flow ID = 4 Waiting Input(foo) Batching(10/10, until=280ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 6 Waiting AutoPolling Schedule(wakeup=270ms)
@@ -4575,28 +4575,28 @@ async fn test_batching_condition_timeout() {
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=170ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/10, until=170ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
             #4: +70ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=170ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/10, until=170ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=1, since=70ms)
                 Flow ID = 0 Finished Success
 
             #5: +80ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=170ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/10, until=170ms)
               "foo" Ingest:
                 Flow ID = 2 Running(task=1)
                 Flow ID = 0 Finished Success
 
             #6: +90ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=170ms)
+                Flow ID = 1 Waiting Input(foo) Batching(8/10, until=170ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=140ms)
                 Flow ID = 2 Finished Success
@@ -4604,7 +4604,7 @@ async fn test_batching_condition_timeout() {
 
             #7: +140ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(10, until=170ms)
+                Flow ID = 1 Waiting Input(foo) Batching(8/10, until=170ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Executor(task=2, since=140ms)
                 Flow ID = 2 Finished Success
@@ -4852,28 +4852,28 @@ async fn test_batching_condition_watermark() {
 
         #3: +20ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting Input(foo) Batching(10, until=220ms)
+            Flow ID = 1 Waiting Input(foo) Batching(0/10, until=220ms)
           "foo" Ingest:
             Flow ID = 2 Waiting AutoPolling Schedule(wakeup=60ms)
             Flow ID = 0 Finished Success
 
         #4: +60ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting Input(foo) Batching(10, until=220ms)
+            Flow ID = 1 Waiting Input(foo) Batching(0/10, until=220ms)
           "foo" Ingest:
             Flow ID = 2 Waiting AutoPolling Executor(task=1, since=60ms)
             Flow ID = 0 Finished Success
 
         #5: +70ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting Input(foo) Batching(10, until=220ms)
+            Flow ID = 1 Waiting Input(foo) Batching(0/10, until=220ms)
           "foo" Ingest:
             Flow ID = 2 Running(task=1)
             Flow ID = 0 Finished Success
 
         #6: +80ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting Input(foo) Batching(10, until=220ms)
+            Flow ID = 1 Waiting Input(foo) Batching(0/10, until=220ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Schedule(wakeup=120ms)
             Flow ID = 2 Finished Success
@@ -4881,7 +4881,7 @@ async fn test_batching_condition_watermark() {
 
         #7: +120ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting Input(foo) Batching(10, until=220ms)
+            Flow ID = 1 Waiting Input(foo) Batching(0/10, until=220ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Executor(task=2, since=120ms)
             Flow ID = 2 Finished Success
@@ -5260,7 +5260,7 @@ async fn test_batching_condition_with_2_inputs() {
           "bar" Ingest:
             Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(5/26, until=320ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
             Flow ID = 0 Finished Success
@@ -5269,7 +5269,7 @@ async fn test_batching_condition_with_2_inputs() {
           "bar" Ingest:
             Flow ID = 1 Running(task=1)
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(5/26, until=320ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
             Flow ID = 0 Finished Success
@@ -5279,7 +5279,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Schedule(wakeup=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(10/26, until=320ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
             Flow ID = 0 Finished Success
@@ -5289,7 +5289,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Schedule(wakeup=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(10/26, until=320ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Executor(task=2, since=100ms)
             Flow ID = 0 Finished Success
@@ -5299,7 +5299,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Schedule(wakeup=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(10/26, until=320ms)
           "foo" Ingest:
             Flow ID = 3 Running(task=2)
             Flow ID = 0 Finished Success
@@ -5309,7 +5309,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Schedule(wakeup=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(17/26, until=320ms)
           "foo" Ingest:
             Flow ID = 5 Waiting AutoPolling Schedule(wakeup=200ms)
             Flow ID = 3 Finished Success
@@ -5320,7 +5320,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Executor(task=3, since=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(17/26, until=320ms)
           "foo" Ingest:
             Flow ID = 5 Waiting AutoPolling Schedule(wakeup=200ms)
             Flow ID = 3 Finished Success
@@ -5331,7 +5331,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Running(task=3)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(17/26, until=320ms)
           "foo" Ingest:
             Flow ID = 5 Waiting AutoPolling Schedule(wakeup=200ms)
             Flow ID = 3 Finished Success
@@ -5343,7 +5343,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(25/26, until=320ms)
           "foo" Ingest:
             Flow ID = 5 Waiting AutoPolling Schedule(wakeup=200ms)
             Flow ID = 3 Finished Success
@@ -5355,7 +5355,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(25/26, until=320ms)
           "foo" Ingest:
             Flow ID = 5 Waiting AutoPolling Executor(task=4, since=200ms)
             Flow ID = 3 Finished Success
@@ -5367,7 +5367,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(25/26, until=320ms)
           "foo" Ingest:
             Flow ID = 5 Running(task=4)
             Flow ID = 3 Finished Success
@@ -5379,7 +5379,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting Input(foo) Batching(26, until=320ms)
+            Flow ID = 2 Waiting Input(foo) Batching(32/26, until=320ms)
           "foo" Ingest:
             Flow ID = 7 Waiting AutoPolling Schedule(wakeup=300ms)
             Flow ID = 5 Finished Success
@@ -6241,7 +6241,7 @@ async fn test_abort_flow_after_task_finishes() {
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(0, until=20ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/0, until=20ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
@@ -6292,7 +6292,7 @@ async fn test_abort_flow_after_task_finishes() {
 
             #10: +150ms:
               "bar" ExecuteTransform:
-                Flow ID = 4 Waiting Input(foo) Batching(0, until=150ms)
+                Flow ID = 4 Waiting Input(foo) Batching(5/0, until=150ms)
                 Flow ID = 1 Finished Aborted
               "foo" Ingest:
                 Flow ID = 3 Finished Success
@@ -6658,7 +6658,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Batching(1, until=320ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/1, until=320ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
                 Flow ID = 0 Finished Success
@@ -6708,7 +6708,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
 
             #10: +170ms:
               "bar" ExecuteTransform:
-                Flow ID = 4 Waiting ExternallyDetectedChange Batching(1, until=470ms)
+                Flow ID = 4 Waiting ExternallyDetectedChange Batching(5/1, until=470ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=220ms)
@@ -6973,7 +6973,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
 
       #3: +20ms:
         "bar" ExecuteTransform:
-          Flow ID = 1 Waiting Input(foo) Batching(100, until=120ms)
+          Flow ID = 1 Waiting Input(foo) Batching(5/100, until=120ms)
         "foo" Ingest:
           Flow ID = 2 Waiting AutoPolling Schedule(wakeup=320ms)
           Flow ID = 0 Finished Success
@@ -6987,7 +6987,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
 
       #5: +80ms:
         "bar" ExecuteTransform:
-          Flow ID = 3 Waiting ExternallyDetectedChange Batching(100, until=180ms)
+          Flow ID = 3 Waiting ExternallyDetectedChange Batching(5/100, until=180ms)
           Flow ID = 1 Finished Aborted
         "foo" Ingest:
           Flow ID = 2 Waiting AutoPolling Schedule(wakeup=320ms)
@@ -7003,7 +7003,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
 
       #7: +170ms:
         "bar" ExecuteTransform:
-          Flow ID = 4 Waiting ExternallyDetectedChange Batching(100, until=270ms)
+          Flow ID = 4 Waiting ExternallyDetectedChange Batching(5/100, until=270ms)
           Flow ID = 3 Finished Aborted
           Flow ID = 1 Finished Aborted
         "foo" Ingest:
@@ -7097,11 +7097,11 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Set reactive trigger for "bar"
+    // Set reactive trigger for "baz"
     harness
         .set_flow_trigger(
-            start_time,
-            bar_transform_binding.clone(),
+            start_time - Duration::milliseconds(400),
+            baz_transform_binding.clone(),
             FlowTriggerRule::Reactive(ReactiveRule::new(
                 BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
@@ -7110,11 +7110,11 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
         )
         .await;
 
-    // Set reactive trigger for "baz"
+    // Set reactive trigger for "bar"
     harness
         .set_flow_trigger(
-            start_time,
-            baz_transform_binding.clone(),
+            start_time - Duration::milliseconds(200),
+            bar_transform_binding.clone(),
             FlowTriggerRule::Reactive(ReactiveRule::new(
                 BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
                 BreakingChangeRule::NoAction,
@@ -7134,18 +7134,18 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
             None,
             vec![
                 FlowEventInitiated {
-                    event_time: start_time,
+                    event_time: start_time - Duration::milliseconds(200),
                     flow_id: flow_id_bar,
                     flow_binding: bar_transform_binding.clone(),
                     activation_cause: FlowActivationCause::ResourceUpdate(
                         FlowActivationCauseResourceUpdate {
-                            activation_time: start_time,
+                            activation_time: start_time - Duration::milliseconds(200),
                             resource_type: DATASET_RESOURCE_TYPE.to_string(),
-                            changes: ResourceChanges::NewData {
+                            changes: ResourceChanges::NewData(ResourceDataChanges {
                                 blocks_added: 1,
                                 records_added: 5,
                                 new_watermark: None,
-                            },
+                            }),
                             details: serde_json::to_value(DatasetResourceUpdateDetails {
                                 dataset_id: foo_id.clone(),
                                 source: DatasetUpdateSource::ExternallyDetectedChange,
@@ -7160,7 +7160,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
-                    event_time: Utc::now(),
+                    event_time: start_time - Duration::milliseconds(200),
                     flow_id: flow_id_bar,
                     start_condition: FlowStartCondition::Reactive(FlowStartConditionReactive {
                         active_rule: ReactiveRule::new(
@@ -7168,12 +7168,13 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                             BreakingChangeRule::NoAction,
                         ),
                         batching_deadline: start_time + Duration::milliseconds(100),
+                        last_activation_cause_index: 0,
                     }),
                     last_activation_cause_index: 0,
                 }
                 .into(),
                 FlowEventScheduledForActivation {
-                    event_time: Utc::now(),
+                    event_time: start_time - Duration::milliseconds(200),
                     flow_id: flow_id_bar,
                     scheduled_for_activation_at: start_time + Duration::milliseconds(100),
                 }
@@ -7192,14 +7193,18 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
             None,
             vec![
                 FlowEventInitiated {
-                    event_time: start_time,
+                    event_time: start_time - Duration::milliseconds(400),
                     flow_id: flow_id_baz,
                     flow_binding: baz_transform_binding.clone(),
                     activation_cause: FlowActivationCause::ResourceUpdate(
                         FlowActivationCauseResourceUpdate {
-                            activation_time: start_time,
+                            activation_time: start_time - Duration::milliseconds(400),
                             resource_type: DATASET_RESOURCE_TYPE.to_string(),
-                            changes: ResourceChanges::NewData { blocks_added: 1, records_added: 5, new_watermark: None },
+                            changes: ResourceChanges::NewData(ResourceDataChanges {
+                                blocks_added: 1,
+                                records_added: 5,
+                                new_watermark: None
+                            }),
                             details: serde_json::to_value(DatasetResourceUpdateDetails {
                                 dataset_id: foo_id.clone(),
                                 source: DatasetUpdateSource::ExternallyDetectedChange,
@@ -7213,7 +7218,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
-                    event_time: Utc::now(),
+                    event_time: start_time - Duration::milliseconds(400),
                     flow_id: flow_id_baz,
                     start_condition: FlowStartCondition::Reactive(FlowStartConditionReactive {
                         active_rule: ReactiveRule::new(
@@ -7221,12 +7226,13 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                           BreakingChangeRule::NoAction,
                         ),
                         batching_deadline: start_time - Duration::milliseconds(100), // in the past
+                        last_activation_cause_index: 0,
                     }),
                     last_activation_cause_index: 0,
                 }
                 .into(),
                 FlowEventScheduledForActivation {
-                    event_time: Utc::now(),
+                    event_time: start_time - Duration::milliseconds(400),
                     flow_id: flow_id_baz,
                     scheduled_for_activation_at: start_time - Duration::milliseconds(100), // in the past
                 }
@@ -7290,25 +7296,25 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
             r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 0 Waiting ExternallyDetectedChange Batching(100, until=100ms)
+                Flow ID = 0 Waiting ExternallyDetectedChange Batching(5/100, until=100ms)
               "baz" ExecuteTransform:
-                Flow ID = 1 Waiting ExternallyDetectedChange Batching(100, until=-100ms)
+                Flow ID = 1 Waiting ExternallyDetectedChange Batching(5/100, until=-100ms)
 
             #1: +-100ms:
               "bar" ExecuteTransform:
-                Flow ID = 0 Waiting ExternallyDetectedChange Batching(100, until=100ms)
+                Flow ID = 0 Waiting ExternallyDetectedChange Batching(5/100, until=100ms)
               "baz" ExecuteTransform:
                 Flow ID = 1 Waiting ExternallyDetectedChange Executor(task=0, since=-100ms)
 
             #2: +10ms:
               "bar" ExecuteTransform:
-                Flow ID = 0 Waiting ExternallyDetectedChange Batching(100, until=100ms)
+                Flow ID = 0 Waiting ExternallyDetectedChange Batching(5/100, until=100ms)
               "baz" ExecuteTransform:
                 Flow ID = 1 Running(task=0)
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 0 Waiting ExternallyDetectedChange Batching(100, until=100ms)
+                Flow ID = 0 Waiting ExternallyDetectedChange Batching(5/100, until=100ms)
               "baz" ExecuteTransform:
                 Flow ID = 1 Finished Success
 
@@ -8377,7 +8383,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
 
             #6: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 2 Waiting Input(foo) Batching(0, until=120ms)
+                Flow ID = 2 Waiting Input(foo) Batching(0/0, until=120ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success

@@ -98,23 +98,42 @@ pub struct FlowActivationCauseResourceUpdate {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ResourceChanges {
-    NewData {
-        blocks_added: u64,
-        records_added: u64,
-        new_watermark: Option<DateTime<Utc>>,
-    },
+    NewData(ResourceDataChanges),
     Breaking,
 }
 
 impl ResourceChanges {
     pub fn is_empty(&self) -> bool {
         match self {
-            ResourceChanges::NewData {
-                blocks_added,
-                records_added,
-                ..
-            } => *blocks_added == 0 && *records_added == 0,
+            ResourceChanges::NewData(changes) => changes.is_empty(),
             ResourceChanges::Breaking => false,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct ResourceDataChanges {
+    pub blocks_added: u64,
+    pub records_added: u64,
+    pub new_watermark: Option<DateTime<Utc>>,
+}
+
+impl ResourceDataChanges {
+    pub fn is_empty(&self) -> bool {
+        self.blocks_added == 0 && self.records_added == 0
+    }
+}
+
+impl std::ops::AddAssign for ResourceDataChanges {
+    fn add_assign(&mut self, rhs: Self) {
+        self.blocks_added += rhs.blocks_added;
+        self.records_added += rhs.records_added;
+        self.new_watermark = match self.new_watermark {
+            None => rhs.new_watermark,
+            Some(self_watermark) => match rhs.new_watermark {
+                None => Some(self_watermark),
+                Some(rhs_watermark) => Some(std::cmp::max(self_watermark, rhs_watermark)),
+            },
         }
     }
 }

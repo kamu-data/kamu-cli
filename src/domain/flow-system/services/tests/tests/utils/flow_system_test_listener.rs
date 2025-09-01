@@ -119,6 +119,16 @@ impl FlowSystemTestListener {
             _ => "<unknown>",
         }
     }
+
+    fn get_accumulated_reactive_records(
+        &self,
+        flow_state: &FlowState,
+        reactive_flow_condition: &FlowStartConditionReactive,
+    ) -> u64 {
+        flow_state
+            .get_reactive_data_increment(reactive_flow_condition.last_activation_cause_index)
+            .records_added
+    }
 }
 
 impl std::fmt::Display for FlowSystemTestListener {
@@ -268,7 +278,8 @@ impl std::fmt::Display for FlowSystemTestListener {
                             }
                             FlowStartCondition::Reactive(b) => write!(
                                 f,
-                                " Batching({}, until={}ms)",
+                                " Batching({}/{}, until={}ms)",
+                                self.get_accumulated_reactive_records(flow_state, &b),
                                 b.active_rule.for_new_data.min_records_to_await(),
                                 (b.batching_deadline - initial_time).num_milliseconds(),
                             )?,
