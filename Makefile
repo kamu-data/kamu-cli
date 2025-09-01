@@ -306,7 +306,7 @@ codegen-odf-serde-flatbuffers:
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
 	# Applying patch for https://github.com/kamu-data/kamu-cli/issues/1084
-	patch -p0 < src/odf/metadata/schemas/flatc-issue-1084.patch
+	patch --no-backup-if-mismatch -p0 < src/odf/metadata/schemas/flatc-issue-1084.patch
 
 	$(call odf_codegen, rust-serde-flatbuffers, $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")

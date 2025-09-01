@@ -15,7 +15,6 @@ use crate::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::needless_pass_by_value)]
 pub fn assert_odf_schema_eq(
     actual: &odf_metadata::DataSchema,
     expected: &odf_metadata::DataSchema,
@@ -31,7 +30,7 @@ pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {
     assert_eq!(expected.trim(), actual.trim());
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub fn assert_arrow_schema_eq(schema: &Schema, expected: serde_json::Value) {
     let actual = serde_json::to_value(schema).unwrap();
     assert_eq!(expected, actual);
