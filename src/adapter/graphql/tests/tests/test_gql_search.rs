@@ -12,6 +12,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
@@ -25,7 +26,7 @@ async fn test_single_dataset_search() {
 
     harness.create_datasets([alias(&"kamu", &"foo")]).await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .search_authorized("bar", SearchOptions::default())
             .await
@@ -44,7 +45,7 @@ async fn test_single_dataset_search() {
             }
         })
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .search_authorized("foo", SearchOptions::default())
             .await
@@ -66,7 +67,7 @@ async fn test_single_dataset_search() {
             }
         })
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .execute_authorized(indoc::indoc!(
                 "
@@ -122,6 +123,84 @@ async fn test_single_dataset_search() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_case_insensitive_search() {
+    let harness = GqlSearchHarness::new().await;
+
+    use odf::metadata::testing::alias;
+
+    harness.create_datasets([alias(&"kamu", &"dataset1")]).await;
+    harness.create_datasets([alias(&"kAMu", &"dataset2")]).await;
+    harness.create_datasets([alias(&"kAMu", &"dAtAsEt3")]).await;
+
+    assert_eq!(
+        value!({
+            "search": {
+                "query": {
+                    "nodes": [
+                        {
+                            "__typename": "Dataset",
+                            "name": "dataset1",
+                        },
+                        {
+                            "__typename": "Dataset",
+                            "name": "dataset2",
+                        },
+                        {
+                            "__typename": "Dataset",
+                            "name": "dAtAsEt3",
+                        }
+                    ],
+                    "totalCount": 3,
+                    "pageInfo": {
+                        "totalPages": 1,
+                        "hasNextPage": false,
+                        "hasPreviousPage": false,
+                    }
+                }
+            }
+        }),
+        harness
+            .search_authorized("am", SearchOptions::default())
+            .await
+            .data,
+    );
+    assert_eq!(
+        value!({
+            "search": {
+                "query": {
+                    "nodes": [
+                        {
+                            "__typename": "Dataset",
+                            "name": "dataset1",
+                        },
+                        {
+                            "__typename": "Dataset",
+                            "name": "dataset2",
+                        },
+                        {
+                            "__typename": "Dataset",
+                            "name": "dAtAsEt3",
+                        }
+                    ],
+                    "totalCount": 3,
+                    "pageInfo": {
+                        "totalPages": 1,
+                        "hasNextPage": false,
+                        "hasPreviousPage": false,
+                    }
+                }
+            }
+        }),
+        harness
+            .search_authorized("tas", SearchOptions::default())
+            .await
+            .data,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_search_correct_dataset_order_in_response() {
     let harness = GqlSearchHarness::new().await;
 
@@ -143,7 +222,7 @@ async fn test_search_correct_dataset_order_in_response() {
     // Run queries multiple times to ensure the search results stability
     for _ in 0..5 {
         // Search without pagination
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             harness
                 .search_authorized("dataset", SearchOptions::default())
                 .await
@@ -185,7 +264,7 @@ async fn test_search_correct_dataset_order_in_response() {
         );
 
         // Checking with pagination
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             harness
                 .search_authorized(
                     "dataset",
@@ -223,7 +302,7 @@ async fn test_search_correct_dataset_order_in_response() {
                 }
             })
         );
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             harness
                 .search_authorized(
                     "dataset",
@@ -266,7 +345,7 @@ async fn test_search_correct_dataset_order_in_response() {
 async fn test_name_lookup_accounts() {
     let harness = GqlSearchHarness::new().await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .name_lookup_anonymous(
                 "kA",
@@ -309,21 +388,17 @@ async fn test_search_by_id() {
 
     let created_datasets = harness.create_datasets([alias(&"kamu", &"foo")]).await;
 
-    let search_query: String = created_datasets
+    let dataset_id = created_datasets
         .first()
         .unwrap()
         .dataset_handle
         .id
         .as_did_str()
-        .to_stack_string()
-        .chars()
-        .skip(10)
-        .take(8)
-        .collect();
+        .to_stack_string();
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
-            .search_authorized(&search_query, SearchOptions::default())
+            .search_authorized(&dataset_id, SearchOptions::default())
             .await
             .data,
         value!({
@@ -343,6 +418,32 @@ async fn test_search_by_id() {
             }
         })
     );
+
+    let mut lowercase_dataset_id = dataset_id;
+    lowercase_dataset_id.make_ascii_lowercase();
+
+    assert_eq!(
+        value!({
+            "search": {
+                "query": {
+                    "nodes": [{
+                        "__typename": "Dataset",
+                        "name": "foo",
+                    }],
+                    "totalCount": 1,
+                    "pageInfo": {
+                        "totalPages": 1,
+                        "hasNextPage": false,
+                        "hasPreviousPage": false,
+                    }
+                }
+            }
+        }),
+        harness
+            .search_authorized(&lowercase_dataset_id, SearchOptions::default())
+            .await
+            .data,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -357,7 +458,7 @@ async fn test_name_lookup_accounts_with_excluding() {
         .unwrap();
     let authorized_account_id = authorized_current_account_subject.account_id().to_string();
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .name_lookup_anonymous(
                 "kA",
@@ -400,7 +501,7 @@ struct GqlSearchHarness {
 impl GqlSearchHarness {
     pub async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(TenancyConfig::SingleTenant)
+            .tenancy_config(TenancyConfig::MultiTenant)
             .build();
 
         let (catalog_anonymous, catalog_authorized) =
