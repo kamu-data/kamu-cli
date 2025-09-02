@@ -29,12 +29,15 @@ impl MoleculeMut {
     async fn create_project(
         &self,
         ctx: &Context<'_>,
-        ipnft_symbol: String,
+        mut ipnft_symbol: String,
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: U256,
     ) -> Result<CreateProjectResult> {
-        use datafusion::logical_expr::{col, lit};
+        ipnft_symbol.make_ascii_lowercase();
+        let lowercase_ipnft_symbol = ipnft_symbol;
+
+        use datafusion::prelude::*;
 
         let (
             subject,
@@ -85,7 +88,7 @@ impl MoleculeMut {
                 .filter(
                     col("ipnft_uid")
                         .eq(lit(&ipnft_uid))
-                        .or(col("ipnft_symbol").eq(lit(&ipnft_symbol))),
+                        .or(lower(col("ipnft_symbol")).eq(lit(&lowercase_ipnft_symbol))),
                 )
                 .int_err()?;
 
@@ -112,7 +115,7 @@ impl MoleculeMut {
             .unwrap();
 
         let project_account_name: odf::AccountName =
-            format!("{}.{ipnft_symbol}", molecule_account.account_name)
+            format!("{}.{lowercase_ipnft_symbol}", molecule_account.account_name)
                 .parse()
                 .int_err()?;
 
@@ -200,7 +203,7 @@ impl MoleculeMut {
             account_id: project_account.id,
             system_time: now,
             event_time: now,
-            ipnft_symbol,
+            ipnft_symbol: lowercase_ipnft_symbol,
             ipnft_address,
             ipnft_token_id: ipnft_token_id.into(),
             ipnft_uid,

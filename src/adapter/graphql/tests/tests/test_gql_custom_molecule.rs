@@ -115,7 +115,7 @@ async fn test_molecule_provision_project() {
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
+                "ipnftSymbol": "VITAFAST",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": "9",
