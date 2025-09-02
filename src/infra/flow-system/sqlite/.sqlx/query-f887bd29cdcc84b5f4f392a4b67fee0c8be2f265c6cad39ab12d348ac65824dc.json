@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH binding AS (\n                SELECT ? AS flow_type, ? AS scope_data\n            )\n            SELECT\n                /* latest finished attempt */\n                (\n                    SELECT e.event_time\n                    FROM flow_events e, binding b\n                    WHERE e.event_type = 'FlowEventTaskFinished'\n                    AND EXISTS (\n                        SELECT 1\n                        FROM flows f\n                        WHERE f.flow_id = e.flow_id\n                        AND f.flow_type = b.flow_type\n                        AND f.scope_data = b.scope_data\n                    )\n                    ORDER BY e.event_id DESC\n                    LIMIT 1\n                ) AS \"last_attempt_time: Option<DateTime<Utc>>\",\n\n                /* latest success */\n                (\n                    SELECT e.event_time\n                    FROM flow_events e, binding b\n                    WHERE e.event_type = 'FlowEventTaskFinished'\n                    AND json_extract(e.event_payload, '$.TaskFinished.task_outcome.Success') IS NOT NULL\n                    AND EXISTS (\n                        SELECT 1\n                        FROM flows f\n                        WHERE f.flow_id = e.flow_id\n                        AND f.flow_type = b.flow_type\n                        AND f.scope_data = b.scope_data\n                    )\n                    ORDER BY e.event_id DESC\n                    LIMIT 1\n                ) AS \"last_success_time: DateTime<Utc>\",\n\n                /* latest failure */\n                (\n                    SELECT e.event_time\n                    FROM flow_events e, binding b\n                    WHERE e.event_type = 'FlowEventTaskFinished'\n                    AND json_extract(e.event_payload, '$.TaskFinished.task_outcome.Failed') IS NOT NULL\n                    AND EXISTS (\n                        SELECT 1\n                        FROM flows f\n                        WHERE f.flow_id = e.flow_id\n                        AND f.flow_type = b.flow_type\n                        AND f.scope_data = b.scope_data\n                    )\n                    ORDER BY e.event_id DESC\n                    LIMIT 1\n                ) AS \"last_failure_time: DateTime<Utc>\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_attempt_time: Option<DateTime<Utc>>",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_success_time: DateTime<Utc>",
+        "ordinal": 1,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_failure_time: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "f887bd29cdcc84b5f4f392a4b67fee0c8be2f265c6cad39ab12d348ac65824dc"
+}

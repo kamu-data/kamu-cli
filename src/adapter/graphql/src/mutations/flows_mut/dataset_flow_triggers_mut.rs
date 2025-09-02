@@ -78,7 +78,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_binding = FlowBinding::new(
-            map_dataset_flow_type(dataset_flow_type),
+            encode_dataset_flow_type(dataset_flow_type),
             FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
         );
 
@@ -102,7 +102,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_binding = FlowBinding::new(
-            map_dataset_flow_type(dataset_flow_type),
+            encode_dataset_flow_type(dataset_flow_type),
             FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
         );
 
@@ -136,7 +136,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_binding = FlowBinding::new(
-            map_dataset_flow_type(dataset_flow_type),
+            encode_dataset_flow_type(dataset_flow_type),
             FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
         );
 
