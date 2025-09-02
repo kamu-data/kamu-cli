@@ -222,6 +222,11 @@ impl DatasetsMut {
                         .collect(),
                 })
             }
+            Err(CreateDatasetFromSnapshotError::InvalidBlock(e)) => {
+                CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot { message: e.message },
+                )
+            }
             Err(CreateDatasetFromSnapshotError::CASFailed(e)) => return Err(e.int_err().into()),
             Err(CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
         };

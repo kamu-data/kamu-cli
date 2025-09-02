@@ -150,8 +150,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             &store_result.seed,
             system_time,
         )
-        .await
-        .int_err()?;
+        .await?;
 
         // TODO: Creating dataset under another account is not supported yet.
         // In future we should check organization-level permissions here.
