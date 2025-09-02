@@ -170,6 +170,11 @@ impl InMemoryFlowEventStore {
                     } else {
                         None
                     },
+                    last_failure_time: if e.task_outcome.is_failure() {
+                        Some(e.event_time)
+                    } else {
+                        None
+                    },
                 };
 
                 state
