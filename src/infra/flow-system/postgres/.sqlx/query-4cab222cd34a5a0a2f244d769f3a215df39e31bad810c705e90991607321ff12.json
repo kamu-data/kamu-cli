@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH binding AS (\n            SELECT $1::text  AS flow_type,\n                    $2::jsonb AS scope_data\n            )\n            SELECT\n            /* latest finished attempt across all flows in the binding */\n            (\n                SELECT e.event_time\n                FROM flow_events e\n                WHERE EXISTS (\n                SELECT 1\n                FROM flows f, binding b\n                WHERE f.flow_id = e.flow_id\n                    AND f.flow_type = b.flow_type\n                    AND f.scope_data = b.scope_data\n                )\n                AND e.event_type = 'FlowEventTaskFinished'\n                ORDER BY e.event_id DESC\n                LIMIT 1\n            ) AS last_attempt_time,\n\n            /* latest SUCCESS across all flows in the binding */\n            (\n                SELECT e.event_time\n                FROM flow_events e\n                WHERE EXISTS (\n                SELECT 1\n                FROM flows f, binding b\n                WHERE f.flow_id = e.flow_id\n                    AND f.flow_type = b.flow_type\n                    AND f.scope_data = b.scope_data\n                )\n                AND e.event_type = 'FlowEventTaskFinished'\n                AND (e.event_payload #> '{TaskFinished,task_outcome,Success}') IS NOT NULL\n                ORDER BY e.event_id DESC\n                LIMIT 1\n            ) AS last_success_time,\n\n            /* latest FAILURE across all flows in the binding */\n            (\n                SELECT e.event_time\n                FROM flow_events e\n                WHERE EXISTS (\n                SELECT 1\n                FROM flows f, binding b\n                WHERE f.flow_id = e.flow_id\n                    AND f.flow_type = b.flow_type\n                    AND f.scope_data = b.scope_data\n                )\n                AND e.event_type = 'FlowEventTaskFinished'\n                AND (e.event_payload #> '{TaskFinished,task_outcome,Failed}') IS NOT NULL\n                ORDER BY e.event_id DESC\n                LIMIT 1\n            ) AS last_failure_time;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_attempt_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_success_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_failure_time",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "4cab222cd34a5a0a2f244d769f3a215df39e31bad810c705e90991607321ff12"
+}

@@ -94,7 +94,7 @@ impl<'a> AccountFlowRuns<'a> {
             .map(|filters| kamu_flow_system::FlowFilters {
                 by_flow_type: filters
                     .by_flow_type
-                    .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
+                    .map(|flow_type| encode_dataset_flow_type(flow_type).to_string()),
                 by_flow_status: filters.by_status.map(Into::into),
                 by_initiator: filters
                     .by_initiator

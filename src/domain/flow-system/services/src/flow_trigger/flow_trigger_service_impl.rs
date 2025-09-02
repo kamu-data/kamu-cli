@@ -133,7 +133,16 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
                 .await
                 .int_err()?;
-        Ok(maybe_flow_trigger.map(Into::into))
+
+        Ok(if let Some(flow_trigger) = maybe_flow_trigger {
+            if flow_trigger.status == FlowTriggerStatus::ScopeRemoved {
+                None
+            } else {
+                Some(flow_trigger.into())
+            }
+        } else {
+            None
+        })
     }
 
     async fn set_trigger(
