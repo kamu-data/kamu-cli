@@ -67,6 +67,11 @@ impl DatasetRequestState {
         &self.dataset_handle.alias
     }
 
+    #[inline]
+    pub fn dataset_kind(&self) -> odf::DatasetKind {
+        self.dataset_handle.kind
+    }
+
     pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
         self.resolved_dataset
             .get_or_try_init(|| async {

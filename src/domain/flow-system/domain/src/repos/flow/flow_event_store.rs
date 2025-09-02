@@ -118,6 +118,7 @@ pub enum InitiatorFilter {
 pub struct FlowRunStats {
     pub last_success_time: Option<DateTime<Utc>>,
     pub last_attempt_time: Option<DateTime<Utc>>,
+    pub last_failure_time: Option<DateTime<Utc>>,
 }
 
 impl FlowRunStats {
@@ -127,6 +128,9 @@ impl FlowRunStats {
         }
         if new_stats.last_attempt_time.is_some() {
             self.last_attempt_time = new_stats.last_attempt_time;
+        }
+        if new_stats.last_failure_time.is_some() {
+            self.last_failure_time = new_stats.last_failure_time;
         }
     }
 }
