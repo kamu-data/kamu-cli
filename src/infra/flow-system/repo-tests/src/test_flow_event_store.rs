@@ -1181,6 +1181,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
 const EMPTY_STATS: FlowRunStats = FlowRunStats {
     last_attempt_time: None,
     last_success_time: None,
+    last_failure_time: None,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1248,7 +1249,8 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
         stats,
         FlowRunStats {
             last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
+            last_attempt_time: Some(attempt_time),
+            last_failure_time: None,
         } if success_time == attempt_time
     );
 
@@ -1281,12 +1283,12 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
         .unwrap();
     assert_eq!(new_stats, stats);
 
-    // Now finish the flow with failure
+    // Now finish the flow with success again
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
         .await;
 
-    // Stats got updated: success stayed as previously, attempt refreshed
+    // Stats got updated: success refreshed, attempt refreshed
     let new_stats = flow_event_store
         .get_flow_run_stats(&binding_ingest)
         .await
@@ -1295,8 +1297,9 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
         new_stats,
         FlowRunStats {
             last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
-        } if success_time < attempt_time && success_time == stats.last_attempt_time.unwrap()
+            last_attempt_time: Some(attempt_time),
+            last_failure_time: None,
+        } if success_time == attempt_time && success_time > stats.last_attempt_time.unwrap()
     );
 }
 
@@ -1362,7 +1365,8 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
         stats,
         FlowRunStats {
             last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
+            last_attempt_time: Some(attempt_time),
+            last_failure_time: None,
         } if success_time == attempt_time
     );
 
@@ -1394,12 +1398,12 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
         .unwrap();
     assert_eq!(new_stats, stats);
 
-    // Now finish the flow with failure
+    // Now finish the flow with another success
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
         .await;
 
-    // Stats got updated: success stayed as previously, attempt refreshed
+    // Stats got updated: success refreshed, attempt refreshed
     let new_stats = flow_event_store
         .get_flow_run_stats(&binding_gc)
         .await
@@ -1408,8 +1412,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
         new_stats,
         FlowRunStats {
             last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
-        } if success_time < attempt_time && success_time == stats.last_attempt_time.unwrap()
+            last_attempt_time: Some(attempt_time),
+            last_failure_time: None
+        } if success_time == attempt_time && success_time > stats.last_attempt_time.unwrap()
     );
 }
 
@@ -2663,6 +2668,380 @@ pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
             .await
             .unwrap()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_dataset_flow_run_stats_with_failure_time(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let binding_ingest = ingest_dataset_binding(&dataset_id);
+    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
+    });
+
+    // Start with a failed flow
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Waiting,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    flow_generator.start_running_flow(flow_id).await;
+    flow_generator
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    // Check that failure time is properly recorded
+    let stats = flow_event_store
+        .get_flow_run_stats(&binding_ingest)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        stats,
+        FlowRunStats {
+            last_success_time: None,
+            last_attempt_time: Some(failure_time),
+            last_failure_time: Some(actual_failure_time),
+        } if failure_time == actual_failure_time
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_dataset_flow_run_stats_mixed_success_failure_history(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let binding_ingest = ingest_dataset_binding(&dataset_id);
+    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
+    });
+
+    // 1. Start with a successful flow
+    let flow_id_1 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Waiting,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    flow_generator.start_running_flow(flow_id_1).await;
+    flow_generator
+        .finish_running_flow(flow_id_1, TaskOutcome::Success(TaskResult::empty()))
+        .await;
+
+    let stats_after_success = flow_event_store
+        .get_flow_run_stats(&binding_ingest)
+        .await
+        .unwrap();
+    assert_matches!(
+        stats_after_success,
+        FlowRunStats {
+            last_success_time: Some(success_time),
+            last_attempt_time: Some(attempt_time),
+            last_failure_time: None,
+        } if success_time == attempt_time
+    );
+
+    // 2. Then have a failed flow
+    let flow_id_2 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Waiting,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    flow_generator.start_running_flow(flow_id_2).await;
+    flow_generator
+        .finish_running_flow(
+            flow_id_2,
+            TaskOutcome::Failed(TaskError::empty_recoverable()),
+        )
+        .await;
+
+    let stats_after_failure = flow_event_store
+        .get_flow_run_stats(&binding_ingest)
+        .await
+        .unwrap();
+
+    // Verify that we have both success and failure times recorded
+    assert_matches!(
+        stats_after_failure,
+        FlowRunStats {
+            last_success_time: Some(success_time),
+            last_attempt_time: Some(failure_time),
+            last_failure_time: Some(actual_failure_time),
+        } if success_time == stats_after_success.last_success_time.unwrap()
+             && failure_time == actual_failure_time
+             && success_time < failure_time
+    );
+
+    // 3. Then have another successful flow
+    let flow_id_3 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Waiting,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    flow_generator.start_running_flow(flow_id_3).await;
+    flow_generator
+        .finish_running_flow(flow_id_3, TaskOutcome::Success(TaskResult::empty()))
+        .await;
+
+    let stats_after_second_success = flow_event_store
+        .get_flow_run_stats(&binding_ingest)
+        .await
+        .unwrap();
+
+    // Verify that failure time is preserved, but success time is updated
+    assert_matches!(
+        stats_after_second_success,
+        FlowRunStats {
+            last_success_time: Some(new_success_time),
+            last_attempt_time: Some(new_attempt_time),
+            last_failure_time: Some(preserved_failure_time),
+        } if new_success_time == new_attempt_time
+             && preserved_failure_time == stats_after_failure.last_failure_time.unwrap()
+             && new_success_time > preserved_failure_time
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_dataset_flow_run_stats_consecutive_failures_with_times(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let binding_ingest = ingest_dataset_binding(&dataset_id);
+    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
+    });
+
+    // Have multiple consecutive failures
+    let mut failure_times = Vec::new();
+
+    for i in 0..3 {
+        let flow_id = flow_generator
+            .make_new_flow(
+                FLOW_TYPE_DATASET_INGEST,
+                FlowStatus::Waiting,
+                automatic_cause.clone(),
+                None,
+                None,
+            )
+            .await;
+
+        flow_generator.start_running_flow(flow_id).await;
+        flow_generator
+            .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+            .await;
+
+        let stats = flow_event_store
+            .get_flow_run_stats(&binding_ingest)
+            .await
+            .unwrap();
+
+        // Each failure should update the last_failure_time
+        assert!(stats.last_failure_time.is_some());
+        assert!(stats.last_success_time.is_none());
+
+        // Store the failure time
+        failure_times.push(stats.last_failure_time.unwrap());
+
+        // Verify consecutive failures count increases
+        let failure_count = flow_event_store
+            .get_current_consecutive_flow_failures_count(&binding_ingest)
+            .await
+            .unwrap();
+        assert_eq!(failure_count, u32::try_from(i + 1).unwrap());
+
+        // Each subsequent failure should have a later timestamp
+        if i > 0 {
+            assert!(failure_times[i] > failure_times[i - 1]);
+        }
+    }
+
+    // Final check: last_failure_time should be the most recent failure
+    let final_stats = flow_event_store
+        .get_flow_run_stats(&binding_ingest)
+        .await
+        .unwrap();
+
+    assert_eq!(final_stats.last_failure_time.unwrap(), failure_times[2]);
+    assert_eq!(final_stats.last_attempt_time.unwrap(), failure_times[2]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_system_flow_run_stats_with_failures(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
+    let flow_generator = SystemFlowGenerator::new(flow_event_store.clone());
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
+    });
+
+    // Initial state - no stats
+    let stats = flow_event_store
+        .get_flow_run_stats(&binding_gc)
+        .await
+        .unwrap();
+    assert_eq!(stats, EMPTY_STATS);
+
+    // First failure
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_SYSTEM_GC,
+            FlowStatus::Running,
+            automatic_cause.clone(),
+            None,
+        )
+        .await;
+
+    flow_generator
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    let stats_after_failure = flow_event_store
+        .get_flow_run_stats(&binding_gc)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        stats_after_failure,
+        FlowRunStats {
+            last_success_time: None,
+            last_attempt_time: Some(failure_time),
+            last_failure_time: Some(actual_failure_time),
+        } if failure_time == actual_failure_time
+    );
+
+    // Then success
+    let flow_id = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_SYSTEM_GC,
+            FlowStatus::Running,
+            automatic_cause.clone(),
+            None,
+        )
+        .await;
+
+    flow_generator
+        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
+        .await;
+
+    let stats_after_success = flow_event_store
+        .get_flow_run_stats(&binding_gc)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        stats_after_success,
+        FlowRunStats {
+            last_success_time: Some(success_time),
+            last_attempt_time: Some(attempt_time),
+            last_failure_time: Some(preserved_failure_time),
+        } if success_time == attempt_time
+             && preserved_failure_time == stats_after_failure.last_failure_time.unwrap()
+             && success_time > preserved_failure_time
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flow_run_stats_aborted_vs_failed_flows(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let binding_ingest = ingest_dataset_binding(&dataset_id);
+    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
+    });
+
+    // 1. Failed flow - should update failure time
+    let flow_id_1 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Waiting,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    flow_generator.start_running_flow(flow_id_1).await;
+    flow_generator
+        .finish_running_flow(
+            flow_id_1,
+            TaskOutcome::Failed(TaskError::empty_recoverable()),
+        )
+        .await;
+
+    let stats_after_failure = flow_event_store
+        .get_flow_run_stats(&binding_ingest)
+        .await
+        .unwrap();
+
+    assert!(stats_after_failure.last_failure_time.is_some());
+
+    // 2. Aborted flow - should NOT update failure time
+    let flow_id_2 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Waiting,
+            automatic_cause.clone(),
+            None,
+            None,
+        )
+        .await;
+
+    flow_generator.start_running_flow(flow_id_2).await;
+    flow_generator.abort_flow(flow_id_2).await;
+
+    let stats_after_abortion = flow_event_store
+        .get_flow_run_stats(&binding_ingest)
+        .await
+        .unwrap();
+
+    // Abort should not change failure time or attempt time (aborted flows don't
+    // count as attempts)
+    assert_eq!(
+        stats_after_abortion.last_failure_time,
+        stats_after_failure.last_failure_time
+    );
+    assert_eq!(
+        stats_after_abortion.last_attempt_time,
+        stats_after_failure.last_attempt_time
+    );
+
+    // Verify consecutive failures count doesn't increase for aborted flows
+    let failure_count = flow_event_store
+        .get_current_consecutive_flow_failures_count(&binding_ingest)
+        .await
+        .unwrap();
+    assert_eq!(failure_count, 1); // Only the failed flow counts, not the aborted one
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

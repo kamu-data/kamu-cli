@@ -516,59 +516,76 @@ impl FlowEventStore for SqliteFlowEventStore {
         let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
 
         let connection_mut = tr.connection_mut().await?;
-        let maybe_attempt_result = sqlx::query_as!(
-            RunStatsRow,
+        let row = sqlx::query!(
             r#"
-            SELECT attempt.last_event_time AS "last_event_time: _"
-            FROM (
-                SELECT e.event_id AS event_id, e.event_time AS last_event_time
-                FROM flow_events e
-                INNER JOIN flows f ON f.flow_id = e.flow_id
-                WHERE
-                    e.event_type = 'FlowEventTaskFinished' AND
-                    f.flow_type = $1 AND
-                    f.scope_data = $2
-                ORDER BY e.event_id DESC
-                LIMIT 1
-            ) AS attempt
+            WITH binding AS (
+                SELECT ? AS flow_type, ? AS scope_data
+            )
+            SELECT
+                /* latest finished attempt */
+                (
+                    SELECT e.event_time
+                    FROM flow_events e, binding b
+                    WHERE e.event_type = 'FlowEventTaskFinished'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM flows f
+                        WHERE f.flow_id = e.flow_id
+                        AND f.flow_type = b.flow_type
+                        AND f.scope_data = b.scope_data
+                    )
+                    ORDER BY e.event_id DESC
+                    LIMIT 1
+                ) AS "last_attempt_time: Option<DateTime<Utc>>",
+
+                /* latest success */
+                (
+                    SELECT e.event_time
+                    FROM flow_events e, binding b
+                    WHERE e.event_type = 'FlowEventTaskFinished'
+                    AND json_extract(e.event_payload, '$.TaskFinished.task_outcome.Success') IS NOT NULL
+                    AND EXISTS (
+                        SELECT 1
+                        FROM flows f
+                        WHERE f.flow_id = e.flow_id
+                        AND f.flow_type = b.flow_type
+                        AND f.scope_data = b.scope_data
+                    )
+                    ORDER BY e.event_id DESC
+                    LIMIT 1
+                ) AS "last_success_time: DateTime<Utc>",
+
+                /* latest failure */
+                (
+                    SELECT e.event_time
+                    FROM flow_events e, binding b
+                    WHERE e.event_type = 'FlowEventTaskFinished'
+                    AND json_extract(e.event_payload, '$.TaskFinished.task_outcome.Failed') IS NOT NULL
+                    AND EXISTS (
+                        SELECT 1
+                        FROM flows f
+                        WHERE f.flow_id = e.flow_id
+                        AND f.flow_type = b.flow_type
+                        AND f.scope_data = b.scope_data
+                    )
+                    ORDER BY e.event_id DESC
+                    LIMIT 1
+                ) AS "last_failure_time: DateTime<Utc>"
             "#,
             flow_type,
             scope_json_str,
         )
-        .map(|event_row| event_row.last_event_time)
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_success_result = sqlx::query_as!(
-            RunStatsRow,
-            r#"
-            SELECT success.last_event_time AS "last_event_time: _"
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                FROM flow_events e
-                INNER JOIN flows f ON f.flow_id = e.flow_id
-                WHERE
-                    e.event_type = 'FlowEventTaskFinished' AND
-                    e.event_payload ->> '$.TaskFinished.task_outcome.Success' IS NOT NULL AND
-                    f.flow_type = $1 AND
-                    f.scope_data = $2
-                ORDER BY e.event_id DESC
-                LIMIT 1
-            ) AS success
-            "#,
-            flow_type,
-            scope_json_str,
-        )
-        .map(|event_row| event_row.last_event_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(FlowRunStats {
-            last_attempt_time: maybe_attempt_result,
-            last_success_time: maybe_success_result,
+        Ok(match row {
+            Some(r) => FlowRunStats {
+                last_attempt_time: r.last_attempt_time,
+                last_success_time: r.last_success_time,
+                last_failure_time: r.last_failure_time,
+            },
+            None => FlowRunStats::default(),
         })
     }
 

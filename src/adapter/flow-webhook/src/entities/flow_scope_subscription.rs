@@ -82,6 +82,21 @@ impl<'a> FlowScopeSubscription<'a> {
             .and_then(|value| value.as_str())
             .map(|id_str| odf::DatasetID::from_did_str(id_str).expect("Invalid dataset ID format"))
     }
+
+    pub fn query_for_subscriptions_of_dataset(dataset_id: &odf::DatasetID) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                    vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID.to_string(),
+                    vec![dataset_id.to_string()],
+                ),
+            ],
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
