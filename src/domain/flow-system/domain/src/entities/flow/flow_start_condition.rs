@@ -57,6 +57,8 @@ pub struct FlowStartConditionThrottling {
 pub struct FlowStartConditionReactive {
     pub active_rule: ReactiveRule,
     pub batching_deadline: DateTime<Utc>,
+    #[serde(default)] // for backward compatibility only
+    pub last_activation_cause_index: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

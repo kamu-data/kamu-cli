@@ -284,11 +284,11 @@ impl FlowControllerWebhookDeliverHarness {
             webhook_deliver_binding(subscription_id, event_type, Some(dataset_id)),
             FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
                 activation_time: Utc::now(),
-                changes: ResourceChanges::NewData {
+                changes: ResourceChanges::NewData(ResourceDataChanges {
                     blocks_added: 1,
                     records_added: 5,
                     new_watermark: None,
-                },
+                }),
                 resource_type: DATASET_RESOURCE_TYPE.to_string(),
                 details: json!({
                     "dataset_id": dataset_id.to_string(),
@@ -312,11 +312,11 @@ impl FlowControllerWebhookDeliverHarness {
                 Utc::now(),
                 FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
                     activation_time: Utc::now(),
-                    changes: ResourceChanges::NewData {
+                    changes: ResourceChanges::NewData(ResourceDataChanges {
                         blocks_added: 1,
                         records_added: 5,
                         new_watermark: None,
-                    },
+                    }),
                     resource_type: DATASET_RESOURCE_TYPE.to_string(),
                     details: json!({
                         "dataset_id": dataset_id.to_string(),

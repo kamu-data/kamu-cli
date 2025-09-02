@@ -127,11 +127,11 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
             ingest_dataset_binding(&foo_dataset_id),
             FlowActivationCauseResourceUpdate {
                 activation_time: Utc::now(),
-                changes: ResourceChanges::NewData {
+                changes: ResourceChanges::NewData(ResourceDataChanges {
                     blocks_added: 1,
                     records_added: 5,
                     new_watermark: None,
-                },
+                }),
                 resource_type: DATASET_RESOURCE_TYPE.to_string(),
                 details: json!({
                     "dataset_id": foo_dataset_id.to_string(),

@@ -200,12 +200,14 @@ impl Read for ReaderHelper<'_> {
 
 struct DecompressZipStream {
     ingress: std::thread::JoinHandle<Result<(), PollingIngestError>>,
-    consumer: ringbuf::Consumer<u8, Arc<ringbuf::HeapRb<u8>>>,
+    consumer: ringbuf::CachingCons<Arc<ringbuf::HeapRb<u8>>>,
     done_recvr: std::sync::mpsc::Receiver<usize>,
 }
 
 impl DecompressZipStream {
     fn new(mut input: Box<dyn Stream>, sub_path: Option<String>) -> Self {
+        use ringbuf::traits::*;
+
         let (mut producer, consumer) = ringbuf::HeapRb::<u8>::new(BUFFER_SIZE).split();
 
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
@@ -229,7 +231,14 @@ impl DecompressZipStream {
                         while producer.is_full() {
                             std::thread::sleep(std::time::Duration::ZERO);
                         }
-                        let read = producer.read_from(&mut file, None).unwrap();
+
+                        let Some(read) = producer.read_from(&mut file, None).map(Result::unwrap)
+                        else {
+                            // No read attempt was made -- try again
+                            std::thread::sleep(std::time::Duration::ZERO);
+                            continue;
+                        };
+
                         tx.send(read).unwrap();
                         if read == 0 {
                             break;
@@ -242,7 +251,13 @@ impl DecompressZipStream {
                         .unwrap();
 
                     loop {
-                        let read = producer.read_from(&mut file, None).unwrap();
+                        let Some(read) = producer.read_from(&mut file, None).map(Result::unwrap)
+                        else {
+                            // No read attempt was made -- try again
+                            std::thread::sleep(std::time::Duration::ZERO);
+                            continue;
+                        };
+
                         tx.send(read).unwrap();
                         if read == 0 {
                             break;
@@ -264,6 +279,8 @@ impl DecompressZipStream {
 
 impl Read for DecompressZipStream {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
+        use ringbuf::traits::*;
+
         while self.consumer.is_empty() {
             match self.done_recvr.recv() {
                 Ok(0) | Err(_) => break,

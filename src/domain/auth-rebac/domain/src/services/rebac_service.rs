@@ -113,6 +113,11 @@ pub trait RebacService: Send + Sync {
         account_id: &odf::AccountID,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
 
+    async fn get_authorized_datasets_by_account_ids(
+        &self,
+        account_ids: &[odf::AccountID],
+    ) -> Result<HashMap<odf::AccountID, Vec<AuthorizedDataset>>, GetObjectEntityRelationsError>;
+
     async fn get_authorized_accounts(
         &self,
         dataset_id: &odf::DatasetID,
@@ -227,6 +232,14 @@ impl DatasetProperties {
 #[derive(Debug, Clone)]
 pub struct AuthorizedAccount {
     pub account_id: odf::AccountID,
+    pub role: AccountToDatasetRelation,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct AuthorizedDataset {
+    pub dataset_id: odf::DatasetID,
     pub role: AccountToDatasetRelation,
 }
 

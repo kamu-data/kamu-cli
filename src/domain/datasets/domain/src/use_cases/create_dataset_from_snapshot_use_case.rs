@@ -78,7 +78,7 @@ impl std::fmt::Display for InvalidBlockError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Transform {} contains invalid block: {}",
+            "Dataset {} contains invalid block: {}",
             self.dataset_ref, self.message
         )?;
         Ok(())

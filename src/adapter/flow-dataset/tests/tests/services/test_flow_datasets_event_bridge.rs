@@ -87,11 +87,11 @@ async fn test_http_ingest() {
         ingest_dataset_binding(&foo_id),
         FlowActivationCauseResourceUpdate {
             activation_time: Utc::now(),
-            changes: ResourceChanges::NewData {
+            changes: ResourceChanges::NewData(ResourceDataChanges {
                 blocks_added: 1,
                 records_added: 5,
                 new_watermark: None,
-            },
+            }),
             resource_type: DATASET_RESOURCE_TYPE.to_string(),
             details: json!({
                 "dataset_id": foo_id.to_string(),
@@ -144,11 +144,11 @@ async fn test_smart_protocol_push() {
         ingest_dataset_binding(&foo_id),
         FlowActivationCauseResourceUpdate {
             activation_time: Utc::now(),
-            changes: ResourceChanges::NewData {
+            changes: ResourceChanges::NewData(ResourceDataChanges {
                 blocks_added: 1,
                 records_added: 5,
                 new_watermark: None,
-            },
+            }),
             resource_type: DATASET_RESOURCE_TYPE.to_string(),
             details: json!({
                 "dataset_id": foo_id.to_string(),

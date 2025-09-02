@@ -3007,11 +3007,11 @@ async fn test_history_of_completed_transform_flow() {
             FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
                 activation_time: Utc::now(),
                 resource_type: DATASET_RESOURCE_TYPE.to_string(),
-                changes: ResourceChanges::NewData {
+                changes: ResourceChanges::NewData(ResourceDataChanges {
                     blocks_added: 1,
                     records_added: 5,
                     new_watermark: None,
-                },
+                }),
                 details: serde_json::to_value(DatasetResourceUpdateDetails {
                     dataset_id: foo_result.dataset_handle.id.clone(),
                     source: DatasetUpdateSource::ExternallyDetectedChange,
@@ -3029,11 +3029,11 @@ async fn test_history_of_completed_transform_flow() {
             FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
                 activation_time: Utc::now(),
                 resource_type: DATASET_RESOURCE_TYPE.to_string(),
-                changes: ResourceChanges::NewData {
+                changes: ResourceChanges::NewData(ResourceDataChanges {
                     blocks_added: 1,
                     records_added: 5,
                     new_watermark: None,
-                },
+                }),
                 details: serde_json::to_value(DatasetResourceUpdateDetails {
                     dataset_id: foo_result.dataset_handle.id.clone(),
                     source: DatasetUpdateSource::UpstreamFlow {

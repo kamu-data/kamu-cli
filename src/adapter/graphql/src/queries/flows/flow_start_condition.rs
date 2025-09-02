@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_datasets::DatasetIntervalIncrement;
-use kamu_flow_system as fs;
+use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
 
@@ -25,8 +24,8 @@ pub(crate) enum FlowStartCondition {
 
 impl FlowStartCondition {
     pub fn create_from_raw_flow_data(
+        flow_state: &fs::FlowState,
         start_condition: &fs::FlowStartCondition,
-        matching_activation_causes: &[fs::FlowActivationCause],
     ) -> Self {
         match start_condition {
             fs::FlowStartCondition::Schedule(s) => Self::Schedule(FlowStartConditionSchedule {
@@ -34,35 +33,15 @@ impl FlowStartCondition {
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
             fs::FlowStartCondition::Reactive(b) => {
-                // Start from zero increment
-                let mut total_increment = DatasetIntervalIncrement::default();
-
-                // TODO: somehow limit dataset traversal to blocks that existed at the time of
-                // flow latest event, as they might have evolved after this state was loaded
-
-                // For each dataset activation cause, add accumulated changes since the initial
-                for activation_cause in matching_activation_causes {
-                    if let fs::FlowActivationCause::ResourceUpdate(update_cause) = activation_cause
-                        && let fs::ResourceChanges::NewData {
-                            blocks_added,
-                            records_added,
-                            new_watermark,
-                        } = update_cause.changes
-                    {
-                        total_increment += DatasetIntervalIncrement {
-                            num_blocks: blocks_added,
-                            num_records: records_added,
-                            updated_watermark: new_watermark,
-                        };
-                    }
-                }
+                let total_increment =
+                    flow_state.get_reactive_data_increment(b.last_activation_cause_index);
 
                 // Finally, present the full picture from condition + computed view results
                 Self::Reactive(FlowStartConditionReactive {
                     active_batching_rule: b.active_rule.for_new_data.into(),
                     batching_deadline: b.batching_deadline,
-                    accumulated_records_count: total_increment.num_records,
-                    watermark_modified: total_increment.updated_watermark.is_some(),
+                    accumulated_records_count: total_increment.records_added,
+                    watermark_modified: total_increment.new_watermark.is_some(),
                     for_breaking_change: b.active_rule.for_breaking_change.into(),
                 })
             }

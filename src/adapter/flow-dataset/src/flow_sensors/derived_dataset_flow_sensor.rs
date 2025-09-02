@@ -184,11 +184,11 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                     let activation_cause = fs::FlowActivationCause::ResourceUpdate(
                         fs::FlowActivationCauseResourceUpdate {
                             activation_time,
-                            changes: fs::ResourceChanges::NewData {
+                            changes: fs::ResourceChanges::NewData(fs::ResourceDataChanges {
                                 blocks_added: dataset_increment.num_blocks,
                                 records_added: dataset_increment.num_records,
                                 new_watermark: dataset_increment.updated_watermark,
-                            },
+                            }),
                             resource_type: DATASET_RESOURCE_TYPE.to_string(),
                             details: serde_json::to_value(DatasetResourceUpdateDetails {
                                 dataset_id: input_advancement.dataset_id,
