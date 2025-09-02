@@ -1179,6 +1179,10 @@ type DatasetEnvVarsPermissions {
 	canUpdate: Boolean!
 }
 
+type DatasetFlowChannels {
+	webhooks: FlowChannelGroup!
+}
+
 type DatasetFlowConfigs {
 	"""
 	Returns defined configuration for a flow of specified type
@@ -1195,6 +1199,11 @@ input DatasetFlowFilters {
 	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
 	byInitiator: InitiatorFilterInput
+}
+
+type DatasetFlowPeriodicProcesses {
+	primary: FlowPeriodicProcess
+	channels: DatasetFlowChannels!
 }
 
 type DatasetFlowRuns {
@@ -1252,6 +1261,10 @@ type DatasetFlows {
 	Returns interface for flow runs queries
 	"""
 	runs: DatasetFlowRuns!
+	"""
+	Returns interface for flow periodic processes queries
+	"""
+	periodicProcesses: DatasetFlowPeriodicProcesses!
 }
 
 type DatasetFlowsMut {
@@ -2131,6 +2144,25 @@ type FlowActivationCauseManual {
 	initiator: Account!
 }
 
+type FlowChannel {
+	name: String!
+	flowTrigger: FlowTrigger
+	runtimeState: FlowPeriodicProcessState!
+}
+
+type FlowChannelGroup {
+	overallStatus: FlowPeriodicProcessStatus!
+	rollup: FlowChannelGroupRollup!
+	channels: [FlowChannel!]!
+}
+
+type FlowChannelGroupRollup {
+	active: Int!
+	failing: Int!
+	paused: Int!
+	stopped: Int!
+}
+
 input FlowConfigCompactionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
@@ -2379,6 +2411,28 @@ type FlowNotFound implements GetFlowResult & CancelFlowRunResult {
 }
 
 union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
+
+type FlowPeriodicProcess {
+	flowType: DatasetFlowType!
+	flowTrigger: FlowTrigger!
+	runtimeState: FlowPeriodicProcessState!
+}
+
+type FlowPeriodicProcessState {
+	effectiveStatus: FlowPeriodicProcessStatus!
+	consecutiveFailures: Int!
+	lastSuccessAt: DateTime
+	lastAttemptAt: DateTime
+	lastFailureAt: DateTime
+	nextPlannedAt: DateTime
+}
+
+enum FlowPeriodicProcessStatus {
+	ACTIVE
+	FAILING
+	PAUSED_BY_USER
+	STOPPED_AUTOMATICALLY
+}
 
 type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
 	preconditions: String!

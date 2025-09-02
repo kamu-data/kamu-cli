@@ -82,7 +82,7 @@ impl<'a> DatasetFlowRuns<'a> {
             Some(filters) => Some(kamu_flow_system::FlowFilters {
                 by_flow_type: filters
                     .by_flow_type
-                    .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
+                    .map(|flow_type| encode_dataset_flow_type(flow_type).to_string()),
                 by_flow_status: filters.by_status.map(Into::into),
                 by_initiator: match filters.by_initiator {
                     Some(initiator_filter) => match initiator_filter {
