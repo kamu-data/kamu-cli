@@ -19,6 +19,7 @@ Recommendation: for ease of reading, use the following order:
 - Flows: each input contribution to batching rule is reflected as an update of start condition,
    so that flow history may show how many accumulated records were present at the moment of each update
 ### Fixed
+- Crash when multiple unlabeled webhook subscriptions are defined within the same dataset
 - Restrict dataset creation with duplicate transform inputs.
 
 ## [0.247.0] - 2025-08-28

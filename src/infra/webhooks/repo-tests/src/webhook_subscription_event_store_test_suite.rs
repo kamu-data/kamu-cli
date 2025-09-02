@@ -480,6 +480,138 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_empty_labels_allowed_as_duplicates(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
+
+    let subscription_id_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_3 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
+
+    // Create first subscription with empty label
+    let mut subscription_1 = WebhookSubscription::new(
+        subscription_id_1,
+        Url::parse("https://example.com/1").unwrap(),
+        WebhookSubscriptionLabel::try_new("").unwrap(),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+    );
+    subscription_1.save(event_store.as_ref()).await.unwrap();
+
+    // Create second subscription with empty label - should succeed since empty
+    // labels are allowed as duplicates
+    let mut subscription_2 = WebhookSubscription::new(
+        subscription_id_2,
+        Url::parse("https://example.com/2").unwrap(),
+        WebhookSubscriptionLabel::try_new("").unwrap(),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
+    );
+    let res = subscription_2.save(event_store.as_ref()).await;
+    assert!(res.is_ok());
+
+    // Create third subscription with empty label - should also succeed
+    let mut subscription_3 = WebhookSubscription::new(
+        subscription_id_3,
+        Url::parse("https://example.com/3").unwrap(),
+        WebhookSubscriptionLabel::try_new("").unwrap(),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
+    );
+    let res = subscription_3.save(event_store.as_ref()).await;
+    assert!(res.is_ok());
+
+    // Verify all three subscriptions were created successfully
+    let res = event_store
+        .count_subscriptions_by_dataset(&dataset_id)
+        .await;
+    assert_matches!(res, Ok(count) if count == 3);
+
+    let res = event_store
+        .list_subscription_ids_by_dataset(&dataset_id)
+        .await;
+    assert_matches!(res, Ok(ids) if ids.len() == 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_empty_labels_allowed_as_duplicates_on_modify(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
+
+    let subscription_id_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_3 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
+
+    // Create first subscription with empty label
+    let mut subscription_1 = WebhookSubscription::new(
+        subscription_id_1,
+        Url::parse("https://example.com/1").unwrap(),
+        WebhookSubscriptionLabel::try_new("").unwrap(),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+    );
+    subscription_1.save(event_store.as_ref()).await.unwrap();
+
+    // Create second subscription with empty label
+    let mut subscription_2 = WebhookSubscription::new(
+        subscription_id_2,
+        Url::parse("https://example.com/2").unwrap(),
+        WebhookSubscriptionLabel::try_new("").unwrap(),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
+    );
+    subscription_2.save(event_store.as_ref()).await.unwrap();
+
+    // Create third subscription with a non-empty label
+    let mut subscription_3 = WebhookSubscription::new(
+        subscription_id_3,
+        Url::parse("https://example.com/3").unwrap(),
+        WebhookSubscriptionLabel::try_new("test-label").unwrap(),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
+    );
+    subscription_3.save(event_store.as_ref()).await.unwrap();
+
+    // Now modify subscription_3 to have an empty label - should succeed
+    // since empty labels are allowed as duplicates
+    subscription_3
+        .modify(
+            subscription_3.target_url().clone(),
+            WebhookSubscriptionLabel::try_new("").unwrap(), // Change to empty label
+            subscription_3.event_types().to_vec(),
+        )
+        .unwrap();
+    let res = subscription_3.save(event_store.as_ref()).await;
+    assert!(res.is_ok());
+
+    // Verify all three subscriptions exist and now have empty labels
+    let res = event_store
+        .count_subscriptions_by_dataset(&dataset_id)
+        .await;
+    assert_matches!(res, Ok(count) if count == 3);
+
+    // All three should now effectively have empty labels, but that should be fine
+    let res = event_store
+        .list_subscription_ids_by_dataset(&dataset_id)
+        .await;
+    assert_matches!(res, Ok(ids) if ids.len() == 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
     let event_store = catalog
         .get_one::<dyn WebhookSubscriptionEventStore>()

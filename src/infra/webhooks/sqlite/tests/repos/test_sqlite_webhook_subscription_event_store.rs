@@ -65,6 +65,22 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_empty_labels_allowed_as_duplicates,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_empty_labels_allowed_as_duplicates_on_modify,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_same_dataset_different_event_types,
     harness = SqliteWebhookSubscriptionEventStoreHarness
 );
