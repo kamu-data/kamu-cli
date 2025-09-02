@@ -9,3 +9,4 @@
 
 mod test_did_key;
 mod test_multihash;
+mod test_stack_string;
