@@ -48,7 +48,11 @@ impl SqliteWebhookSubscriptionEventStore {
         let subscription_id: &uuid::Uuid = created_event.subscription_id.as_ref();
         let maybe_dataset_id = created_event.dataset_id.as_ref().map(ToString::to_string);
         let event_types_as_str = Self::encode_event_types(&created_event.event_types);
-        let label = created_event.label.as_ref();
+        let label = if created_event.label.as_ref().is_empty() {
+            None
+        } else {
+            Some(created_event.label.as_ref())
+        };
 
         sqlx::query!(
             r#"
@@ -153,7 +157,11 @@ impl SqliteWebhookSubscriptionEventStore {
         if let Some(updated_label) = updated_label {
             let connection_mut = tr.connection_mut().await?;
 
-            let label_str = updated_label.as_ref();
+            let label_str = if updated_label.as_ref().is_empty() {
+                None
+            } else {
+                Some(updated_label.as_ref())
+            };
 
             sqlx::query!(
                 r#"

@@ -63,6 +63,22 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_empty_labels_allowed_as_duplicates,
+    harness = InMemoryWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_empty_labels_allowed_as_duplicates_on_modify,
+    harness = InMemoryWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_same_dataset_different_event_types,
     harness = InMemoryWebhookSubscriptionEventStoreHarness
 );
