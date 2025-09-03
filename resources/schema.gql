@@ -1180,7 +1180,7 @@ type DatasetEnvVarsPermissions {
 }
 
 type DatasetFlowChannels {
-	webhooks: WebhookChannelGroup!
+	webhooks: WebhookFlowChannelGroup!
 }
 
 type DatasetFlowConfigs {
@@ -2145,6 +2145,7 @@ type FlowActivationCauseManual {
 }
 
 type FlowChannel {
+	id: String!
 	name: String!
 	flowTrigger: FlowTrigger!
 	runtimeState: FlowPeriodicProcessState!
@@ -2155,6 +2156,7 @@ type FlowChannelGroupRollup {
 	failing: Int!
 	paused: Int!
 	stopped: Int!
+	worstConsecutiveFailures: Int!
 }
 
 input FlowConfigCompactionInput {
@@ -2413,7 +2415,7 @@ type FlowPeriodicProcess {
 }
 
 type FlowPeriodicProcessState {
-	effectiveStatus: FlowPeriodicProcessStatus!
+	effectiveState: FlowPeriodicProcessStateEnum!
 	consecutiveFailures: Int!
 	lastSuccessAt: DateTime
 	lastAttemptAt: DateTime
@@ -2421,11 +2423,11 @@ type FlowPeriodicProcessState {
 	nextPlannedAt: DateTime
 }
 
-enum FlowPeriodicProcessStatus {
+enum FlowPeriodicProcessStateEnum {
 	ACTIVE
 	FAILING
-	PAUSED_BY_USER
-	STOPPED_AUTOMATICALLY
+	PAUSED_MANUAL
+	STOPPED_AUTO
 }
 
 type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
@@ -4300,12 +4302,12 @@ type WebSocketProtocolDesc {
 	url: String!
 }
 
-type WebhookChannelGroup {
+scalar WebhookEventType
+
+type WebhookFlowChannelGroup {
 	rollup: FlowChannelGroupRollup!
 	channels: [FlowChannel!]!
 }
-
-scalar WebhookEventType
 
 type WebhookSubscription {
 	"""
