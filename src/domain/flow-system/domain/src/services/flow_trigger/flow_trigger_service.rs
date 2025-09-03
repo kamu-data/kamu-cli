@@ -25,6 +25,12 @@ pub trait FlowTriggerService: Sync + Send {
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowTriggerState>, InternalError>;
 
+    /// Match triggers against flow scope query
+    async fn match_triggers(
+        &self,
+        flow_scope_query: FlowScopeQuery,
+    ) -> Result<Vec<FlowTriggerState>, InternalError>;
+
     /// Set or modify flow trigger
     async fn set_trigger(
         &self,

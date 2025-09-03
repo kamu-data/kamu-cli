@@ -10,6 +10,7 @@
 // Re-exports
 pub use kamu_flow_system as domain;
 
+mod helpers;
 mod sqlite_flow_configuration_event_store;
 mod sqlite_flow_event_store;
 mod sqlite_flow_trigger_event_store;

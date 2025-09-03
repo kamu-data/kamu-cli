@@ -47,6 +47,12 @@ pub trait FlowEventStore: EventStore<FlowState> {
         flow_binding: &FlowBinding,
     ) -> Result<u32, InternalError>;
 
+    /// Returns current number of consecutive failures for the given N flows
+    async fn consecutive_flow_failures_by_binding(
+        &self,
+        flow_bindings: Vec<FlowBinding>,
+    ) -> Result<Vec<(FlowBinding, u32)>, InternalError>;
+
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError>;
 
