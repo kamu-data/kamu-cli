@@ -117,10 +117,10 @@ type AccountFieldNonUnique implements CreateAccountResult {
 }
 
 input AccountFlowFilters {
-	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
 	byInitiator: InitiatorFilterInput
 	byDatasetIds: [DatasetID!]!
+	byProcessType: FlowProcessTypeFilterInput
 }
 
 type AccountFlowRuns {
@@ -1196,9 +1196,9 @@ type DatasetFlowConfigsMut {
 }
 
 input DatasetFlowFilters {
-	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
 	byInitiator: InitiatorFilterInput
+	byProcessType: FlowProcessTypeFilterInput
 }
 
 type DatasetFlowPeriodicProcesses {
@@ -2147,6 +2147,7 @@ type FlowActivationCauseManual {
 type FlowChannel {
 	id: String!
 	name: String!
+	channelType: FlowChannelType!
 	flowTrigger: FlowTrigger!
 	runtimeState: FlowPeriodicProcessState!
 }
@@ -2157,6 +2158,10 @@ type FlowChannelGroupRollup {
 	paused: Int!
 	stopped: Int!
 	worstConsecutiveFailures: Int!
+}
+
+enum FlowChannelType {
+	WEBHOOK
 }
 
 input FlowConfigCompactionInput {
@@ -2433,6 +2438,20 @@ enum FlowPeriodicProcessStateEnum {
 type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
 	preconditions: String!
 	message: String!
+}
+
+input FlowProcessTypeChannelFilterInput {
+	channelType: FlowChannelType!
+	channelIds: [String!]
+}
+
+input FlowProcessTypeFilterInput @oneOf {
+	primary: FlowProcessTypePrimaryFilterInput
+	channel: FlowProcessTypeChannelFilterInput
+}
+
+input FlowProcessTypePrimaryFilterInput {
+	byFlowTypes: [DatasetFlowType!]
 }
 
 enum FlowRetryBackoffType {

@@ -78,15 +78,15 @@ struct FlowIndexEntry {
 
 impl FlowIndexEntry {
     pub fn matches_flow_filters(&self, filters: &FlowFilters) -> bool {
-        self.flow_type_matches(filters.by_flow_type.as_deref())
+        self.flow_type_matches(filters.by_flow_types.as_deref())
             && self.flow_status_matches(filters.by_flow_status)
             && self.initiator_matches(filters.by_initiator.as_ref())
     }
 
-    fn flow_type_matches(&self, maybe_flow_type_filter: Option<&str>) -> bool {
+    fn flow_type_matches(&self, maybe_flow_type_filter: Option<&[String]>) -> bool {
         match maybe_flow_type_filter {
             None => true,
-            Some(flow_type) => flow_type == self.flow_binding.flow_type,
+            Some(flow_types) => flow_types.contains(&self.flow_binding.flow_type),
         }
     }
 
@@ -303,13 +303,13 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let g = state.lock().unwrap();
 
         let waiting_filter = FlowFilters {
-            by_flow_type: Some(flow_binding.flow_type.clone()),
+            by_flow_types: Some(vec![flow_binding.flow_type.clone()]),
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         };
 
         let running_filter = FlowFilters {
-            by_flow_type: Some(flow_binding.flow_type.clone()),
+            by_flow_types: Some(vec![flow_binding.flow_type.clone()]),
             by_flow_status: Some(FlowStatus::Running),
             by_initiator: None,
         };
@@ -335,19 +335,19 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let g = state.lock().unwrap();
 
         let waiting_filter = FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         };
 
         let retrying_filter = FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Retrying),
             by_initiator: None,
         };
 
         let running_filter = FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Running),
             by_initiator: None,
         };
