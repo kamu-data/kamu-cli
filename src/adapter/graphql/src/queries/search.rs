@@ -35,7 +35,7 @@ impl Search {
     async fn query(
         &self,
         ctx: &Context<'_>,
-        query: String,
+        mut query: String,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultConnection> {
@@ -55,10 +55,21 @@ impl Search {
         //       to filter, e.g.:
         //       - Anonymous: get all the public
         //       - Logged: all owned datasets and datasets with relations
+
+        query.make_ascii_lowercase();
         let filtered_all_dataset_handles_stream =
             filter_dataset_handle_stream(dataset_registry.all_dataset_handles(), |hdl| {
-                hdl.alias.to_string().contains(&query)
-                    || hdl.id.as_did_str().to_stack_string().contains(&query)
+                let mut lowercase_alias = hdl.alias.to_string();
+                lowercase_alias.make_ascii_lowercase();
+
+                if lowercase_alias.contains(&query) {
+                    return true;
+                }
+
+                let mut id = hdl.id.as_did_str().to_stack_string();
+                id.make_ascii_lowercase();
+
+                id.contains(&query)
             });
         let mut readable_dataset_handles = dataset_action_authorizer
             .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read)
