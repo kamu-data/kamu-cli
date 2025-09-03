@@ -1550,7 +1550,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
                   tiles: listFlows(
                     page: 0
                     perPage: $perPageTiles
-                    filters: { byFlowType: null, byStatus: null, byInitiator: null }
+                    filters: { byProcessType: null, byStatus: null, byInitiator: null }
                   ) {
                     ...FlowConnectionWidgetData
                     __typename

@@ -88,6 +88,16 @@ pub(crate) fn encode_dataset_flow_type(dataset_flow_type: DatasetFlowType) -> &'
     }
 }
 
+pub(crate) fn unpack_all_dataset_flow_types() -> Vec<String> {
+    vec![
+        FLOW_TYPE_DATASET_INGEST.to_string(),
+        FLOW_TYPE_DATASET_TRANSFORM.to_string(),
+        FLOW_TYPE_DATASET_COMPACT.to_string(),
+        FLOW_TYPE_DATASET_RESET.to_string(),
+        FLOW_TYPE_DATASET_RESET_TO_METADATA.to_string(),
+    ]
+}
+
 pub(crate) fn decode_dataset_flow_type(flow_type: &str) -> DatasetFlowType {
     match flow_type {
         FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,

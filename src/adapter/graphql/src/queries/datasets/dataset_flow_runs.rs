@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::AccountService;
@@ -16,7 +14,15 @@ use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use crate::mutations::{FlowInDatasetError, FlowNotFound, check_if_flow_belongs_to_dataset};
 use crate::prelude::*;
-use crate::queries::{Account, DatasetRequestState, Flow};
+use crate::queries::{
+    Account,
+    DatasetRequestState,
+    Flow,
+    FlowChannelType,
+    prepare_flows_filter_by_initiator,
+    prepare_flows_filter_by_types,
+    prepare_flows_scope_query,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,40 +81,38 @@ impl<'a> DatasetFlowRuns<'a> {
     ) -> Result<FlowConnection> {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
+        let dataset_id = self.dataset_request_state.dataset_id();
+
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
+        let scope_query = prepare_flows_scope_query(
+            filters
+                .as_ref()
+                .map(|f| f.by_process_type.as_ref())
+                .unwrap_or_default(),
+            &[dataset_id],
+        )
+        .unwrap_or_else(|| afs::FlowScopeDataset::query_for_single_dataset(dataset_id));
+
         let maybe_filters = match filters {
-            Some(filters) => Some(kamu_flow_system::FlowFilters {
-                by_flow_type: filters
-                    .by_flow_type
-                    .map(|flow_type| encode_dataset_flow_type(flow_type).to_string()),
-                by_flow_status: filters.by_status.map(Into::into),
-                by_initiator: match filters.by_initiator {
-                    Some(initiator_filter) => match initiator_filter {
-                        InitiatorFilterInput::System(_) => {
-                            Some(kamu_flow_system::InitiatorFilter::System)
-                        }
-                        InitiatorFilterInput::Accounts(account_ids) => {
-                            Some(kamu_flow_system::InitiatorFilter::Account(
-                                account_ids
-                                    .into_iter()
-                                    .map(Into::into)
-                                    .collect::<HashSet<_>>(),
-                            ))
-                        }
-                    },
-                    None => None,
-                },
-            }),
+            Some(filters) => {
+                let by_initiator = prepare_flows_filter_by_initiator(filters.by_initiator);
+
+                let by_flow_types = prepare_flows_filter_by_types(filters.by_process_type.as_ref());
+
+                Some(kamu_flow_system::FlowFilters {
+                    by_flow_types,
+                    by_flow_status: filters.by_status.map(Into::into),
+                    by_initiator,
+                })
+            }
             None => None,
         };
 
         let flows_state_listing = flow_query_service
             .list_scoped_flows(
-                afs::FlowScopeDataset::query_for_single_dataset(
-                    self.dataset_request_state.dataset_id(),
-                ),
+                scope_query,
                 maybe_filters.unwrap_or_default(),
                 PaginationOpts::from_page(page, per_page),
             )
@@ -190,17 +194,34 @@ impl GetFlowSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(InputObject)]
-pub struct DatasetFlowFilters {
-    by_flow_type: Option<DatasetFlowType>,
+#[derive(InputObject, Debug, Clone)]
+pub(crate) struct DatasetFlowFilters {
     by_status: Option<FlowStatus>,
     by_initiator: Option<InitiatorFilterInput>,
+    by_process_type: Option<FlowProcessTypeFilterInput>,
 }
 
-#[derive(OneofObject, Debug)]
-pub enum InitiatorFilterInput {
+#[derive(OneofObject, Debug, Clone)]
+pub(crate) enum InitiatorFilterInput {
     System(bool),
     Accounts(Vec<AccountID<'static>>),
+}
+
+#[derive(OneofObject, Debug, Clone)]
+pub(crate) enum FlowProcessTypeFilterInput {
+    Primary(FlowProcessTypePrimaryFilterInput),
+    Channel(FlowProcessTypeChannelFilterInput),
+}
+
+#[derive(InputObject, Debug, Clone)]
+pub(crate) struct FlowProcessTypePrimaryFilterInput {
+    pub(crate) by_flow_types: Option<Vec<DatasetFlowType>>,
+}
+
+#[derive(InputObject, Debug, Clone)]
+pub(crate) struct FlowProcessTypeChannelFilterInput {
+    pub(crate) channel_type: FlowChannelType,
+    pub(crate) channel_ids: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
