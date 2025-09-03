@@ -20,11 +20,13 @@ pub struct FlowChannelGroupRollup {
     pub failing: u32,
     pub paused: u32,
     pub stopped: u32,
+    pub worst_consecutive_failures: u32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowChannel {
+    id: String,
     name: String,
     flow_trigger: fs::FlowTriggerState,
 }
@@ -34,8 +36,17 @@ pub struct FlowChannel {
 impl FlowChannel {
     #[graphql(skip)]
     #[allow(dead_code)]
-    pub fn new(name: String, flow_trigger: fs::FlowTriggerState) -> Self {
-        Self { name, flow_trigger }
+    pub fn new(id: String, name: String, flow_trigger: fs::FlowTriggerState) -> Self {
+        Self {
+            id,
+            name,
+            flow_trigger,
+        }
+    }
+
+    #[allow(clippy::unused_async)]
+    pub async fn id(&self) -> String {
+        self.id.clone()
     }
 
     #[allow(clippy::unused_async)]

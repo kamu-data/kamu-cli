@@ -16,14 +16,14 @@ use crate::queries::{FlowChannel, FlowChannelGroupRollup};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct WebhookChannelGroup {
+pub struct WebhookFlowChannelGroup {
     webhooks_with_triggers: Vec<(WebhookSubscription, FlowTriggerState)>,
     rollup: OnceCell<FlowChannelGroupRollup>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl WebhookChannelGroup {
+impl WebhookFlowChannelGroup {
     #[graphql(skip)]
     pub fn new(webhooks_with_triggers: Vec<(WebhookSubscription, FlowTriggerState)>) -> Self {
         Self {
@@ -55,6 +55,7 @@ impl WebhookChannelGroup {
                     }
                 }
 
+                let mut worst_consecutive_failures = 0;
                 let mut active = 0;
                 let mut failing = 0;
 
@@ -63,6 +64,9 @@ impl WebhookChannelGroup {
                     let results = flow_event_store
                         .consecutive_flow_failures_by_binding(running_bindings)
                         .await?;
+
+                    worst_consecutive_failures =
+                        results.iter().map(|(_, count)| *count).max().unwrap_or(0);
 
                     for (_, consecutive_failures_count) in results {
                         if consecutive_failures_count > 0 {
@@ -78,6 +82,7 @@ impl WebhookChannelGroup {
                     failing,
                     paused,
                     stopped,
+                    worst_consecutive_failures,
                 })
             })
             .await?;
@@ -89,13 +94,15 @@ impl WebhookChannelGroup {
     async fn channels(&self) -> Result<Vec<FlowChannel>> {
         let mut channels = Vec::new();
         for (webhook_subscription, trigger) in &self.webhooks_with_triggers {
-            let subscription_label = if webhook_subscription.label().as_ref().is_empty() {
+            let channel_id = webhook_subscription.id().to_string();
+
+            let channel_name = if webhook_subscription.label().as_ref().is_empty() {
                 webhook_subscription.target_url().to_string()
             } else {
                 webhook_subscription.label().as_ref().to_string()
             };
 
-            channels.push(FlowChannel::new(subscription_label, trigger.clone()));
+            channels.push(FlowChannel::new(channel_id, channel_name, trigger.clone()));
         }
 
         Ok(channels)
