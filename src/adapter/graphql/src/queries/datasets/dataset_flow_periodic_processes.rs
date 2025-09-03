@@ -7,12 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use kamu_adapter_flow_dataset::{ingest_dataset_binding, transform_dataset_binding};
 use kamu_adapter_flow_webhook::FlowScopeSubscription;
-use kamu_flow_system as fs;
+use kamu_flow_system::FlowTriggerService;
+use kamu_webhooks::{WebhookSubscription, WebhookSubscriptionEventStore};
 
 use crate::prelude::*;
-use crate::queries::{DatasetRequestState, FlowChannelGroup, FlowPeriodicProcess};
+use crate::queries::{DatasetRequestState, FlowPeriodicProcess, WebhookChannelGroup};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +34,7 @@ impl<'a> DatasetFlowPeriodicProcesses<'a> {
     }
 
     async fn primary(&self, ctx: &Context<'_>) -> Result<Option<FlowPeriodicProcess>> {
-        let flow_trigger_service = from_catalog_n!(ctx, dyn fs::FlowTriggerService);
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         // Updates are the primary periodic process for datasets
         // Choose ingest or transform binding depending on dataset kind
@@ -76,11 +79,47 @@ impl<'a> DatasetFlowChannels<'a> {
         }
     }
 
-    pub async fn webhooks(&self) -> FlowChannelGroup {
-        let flow_scope_query = FlowScopeSubscription::query_for_subscriptions_of_dataset(
-            self.dataset_request_state.dataset_id(),
+    pub async fn webhooks(&self, ctx: &Context<'_>) -> Result<WebhookChannelGroup> {
+        let (flow_trigger_service, webhook_subscription_event_store) = from_catalog_n!(
+            ctx,
+            dyn FlowTriggerService,
+            dyn WebhookSubscriptionEventStore
         );
-        FlowChannelGroup::new(flow_scope_query)
+
+        // Find trigers that point to webhooks bound to this dataset
+        let matched_triggers = flow_trigger_service
+            .match_triggers(FlowScopeSubscription::query_for_subscriptions_of_dataset(
+                self.dataset_request_state.dataset_id(),
+            ))
+            .await?;
+
+        // Organize triggers by subscription id
+        let mut triggers_by_subscription_id = HashMap::new();
+        for t in matched_triggers {
+            let subscription_id =
+                FlowScopeSubscription::new(&t.flow_binding.scope).subscription_id();
+            triggers_by_subscription_id.insert(subscription_id, t);
+        }
+
+        // Load subscriptions
+        let subscriptions = WebhookSubscription::load_multi_simple(
+            triggers_by_subscription_id.keys().copied().collect(),
+            webhook_subscription_event_store.as_ref(),
+        )
+        .await
+        .int_err()?;
+
+        // Zip the (subscription, trigger) pairs
+        let subscription_trigger_pairs: Vec<_> = subscriptions
+            .into_iter()
+            .filter_map(|subscription| {
+                let trigger = triggers_by_subscription_id.remove(&subscription.id())?;
+                Some((subscription, trigger))
+            })
+            .collect();
+
+        // Enough data for a channel group
+        Ok(WebhookChannelGroup::new(subscription_trigger_pairs))
     }
 
     // TODO: Kafka exports

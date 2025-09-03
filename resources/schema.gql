@@ -1180,7 +1180,7 @@ type DatasetEnvVarsPermissions {
 }
 
 type DatasetFlowChannels {
-	webhooks: FlowChannelGroup!
+	webhooks: WebhookChannelGroup!
 }
 
 type DatasetFlowConfigs {
@@ -2146,14 +2146,8 @@ type FlowActivationCauseManual {
 
 type FlowChannel {
 	name: String!
-	flowTrigger: FlowTrigger
+	flowTrigger: FlowTrigger!
 	runtimeState: FlowPeriodicProcessState!
-}
-
-type FlowChannelGroup {
-	overallStatus: FlowPeriodicProcessStatus!
-	rollup: FlowChannelGroupRollup!
-	channels: [FlowChannel!]!
 }
 
 type FlowChannelGroupRollup {
@@ -4304,6 +4298,11 @@ type ViewDatasetEnvVarEdge {
 
 type WebSocketProtocolDesc {
 	url: String!
+}
+
+type WebhookChannelGroup {
+	rollup: FlowChannelGroupRollup!
+	channels: [FlowChannel!]!
 }
 
 scalar WebhookEventType

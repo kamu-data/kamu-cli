@@ -15,6 +15,8 @@ use kamu_flow_system::*;
 use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
+use crate::helpers::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const SYSTEM_INITIATOR: &str = "<system>";
@@ -192,36 +194,6 @@ impl PostgresFlowEventStore {
 
         let last_event_id = rows.last().unwrap().event_id;
         Ok(EventID::new(last_event_id))
-    }
-
-    fn generate_scope_condition_clauses(
-        &self,
-        flow_scope_query: &FlowScopeQuery,
-        starting_parameter_index: usize,
-    ) -> (String, usize) {
-        let mut parameter_index = starting_parameter_index;
-
-        let mut scope_clauses = Vec::new();
-        for (key, values) in &flow_scope_query.attributes {
-            if values.is_empty() {
-                continue;
-            }
-
-            scope_clauses.push(format!("scope_data->>'{key}' = ANY(${parameter_index})"));
-            parameter_index += 1;
-        }
-
-        (scope_clauses.join(" AND "), parameter_index)
-    }
-
-    fn form_scope_condition_values(&self, flow_scope_query: FlowScopeQuery) -> Vec<Vec<String>> {
-        let mut scope_values = Vec::new();
-        for (_, values) in flow_scope_query.attributes {
-            if !values.is_empty() {
-                scope_values.push(values);
-            }
-        }
-        scope_values
     }
 }
 
@@ -576,6 +548,98 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(failures_count)
     }
 
+    async fn consecutive_flow_failures_by_binding(
+        &self,
+        flow_bindings: Vec<FlowBinding>,
+    ) -> Result<Vec<(FlowBinding, u32)>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        if flow_bindings.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Convert flow bindings to JSON for the query
+        let bindings_json: Vec<serde_json::Value> = flow_bindings
+            .iter()
+            .map(|binding| {
+                serde_json::json!({
+                    "flow_type": binding.flow_type.as_str(),
+                    "scope_data": serde_json::to_value(&binding.scope).unwrap()
+                })
+            })
+            .collect();
+
+        let consecutive_failures = sqlx::query!(
+            r#"
+            WITH bindings AS (
+                SELECT
+                    (binding->>'flow_type')::text AS flow_type,
+                    (binding->'scope_data')::jsonb AS scope_data
+                FROM jsonb_array_elements($1::jsonb) AS binding
+            ),
+            finished AS (
+                SELECT
+                    b.flow_type,
+                    b.scope_data,
+                    e.event_id,
+                    (e.event_payload #>> '{TaskFinished,task_outcome,Success}') IS NOT NULL AS is_success,
+                    (e.event_payload #>> '{TaskFinished,task_outcome,Failed}') IS NOT NULL AS is_failed
+                FROM flow_events e
+                JOIN flows f ON f.flow_id = e.flow_id
+                JOIN bindings b ON b.flow_type = f.flow_type AND b.scope_data = f.scope_data
+                WHERE e.event_type = 'FlowEventTaskFinished'
+            ),
+            last_success AS (
+                SELECT
+                    flow_type,
+                    scope_data,
+                    MAX(event_id) AS event_id
+                FROM finished
+                WHERE is_success
+                GROUP BY flow_type, scope_data
+            )
+            SELECT
+                f.flow_type as "flow_type: String",
+                f.scope_data,
+                COUNT(*)::bigint AS consecutive_failures
+            FROM finished f
+            LEFT JOIN last_success ls ON ls.flow_type = f.flow_type AND ls.scope_data = f.scope_data
+            WHERE f.is_failed AND f.event_id > COALESCE(ls.event_id, 0)
+            GROUP BY f.flow_type, f.scope_data
+            "#,
+            serde_json::to_value(&bindings_json).int_err()?,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        // Create a map for quick lookup of results
+        let mut results_map = std::collections::HashMap::new();
+        for row in consecutive_failures {
+            if let (Some(flow_type), Some(scope_data)) = (row.flow_type, row.scope_data) {
+                let failures_count = row.consecutive_failures.unwrap_or(0);
+
+                let flow_binding = FlowBinding::new(
+                    &flow_type,
+                    FlowScope::new(serde_json::to_value(&scope_data).int_err()?),
+                );
+                results_map.insert(flow_binding, u32::try_from(failures_count).unwrap());
+            } else {
+                unreachable!()
+            }
+        }
+
+        // Build the result vector, ensuring all input bindings are represented
+        let mut results = Vec::with_capacity(flow_bindings.len());
+        for binding in flow_bindings {
+            let failures_count = results_map.get(&binding).copied().unwrap_or(0);
+            results.push((binding, failures_count));
+        }
+
+        Ok(results)
+    }
+
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -649,9 +713,9 @@ impl FlowEventStore for PostgresFlowEventStore {
         let pagination_offset = i64::try_from(pagination.offset).unwrap();
 
         let (scope_conditions, _) =
-            self.generate_scope_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
+            generate_scope_query_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
 
-        let scope_values = self.form_scope_condition_values(flow_scope_query);
+        let scope_values = form_scope_query_condition_values(flow_scope_query);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -712,7 +776,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .map(Self::prepare_initiator_filter);
 
         let (scope_conditions, _) =
-            self.generate_scope_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
+            generate_scope_query_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
 
         let query_str = format!(
             r#"
@@ -744,9 +808,9 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         let (scope_conditions, _) =
-            self.generate_scope_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
+            generate_scope_query_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
 
-        let scope_values = self.form_scope_condition_values(flow_scope_query);
+        let scope_values = form_scope_query_condition_values(flow_scope_query);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
