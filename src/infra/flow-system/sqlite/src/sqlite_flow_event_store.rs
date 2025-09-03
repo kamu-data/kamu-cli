@@ -16,6 +16,8 @@ use futures::TryStreamExt;
 use kamu_flow_system::*;
 use sqlx::{FromRow, QueryBuilder, Sqlite};
 
+use crate::helpers::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const SYSTEM_INITIATOR: &str = "<system>";
@@ -199,45 +201,6 @@ impl SqliteFlowEventStore {
             .int_err()?;
         let last_event_id = rows.last().unwrap().event_id;
         Ok(EventID::new(last_event_id))
-    }
-
-    fn generate_scope_condition_clauses(
-        &self,
-        flow_scope_query: &FlowScopeQuery,
-        starting_parameter_index: usize,
-    ) -> (String, usize) {
-        let mut parameter_index = starting_parameter_index;
-
-        let mut scope_clauses = Vec::new();
-        for (key, values) in &flow_scope_query.attributes {
-            if values.len() == 1 {
-                scope_clauses.push(format!(
-                    "json_extract(scope_data, '$.{key}') = ${parameter_index}",
-                ));
-                parameter_index += 1;
-            } else if !values.is_empty() {
-                scope_clauses.push(format!(
-                    "json_extract(scope_data, '$.{key}') IN ({})",
-                    sqlite_generate_placeholders_list(
-                        values.len(),
-                        NonZeroUsize::new(parameter_index).unwrap()
-                    )
-                ));
-                parameter_index += values.len();
-            }
-        }
-
-        (scope_clauses.join(" AND "), parameter_index)
-    }
-
-    fn form_scope_condition_values(&self, flow_scope_query: FlowScopeQuery) -> Vec<String> {
-        let mut scope_values = Vec::new();
-        for (_, values) in flow_scope_query.attributes {
-            for value in values {
-                scope_values.push(value);
-            }
-        }
-        scope_values
     }
 }
 
@@ -641,6 +604,26 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(failures_count)
     }
 
+    async fn consecutive_flow_failures_by_binding(
+        &self,
+        flow_bindings: Vec<FlowBinding>,
+    ) -> Result<Vec<(FlowBinding, u32)>, InternalError> {
+        if flow_bindings.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut results = Vec::with_capacity(flow_bindings.len());
+
+        for binding in flow_bindings {
+            let failures_count = self
+                .get_current_consecutive_flow_failures_count(&binding)
+                .await?;
+            results.push((binding, failures_count));
+        }
+
+        Ok(results)
+    }
+
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
@@ -719,8 +702,8 @@ impl FlowEventStore for SqliteFlowEventStore {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-            let (scope_clauses, next_parameter_index) = self.generate_scope_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
-            let scope_values = self.form_scope_condition_values(flow_scope_query);
+            let (scope_clauses, next_parameter_index) = generate_scope_query_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
+            let scope_values = form_scope_query_condition_values(flow_scope_query);
 
             let query_str = format!(
                 r#"
@@ -783,7 +766,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         let maybe_filters_by_flow_status = filters.by_flow_status;
 
         let (scope_clauses, next_parameter_index) =
-            self.generate_scope_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
+            generate_scope_query_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
 
         let query_str = format!(
             r#"
@@ -833,9 +816,9 @@ impl FlowEventStore for SqliteFlowEventStore {
             let connection_mut = tr.connection_mut().await?;
 
             let (scope_clauses, _) =
-                self.generate_scope_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
+                generate_scope_query_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
 
-            let scope_values = self.form_scope_condition_values(flow_scope_query);
+            let scope_values = form_scope_query_condition_values(flow_scope_query);
 
             let query_str = format!(
                 r#"

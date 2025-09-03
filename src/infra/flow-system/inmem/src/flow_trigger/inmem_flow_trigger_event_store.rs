@@ -146,6 +146,29 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         Ok(bindings)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?scope_query))]
+    async fn match_trigger_bindings_by_scope_query(
+        &self,
+        scope_query: FlowScopeQuery,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut seen_flow_types = HashSet::new();
+        let mut bindings = Vec::new();
+
+        for event in g.events.iter().rev() {
+            let binding = event.flow_binding();
+            if binding.scope.matches_query(&scope_query)
+                && seen_flow_types.insert(binding.flow_type.clone())
+            {
+                bindings.push(binding.clone());
+            }
+        }
+
+        Ok(bindings)
+    }
+
     #[tracing::instrument(level = "debug", skip_all)]
     async fn has_active_triggers_for_scopes(
         &self,
