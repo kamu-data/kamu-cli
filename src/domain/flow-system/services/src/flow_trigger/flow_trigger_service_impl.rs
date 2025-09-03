@@ -105,7 +105,9 @@ impl FlowTriggerServiceImpl {
                     .await
                     .int_err()?;
 
-            if let Some(mut flow_trigger) = maybe_flow_trigger {
+            if let Some(mut flow_trigger) = maybe_flow_trigger
+                && flow_trigger.is_alive()
+            {
                 flow_trigger
                     .notify_scope_removed(self.time_source.now())
                     .int_err()?;
@@ -135,7 +137,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 .int_err()?;
 
         Ok(if let Some(flow_trigger) = maybe_flow_trigger {
-            if flow_trigger.status == FlowTriggerStatus::ScopeRemoved {
+            if flow_trigger.is_dead() {
                 None
             } else {
                 Some(flow_trigger.into())
@@ -143,6 +145,28 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         } else {
             None
         })
+    }
+
+    async fn match_triggers(
+        &self,
+        flow_scope_query: FlowScopeQuery,
+    ) -> Result<Vec<FlowTriggerState>, InternalError> {
+        let flow_bindings = self
+            .flow_trigger_event_store
+            .match_trigger_bindings_by_scope_query(flow_scope_query)
+            .await
+            .int_err()?;
+
+        let flow_triggers =
+            FlowTrigger::load_multi_simple(flow_bindings, self.flow_trigger_event_store.as_ref())
+                .await
+                .int_err()?;
+
+        Ok(flow_triggers
+            .into_iter()
+            .filter(|ft| ft.is_alive())
+            .map(Into::into)
+            .collect())
     }
 
     async fn set_trigger(
@@ -256,9 +280,11 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .int_err()?;
 
             for flow_trigger in flow_triggers {
-                self.pause_given_trigger(request_time, flow_trigger)
-                    .await
-                    .int_err()?;
+                if flow_trigger.is_alive() {
+                    self.pause_given_trigger(request_time, flow_trigger)
+                        .await
+                        .int_err()?;
+                }
             }
         }
 
@@ -287,9 +313,11 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .int_err()?;
 
             for flow_trigger in flow_triggers {
-                self.resume_given_trigger(request_time, flow_trigger)
-                    .await
-                    .int_err()?;
+                if flow_trigger.is_alive() {
+                    self.resume_given_trigger(request_time, flow_trigger)
+                        .await
+                        .int_err()?;
+                }
             }
         }
 
