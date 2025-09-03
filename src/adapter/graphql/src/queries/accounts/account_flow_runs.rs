@@ -19,7 +19,17 @@ use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::Account;
 use crate::prelude::*;
-use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, InitiatorFilterInput};
+use crate::queries::{
+    Dataset,
+    DatasetConnection,
+    Flow,
+    FlowConnection,
+    FlowProcessTypeFilterInput,
+    InitiatorFilterInput,
+    prepare_flows_filter_by_initiator,
+    prepare_flows_filter_by_types,
+    prepare_flows_scope_query,
+};
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,30 +100,29 @@ impl<'a> AccountFlowRuns<'a> {
 
         let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
+        let scope_query = filters
+            .as_ref()
+            .map(|filters| {
+                prepare_flows_scope_query(filters.by_process_type.as_ref(), &dataset_id_refs)
+            })
+            .unwrap_or_else(|| {
+                Some(afs::FlowScopeDataset::query_for_multiple_datasets(
+                    &dataset_id_refs,
+                ))
+            })
+            .unwrap();
+
         let dataset_flow_filters = filters
             .map(|filters| kamu_flow_system::FlowFilters {
-                by_flow_type: filters
-                    .by_flow_type
-                    .map(|flow_type| encode_dataset_flow_type(flow_type).to_string()),
+                by_flow_types: prepare_flows_filter_by_types(filters.by_process_type.as_ref()),
                 by_flow_status: filters.by_status.map(Into::into),
-                by_initiator: filters
-                    .by_initiator
-                    .map(|initiator_filter| match initiator_filter {
-                        InitiatorFilterInput::System(_) => {
-                            kamu_flow_system::InitiatorFilter::System
-                        }
-                        InitiatorFilterInput::Accounts(account_ids) => {
-                            kamu_flow_system::InitiatorFilter::Account(
-                                account_ids.into_iter().map(Into::into).collect(),
-                            )
-                        }
-                    }),
+                by_initiator: prepare_flows_filter_by_initiator(filters.by_initiator),
             })
             .unwrap_or_default();
 
         let flows_state_listing = flow_query_service
             .list_scoped_flows(
-                afs::FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs),
+                scope_query,
                 dataset_flow_filters,
                 PaginationOpts::from_page(page, per_page),
             )
@@ -205,10 +214,10 @@ impl<'a> AccountFlowRuns<'a> {
 
 #[derive(InputObject, Debug)]
 pub struct AccountFlowFilters {
-    by_flow_type: Option<DatasetFlowType>,
     by_status: Option<FlowStatus>,
     by_initiator: Option<InitiatorFilterInput>,
     by_dataset_ids: Vec<DatasetID<'static>>,
+    by_process_type: Option<FlowProcessTypeFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
