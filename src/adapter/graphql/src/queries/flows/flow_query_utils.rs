@@ -25,18 +25,16 @@ pub(crate) async fn periodic_process_state(
         .get_current_consecutive_flow_failures_count(flow_binding)
         .await?;
 
-    let effective_status = match flow_trigger.status {
+    let effective_state = match flow_trigger.status {
         fs::FlowTriggerStatus::Active => {
             if consecutive_failures == 0 {
-                FlowPeriodicProcessStatus::Active
+                FlowPeriodicProcessStateEnum::Active
             } else {
-                FlowPeriodicProcessStatus::Failing
+                FlowPeriodicProcessStateEnum::Failing
             }
         }
-        fs::FlowTriggerStatus::PausedByUser => FlowPeriodicProcessStatus::PausedByUser,
-        fs::FlowTriggerStatus::StoppedAutomatically => {
-            FlowPeriodicProcessStatus::StoppedAutomatically
-        }
+        fs::FlowTriggerStatus::PausedByUser => FlowPeriodicProcessStateEnum::PausedManual,
+        fs::FlowTriggerStatus::StoppedAutomatically => FlowPeriodicProcessStateEnum::StoppedAuto,
         fs::FlowTriggerStatus::ScopeRemoved => {
             unreachable!("ScopeRemoved triggers are not expected here")
         }
@@ -55,7 +53,7 @@ pub(crate) async fn periodic_process_state(
     };
 
     Ok(FlowPeriodicProcessState {
-        effective_status,
+        effective_state,
         consecutive_failures,
         last_success_at: run_stats.last_success_time,
         last_attempt_at: run_stats.last_attempt_time,

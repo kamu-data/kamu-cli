@@ -15,7 +15,7 @@ use crate::prelude::*;
 
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowPeriodicProcessState {
-    pub effective_status: FlowPeriodicProcessStatus,
+    pub effective_state: FlowPeriodicProcessStateEnum,
     pub consecutive_failures: u32,
     pub last_success_at: Option<DateTime<Utc>>,
     pub last_attempt_at: Option<DateTime<Utc>>,
@@ -26,11 +26,11 @@ pub struct FlowPeriodicProcessState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
-pub enum FlowPeriodicProcessStatus {
+pub enum FlowPeriodicProcessStateEnum {
     Active,
     Failing,
-    PausedByUser,
-    StoppedAutomatically,
+    PausedManual,
+    StoppedAuto,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
