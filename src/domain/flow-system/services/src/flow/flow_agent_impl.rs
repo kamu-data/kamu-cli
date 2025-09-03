@@ -137,7 +137,7 @@ impl FlowAgentImpl {
 
         // How many waiting flows do we have?
         let waiting_filters = FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         };
