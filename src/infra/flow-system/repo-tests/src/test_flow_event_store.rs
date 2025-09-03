@@ -144,7 +144,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
     let cases = vec![
         (
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 ..Default::default()
             },
             vec![
@@ -155,7 +155,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
         ),
         (
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_COMPACT.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_COMPACT.to_string()]),
                 ..Default::default()
             },
             vec![
@@ -166,7 +166,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
         ),
         (
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_TRANSFORM.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_TRANSFORM.to_string()]),
                 ..Default::default()
             },
             vec![],
@@ -318,7 +318,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
         (
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 by_initiator: Some(InitiatorFilter::System),
             },
             vec![foo_cases.ingest_flow_ids.flow_id_finished],
@@ -326,7 +326,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
         (
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: Some(FLOW_TYPE_DATASET_COMPACT.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_COMPACT.to_string()]),
                 by_initiator: Some(InitiatorFilter::Account(petya_filter)),
             },
             vec![foo_cases.compaction_flow_ids.flow_id_waiting],
@@ -334,7 +334,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
         (
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 by_initiator: Some(InitiatorFilter::System),
             },
             vec![],
@@ -615,7 +615,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
                 limit: 2,
             },
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 ..Default::default()
             },
             3,
@@ -719,7 +719,7 @@ pub async fn test_system_flows_filtered_by_flow_type(catalog: &Catalog) {
 
     let cases = vec![(
         FlowFilters {
-            by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+            by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
             ..Default::default()
         },
         vec![
@@ -853,7 +853,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
                 by_initiator: Some(InitiatorFilter::System),
-                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
             },
             vec![system_case.gc_flow_ids.flow_id_finished],
         ),
@@ -861,7 +861,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
             FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(petya_filter)),
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: None,
+                by_flow_types: None,
             },
             vec![system_case.gc_flow_ids.flow_id_waiting],
         ),
@@ -869,7 +869,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
                 by_initiator: Some(InitiatorFilter::System),
-                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
             },
             vec![],
         ),
@@ -960,7 +960,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
                 limit: 2,
             },
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
                 ..Default::default()
             },
             3,
@@ -1118,7 +1118,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         },
@@ -1138,7 +1138,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Running),
             by_initiator: None,
         },
@@ -1158,7 +1158,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Finished),
             by_initiator: None,
         },

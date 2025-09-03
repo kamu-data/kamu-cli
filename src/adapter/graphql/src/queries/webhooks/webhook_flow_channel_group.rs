@@ -12,7 +12,7 @@ use kamu_webhooks::WebhookSubscription;
 use tokio::sync::OnceCell;
 
 use crate::prelude::*;
-use crate::queries::{FlowChannel, FlowChannelGroupRollup};
+use crate::queries::{FlowChannel, FlowChannelGroupRollup, FlowChannelType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,7 +102,12 @@ impl WebhookFlowChannelGroup {
                 webhook_subscription.label().as_ref().to_string()
             };
 
-            channels.push(FlowChannel::new(channel_id, channel_name, trigger.clone()));
+            channels.push(FlowChannel::new(
+                channel_id,
+                channel_name,
+                FlowChannelType::Webhook,
+                trigger.clone(),
+            ));
         }
 
         Ok(channels)

@@ -28,6 +28,7 @@ pub struct FlowChannelGroupRollup {
 pub struct FlowChannel {
     id: String,
     name: String,
+    channel_type: FlowChannelType,
     flow_trigger: fs::FlowTriggerState,
 }
 
@@ -36,10 +37,16 @@ pub struct FlowChannel {
 impl FlowChannel {
     #[graphql(skip)]
     #[allow(dead_code)]
-    pub fn new(id: String, name: String, flow_trigger: fs::FlowTriggerState) -> Self {
+    pub fn new(
+        id: String,
+        name: String,
+        channel_type: FlowChannelType,
+        flow_trigger: fs::FlowTriggerState,
+    ) -> Self {
         Self {
             id,
             name,
+            channel_type,
             flow_trigger,
         }
     }
@@ -55,6 +62,11 @@ impl FlowChannel {
     }
 
     #[allow(clippy::unused_async)]
+    pub async fn channel_type(&self) -> FlowChannelType {
+        self.channel_type
+    }
+
+    #[allow(clippy::unused_async)]
     async fn flow_trigger(&self) -> FlowTrigger {
         self.flow_trigger.clone().into()
     }
@@ -62,6 +74,13 @@ impl FlowChannel {
     async fn runtime_state(&self, ctx: &Context<'_>) -> Result<FlowPeriodicProcessState> {
         periodic_process_state(ctx, &self.flow_trigger).await
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Enum, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum FlowChannelType {
+    Webhook,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
