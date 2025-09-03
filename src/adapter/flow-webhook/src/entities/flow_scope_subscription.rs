@@ -97,6 +97,43 @@ impl<'a> FlowScopeSubscription<'a> {
             ],
         }
     }
+
+    pub fn query_for_subscriptions_of_multiple_datasets(
+        dataset_id_refs: &[&odf::DatasetID],
+    ) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                    vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID.to_string(),
+                    dataset_id_refs.iter().map(ToString::to_string).collect(),
+                ),
+            ],
+        }
+    }
+
+    pub fn query_for_multiple_subscriptions(
+        subscription_ids: &[WebhookSubscriptionID],
+    ) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                    vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID.to_string(),
+                    subscription_ids
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>(),
+                ),
+            ],
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
