@@ -24,6 +24,11 @@ impl<const S: usize> StackString<S> {
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(&self.buf[..self.len]).unwrap()
     }
+
+    pub fn make_ascii_lowercase(&mut self) {
+        let buf = &mut self.buf[..self.len];
+        buf.make_ascii_lowercase();
+    }
 }
 
 impl<const S: usize> std::ops::Deref for StackString<S> {
