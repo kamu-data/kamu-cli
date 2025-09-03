@@ -26,6 +26,10 @@ impl FlowTriggerStatus {
             Self::PausedByUser | Self::StoppedAutomatically | Self::ScopeRemoved => false,
         }
     }
+
+    pub fn is_dead(&self) -> bool {
+        *self == FlowTriggerStatus::ScopeRemoved
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

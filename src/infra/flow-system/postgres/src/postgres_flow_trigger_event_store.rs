@@ -13,6 +13,8 @@ use futures::TryStreamExt;
 use kamu_flow_system::*;
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
+use crate::helpers::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
@@ -213,6 +215,50 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
                 let scope: FlowScope = serde_json::from_value(row.scope_data).int_err()?;
                 Ok(FlowBinding {
                     flow_type: row.flow_type,
+                    scope,
+                })
+            })
+            .collect()
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn match_trigger_bindings_by_scope_query(
+        &self,
+        scope_query: FlowScopeQuery,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let (scope_conditions, _) =
+            generate_scope_query_condition_clauses(&scope_query, 1 /* no params + 1 */);
+
+        let scope_values = form_scope_query_condition_values(scope_query);
+
+        let query_str = format!(
+            r#"
+            SELECT DISTINCT flow_type, scope_data
+                FROM flow_trigger_events
+                WHERE ({scope_conditions})
+                    AND event_type = 'FlowTriggerEventCreated'
+            );
+            "#
+        );
+
+        let mut query = sqlx::query(&query_str);
+        for values in scope_values {
+            query = query.bind(values);
+        }
+
+        let flow_bindings = query.fetch_all(connection_mut).await.int_err()?;
+
+        use sqlx::Row;
+        flow_bindings
+            .into_iter()
+            .map(|row| {
+                let scope: FlowScope = serde_json::from_value(row.get("scope_data")).int_err()?;
+                Ok(FlowBinding {
+                    flow_type: row.get("flow_type"),
                     scope,
                 })
             })
