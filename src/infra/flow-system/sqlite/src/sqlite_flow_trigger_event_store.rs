@@ -261,7 +261,6 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                 FROM flow_trigger_events
                 WHERE ({scope_conditions})
                     AND event_type = 'FlowTriggerEventCreated'
-                );
             "#
         );
 
