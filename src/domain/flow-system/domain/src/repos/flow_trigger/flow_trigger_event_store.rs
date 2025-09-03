@@ -25,6 +25,13 @@ pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
         scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError>;
 
+    /// Returns all bindings for a where triggers are defined
+    /// regardless of status
+    async fn match_trigger_bindings_by_scope_query(
+        &self,
+        scope_query: FlowScopeQuery,
+    ) -> Result<Vec<FlowBinding>, InternalError>;
+
     /// Checks if there are any active triggers for the given list of scopes
     async fn has_active_triggers_for_scopes(
         &self,

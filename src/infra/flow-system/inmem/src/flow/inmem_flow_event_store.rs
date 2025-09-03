@@ -415,6 +415,26 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Ok(u32::try_from(count).unwrap())
     }
 
+    async fn consecutive_flow_failures_by_binding(
+        &self,
+        flow_bindings: Vec<FlowBinding>,
+    ) -> Result<Vec<(FlowBinding, u32)>, InternalError> {
+        if flow_bindings.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut results = Vec::with_capacity(flow_bindings.len());
+
+        for binding in flow_bindings {
+            let failures_count = self
+                .get_current_consecutive_flow_failures_count(&binding)
+                .await?;
+            results.push((binding, failures_count));
+        }
+
+        Ok(results)
+    }
+
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let state = self.inner.as_state();
