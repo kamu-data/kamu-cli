@@ -15,7 +15,7 @@ use kamu_flow_system::FlowTriggerService;
 use kamu_webhooks::{WebhookSubscription, WebhookSubscriptionEventStore};
 
 use crate::prelude::*;
-use crate::queries::{DatasetRequestState, FlowPeriodicProcess, WebhookChannelGroup};
+use crate::queries::{DatasetRequestState, FlowPeriodicProcess, WebhookFlowChannelGroup};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,7 +79,7 @@ impl<'a> DatasetFlowChannels<'a> {
         }
     }
 
-    pub async fn webhooks(&self, ctx: &Context<'_>) -> Result<WebhookChannelGroup> {
+    pub async fn webhooks(&self, ctx: &Context<'_>) -> Result<WebhookFlowChannelGroup> {
         let (flow_trigger_service, webhook_subscription_event_store) = from_catalog_n!(
             ctx,
             dyn FlowTriggerService,
@@ -119,7 +119,7 @@ impl<'a> DatasetFlowChannels<'a> {
             .collect();
 
         // Enough data for a channel group
-        Ok(WebhookChannelGroup::new(subscription_trigger_pairs))
+        Ok(WebhookFlowChannelGroup::new(subscription_trigger_pairs))
     }
 
     // TODO: Kafka exports
