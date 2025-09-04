@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flow;
-mod flow_configuration;
-mod flow_process_state;
-mod flow_trigger;
+mod flow_process_state_query;
+mod flow_process_state_repository;
 
-pub use flow::*;
-pub use flow_configuration::*;
-pub use flow_process_state::*;
-pub use flow_trigger::*;
+pub use flow_process_state_query::*;
+pub use flow_process_state_repository::*;
