@@ -20,7 +20,7 @@ use crate::queries::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct DatasetRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
