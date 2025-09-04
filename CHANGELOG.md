@@ -15,9 +15,10 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - GQL: `Auth::relations()` for getting ReBAC triplets for debugging purposes.
 ### Changed
-- dep: `ringbug` updated from `0.3` to `0.4`.
+- dep: `ringbuf` updated from `0.3` to `0.4`.
 - Flows: each input contribution to batching rule is reflected as an update of start condition,
    so that flow history may show how many accumulated records were present at the moment of each update
+- GQL: `Search::query()`: case insensitive search.
 ### Fixed
 - Crash when multiple unlabeled webhook subscriptions are defined within the same dataset
 - Restrict dataset creation with duplicate transform inputs.

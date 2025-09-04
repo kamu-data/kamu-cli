@@ -9197,6 +9197,7 @@ dependencies = [
  "digest 0.10.7",
  "ed25519-dalek",
  "hex",
+ "pretty_assertions",
  "rand 0.8.5",
  "serde",
  "serde_json",
