@@ -9,12 +9,14 @@
 
 mod flow;
 mod flow_configuration;
+mod flow_process_state;
 mod flow_sensor;
 mod flow_trigger;
 mod shared;
 
 pub use flow::*;
 pub use flow_configuration::*;
+pub use flow_process_state::*;
 pub use flow_sensor::*;
 pub use flow_trigger::*;
 pub use shared::*;

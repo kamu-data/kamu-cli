@@ -9,17 +9,17 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(
     feature = "sqlx",
     derive(sqlx::Type),
-    sqlx(type_name = "flow_status_type", rename_all = "lowercase")
+    sqlx(type_name = "flow_process_effective_state", rename_all = "lowercase")
 )]
-pub enum FlowStatus {
-    Waiting,
-    Running,
-    Retrying,
-    Finished,
+pub enum FlowProcessEffectiveState {
+    Active,
+    Failing,
+    PausedManual,
+    StoppedAuto,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

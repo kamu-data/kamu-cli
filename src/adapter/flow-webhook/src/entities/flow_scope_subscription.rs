@@ -87,11 +87,11 @@ impl<'a> FlowScopeSubscription<'a> {
         fs::FlowScopeQuery {
             attributes: vec![
                 (
-                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
                     vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
                 ),
                 (
-                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID.to_string(),
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
                     vec![dataset_id.to_string()],
                 ),
             ],
@@ -104,11 +104,11 @@ impl<'a> FlowScopeSubscription<'a> {
         fs::FlowScopeQuery {
             attributes: vec![
                 (
-                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
                     vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
                 ),
                 (
-                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID.to_string(),
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
                     dataset_id_refs.iter().map(ToString::to_string).collect(),
                 ),
             ],
@@ -121,11 +121,11 @@ impl<'a> FlowScopeSubscription<'a> {
         fs::FlowScopeQuery {
             attributes: vec![
                 (
-                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
                     vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
                 ),
                 (
-                    FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID.to_string(),
+                    FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID,
                     subscription_ids
                         .iter()
                         .map(ToString::to_string)
