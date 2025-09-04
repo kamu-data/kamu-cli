@@ -12,18 +12,18 @@ use kamu_webhooks::WebhookSubscription;
 use tokio::sync::OnceCell;
 
 use crate::prelude::*;
-use crate::queries::{FlowChannel, FlowChannelGroupRollup, FlowChannelType};
+use crate::queries::{FlowProcessGroupRollup, WebhookFlowSubProcess};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct WebhookFlowChannelGroup {
+pub struct WebhookFlowSubProcessGroup {
     webhooks_with_triggers: Vec<(WebhookSubscription, FlowTriggerState)>,
-    rollup: OnceCell<FlowChannelGroupRollup>,
+    rollup: OnceCell<FlowProcessGroupRollup>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl WebhookFlowChannelGroup {
+impl WebhookFlowSubProcessGroup {
     #[graphql(skip)]
     pub fn new(webhooks_with_triggers: Vec<(WebhookSubscription, FlowTriggerState)>) -> Self {
         Self {
@@ -33,7 +33,7 @@ impl WebhookFlowChannelGroup {
     }
 
     #[allow(clippy::unused_async)]
-    async fn rollup(&self, ctx: &Context<'_>) -> Result<FlowChannelGroupRollup> {
+    async fn rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
         let rollup = self
             .rollup
             .get_or_try_init(|| async {
@@ -77,7 +77,7 @@ impl WebhookFlowChannelGroup {
                     }
                 }
 
-                Ok::<_, InternalError>(FlowChannelGroupRollup {
+                Ok::<_, InternalError>(FlowProcessGroupRollup {
                     active,
                     failing,
                     paused,
@@ -91,26 +91,24 @@ impl WebhookFlowChannelGroup {
     }
 
     #[allow(clippy::unused_async)]
-    async fn channels(&self) -> Result<Vec<FlowChannel>> {
-        let mut channels = Vec::new();
-        for (webhook_subscription, trigger) in &self.webhooks_with_triggers {
-            let channel_id = webhook_subscription.id().to_string();
+    async fn subprocesses(&self) -> Result<Vec<WebhookFlowSubProcess>> {
+        let mut subprocesses = Vec::new();
 
-            let channel_name = if webhook_subscription.label().as_ref().is_empty() {
+        for (webhook_subscription, trigger) in &self.webhooks_with_triggers {
+            let subprocess_name = if webhook_subscription.label().as_ref().is_empty() {
                 webhook_subscription.target_url().to_string()
             } else {
                 webhook_subscription.label().as_ref().to_string()
             };
 
-            channels.push(FlowChannel::new(
-                channel_id,
-                channel_name,
-                FlowChannelType::Webhook,
+            subprocesses.push(WebhookFlowSubProcess::new(
+                webhook_subscription.id(),
+                subprocess_name,
                 trigger.clone(),
             ));
         }
 
-        Ok(channels)
+        Ok(subprocesses)
     }
 }
 

@@ -1179,10 +1179,6 @@ type DatasetEnvVarsPermissions {
 	canUpdate: Boolean!
 }
 
-type DatasetFlowChannels {
-	webhooks: WebhookFlowChannelGroup!
-}
-
 type DatasetFlowConfigs {
 	"""
 	Returns defined configuration for a flow of specified type
@@ -1201,9 +1197,9 @@ input DatasetFlowFilters {
 	byProcessType: FlowProcessTypeFilterInput
 }
 
-type DatasetFlowPeriodicProcesses {
-	primary: FlowPeriodicProcess
-	channels: DatasetFlowChannels!
+type DatasetFlowProcesses {
+	primary: FlowProcess
+	webhooks: WebhookFlowSubProcessGroup!
 }
 
 type DatasetFlowRuns {
@@ -1262,9 +1258,9 @@ type DatasetFlows {
 	"""
 	runs: DatasetFlowRuns!
 	"""
-	Returns interface for flow periodic processes queries
+	Returns interface for flow processes queries
 	"""
-	periodicProcesses: DatasetFlowPeriodicProcesses!
+	processes: DatasetFlowProcesses!
 }
 
 type DatasetFlowsMut {
@@ -2144,26 +2140,6 @@ type FlowActivationCauseManual {
 	initiator: Account!
 }
 
-type FlowChannel {
-	id: String!
-	name: String!
-	channelType: FlowChannelType!
-	flowTrigger: FlowTrigger!
-	runtimeState: FlowPeriodicProcessState!
-}
-
-type FlowChannelGroupRollup {
-	active: Int!
-	failing: Int!
-	paused: Int!
-	stopped: Int!
-	worstConsecutiveFailures: Int!
-}
-
-enum FlowChannelType {
-	WEBHOOK
-}
-
 input FlowConfigCompactionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
@@ -2413,14 +2389,27 @@ type FlowNotFound implements GetFlowResult & CancelFlowRunResult {
 
 union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 
-type FlowPeriodicProcess {
-	flowType: DatasetFlowType!
-	flowTrigger: FlowTrigger!
-	runtimeState: FlowPeriodicProcessState!
+type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
+	preconditions: String!
+	message: String!
 }
 
-type FlowPeriodicProcessState {
-	effectiveState: FlowPeriodicProcessStateEnum!
+type FlowProcess {
+	flowType: DatasetFlowType!
+	flowTrigger: FlowTrigger!
+	runtimeState: FlowProcessRuntimeState!
+}
+
+type FlowProcessGroupRollup {
+	active: Int!
+	failing: Int!
+	paused: Int!
+	stopped: Int!
+	worstConsecutiveFailures: Int!
+}
+
+type FlowProcessRuntimeState {
+	effectiveState: FlowProcessRuntimeStateEnum!
 	consecutiveFailures: Int!
 	lastSuccessAt: DateTime
 	lastAttemptAt: DateTime
@@ -2428,30 +2417,24 @@ type FlowPeriodicProcessState {
 	nextPlannedAt: DateTime
 }
 
-enum FlowPeriodicProcessStateEnum {
+enum FlowProcessRuntimeStateEnum {
 	ACTIVE
 	FAILING
 	PAUSED_MANUAL
 	STOPPED_AUTO
 }
 
-type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
-	preconditions: String!
-	message: String!
-}
-
-input FlowProcessTypeChannelFilterInput {
-	channelType: FlowChannelType!
-	channelIds: [String!]
-}
-
 input FlowProcessTypeFilterInput @oneOf {
 	primary: FlowProcessTypePrimaryFilterInput
-	channel: FlowProcessTypeChannelFilterInput
+	webhooks: FlowProcessTypeWebhooksFilterInput
 }
 
 input FlowProcessTypePrimaryFilterInput {
 	byFlowTypes: [DatasetFlowType!]
+}
+
+input FlowProcessTypeWebhooksFilterInput {
+	subscriptionIds: [WebhookSubscriptionID!]
 }
 
 enum FlowRetryBackoffType {
@@ -4323,9 +4306,16 @@ type WebSocketProtocolDesc {
 
 scalar WebhookEventType
 
-type WebhookFlowChannelGroup {
-	rollup: FlowChannelGroupRollup!
-	channels: [FlowChannel!]!
+type WebhookFlowSubProcess {
+	id: WebhookSubscriptionID!
+	name: String!
+	flowTrigger: FlowTrigger!
+	runtimeState: FlowProcessRuntimeState!
+}
+
+type WebhookFlowSubProcessGroup {
+	rollup: FlowProcessGroupRollup!
+	subprocesses: [WebhookFlowSubProcess!]!
 }
 
 type WebhookSubscription {
