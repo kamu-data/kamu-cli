@@ -59,6 +59,11 @@ impl Search {
         query.make_ascii_lowercase();
         let filtered_all_dataset_handles_stream =
             filter_dataset_handle_stream(dataset_registry.all_dataset_handles(), |hdl| {
+                // TODO: PERF: Move the substring search operation from Rust code to
+                //       the database level (ILIKE).
+                //
+                //       GQL: `Search::query()`: performance improvements
+                //       https://github.com/kamu-data/kamu-cli/issues/1360
                 let mut lowercase_alias = hdl.alias.to_string();
                 lowercase_alias.make_ascii_lowercase();
 
