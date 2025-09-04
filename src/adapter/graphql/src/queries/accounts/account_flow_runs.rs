@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::Account as AccountEntity;
-use kamu_core::DatasetRegistry;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
@@ -26,6 +24,7 @@ use crate::queries::{
     FlowConnection,
     FlowProcessTypeFilterInput,
     InitiatorFilterInput,
+    list_accessible_datasets_with_flows,
     prepare_flows_filter_by_initiator,
     prepare_flows_filter_by_types,
     prepare_flows_scope_query,
@@ -148,54 +147,14 @@ impl<'a> AccountFlowRuns<'a> {
             return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
         }
 
-        let (flow_query_service, dataset_entry_service, dataset_registry) = from_catalog_n!(
-            ctx,
-            dyn fs::FlowQueryService,
-            dyn DatasetEntryService,
-            dyn DatasetRegistry
-        );
-
-        // Consider using ReBAC: not just owned, but perhaps "Maintain" too,
-        // which allows launching flows
-        let owned_dataset_ids = dataset_entry_service
-            .get_owned_dataset_ids(&self.account.id)
-            .await
-            .int_err()?;
-
-        let input_flow_scopes = owned_dataset_ids
-            .iter()
-            .map(afs::FlowScopeDataset::make_scope)
-            .collect::<Vec<_>>();
-
-        let filtered_flow_scopes = flow_query_service
-            .filter_flow_scopes_having_flows(&input_flow_scopes)
-            .await?;
-
-        let dataset_ids = filtered_flow_scopes
-            .iter()
-            .filter_map(|flow_scope| {
-                afs::FlowScopeDataset::maybe_dataset_id_in_scope(flow_scope).map(Cow::Owned)
-            })
-            .collect::<Vec<_>>();
-
-        let dataset_handles_resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
-            .await
-            .int_err()?;
-
-        for (dataset_id, _) in dataset_handles_resolution.unresolved_datasets {
-            tracing::warn!(
-                %dataset_id,
-                "Ignoring point that refers to a dataset not present in the registry",
-            );
-        }
+        let (dataset_handles, _) =
+            list_accessible_datasets_with_flows(ctx, &self.account.id, 0, usize::MAX).await?;
 
         let account = Account::new(
             self.account.id.clone().into(),
             self.account.account_name.clone().into(),
         );
-        let readable_datasets: Vec<_> = dataset_handles_resolution
-            .resolved_handles
+        let readable_datasets: Vec<_> = dataset_handles
             .into_iter()
             .map(|dataset_handle| Dataset::new_access_checked(account.clone(), dataset_handle))
             .collect();
