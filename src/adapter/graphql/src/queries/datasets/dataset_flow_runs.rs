@@ -18,7 +18,6 @@ use crate::queries::{
     Account,
     DatasetRequestState,
     Flow,
-    FlowChannelType,
     prepare_flows_filter_by_initiator,
     prepare_flows_filter_by_types,
     prepare_flows_scope_query,
@@ -210,7 +209,7 @@ pub(crate) enum InitiatorFilterInput {
 #[derive(OneofObject, Debug, Clone)]
 pub(crate) enum FlowProcessTypeFilterInput {
     Primary(FlowProcessTypePrimaryFilterInput),
-    Channel(FlowProcessTypeChannelFilterInput),
+    Webhooks(FlowProcessTypeWebhooksFilterInput),
 }
 
 #[derive(InputObject, Debug, Clone)]
@@ -219,9 +218,8 @@ pub(crate) struct FlowProcessTypePrimaryFilterInput {
 }
 
 #[derive(InputObject, Debug, Clone)]
-pub(crate) struct FlowProcessTypeChannelFilterInput {
-    pub(crate) channel_type: FlowChannelType,
-    pub(crate) channel_ids: Option<Vec<String>>,
+pub(crate) struct FlowProcessTypeWebhooksFilterInput {
+    pub(crate) subscription_ids: Option<Vec<WebhookSubscriptionID>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
