@@ -10,17 +10,17 @@
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
-use crate::queries::periodic_process_state;
+use crate::queries::flow_process_runtime_state;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowPeriodicProcess {
+pub struct FlowProcess {
     flow_trigger: fs::FlowTriggerState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl FlowPeriodicProcess {
+impl FlowProcess {
     #[graphql(skip)]
     pub fn new(flow_trigger: fs::FlowTriggerState) -> Self {
         Self { flow_trigger }
@@ -34,8 +34,9 @@ impl FlowPeriodicProcess {
         self.flow_trigger.clone().into()
     }
 
-    async fn runtime_state(&self, ctx: &Context<'_>) -> Result<FlowPeriodicProcessState> {
-        periodic_process_state(ctx, &self.flow_trigger).await
+    #[tracing::instrument(level = "debug", name = "Gql::FlowProcess::runtime_state", skip_all)]
+    async fn runtime_state(&self, ctx: &Context<'_>) -> Result<FlowProcessRuntimeState> {
+        flow_process_runtime_state(ctx, &self.flow_trigger).await
     }
 }
 

@@ -9,7 +9,7 @@
 
 use super::{DatasetFlowConfigs, DatasetFlowRuns, DatasetFlowTriggers};
 use crate::prelude::*;
-use crate::queries::{DatasetFlowPeriodicProcesses, DatasetRequestState};
+use crate::queries::{DatasetFlowProcesses, DatasetRequestState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,9 +41,9 @@ impl<'a> DatasetFlows<'a> {
         DatasetFlowRuns::new(self.dataset_request_state)
     }
 
-    /// Returns interface for flow periodic processes queries
-    async fn periodic_processes(&self) -> DatasetFlowPeriodicProcesses {
-        DatasetFlowPeriodicProcesses::new(self.dataset_request_state)
+    /// Returns interface for flow processes queries
+    async fn processes(&self) -> DatasetFlowProcesses {
+        DatasetFlowProcesses::new(self.dataset_request_state)
     }
 }
 
