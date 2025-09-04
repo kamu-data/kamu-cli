@@ -13,8 +13,12 @@ pub use kamu_flow_system as domain;
 mod helpers;
 mod postgres_flow_configuration_event_store;
 mod postgres_flow_event_store;
+mod postgres_flow_process_state_query;
+mod postgres_flow_process_state_repository;
 mod postgres_flow_trigger_event_store;
 
 pub use postgres_flow_configuration_event_store::*;
 pub use postgres_flow_event_store::*;
+pub use postgres_flow_process_state_query::*;
+pub use postgres_flow_process_state_repository::*;
 pub use postgres_flow_trigger_event_store::*;
