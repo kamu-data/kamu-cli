@@ -15,17 +15,17 @@ use kamu_flow_system::FlowTriggerService;
 use kamu_webhooks::{WebhookSubscription, WebhookSubscriptionEventStore};
 
 use crate::prelude::*;
-use crate::queries::{DatasetRequestState, FlowPeriodicProcess, WebhookFlowChannelGroup};
+use crate::queries::{DatasetRequestState, FlowProcess, WebhookFlowSubProcessGroup};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowPeriodicProcesses<'a> {
+pub struct DatasetFlowProcesses<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl<'a> DatasetFlowPeriodicProcesses<'a> {
+impl<'a> DatasetFlowProcesses<'a> {
     #[graphql(skip)]
     pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
@@ -33,7 +33,7 @@ impl<'a> DatasetFlowPeriodicProcesses<'a> {
         }
     }
 
-    async fn primary(&self, ctx: &Context<'_>) -> Result<Option<FlowPeriodicProcess>> {
+    async fn primary(&self, ctx: &Context<'_>) -> Result<Option<FlowProcess>> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         // Updates are the primary periodic process for datasets
@@ -53,33 +53,12 @@ impl<'a> DatasetFlowPeriodicProcesses<'a> {
         let maybe_trigger = flow_trigger_service.find_trigger(&flow_binding).await?;
 
         // If trigger is present, present it's execution history as a periodic process
-        Ok(maybe_trigger.map(FlowPeriodicProcess::new))
+        Ok(maybe_trigger.map(FlowProcess::new))
     }
 
     // TODO: other secondary processes in future
 
-    async fn channels(&self) -> DatasetFlowChannels {
-        DatasetFlowChannels::new(self.dataset_request_state)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DatasetFlowChannels<'a> {
-    dataset_request_state: &'a DatasetRequestState,
-}
-
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
-impl<'a> DatasetFlowChannels<'a> {
-    #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
-            dataset_request_state,
-        }
-    }
-
-    pub async fn webhooks(&self, ctx: &Context<'_>) -> Result<WebhookFlowChannelGroup> {
+    pub async fn webhooks(&self, ctx: &Context<'_>) -> Result<WebhookFlowSubProcessGroup> {
         let (flow_trigger_service, webhook_subscription_event_store) = from_catalog_n!(
             ctx,
             dyn FlowTriggerService,
@@ -119,7 +98,7 @@ impl<'a> DatasetFlowChannels<'a> {
             .collect();
 
         // Enough data for a channel group
-        Ok(WebhookFlowChannelGroup::new(subscription_trigger_pairs))
+        Ok(WebhookFlowSubProcessGroup::new(subscription_trigger_pairs))
     }
 
     // TODO: Kafka exports
