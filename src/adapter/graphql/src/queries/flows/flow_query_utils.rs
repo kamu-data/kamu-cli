@@ -13,14 +13,14 @@ use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
-use crate::queries::{FlowChannelType, FlowProcessTypeFilterInput, InitiatorFilterInput};
+use crate::queries::{FlowProcessTypeFilterInput, InitiatorFilterInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn periodic_process_state(
+pub(crate) async fn flow_process_runtime_state(
     ctx: &Context<'_>,
     flow_trigger: &fs::FlowTriggerState,
-) -> Result<FlowPeriodicProcessState> {
+) -> Result<FlowProcessRuntimeState> {
     let flow_event_store = from_catalog_n!(ctx, dyn fs::FlowEventStore);
 
     let flow_binding = &flow_trigger.flow_binding;
@@ -32,13 +32,13 @@ pub(crate) async fn periodic_process_state(
     let effective_state = match flow_trigger.status {
         fs::FlowTriggerStatus::Active => {
             if consecutive_failures == 0 {
-                FlowPeriodicProcessStateEnum::Active
+                FlowProcessRuntimeStateEnum::Active
             } else {
-                FlowPeriodicProcessStateEnum::Failing
+                FlowProcessRuntimeStateEnum::Failing
             }
         }
-        fs::FlowTriggerStatus::PausedByUser => FlowPeriodicProcessStateEnum::PausedManual,
-        fs::FlowTriggerStatus::StoppedAutomatically => FlowPeriodicProcessStateEnum::StoppedAuto,
+        fs::FlowTriggerStatus::PausedByUser => FlowProcessRuntimeStateEnum::PausedManual,
+        fs::FlowTriggerStatus::StoppedAutomatically => FlowProcessRuntimeStateEnum::StoppedAuto,
         fs::FlowTriggerStatus::ScopeRemoved => {
             unreachable!("ScopeRemoved triggers are not expected here")
         }
@@ -56,7 +56,7 @@ pub(crate) async fn periodic_process_state(
         None
     };
 
-    Ok(FlowPeriodicProcessState {
+    Ok(FlowProcessRuntimeState {
         effective_state,
         consecutive_failures,
         last_success_at: run_stats.last_success_time,
@@ -106,13 +106,8 @@ pub(crate) fn prepare_flows_filter_by_types(
                 .unwrap_or_else(unpack_all_dataset_flow_types),
         ),
 
-        Some(FlowProcessTypeFilterInput::Channel(channel_filter)) => {
-            match channel_filter.channel_type {
-                FlowChannelType::Webhook => {
-                    // For now we only have webhook channels
-                    Some(vec![FLOW_TYPE_WEBHOOK_DELIVER.to_string()])
-                }
-            }
+        Some(FlowProcessTypeFilterInput::Webhooks(_)) => {
+            Some(vec![FLOW_TYPE_WEBHOOK_DELIVER.to_string()])
         }
 
         None => None,
@@ -126,38 +121,32 @@ pub(crate) fn prepare_flows_scope_query(
     dataset_id_refs: &[&odf::DatasetID],
 ) -> Option<fs::FlowScopeQuery> {
     match maybe_input {
-        Some(FlowProcessTypeFilterInput::Channel(channel_filter)) => {
-            match channel_filter.channel_type {
-                // For now we only have webhook channels
-                FlowChannelType::Webhook => {
-                    // Particular channels listed?
-                    if let Some(channel_ids) = &channel_filter.channel_ids
-                        && !channel_ids.is_empty()
-                    {
-                        // Convert to webhook subscription IDs
-                        let subscription_ids = channel_ids
-                            .iter()
-                            .map(|id_str| {
-                                kamu_webhooks::WebhookSubscriptionID::new(id_str.parse().unwrap())
-                            })
-                            .collect::<Vec<_>>();
+        Some(FlowProcessTypeFilterInput::Webhooks(webhooks_filter)) => {
+            // Particular subscriptions listed?
+            if let Some(subscription_ids) = &webhooks_filter.subscription_ids
+                && !subscription_ids.is_empty()
+            {
+                // Convert to domain-level webhook subscription IDs
+                let subscription_ids = subscription_ids
+                    .iter()
+                    .copied()
+                    .map(Into::into)
+                    .collect::<Vec<_>>();
 
-                        // We want a flow scope query for these subscriptions
-                        // Note: we don't have to use "dataset_id_refs",
-                        // it would be a redundant condition at the database level
-                        Some(FlowScopeSubscription::query_for_multiple_subscriptions(
-                            &subscription_ids,
-                        ))
-                    } else {
-                        // No particular channels listed, use all subscriptions
-                        // that belong to the datasets
-                        Some(
-                            FlowScopeSubscription::query_for_subscriptions_of_multiple_datasets(
-                                dataset_id_refs,
-                            ),
-                        )
-                    }
-                }
+                // We want a flow scope query for these subscriptions
+                // Note: we don't have to use "dataset_id_refs",
+                // it would be a redundant condition at the database level
+                Some(FlowScopeSubscription::query_for_multiple_subscriptions(
+                    &subscription_ids,
+                ))
+            } else {
+                // No particular channels listed, use all subscriptions
+                // that belong to the datasets
+                Some(
+                    FlowScopeSubscription::query_for_subscriptions_of_multiple_datasets(
+                        dataset_id_refs,
+                    ),
+                )
             }
         }
         Some(FlowProcessTypeFilterInput::Primary(_)) | None => None, // we'll use default query
