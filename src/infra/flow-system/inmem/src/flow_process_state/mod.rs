@@ -7,17 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(let_chains)]
+mod inmem_flow_process_state;
 
-// Re-exports
-pub use kamu_flow_system as domain;
-
-mod flow;
-mod flow_configuration;
-mod flow_process_state;
-mod flow_trigger;
-
-pub use flow::*;
-pub use flow_configuration::*;
-pub use flow_process_state::*;
-pub use flow_trigger::*;
+pub use inmem_flow_process_state::*;
