@@ -9,17 +9,13 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
-#[cfg_attr(
-    feature = "sqlx",
-    derive(sqlx::Type),
-    sqlx(type_name = "flow_status_type", rename_all = "lowercase")
-)]
-pub enum FlowStatus {
-    Waiting,
-    Running,
-    Retrying,
-    Finished,
+pub struct FlowProcessGroupRollup {
+    pub active: u32,
+    pub failing: u32,
+    pub paused: u32,
+    pub stopped: u32,
+    pub total: u32,
+    pub worst_consecutive_failures: u32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

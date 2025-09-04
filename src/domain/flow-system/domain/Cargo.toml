@@ -23,6 +23,7 @@ doctest = false
 
 [features]
 default = []
+sqlx = ["dep:sqlx"]
 testing = ["dep:mockall"]
 
 [dependencies]
@@ -42,7 +43,6 @@ dill = { version = "0.14", default-features = false }
 nutype = { version = "0.6", default-features = false, features = ["serde", "new_unchecked"] }
 rand = { version = "0.8", default-features = false }
 serde_json = { version = "1", default-features = false }
-sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 strum = { version = "0.27", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
@@ -55,3 +55,8 @@ serde_with = { version = "3", default-features = false, features = [
 ] }
 
 mockall = { optional = true, version = "0.13", default-features = false }
+
+# Optional
+sqlx = { optional = true, version = "0.8", default-features = false, features = [
+    "macros",
+] }
