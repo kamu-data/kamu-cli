@@ -23,7 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-flow-system = { workspace = true }
+kamu-flow-system = { workspace = true, features = ["sqlx"] }
 odf = { workspace = true }
 
 async-stream = "0.3"
