@@ -12,7 +12,8 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct FlowProcessGroupRollup {
+pub struct FlowProcessGroupRollup {
+    pub total: u32,
     pub active: u32,
     pub failing: u32,
     pub paused: u32,

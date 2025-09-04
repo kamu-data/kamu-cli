@@ -12,7 +12,7 @@ use kamu_webhooks::WebhookSubscription;
 use tokio::sync::OnceCell;
 
 use crate::prelude::*;
-use crate::queries::{FlowProcessGroupRollup, WebhookFlowSubProcess};
+use crate::queries::WebhookFlowSubProcess;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -77,7 +77,10 @@ impl WebhookFlowSubProcessGroup {
                     }
                 }
 
+                let total = active + failing + paused + stopped;
+
                 Ok::<_, InternalError>(FlowProcessGroupRollup {
+                    total,
                     active,
                     failing,
                     paused,
