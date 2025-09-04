@@ -123,6 +123,36 @@ input AccountFlowFilters {
 	byProcessType: FlowProcessTypeFilterInput
 }
 
+type AccountFlowProcessDatasetCard {
+	dataset: Dataset!
+	processes: DatasetFlowProcesses!
+}
+
+type AccountFlowProcessDatasetCardConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [AccountFlowProcessDatasetCard!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [AccountFlowProcessDatasetCardEdge!]!
+}
+
+type AccountFlowProcessDatasetCardEdge {
+	node: AccountFlowProcessDatasetCard!
+}
+
+type AccountFlowProcesses {
+	primaryRollup: FlowProcessGroupRollup!
+	datasetCards(page: Int, perPage: Int): AccountFlowProcessDatasetCardConnection!
+}
+
 type AccountFlowRuns {
 	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters): FlowConnection!
 	listDatasetsWithFlow: DatasetConnection!
@@ -141,6 +171,10 @@ type AccountFlowTriggersMut {
 }
 
 type AccountFlows {
+	"""
+	Returns interface for flow processes summary queries
+	"""
+	processes: AccountFlowProcesses!
 	"""
 	Returns interface for flow runs queries
 	"""
@@ -2401,6 +2435,7 @@ type FlowProcess {
 }
 
 type FlowProcessGroupRollup {
+	total: Int!
 	active: Int!
 	failing: Int!
 	paused: Int!
