@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod webhook_flow_channel_group;
+mod webhook_flow_subprocess;
+mod webhook_flow_subprocess_group;
 mod webhook_subscription;
 mod webhooks;
 
-pub use webhook_flow_channel_group::*;
+pub use webhook_flow_subprocess::*;
+pub use webhook_flow_subprocess_group::*;
 pub use webhook_subscription::*;
 pub use webhooks::*;
