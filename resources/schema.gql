@@ -68,6 +68,10 @@ type Account {
 	Access to the flow configurations of this account
 	"""
 	accessTokens: AccountAccessTokens!
+	"""
+	Returns datasets belonging to this account
+	"""
+	ownedDatasets(page: Int, perPage: Int): DatasetConnection!
 }
 
 type AccountAccessTokens {
@@ -230,24 +234,68 @@ type AccountWithRoleEdge {
 
 type Accounts {
 	"""
-	Returns account by its ID
+	Returns the account that is making the call (authorized subject)
+	"""
+	me: Account!
+	"""
+	Returns an account by its ID, if found
 	"""
 	byId(accountId: AccountID!): Account
 	"""
-	Returns account by its name
+	Returns accounts by their IDs
+	"""
+	byIds(		accountIds: [AccountID!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Account!]!
+	"""
+	Returns an account by its name, if found
 	"""
 	byName(name: AccountName!): Account
+	"""
+	Returns accounts by their names
+	"""
+	byNames(		accountNames: [AccountName!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Account!]!
 }
 
 type AccountsMut {
+	"""
+	Returns the mutable account that is making the call (authorized subject)
+	"""
+	me: AccountMut!
 	"""
 	Returns a mutable account by its id
 	"""
 	byId(accountId: AccountID!): AccountMut
 	"""
+	Returns mutable accounts by their IDs
+	"""
+	byIds(		accountIds: [AccountID!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [AccountMut!]!
+	"""
 	Returns a mutable account by its name
 	"""
 	byName(accountName: AccountName!): AccountMut
+	"""
+	Returns accounts by their names
+	"""
+	byNames(		accountNames: [AccountName!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [AccountMut!]!
 	"""
 	Create a new account
 	"""
@@ -1427,9 +1475,31 @@ type DatasetWebhooksPermissions {
 
 type Datasets {
 	"""
-	Returns dataset by its ID
+	Returns a dataset by its ID, if found
 	"""
 	byId(datasetId: DatasetID!): Dataset
+	"""
+	Returns multiple datasets by their IDs
+	"""
+	byIds(		datasetIds: [DatasetID!]!,
+		"""
+		Whether to skip unresolved datasets or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Dataset!]!
+	"""
+	Returns a dataset by a ID or alias, if found
+	"""
+	byRef(datasetRef: DatasetRef!): Dataset
+	"""
+	Returns multiple datasets by their IDs or aliases
+	"""
+	byRefs(		datasetRefs: [DatasetRef!]!,
+		"""
+		Whether to skip unresolved datasets or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Dataset!]!
 	"""
 	Returns dataset by its owner and name
 	"""
@@ -1446,9 +1516,18 @@ type Datasets {
 
 type DatasetsMut {
 	"""
-	Returns a mutable dataset by its ID
+	Returns a mutable dataset by its ID, if found
 	"""
 	byId(datasetId: DatasetID!): DatasetMut
+	"""
+	Returns mutable datasets by their IDs
+	"""
+	byIds(		datasetIds: [DatasetID!]!,
+		"""
+		Whether to skip unresolved datasets or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [DatasetMut!]!
 	"""
 	Creates a new empty dataset
 	"""

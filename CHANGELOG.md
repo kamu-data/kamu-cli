@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following order:
 ## Unreleased
 ### Added
 - GQL: `Auth::relations()` for getting ReBAC triplets for debugging purposes.
+- GQL: Vectorized access endpoints `Accounts::byIds`, `Accounts::byNames`, `Datasets::byIds`, `Datasets::byRefs`
+- GQL: `Account::ownedDatasets` for accessing datasets owned by an account
+- GQL: `Account::me` for accessing current account
 ### Changed
 - dep: `ringbuf` updated from `0.3` to `0.4`.
 - Flows: each input contribution to batching rule is reflected as an update of start condition,

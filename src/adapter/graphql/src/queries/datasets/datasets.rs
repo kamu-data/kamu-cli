@@ -17,12 +17,11 @@ use crate::queries::*;
 
 pub struct Datasets;
 
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
 
-    #[graphql(skip)]
     async fn by_dataset_ref(
         &self,
         ctx: &Context<'_>,
@@ -51,12 +50,105 @@ impl Datasets {
         Ok(Some(Dataset::new_access_checked(account, handle)))
     }
 
-    /// Returns dataset by its ID
+    async fn by_dataset_refs(
+        &self,
+        ctx: &Context<'_>,
+        dataset_refs: Vec<odf::DatasetRef>,
+        skip_missing: bool,
+    ) -> Result<Vec<Dataset>> {
+        let rebac_dataset_registry_facade = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
+
+        let mut res = Vec::new();
+        for r in &dataset_refs {
+            // TODO: PERF: Vectorize resolution
+            let handle = match rebac_dataset_registry_facade
+                .resolve_dataset_handle_by_ref(r, auth::DatasetAction::Read)
+                .await
+            {
+                Ok(handle) => handle,
+                Err(e) => match e {
+                    RebacDatasetRefUnresolvedError::NotFound(_)
+                    | RebacDatasetRefUnresolvedError::Access(_) => {
+                        if skip_missing {
+                            continue;
+                        }
+                        return Err(GqlError::gql(format!(
+                            "Dataset {r} not found or not accessible"
+                        )));
+                    }
+                    e @ RebacDatasetRefUnresolvedError::Internal(_) => {
+                        return Err(e.int_err().into());
+                    }
+                },
+            };
+
+            let account = Account::from_dataset_alias(ctx, &handle.alias)
+                .await?
+                .expect("Account must exist");
+
+            res.push(Dataset::new_access_checked(account, handle));
+        }
+
+        Ok(res)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl Datasets {
+    /// Returns a dataset by its ID, if found
     #[tracing::instrument(level = "info", name = Datasets_by_id, skip_all, fields(%dataset_id))]
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID<'_>) -> Result<Option<Dataset>> {
         let dataset_id: odf::DatasetID = dataset_id.into();
 
         self.by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
+    }
+
+    /// Returns multiple datasets by their IDs
+    #[tracing::instrument(level = "info", name = Datasets_by_ids, skip_all, fields(?dataset_ids, ?skip_missing))]
+    async fn by_ids(
+        &self,
+        ctx: &Context<'_>,
+        dataset_ids: Vec<DatasetID<'_>>,
+        #[graphql(
+            desc = "Whether to skip unresolved datasets or return an error if one or more are \
+                    missing"
+        )]
+        skip_missing: bool,
+    ) -> Result<Vec<Dataset>> {
+        let dataset_refs: Vec<odf::DatasetRef> =
+            dataset_ids.iter().map(|id| id.as_local_ref()).collect();
+
+        self.by_dataset_refs(ctx, dataset_refs, skip_missing).await
+    }
+
+    /// Returns a dataset by a ID or alias, if found
+    #[tracing::instrument(level = "info", name = Datasets_by_ref, skip_all, fields(%dataset_ref))]
+    async fn by_ref(
+        &self,
+        ctx: &Context<'_>,
+        dataset_ref: DatasetRef<'_>,
+    ) -> Result<Option<Dataset>> {
+        self.by_dataset_ref(ctx, &dataset_ref).await
+    }
+
+    /// Returns multiple datasets by their IDs or aliases
+    #[tracing::instrument(level = "info", name = Datasets_by_refs, skip_all, fields(?dataset_refs, ?skip_missing))]
+    async fn by_refs(
+        &self,
+        ctx: &Context<'_>,
+        dataset_refs: Vec<DatasetRef<'_>>,
+        #[graphql(
+            desc = "Whether to skip unresolved datasets or return an error if one or more are \
+                    missing"
+        )]
+        skip_missing: bool,
+    ) -> Result<Vec<Dataset>> {
+        let dataset_refs: Vec<odf::DatasetRef> = dataset_refs.into_iter().map(Into::into).collect();
+
+        self.by_dataset_refs(ctx, dataset_refs, skip_missing).await
     }
 
     /// Returns dataset by its owner and name

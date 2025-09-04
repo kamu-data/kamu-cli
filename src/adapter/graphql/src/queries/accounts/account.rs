@@ -16,11 +16,12 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME,
 };
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use tokio::sync::OnceCell;
 
 use super::AccountFlows;
 use crate::prelude::*;
-use crate::queries::AccountAccessTokens;
+use crate::queries::{AccountAccessTokens, Dataset, DatasetConnection};
 use crate::utils::check_logged_account_id_match;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,10 +39,9 @@ pub enum AccountType {
     Organization,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
 impl Account {
-    #[graphql(skip)]
+    const DEFAULT_PER_PAGE: usize = 15;
+
     pub(crate) fn new(account_id: AccountID<'static>, account_name: AccountName<'static>) -> Self {
         Self {
             account_id,
@@ -50,7 +50,6 @@ impl Account {
         }
     }
 
-    #[graphql(skip)]
     pub(crate) fn from_account(account: kamu_accounts::Account) -> Self {
         Self {
             account_id: AccountID::from(account.id.clone()),
@@ -59,7 +58,6 @@ impl Account {
         }
     }
 
-    #[graphql(skip)]
     pub(crate) async fn from_account_id(
         ctx: &Context<'_>,
         account_id: odf::AccountID,
@@ -77,7 +75,6 @@ impl Account {
         Ok(Self::new(account_id.into(), account_name.into()))
     }
 
-    #[graphql(skip)]
     pub(crate) async fn from_account_name(
         ctx: &Context<'_>,
         account_name: odf::AccountName,
@@ -89,7 +86,6 @@ impl Account {
         Ok(maybe_account.map(Self::from_account))
     }
 
-    #[graphql(skip)]
     pub(crate) async fn from_dataset_alias(
         ctx: &Context<'_>,
         alias: &odf::DatasetAlias,
@@ -114,11 +110,12 @@ impl Account {
         }
     }
 
-    #[graphql(skip)]
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
         let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        let maybe_account_info = account_service.account_by_id(&self.account_id).await?;
+        let maybe_account_info = account_service
+            .try_get_account_by_id(&self.account_id)
+            .await?;
 
         maybe_account_info.ok_or_else(|| {
             GqlError::Gql(
@@ -128,7 +125,6 @@ impl Account {
         })
     }
 
-    #[graphql(skip)]
     #[inline]
     async fn get_full_account_info<'a>(
         &'a self,
@@ -140,16 +136,20 @@ impl Account {
             .map(AsRef::as_ref)
     }
 
-    #[graphql(skip)]
     pub(crate) fn account_name_internal(&self) -> &AccountName {
         &self.account_name
     }
 
-    #[graphql(skip)]
     pub(crate) fn account_id_internal(&self) -> &odf::AccountID {
         &self.account_id
     }
+}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl Account {
     /// Unique and stable identifier of this account
     async fn id(&self) -> &AccountID {
         &self.account_id
@@ -224,6 +224,47 @@ impl Account {
     #[expect(clippy::unused_async)]
     async fn access_tokens(&self) -> Result<AccountAccessTokens> {
         Ok(AccountAccessTokens::new(&self.account_id))
+    }
+
+    /// Returns datasets belonging to this account
+    #[tracing::instrument(level = "info", name = Account_owned_datasets, skip_all)]
+    async fn owned_datasets(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<DatasetConnection> {
+        let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+            ctx,
+            dyn kamu_core::DatasetRegistry,
+            dyn DatasetActionAuthorizer
+        );
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        use futures::TryStreamExt;
+
+        let account_owned_datasets_stream =
+            dataset_registry.all_dataset_handles_by_owner_id(&self.account_id);
+        let readable_dataset_handles_stream = dataset_action_authorizer
+            .filtered_datasets_stream(account_owned_datasets_stream, DatasetAction::Read);
+        let mut accessible_datasets_handles = readable_dataset_handles_stream
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        let total_count = accessible_datasets_handles.len();
+
+        accessible_datasets_handles.sort_by(|a, b| a.alias.cmp(&b.alias));
+
+        let nodes = accessible_datasets_handles
+            .into_iter()
+            .skip(page * per_page)
+            .take(per_page)
+            .map(|handle| Dataset::new_access_checked(self.clone(), handle))
+            .collect();
+
+        Ok(DatasetConnection::new(nodes, page, per_page, total_count))
     }
 }
 

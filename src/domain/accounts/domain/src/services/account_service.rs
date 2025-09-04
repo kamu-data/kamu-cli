@@ -114,7 +114,7 @@ pub trait AccountService: Sync + Send {
 
 #[async_trait::async_trait]
 pub trait AccountServiceExt {
-    async fn account_by_id(
+    async fn try_get_account_by_id(
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Option<Account>, InternalError>;
@@ -122,7 +122,7 @@ pub trait AccountServiceExt {
 
 #[async_trait::async_trait]
 impl<T: AccountService + ?Sized> AccountServiceExt for T {
-    async fn account_by_id(
+    async fn try_get_account_by_id(
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Option<Account>, InternalError> {

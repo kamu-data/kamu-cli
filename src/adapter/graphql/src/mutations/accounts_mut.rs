@@ -28,6 +28,29 @@ pub struct AccountsMut;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AccountsMut {
+    /// Returns the mutable account that is making the call (authorized subject)
+    #[tracing::instrument(level = "info", name = AccountsMut_me, skip_all)]
+    async fn me(&self, ctx: &Context<'_>) -> Result<AccountMut> {
+        use kamu_accounts::CurrentAccountSubject;
+
+        let (subject, account_service) =
+            from_catalog_n!(ctx, CurrentAccountSubject, dyn AccountService);
+
+        match subject.as_ref() {
+            CurrentAccountSubject::Logged(account) => {
+                let account = account_service
+                    .try_get_account_by_id(&account.account_id)
+                    .await?
+                    .expect("Account exists");
+
+                Ok(AccountMut::new(account))
+            }
+            CurrentAccountSubject::Anonymous(_) => {
+                Err(GqlError::gql(ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE))
+            }
+        }
+    }
+
     /// Returns a mutable account by its id
     #[tracing::instrument(level = "info", name = AccountsMut_by_id, skip_all, fields(%account_id))]
     async fn by_id(
@@ -39,8 +62,40 @@ impl AccountsMut {
 
         let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        let account_maybe = account_service.account_by_id(&account_id).await?;
+        let account_maybe = account_service.try_get_account_by_id(&account_id).await?;
         Ok(account_maybe.map(AccountMut::new))
+    }
+
+    /// Returns mutable accounts by their IDs
+    #[tracing::instrument(level = "info", name = AccountsMut_by_ids, skip_all, fields(?account_ids, ?skip_missing))]
+    async fn by_ids(
+        &self,
+        ctx: &Context<'_>,
+        account_ids: Vec<AccountID<'_>>,
+        #[graphql(
+            desc = "Whether to skip unresolved accounts or return an error if one or more are \
+                    missing"
+        )]
+        skip_missing: bool,
+    ) -> Result<Vec<AccountMut>> {
+        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+
+        let mut res = Vec::new();
+
+        for account_id in account_ids {
+            let account_id = account_id.into();
+
+            // TODO: PERF: Vectorize resolution
+            match account_service.try_get_account_by_id(&account_id).await? {
+                Some(account) => res.push(AccountMut::new(account)),
+                None if skip_missing => (),
+                None => {
+                    return Err(GqlError::gql(format!("Unresolved account: {account_id}")));
+                }
+            }
+        }
+
+        Ok(res)
     }
 
     /// Returns a mutable account by its name
@@ -56,6 +111,38 @@ impl AccountsMut {
 
         let account_maybe = account_service.account_by_name(&account_name).await?;
         Ok(account_maybe.map(AccountMut::new))
+    }
+
+    /// Returns accounts by their names
+    #[tracing::instrument(level = "info", name = AccountsMut_by_names, skip_all, fields(?account_names, ?skip_missing))]
+    async fn by_names(
+        &self,
+        ctx: &Context<'_>,
+        account_names: Vec<AccountName<'_>>,
+        #[graphql(
+            desc = "Whether to skip unresolved accounts or return an error if one or more are \
+                    missing"
+        )]
+        skip_missing: bool,
+    ) -> Result<Vec<AccountMut>> {
+        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+
+        let mut res = Vec::new();
+
+        for account_name in account_names {
+            let account_name = account_name.into();
+
+            // TODO: PERF: Vectorize resolution
+            match account_service.account_by_name(&account_name).await? {
+                Some(account) => res.push(AccountMut::new(account)),
+                None if skip_missing => (),
+                None => {
+                    return Err(GqlError::gql(format!("Unresolved account: {account_name}")));
+                }
+            }
+        }
+
+        Ok(res)
     }
 
     /// Create a new account

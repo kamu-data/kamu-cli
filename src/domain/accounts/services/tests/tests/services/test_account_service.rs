@@ -59,7 +59,10 @@ async fn test_can_find_account_by_all_means() {
         maybe_wasya_account.unwrap()
     };
 
-    let maybe_wasya_by_id = account_svc.account_by_id(&wasya_account.id).await.unwrap();
+    let maybe_wasya_by_id = account_svc
+        .try_get_account_by_id(&wasya_account.id)
+        .await
+        .unwrap();
     assert_matches!(maybe_wasya_by_id, Some(wasya_by_id) if wasya_by_id == wasya_account);
 
     let maybe_id = account_svc
