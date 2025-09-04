@@ -356,3 +356,9 @@ codegen: codegen-odf-dtos \
 	codegen-odf-serde-yaml \
 	codegen-engine-tonic \
 	codegen-graphql
+
+
+# Executes codegen action in a nix flake environment that contains necessary tools like `flatc` and `protoc`
+.PHONY: codegen-nix
+codegen-nix:
+	nix develop .config -c make codegen
