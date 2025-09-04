@@ -9,7 +9,7 @@
 
 use kamu_accounts::Account;
 
-use super::{AccountFlowRuns, AccountFlowTriggers};
+use super::{AccountFlowProcesses, AccountFlowRuns, AccountFlowTriggers};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,6 +23,11 @@ impl<'a> AccountFlows<'a> {
     #[graphql(skip)]
     pub fn new(account: &'a Account) -> Self {
         Self { account }
+    }
+
+    /// Returns interface for flow processes summary queries
+    async fn processes(&self) -> AccountFlowProcesses {
+        AccountFlowProcesses::new(self.account)
     }
 
     /// Returns interface for flow runs queries

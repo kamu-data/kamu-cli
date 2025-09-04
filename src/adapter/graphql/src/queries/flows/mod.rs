@@ -13,7 +13,6 @@ mod flow_description;
 mod flow_event;
 mod flow_outcome;
 mod flow_process;
-mod flow_process_group_rollup;
 mod flow_query_utils;
 mod flow_start_condition;
 
@@ -22,6 +21,5 @@ pub(crate) use flow_activation_cause::*;
 pub(crate) use flow_event::*;
 pub(crate) use flow_outcome::*;
 pub(crate) use flow_process::*;
-pub(crate) use flow_process_group_rollup::*;
 pub(crate) use flow_query_utils::*;
 pub(crate) use flow_start_condition::*;
