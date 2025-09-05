@@ -20,10 +20,10 @@ use crate::FlowTriggerStopPolicy;
     sqlx(type_name = "flow_process_effective_state", rename_all = "lowercase")
 )]
 pub enum FlowProcessEffectiveState {
-    Active,
+    StoppedAuto,
     Failing,
     PausedManual,
-    StoppedAuto,
+    Active,
 }
 
 impl FlowProcessEffectiveState {
