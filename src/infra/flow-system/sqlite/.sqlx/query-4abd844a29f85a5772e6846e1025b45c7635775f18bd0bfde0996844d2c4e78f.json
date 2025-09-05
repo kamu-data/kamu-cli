@@ -1,0 +1,92 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                paused_manual,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                effective_state,\n                sort_key,\n                updated_at as \"updated_at: _\",\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "paused_manual",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "stop_policy_kind",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "stop_policy_data: _",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "consecutive_failures",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_success_at: _",
+        "ordinal": 4,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_failure_at: _",
+        "ordinal": 5,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_attempt_at: _",
+        "ordinal": 6,
+        "type_info": "Null"
+      },
+      {
+        "name": "next_planned_at: _",
+        "ordinal": 7,
+        "type_info": "Null"
+      },
+      {
+        "name": "effective_state",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_key",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at: _",
+        "ordinal": 10,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_applied_trigger_event_id",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_applied_flow_event_id",
+        "ordinal": 12,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4abd844a29f85a5772e6846e1025b45c7635775f18bd0bfde0996844d2c4e78f"
+}

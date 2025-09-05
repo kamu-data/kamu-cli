@@ -7991,6 +7991,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "time-source",
  "tracing",
 ]
 
@@ -8069,6 +8070,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "time-source",
  "tracing",
 ]
 

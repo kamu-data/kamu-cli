@@ -71,6 +71,9 @@ pub enum FlowProcessUpdateError {
     NotFound(FlowProcessNotFoundError),
 
     #[error(transparent)]
+    ConcurrentModification(FlowProcessConcurrentModificationError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -80,6 +83,31 @@ pub enum FlowProcessUpdateError {
 pub enum FlowProcessApplyResultError {
     #[error(transparent)]
     NotFound(FlowProcessNotFoundError),
+
+    #[error(transparent)]
+    ConcurrentModification(FlowProcessConcurrentModificationError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum FlowProcessLoadError {
+    #[error(transparent)]
+    NotFound(FlowProcessNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum FlowProcessSaveError {
+    #[error(transparent)]
+    ConcurrentModification(FlowProcessConcurrentModificationError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -94,6 +122,14 @@ pub enum FlowProcessDeleteError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Concurrent modification for the given flow binding: {flow_binding:?}")]
+pub struct FlowProcessConcurrentModificationError {
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
