@@ -1,6 +1,6 @@
 /* ------------------------------ */
 
-CREATE TABLE flow_process_state (
+CREATE TABLE flow_process_states (
     scope_data      JSON NOT NULL,
     flow_type       TEXT NOT NULL,
 
@@ -33,28 +33,28 @@ CREATE TABLE flow_process_state (
 
 -- Alphabetical ordering / prefix searches on sort_key
 CREATE INDEX idx_fps_sort_key_btree
-  ON flow_process_state (sort_key);
+  ON flow_process_states (sort_key);
 
 -- Filter by dataset_id across scopes
 CREATE INDEX idx_fps_dataset_id
-  ON flow_process_state (json_extract(scope_data, '$.dataset_id'));
+  ON flow_process_states (json_extract(scope_data, '$.dataset_id'));
 
 -- Narrow to dataset-only scopes
 CREATE INDEX idx_fps_dataset_only
-  ON flow_process_state (json_extract(scope_data, '$.dataset_id'))
+  ON flow_process_states (json_extract(scope_data, '$.dataset_id'))
   WHERE json_extract(scope_data, '$.type') = 'Dataset';
 
 -- Narrow to webhook-only scopes
 CREATE INDEX idx_fps_webhook_only
-  ON flow_process_state (json_extract(scope_data, '$.dataset_id'))
+  ON flow_process_states (json_extract(scope_data, '$.dataset_id'))
   WHERE json_extract(scope_data, '$.type') = 'WebhookSubscription';
 
 -- Effective-state filters
 CREATE INDEX idx_fps_effective_state
-  ON flow_process_state (effective_state);
+  ON flow_process_states (effective_state);
 
 -- “Recent activity” sorts
 CREATE INDEX idx_fps_last_attempt_desc
-  ON flow_process_state (last_attempt_at DESC);
+  ON flow_process_states (last_attempt_at DESC);
 
 /* ------------------------------ */
