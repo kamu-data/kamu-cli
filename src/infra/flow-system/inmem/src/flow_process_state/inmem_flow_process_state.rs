@@ -40,6 +40,9 @@ impl InMemoryFlowProcessState {
         state: &'a State,
         filter: &'a FlowProcessListFilter<'_>,
     ) -> Vec<&'a FlowProcessState> {
+        // Pre-lowercase the name query once outside the loop for efficiency
+        let name_query_lowercase = filter.name_contains.map(str::to_lowercase);
+
         state
             .list_matching_process_states(filter.scope)
             .filter(|ps| {
@@ -88,7 +91,7 @@ impl InMemoryFlowProcessState {
                 // Next planned before filter
                 if let Some(before) = filter.next_planned_before {
                     if let Some(next_planned) = ps.next_planned_at() {
-                        if before <= next_planned {
+                        if before < next_planned {
                             return false;
                         }
                     } else {
@@ -100,7 +103,7 @@ impl InMemoryFlowProcessState {
                 // Next planned after filter
                 if let Some(after) = filter.next_planned_after {
                     if let Some(next_planned) = ps.next_planned_at() {
-                        if after >= next_planned {
+                        if after > next_planned {
                             return false;
                         }
                     } else {
@@ -117,12 +120,10 @@ impl InMemoryFlowProcessState {
                 }
 
                 // Name contains filter (case-insensitive)
-                if let Some(name_query) = filter.name_contains {
-                    if !ps
-                        .sort_key()
-                        .to_lowercase()
-                        .contains(&name_query.to_lowercase())
-                    {
+                // Note: sort_key is guaranteed to be lowercase, so we only need to compare
+                // against the pre-lowercased query
+                if let Some(ref name_query_lower) = name_query_lowercase {
+                    if !ps.sort_key().contains(name_query_lower) {
                         return false;
                     }
                 }
@@ -142,21 +143,32 @@ impl InMemoryFlowProcessState {
     fn apply_ordering(&self, states: &mut [&FlowProcessState], order: FlowProcessOrder) {
         // Apply ordering with multi-level sort criteria:
         // 1. Primary field (user-defined)
-        // 2. Last attempt time (newest first as tie-breaker)
-        // 3. Sort key (final tie-breaker for stable pagination)
+        // 2. Last attempt time (newest first as tie-breaker, unless it's the primary
+        //    field)
+        // 3. Flow type (for additional stability, unless it's the primary field)
+        // 4. Sort key (final tie-breaker for stable pagination)
         states.sort_by(|a, b| {
             use std::cmp::Ordering;
 
-            // Primary sort field
+            // Primary sort field with NULLS LAST for datetime fields
             let primary_ordering = match order.field {
                 FlowProcessOrderField::LastAttemptAt => {
-                    a.last_attempt_at().cmp(&b.last_attempt_at())
+                    // NULLS LAST: (is_none, value) ensures None sorts after Some
+                    let key_a = (a.last_attempt_at().is_none(), a.last_attempt_at());
+                    let key_b = (b.last_attempt_at().is_none(), b.last_attempt_at());
+                    key_a.cmp(&key_b)
                 }
                 FlowProcessOrderField::NextPlannedAt => {
-                    a.next_planned_at().cmp(&b.next_planned_at())
+                    // NULLS LAST: (is_none, value) ensures None sorts after Some
+                    let key_a = (a.next_planned_at().is_none(), a.next_planned_at());
+                    let key_b = (b.next_planned_at().is_none(), b.next_planned_at());
+                    key_a.cmp(&key_b)
                 }
                 FlowProcessOrderField::LastFailureAt => {
-                    a.last_failure_at().cmp(&b.last_failure_at())
+                    // NULLS LAST: (is_none, value) ensures None sorts after Some
+                    let key_a = (a.last_failure_at().is_none(), a.last_failure_at());
+                    let key_b = (b.last_failure_at().is_none(), b.last_failure_at());
+                    key_a.cmp(&key_b)
                 }
                 FlowProcessOrderField::ConsecutiveFailures => {
                     a.consecutive_failures().cmp(&b.consecutive_failures())
@@ -180,24 +192,31 @@ impl InMemoryFlowProcessState {
             // If primary field values are equal, use tie-breakers
             match primary_ordering {
                 Ordering::Equal => {
-                    // Use last attempt time as tie-breaker only if it's not the primary field
-                    match order.field {
-                        FlowProcessOrderField::LastAttemptAt => {
-                            // Primary field is already LastAttemptAt, so go directly to sort key
-                            a.sort_key().cmp(b.sort_key())
-                        }
-                        _ => {
-                            // Tie-breaker 1: Last attempt time (newest first)
-                            // Note: We reverse this to get "newest first" behavior
-                            match b.last_attempt_at().cmp(&a.last_attempt_at()) {
-                                Ordering::Equal => {
-                                    // Final tie-breaker: Sort key for stable pagination
-                                    a.sort_key().cmp(b.sort_key())
-                                }
-                                attempt_order => attempt_order,
-                            }
+                    // Build tie-breaker chain dynamically based on primary field
+
+                    // Tie-breaker 1: Last attempt time (newest first) - skip if it's the primary
+                    // field
+                    if !matches!(order.field, FlowProcessOrderField::LastAttemptAt) {
+                        // NULLS LAST for tie-breaker, reversed for newest first (DESC)
+                        let key_a = (a.last_attempt_at().is_none(), a.last_attempt_at());
+                        let key_b = (b.last_attempt_at().is_none(), b.last_attempt_at());
+                        let attempt_ordering = key_b.cmp(&key_a); // reversed for newest first
+                        if attempt_ordering != Ordering::Equal {
+                            return attempt_ordering;
                         }
                     }
+
+                    // Tie-breaker 2: Flow type - skip if it's the primary field
+                    if !matches!(order.field, FlowProcessOrderField::FlowType) {
+                        let flow_type_ordering =
+                            a.flow_binding().flow_type.cmp(&b.flow_binding().flow_type);
+                        if flow_type_ordering != Ordering::Equal {
+                            return flow_type_ordering;
+                        }
+                    }
+
+                    // Final tie-breaker: Sort key for stable pagination
+                    a.sort_key().cmp(b.sort_key())
                 }
                 primary_order => primary_order,
             }
