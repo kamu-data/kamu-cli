@@ -33,6 +33,222 @@ impl InMemoryFlowProcessState {
             state: Arc::new(RwLock::new(State::default())),
         }
     }
+
+    #[allow(clippy::collapsible_if)]
+    fn apply_filters<'a>(
+        &self,
+        state: &'a State,
+        filter: &'a FlowProcessListFilter<'_>,
+    ) -> Vec<&'a FlowProcessState> {
+        state
+            .list_matching_process_states(filter.scope)
+            .filter(|ps| {
+                // Flow types filter
+                if let Some(types) = filter.for_flow_types {
+                    if !types
+                        .iter()
+                        .any(|&t| t == ps.flow_binding().flow_type.as_str())
+                    {
+                        return false;
+                    }
+                }
+
+                // Effective state filter
+                if filter
+                    .effective_state_in
+                    .is_some_and(|states| !states.contains(&ps.effective_state()))
+                {
+                    return false;
+                }
+
+                // Last attempt time range filter
+                if let Some((start, end)) = filter.last_attempt_between {
+                    if let Some(last_attempt) = ps.last_attempt_at() {
+                        if start > last_attempt || end < last_attempt {
+                            return false;
+                        }
+                    } else {
+                        // No last attempt time, so doesn't match range filter
+                        return false;
+                    }
+                }
+
+                // Last failure since filter
+                if let Some(since) = filter.last_failure_since {
+                    if let Some(last_failure) = ps.last_failure_at() {
+                        if since > last_failure {
+                            return false;
+                        }
+                    } else {
+                        // No failure recorded, so doesn't match "since" filter
+                        return false;
+                    }
+                }
+
+                // Next planned before filter
+                if let Some(before) = filter.next_planned_before {
+                    if let Some(next_planned) = ps.next_planned_at() {
+                        if before <= next_planned {
+                            return false;
+                        }
+                    } else {
+                        // No next planned time, so doesn't match "before" filter
+                        return false;
+                    }
+                }
+
+                // Next planned after filter
+                if let Some(after) = filter.next_planned_after {
+                    if let Some(next_planned) = ps.next_planned_at() {
+                        if after >= next_planned {
+                            return false;
+                        }
+                    } else {
+                        // No next planned time, so doesn't match "after" filter
+                        return false;
+                    }
+                }
+
+                // Minimum consecutive failures filter
+                if let Some(min_failures) = filter.min_consecutive_failures {
+                    if ps.consecutive_failures() < min_failures {
+                        return false;
+                    }
+                }
+
+                // Name contains filter (case-insensitive)
+                if let Some(name_query) = filter.name_contains {
+                    if !ps
+                        .sort_key()
+                        .to_lowercase()
+                        .contains(&name_query.to_lowercase())
+                    {
+                        return false;
+                    }
+                }
+
+                // Name prefix filter (case-sensitive for A-Z optimization)
+                if let Some(prefix) = filter.name_prefix {
+                    if !ps.sort_key().starts_with(prefix) {
+                        return false;
+                    }
+                }
+
+                true
+            })
+            .collect()
+    }
+
+    fn apply_ordering(&self, states: &mut [&FlowProcessState], order: FlowProcessOrder) {
+        // Apply ordering with multi-level sort criteria:
+        // 1. Primary field (user-defined)
+        // 2. Last attempt time (newest first as tie-breaker)
+        // 3. Sort key (final tie-breaker for stable pagination)
+        states.sort_by(|a, b| {
+            use std::cmp::Ordering;
+
+            // Primary sort field
+            let primary_ordering = match order.field {
+                FlowProcessOrderField::LastAttemptAt => {
+                    a.last_attempt_at().cmp(&b.last_attempt_at())
+                }
+                FlowProcessOrderField::NextPlannedAt => {
+                    a.next_planned_at().cmp(&b.next_planned_at())
+                }
+                FlowProcessOrderField::LastFailureAt => {
+                    a.last_failure_at().cmp(&b.last_failure_at())
+                }
+                FlowProcessOrderField::ConsecutiveFailures => {
+                    a.consecutive_failures().cmp(&b.consecutive_failures())
+                }
+                FlowProcessOrderField::EffectiveState => {
+                    a.effective_state().cmp(&b.effective_state())
+                }
+                FlowProcessOrderField::NameAlpha => a.sort_key().cmp(b.sort_key()),
+                FlowProcessOrderField::FlowType => {
+                    a.flow_binding().flow_type.cmp(&b.flow_binding().flow_type)
+                }
+            };
+
+            // Apply desc flag to primary ordering
+            let primary_ordering = if order.desc {
+                primary_ordering.reverse()
+            } else {
+                primary_ordering
+            };
+
+            // If primary field values are equal, use tie-breakers
+            match primary_ordering {
+                Ordering::Equal => {
+                    // Use last attempt time as tie-breaker only if it's not the primary field
+                    match order.field {
+                        FlowProcessOrderField::LastAttemptAt => {
+                            // Primary field is already LastAttemptAt, so go directly to sort key
+                            a.sort_key().cmp(b.sort_key())
+                        }
+                        _ => {
+                            // Tie-breaker 1: Last attempt time (newest first)
+                            // Note: We reverse this to get "newest first" behavior
+                            match b.last_attempt_at().cmp(&a.last_attempt_at()) {
+                                Ordering::Equal => {
+                                    // Final tie-breaker: Sort key for stable pagination
+                                    a.sort_key().cmp(b.sort_key())
+                                }
+                                attempt_order => attempt_order,
+                            }
+                        }
+                    }
+                }
+                primary_order => primary_order,
+            }
+        });
+    }
+
+    fn apply_pagination(
+        &self,
+        states: Vec<&FlowProcessState>,
+        limit: usize,
+        offset: usize,
+    ) -> Vec<FlowProcessState> {
+        states
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .cloned()
+            .collect()
+    }
+
+    fn compute_rollup(&self, matching_states: &[&FlowProcessState]) -> FlowProcessGroupRollup {
+        // Use an array to count states by enum discriminant for performance
+        use strum::EnumCount;
+        let mut worst_consecutive_failures = 0;
+        let mut counts = [0_u32; FlowProcessEffectiveState::COUNT];
+
+        for ps in matching_states {
+            let idx = ps.effective_state() as usize;
+            counts[idx] += 1;
+
+            if ps.consecutive_failures() > worst_consecutive_failures {
+                worst_consecutive_failures = ps.consecutive_failures();
+            }
+        }
+
+        let active = counts[FlowProcessEffectiveState::Active];
+        let failing = counts[FlowProcessEffectiveState::Failing];
+        let paused = counts[FlowProcessEffectiveState::PausedManual];
+        let stopped = counts[FlowProcessEffectiveState::StoppedAuto];
+        let total = active + failing + paused + stopped;
+
+        // Form final rollup result
+        FlowProcessGroupRollup {
+            total,
+            active,
+            failing,
+            paused,
+            stopped,
+            worst_consecutive_failures,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,70 +283,44 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
 
     async fn list_processes(
         &self,
-        _filter: &FlowProcessListFilter<'_>,
-        _order: FlowProcessOrder,
-        _limit: usize,
-        _offset: usize,
+        filter: &FlowProcessListFilter<'_>,
+        order: FlowProcessOrder,
+        limit: usize,
+        offset: usize,
     ) -> Result<Vec<FlowProcessState>, InternalError> {
-        unimplemented!()
+        let state = self.state.read().unwrap();
+
+        // Apply filtering
+        let mut matching_states = self.apply_filters(&state, filter);
+
+        // Apply ordering
+        self.apply_ordering(&mut matching_states, order);
+
+        // Apply pagination
+        let paged_states = self.apply_pagination(matching_states, limit, offset);
+
+        Ok(paged_states)
     }
 
     /// Compute rollup for matching rows.
     async fn rollup_by_scope(
         &self,
         flow_scope_query: &FlowScopeQuery,
-        for_flow_types: Option<&[&str]>,
+        for_flow_types: Option<&[&'static str]>,
         effective_state_in: Option<&[FlowProcessEffectiveState]>,
     ) -> Result<FlowProcessGroupRollup, InternalError> {
         let state = self.state.read().unwrap();
 
-        // Get filtered list of matching process states
-        let matching_states: Vec<&FlowProcessState> = state
-            .list_matching_process_states(flow_scope_query)
-            .filter(|ps| {
-                if for_flow_types
-                    .is_some_and(|types| !types.contains(&ps.flow_binding().flow_type.as_str()))
-                {
-                    return false;
-                }
-                if effective_state_in.is_some_and(|states| !states.contains(&ps.effective_state()))
-                {
-                    return false;
-                }
-                true
-            })
-            .collect();
+        // Create a filter using the builder-style API with optional methods
+        let filter = FlowProcessListFilter::for_scope(flow_scope_query)
+            .for_flow_types_opt(for_flow_types)
+            .with_effective_states_opt(effective_state_in);
 
-        // Use an array to count states by enum discriminant for performance
-        use strum::EnumCount;
-        let mut worst_consecutive_failures = 0;
-        let mut counts = [0_u32; FlowProcessEffectiveState::COUNT];
+        // Get filtered list of matching process states using existing method
+        let matching_states = self.apply_filters(&state, &filter);
 
-        for ps in &matching_states {
-            let idx = ps.effective_state() as usize;
-            counts[idx] += 1;
-
-            if ps.consecutive_failures() > worst_consecutive_failures {
-                worst_consecutive_failures = ps.consecutive_failures();
-            }
-        }
-
-        let active = counts[FlowProcessEffectiveState::Active];
-        let failing = counts[FlowProcessEffectiveState::Failing];
-        let paused = counts[FlowProcessEffectiveState::PausedManual];
-        let stopped = counts[FlowProcessEffectiveState::StoppedAuto];
-        let total = active + failing + paused + stopped;
-
-        // Form final rollup result
-        let rollup = FlowProcessGroupRollup {
-            total,
-            active,
-            failing,
-            paused,
-            stopped,
-            worst_consecutive_failures,
-        };
-
+        // Compute and return the rollup
+        let rollup = self.compute_rollup(&matching_states);
         Ok(rollup)
     }
 }
@@ -142,6 +332,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
     async fn insert_process(
         &self,
         flow_binding: FlowBinding,
+        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
         trigger_event_id: EventID,
@@ -156,6 +347,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             FlowProcessState::new(
                 self.time_source.now(),
                 flow_binding,
+                sort_key,
                 paused_manual,
                 stop_policy,
                 trigger_event_id,
