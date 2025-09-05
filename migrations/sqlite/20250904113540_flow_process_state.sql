@@ -18,7 +18,7 @@ CREATE TABLE flow_process_state (
     next_planned_at  TIMESTAMPTZ,
 
     effective_state  TEXT NOT NULL
-        CHECK (effective_state IN ('active', 'failing', 'paused_manual', 'stopped_auto')),
+        CHECK (effective_state IN ('failing', 'stopped_auto', 'paused_manual', 'active')),
 
     sort_key        TEXT NOT NULL,
 
