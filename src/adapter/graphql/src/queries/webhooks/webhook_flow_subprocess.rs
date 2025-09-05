@@ -10,7 +10,7 @@
 use {kamu_flow_system as fs, kamu_webhooks as wh};
 
 use crate::prelude::*;
-use crate::queries::flow_process_runtime_state;
+use crate::queries::flow_process_summary;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,13 +47,8 @@ impl WebhookFlowSubProcess {
         self.name.clone()
     }
 
-    #[allow(clippy::unused_async)]
-    async fn flow_trigger(&self) -> FlowTrigger {
-        self.flow_trigger.clone().into()
-    }
-
-    async fn runtime_state(&self, ctx: &Context<'_>) -> Result<FlowProcessRuntimeState> {
-        flow_process_runtime_state(ctx, &self.flow_trigger).await
+    async fn summary(&self, ctx: &Context<'_>) -> Result<FlowProcessSummary> {
+        flow_process_summary(ctx, &self.flow_trigger).await
     }
 }
 
