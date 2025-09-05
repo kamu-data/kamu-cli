@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE flow_process_states\n                SET\n                    paused_manual = $1,\n                    stop_policy_kind = $2::flow_stop_policy_kind,\n                    stop_policy_data = $3,\n                    consecutive_failures = $4,\n                    last_success_at = $5,\n                    last_failure_at = $6,\n                    last_attempt_at = $7,\n                    next_planned_at = $8,\n                    effective_state = $9,\n                    sort_key = $10,\n                    updated_at = $11,\n                    last_applied_trigger_event_id = $12,\n                    last_applied_flow_event_id = $13\n                WHERE\n                    flow_type = $14 AND scope_data = $15 AND\n                    last_applied_trigger_event_id = $16 AND\n                    last_applied_flow_event_id = $17\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bool",
+        {
+          "Custom": {
+            "name": "flow_stop_policy_kind",
+            "kind": {
+              "Enum": [
+                "never",
+                "after_n_consecutive_failures"
+              ]
+            }
+          }
+        },
+        "Jsonb",
+        "Int4",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        {
+          "Custom": {
+            "name": "flow_process_effective_state",
+            "kind": {
+              "Enum": [
+                "stopped_auto",
+                "failing",
+                "paused_manual",
+                "active"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Timestamptz",
+        "Int8",
+        "Int8",
+        "Text",
+        "Jsonb",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "44147bd52037e1cf97d1985dffe7d20673f415abdbfbc90593a8929911231315"
+}

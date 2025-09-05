@@ -1,0 +1,117 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                paused_manual,\n                stop_policy_kind as \"stop_policy_kind: String\",\n                stop_policy_data,\n                consecutive_failures,\n                last_success_at,\n                last_failure_at,\n                last_attempt_at,\n                next_planned_at,\n                effective_state as \"effective_state: FlowProcessEffectiveState\",\n                sort_key,\n                updated_at,\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "paused_manual",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "stop_policy_kind: String",
+        "type_info": {
+          "Custom": {
+            "name": "flow_stop_policy_kind",
+            "kind": {
+              "Enum": [
+                "never",
+                "after_n_consecutive_failures"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "stop_policy_data",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "consecutive_failures",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "last_success_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_failure_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "last_attempt_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "next_planned_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "effective_state: FlowProcessEffectiveState",
+        "type_info": {
+          "Custom": {
+            "name": "flow_process_effective_state",
+            "kind": {
+              "Enum": [
+                "stopped_auto",
+                "failing",
+                "paused_manual",
+                "active"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "sort_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "last_applied_trigger_event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 12,
+        "name": "last_applied_flow_event_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a2dfdce6091cd6af26e451f45ce77065d6b413c35de05b85be98b4cab858b8d8"
+}

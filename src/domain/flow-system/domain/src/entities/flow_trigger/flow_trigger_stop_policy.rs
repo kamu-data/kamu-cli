@@ -20,6 +20,15 @@ pub enum FlowTriggerStopPolicy {
     Never,
 }
 
+impl FlowTriggerStopPolicy {
+    pub fn kind_to_string(&self) -> &'static str {
+        match self {
+            FlowTriggerStopPolicy::AfterConsecutiveFailures { .. } => "after_consecutive_failures",
+            FlowTriggerStopPolicy::Never => "never",
+        }
+    }
+}
+
 impl Default for FlowTriggerStopPolicy {
     fn default() -> Self {
         Self::AfterConsecutiveFailures {
