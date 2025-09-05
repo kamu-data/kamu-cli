@@ -23,11 +23,17 @@ pub(crate) fn generate_scope_query_condition_clauses(
             continue;
         }
 
+        // keys are &'static str from code; safe to inline
         scope_clauses.push(format!("scope_data->>'{key}' = ANY(${parameter_index})"));
         parameter_index += 1;
     }
 
-    (scope_clauses.join(" AND "), parameter_index)
+    let text = if scope_clauses.is_empty() {
+        "TRUE".to_string()
+    } else {
+        scope_clauses.join(" AND ")
+    };
+    (text, parameter_index)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
