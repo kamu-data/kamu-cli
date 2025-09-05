@@ -324,14 +324,14 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
     /// Compute rollup for matching rows.
     async fn rollup_by_scope(
         &self,
-        flow_scope_query: &FlowScopeQuery,
+        flow_scope_query: FlowScopeQuery,
         for_flow_types: Option<&[&'static str]>,
         effective_state_in: Option<&[FlowProcessEffectiveState]>,
     ) -> Result<FlowProcessGroupRollup, InternalError> {
         let state = self.state.read().unwrap();
 
         // Create a filter using the builder-style API with optional methods
-        let filter = FlowProcessListFilter::for_scope(flow_scope_query)
+        let filter = FlowProcessListFilter::for_scope(&flow_scope_query)
             .for_flow_types_opt(for_flow_types)
             .with_effective_states_opt(effective_state_in);
 
