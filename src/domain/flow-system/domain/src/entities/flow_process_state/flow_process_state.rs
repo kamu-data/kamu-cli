@@ -18,6 +18,7 @@ use crate::{FlowBinding, FlowProcessEffectiveState, FlowTriggerStopPolicy};
 #[derive(Debug, Clone)]
 pub struct FlowProcessState {
     flow_binding: FlowBinding,
+    sort_key: String,
 
     paused_manual: bool,
     stop_policy: FlowTriggerStopPolicy,
@@ -41,12 +42,14 @@ impl FlowProcessState {
     pub fn new(
         current_time: DateTime<Utc>,
         flow_binding: FlowBinding,
+        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
         trigger_event_id: EventID,
     ) -> Self {
         Self {
             flow_binding,
+            sort_key,
             paused_manual,
             stop_policy,
             consecutive_failures: 0,
@@ -63,6 +66,7 @@ impl FlowProcessState {
 
     pub fn from_storage_row(
         flow_binding: FlowBinding,
+        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
         consecutive_failures: u32,
@@ -92,6 +96,7 @@ impl FlowProcessState {
 
         Self {
             flow_binding,
+            sort_key,
             paused_manual,
             stop_policy,
             consecutive_failures,
@@ -110,6 +115,11 @@ impl FlowProcessState {
     #[inline]
     pub fn flow_binding(&self) -> &FlowBinding {
         &self.flow_binding
+    }
+
+    #[inline]
+    pub fn sort_key(&self) -> &str {
+        &self.sort_key
     }
 
     #[inline]
@@ -357,6 +367,10 @@ mod tests {
         FlowBinding::new("test.flow.type", FlowScope::make_system_scope())
     }
 
+    fn make_test_sort_key() -> String {
+        "test_sort_key".to_string()
+    }
+
     fn make_test_stop_policy_with_failures(count: u32) -> FlowTriggerStopPolicy {
         FlowTriggerStopPolicy::AfterConsecutiveFailures {
             failures_count: ConsecutiveFailuresCount::try_new(count).unwrap(),
@@ -367,6 +381,7 @@ mod tests {
     fn test_new_flow_process_state() {
         let current_time = Utc::now();
         let flow_binding = make_test_flow_binding();
+        let sort_key = make_test_sort_key();
         let stop_policy = FlowTriggerStopPolicy::Never;
         let trigger_event_id = EventID::new(123);
 
@@ -374,12 +389,14 @@ mod tests {
         let state = FlowProcessState::new(
             current_time,
             flow_binding.clone(),
+            sort_key.clone(),
             false, // not paused manually
             stop_policy,
             trigger_event_id,
         );
 
         assert_eq!(state.flow_binding(), &flow_binding);
+        assert_eq!(state.sort_key, sort_key);
         assert!(!state.paused_manual());
         assert_eq!(state.stop_policy(), stop_policy);
         assert_eq!(state.consecutive_failures(), 0);
@@ -397,6 +414,7 @@ mod tests {
     fn test_new_flow_process_state_with_manual_pause() {
         let current_time = Utc::now();
         let flow_binding = make_test_flow_binding();
+        let sort_key = make_test_sort_key();
         let stop_policy = FlowTriggerStopPolicy::Never;
         let trigger_event_id = EventID::new(456);
 
@@ -404,6 +422,7 @@ mod tests {
         let state = FlowProcessState::new(
             current_time,
             flow_binding.clone(),
+            sort_key.clone(),
             true, // paused manually
             stop_policy,
             trigger_event_id,
@@ -421,6 +440,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(1),
@@ -453,6 +473,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(1),
@@ -484,6 +505,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(1),
@@ -519,6 +541,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
             EventID::new(1),
@@ -551,6 +574,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
             EventID::new(1),
@@ -579,6 +603,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
             EventID::new(1),
@@ -609,6 +634,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(1),
@@ -637,6 +663,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(2),
             EventID::new(1),
@@ -671,6 +698,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             true, // start paused
             make_test_stop_policy_with_failures(2),
             EventID::new(1),
@@ -709,6 +737,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
             EventID::new(1),
@@ -729,6 +758,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(5),
             EventID::new(1),
@@ -786,6 +816,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
             EventID::new(1),
@@ -896,6 +927,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(100),
@@ -925,6 +957,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(100),
@@ -954,6 +987,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(100),
@@ -976,6 +1010,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(1),
@@ -1015,6 +1050,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(1),
@@ -1055,6 +1091,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(1),
@@ -1092,6 +1129,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
             EventID::new(10), // trigger event
@@ -1154,6 +1192,7 @@ mod tests {
         let mut state = FlowProcessState::new(
             Utc::now(),
             make_test_flow_binding(),
+            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
             EventID::new(100),
