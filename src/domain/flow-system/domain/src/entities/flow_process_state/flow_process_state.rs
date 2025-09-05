@@ -47,6 +47,13 @@ impl FlowProcessState {
         stop_policy: FlowTriggerStopPolicy,
         trigger_event_id: EventID,
     ) -> Self {
+        // Ensure sort_key is lowercase for efficient filtering
+        debug_assert_eq!(
+            sort_key.to_lowercase(),
+            sort_key,
+            "sort_key must be lowercase for efficient filtering"
+        );
+
         Self {
             flow_binding,
             sort_key,
@@ -79,10 +86,17 @@ impl FlowProcessState {
         last_applied_trigger_event_id: EventID,
         last_applied_flow_event_id: EventID,
     ) -> Self {
+        // Ensure sort_key is lowercase for efficient filtering
+        debug_assert_eq!(
+            sort_key.to_lowercase(),
+            sort_key,
+            "sort_key must be lowercase for efficient filtering"
+        );
+
         let actual_effective_state =
             FlowProcessEffectiveState::calculate(paused_manual, consecutive_failures, stop_policy);
 
-        assert_eq!(
+        debug_assert_eq!(
             effective_state, actual_effective_state,
             "Inconsistent effective state in storage row"
         );
@@ -291,20 +305,20 @@ impl FlowProcessState {
                 // No attempts yet, all should be None
             }
             (Some(success), None, Some(attempt)) => {
-                assert_eq!(
+                debug_assert_eq!(
                     attempt, success,
                     "last_attempt_at should match last_success_at if only success exists"
                 );
             }
             (None, Some(failure), Some(attempt)) => {
-                assert_eq!(
+                debug_assert_eq!(
                     attempt, failure,
                     "last_attempt_at should match last_failure_at if only failure exists"
                 );
             }
             (Some(success), Some(failure), Some(attempt)) => {
                 let latest = if success > failure { success } else { failure };
-                assert_eq!(
+                debug_assert_eq!(
                     attempt, latest,
                     "last_attempt_at should match the latest of last_success_at or last_failure_at"
                 );
@@ -317,7 +331,7 @@ impl FlowProcessState {
         }
 
         if let (Some(next_planned), Some(last_attempt)) = (next_planned_at, last_attempt_at) {
-            assert!(
+            debug_assert!(
                 next_planned > last_attempt,
                 "next_planned_at must be later than last_attempt_at"
             );
