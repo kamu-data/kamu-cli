@@ -41,7 +41,7 @@ pub trait FlowProcessStateQuery: Send + Sync {
     /// Compute rollup for matching rows.
     async fn rollup_by_scope(
         &self,
-        flow_scope_query: &FlowScopeQuery,
+        flow_scope_query: FlowScopeQuery,
         for_flow_types: Option<&[&'static str]>,
         effective_state_in: Option<&[FlowProcessEffectiveState]>,
     ) -> Result<FlowProcessGroupRollup, InternalError>;

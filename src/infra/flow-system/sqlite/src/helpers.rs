@@ -21,6 +21,7 @@ pub(crate) fn generate_scope_query_condition_clauses(
     let mut parameter_index = starting_parameter_index;
 
     let mut scope_clauses = Vec::new();
+    // keys are &'static str from code; safe to inline
     for (key, values) in &flow_scope_query.attributes {
         if values.len() == 1 {
             scope_clauses.push(format!(
@@ -39,7 +40,13 @@ pub(crate) fn generate_scope_query_condition_clauses(
         }
     }
 
-    (scope_clauses.join(" AND "), parameter_index)
+    let text = if scope_clauses.is_empty() {
+        "1".to_string()
+    } else {
+        scope_clauses.join(" AND ")
+    };
+
+    (text, parameter_index)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

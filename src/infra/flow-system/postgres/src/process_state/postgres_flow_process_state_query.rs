@@ -12,6 +12,8 @@ use dill::{Singleton, component, interface, scope};
 use kamu_flow_system::*;
 use sqlx::Postgres;
 
+use crate::helpers::{form_scope_query_condition_values, generate_scope_query_condition_clauses};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresFlowProcessStateQuery {
@@ -63,11 +65,44 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
     /// Compute rollup for matching rows.
     async fn rollup_by_scope(
         &self,
-        _flow_scope_query: &FlowScopeQuery,
-        _for_flow_types: Option<&[&'static str]>,
-        _effective_state_in: Option<&[FlowProcessEffectiveState]>,
+        flow_scope_query: FlowScopeQuery,
+        for_flow_types: Option<&[&'static str]>,
+        effective_state_in: Option<&[FlowProcessEffectiveState]>,
     ) -> Result<FlowProcessGroupRollup, InternalError> {
-        unimplemented!()
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let (scope_conditions, _next) =
+            generate_scope_query_condition_clauses(&flow_scope_query, 3);
+        let scope_values = form_scope_query_condition_values(flow_scope_query);
+
+        let sql = format!(
+            r#"
+            SELECT
+                COUNT(*)::bigint                                                    AS total,
+                COALESCE(SUM((effective_state = 'active')::int), 0)::bigint         AS active,
+                COALESCE(SUM((effective_state = 'failing')::int), 0)::bigint        AS failing,
+                COALESCE(SUM((effective_state = 'paused_manual')::int), 0)::bigint  AS paused,
+                COALESCE(SUM((effective_state = 'stopped_auto')::int), 0)::bigint   AS stopped,
+                COALESCE(MAX(consecutive_failures), 0)::bigint                      AS worst
+            FROM flow_process_status
+                WHERE
+                    ({scope_conditions})
+                    AND ($1::text[] IS NULL OR flow_type = ANY($1))
+                    AND ($2::flow_process_effective_state[] IS NULL OR effective_state = ANY($2))
+            "#
+        );
+
+        let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(&sql)
+            .bind(for_flow_types as Option<&[&str]>)
+            .bind(effective_state_in as Option<&[FlowProcessEffectiveState]>);
+
+        for arr in &scope_values {
+            query = query.bind(arr);
+        }
+
+        let row = query.fetch_one(connection_mut).await.int_err()?;
+        Ok(row.try_into()?)
     }
 }
 
