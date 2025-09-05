@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{Singleton, component, interface, scope};
 use kamu_flow_system::*;
@@ -40,8 +41,8 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         _flow_binding: FlowBinding,
         _paused_manual: bool,
         _stop_policy: FlowTriggerStopPolicy,
-        _trigger_event_id: i64,
-    ) -> Result<(), InternalError> {
+        _trigger_event_id: EventID,
+    ) -> Result<(), FlowProcessInsertError> {
         unimplemented!()
     }
 
@@ -50,8 +51,8 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         _flow_binding: FlowBinding,
         _paused_manual: Option<bool>,
         _stop_policy: Option<FlowTriggerStopPolicy>,
-        _trigger_event_id: i64,
-    ) -> Result<(), InternalError> {
+        _trigger_event_id: EventID,
+    ) -> Result<(), FlowProcessUpdateError> {
         unimplemented!()
     }
 
@@ -59,13 +60,17 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         &self,
         _flow_binding: FlowBinding,
         _success: bool,
-        _event_time: chrono::DateTime<chrono::Utc>,
-        _flow_event_id: i64,
-    ) -> Result<(), InternalError> {
+        _event_time: DateTime<Utc>,
+        _next_planned_at: Option<DateTime<Utc>>,
+        _flow_event_id: EventID,
+    ) -> Result<(), FlowProcessApplyResultError> {
         unimplemented!()
     }
 
-    async fn delete_process(&self, _flow_binding: FlowBinding) -> Result<(), InternalError> {
+    async fn delete_process(
+        &self,
+        _flow_binding: FlowBinding,
+    ) -> Result<(), FlowProcessDeleteError> {
         unimplemented!()
     }
 }

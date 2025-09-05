@@ -8026,8 +8026,10 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
+ "strum 0.27.2",
  "test-group",
  "test-log",
+ "time-source",
  "tokio",
  "tracing",
 ]
