@@ -10,12 +10,12 @@
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{Singleton, component, interface, scope};
 use kamu_flow_system::*;
-use sqlx::Postgres;
+use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresFlowProcessStateQuery {
-    _transaction: TransactionRefT<Postgres>,
+pub struct SqliteFlowProcessStateQuery {
+    transaction: TransactionRefT<Sqlite>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,10 +23,10 @@ pub struct PostgresFlowProcessStateQuery {
 #[component(pub)]
 #[interface(dyn FlowProcessStateQuery)]
 #[scope(Singleton)]
-impl PostgresFlowProcessStateQuery {
+impl SqliteFlowProcessStateQuery {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
-            _transaction: transaction.into(),
+            transaction: transaction.into(),
         }
     }
 }
@@ -34,12 +34,20 @@ impl PostgresFlowProcessStateQuery {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
+impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
     async fn try_get_process_state(
         &self,
-        _flow_binding: &FlowBinding,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowProcessState>, InternalError> {
-        unimplemented!()
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        match crate::process_state::helpers::load_process_state(connection_mut, flow_binding).await
+        {
+            Ok(state) => Ok(Some(state)),
+            Err(FlowProcessLoadError::NotFound(_)) => Ok(None),
+            Err(FlowProcessLoadError::Internal(e)) => Err(e),
+        }
     }
 
     async fn list_processes(
