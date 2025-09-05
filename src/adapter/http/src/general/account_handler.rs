@@ -62,11 +62,13 @@ async fn get_account(catalog: &Catalog) -> Result<Json<AccountResponse>, ApiErro
         CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),
         CurrentAccountSubject::Logged(account) => {
             let account_service = catalog.get_one::<dyn AccountService>().unwrap();
-            let full_account_info = account_service
-                .account_by_id(&account.account_id)
+            match account_service
+                .try_get_account_by_id(&account.account_id)
                 .await?
-                .unwrap();
-            Ok(Json(full_account_info.into()))
+            {
+                Some(full_account_info) => Ok(Json(full_account_info.into())),
+                None => Err(ApiError::not_found_without_reason()),
+            }
         }
     }
 }
