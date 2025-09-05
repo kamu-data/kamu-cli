@@ -12,12 +12,12 @@
 // Re-exports
 pub use kamu_flow_system as domain;
 
-mod flow;
-mod flow_configuration;
-mod flow_process_state;
-mod flow_trigger;
+mod inmem_flow_configuration_event_store;
+mod inmem_flow_event_store;
+mod inmem_flow_process_state;
+mod inmem_flow_trigger_event_store;
 
-pub use flow::*;
-pub use flow_configuration::*;
-pub use flow_process_state::*;
-pub use flow_trigger::*;
+pub use inmem_flow_configuration_event_store::*;
+pub use inmem_flow_event_store::*;
+pub use inmem_flow_process_state::*;
+pub use inmem_flow_trigger_event_store::*;
