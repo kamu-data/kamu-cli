@@ -25,6 +25,7 @@ doctest = false
 database-common = { workspace = true }
 kamu-flow-system = { workspace = true, features = ["sqlx"] }
 odf = { workspace = true }
+time-source = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
