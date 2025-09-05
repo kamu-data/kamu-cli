@@ -10,7 +10,7 @@
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
-use crate::queries::flow_process_runtime_state;
+use crate::queries::flow_process_summary;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,13 +30,9 @@ impl FlowProcess {
         decode_dataset_flow_type(&self.flow_trigger.flow_binding.flow_type)
     }
 
-    async fn flow_trigger(&self) -> FlowTrigger {
-        self.flow_trigger.clone().into()
-    }
-
-    #[tracing::instrument(level = "debug", name = "Gql::FlowProcess::runtime_state", skip_all)]
-    async fn runtime_state(&self, ctx: &Context<'_>) -> Result<FlowProcessRuntimeState> {
-        flow_process_runtime_state(ctx, &self.flow_trigger).await
+    #[tracing::instrument(level = "debug", name = "Gql::FlowProcess::summary", skip_all)]
+    async fn summary(&self, ctx: &Context<'_>) -> Result<FlowProcessSummary> {
+        flow_process_summary(ctx, &self.flow_trigger).await
     }
 }
 
