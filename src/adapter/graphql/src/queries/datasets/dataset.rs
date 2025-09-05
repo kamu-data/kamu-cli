@@ -9,9 +9,7 @@
 
 use chrono::prelude::*;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{ResolvedDataset, ServerUrlConfig, auth};
-use kamu_datasets::{CONTENT_HASH_COLUMN_NAME, VERSION_COLUMN_NAME};
-use odf::dataset::MetadataChainExt;
+use kamu_core::{ServerUrlConfig, auth};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -69,48 +67,6 @@ impl Dataset {
             dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
                 .with_owner(owner),
         }
-    }
-
-    pub(crate) async fn is_versioned_file(dataset: &ResolvedDataset) -> Result<bool> {
-        // TODO: Currently guessing whether its OK to cast by push source. Replace with
-        // some archetype metadata on ODF layer.
-        Self::push_source_has_columns(dataset, &[VERSION_COLUMN_NAME, CONTENT_HASH_COLUMN_NAME])
-            .await
-    }
-
-    pub(crate) async fn is_collection(dataset: &ResolvedDataset) -> Result<bool> {
-        Self::push_source_has_columns(dataset, &["path", "ref"]).await
-    }
-
-    async fn push_source_has_columns(dataset: &ResolvedDataset, columns: &[&str]) -> Result<bool> {
-        let (source, _merge) = match dataset
-            .as_metadata_chain()
-            .accept_one(kamu_core::WriterSourceEventVisitor::new(None))
-            .await
-            .int_err()?
-            .get_source_event_and_merge_strategy()
-        {
-            Ok(src) => src,
-            Err(kamu_core::ScanMetadataError::SourceNotFound(_)) => return Ok(false),
-            Err(err) => return Err(err.int_err().into()),
-        };
-
-        let Some(odf::MetadataEvent::AddPushSource(source)) = source else {
-            return Ok(false);
-        };
-
-        let Some(schema_ddl) = source.read.schema() else {
-            return Ok(false);
-        };
-
-        let push_source_columns: std::collections::BTreeSet<String> = schema_ddl
-            .iter()
-            .filter_map(|c| c.split_once(' ').map(|s| s.0.to_string()))
-            .collect();
-
-        Ok(columns
-            .iter()
-            .all(|name| push_source_columns.contains(*name)))
     }
 }
 
@@ -313,32 +269,25 @@ impl Dataset {
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = Dataset_as_versioned_file, skip_all)]
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
-        if !Self::is_versioned_file(self.dataset_request_state.resolved_dataset(ctx).await?).await?
-        {
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
             return Ok(None);
         }
 
-        Ok(Some(VersionedFile::new(
-            self.dataset_request_state
-                .resolved_dataset(ctx)
-                .await?
-                .clone(),
-        )))
+        Ok(Some(VersionedFile::new(&self.dataset_request_state)))
     }
 
     /// Downcast a dataset to a collection interface
     #[tracing::instrument(level = "info", name = Dataset_as_collection, skip_all)]
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection>> {
-        if !Self::is_collection(self.dataset_request_state.resolved_dataset(ctx).await?).await? {
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {
             return Ok(None);
         }
 
-        Ok(Some(Collection::new(
-            self.dataset_request_state
-                .resolved_dataset(ctx)
-                .await?
-                .clone(),
-        )))
+        Ok(Some(Collection::new(&self.dataset_request_state)))
     }
 }
 

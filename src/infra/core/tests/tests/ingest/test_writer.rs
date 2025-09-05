@@ -17,8 +17,14 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
 use odf::metadata::testing::MetadataFactory;
+use odf::metadata::{DataField, DataSchema};
 use odf::utils::data::DataFrameExt;
-use odf::utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
+use odf::utils::testing::{
+    assert_arrow_schema_eq,
+    assert_data_eq,
+    assert_odf_schema_eq,
+    assert_schema_eq,
+};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -29,7 +35,7 @@ use time_source::SystemTimeSourceDefault;
 // crate.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
     let mut harness = Harness::new(vec![
@@ -146,8 +152,26 @@ async fn test_data_writer_happy_path() {
 
     // Check schema in block SetDataSchema block
     let (schema_block_hash, schema_block) = harness.get_last_schema_block().await;
+
+    assert_odf_schema_eq(
+        schema_block.event.schema.as_ref().unwrap(),
+        &DataSchema::new(vec![
+            DataField::i64("offset"),
+            DataField::i32("op"),
+            DataField::timestamp_millis_utc("system_time"),
+            DataField::timestamp_millis_utc("event_time").optional(),
+            // NOTE: In SetDataSchema we strip the encoding information, leaving only logical types
+            DataField::string("city").optional(),
+            DataField::i64("population").optional(),
+        ]),
+    );
+
+    // Check the converted Arrow schema
     assert_arrow_schema_eq(
-        &schema_block.event.schema_as_arrow().unwrap(),
+        &schema_block
+            .event
+            .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
+            .unwrap(),
         json!({
             "fields": [{
                 "name": "offset",
@@ -189,7 +213,8 @@ async fn test_data_writer_happy_path() {
                 "nullable": true,
             }, {
                 "name": "city",
-                "data_type": "Utf8View",
+                // NOTE: Not Utf8View due to stripped encoding
+                "data_type": "Utf8",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
@@ -599,7 +624,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
 
     let mut writer = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
-        harness.target.clone(),
+        harness.dataset.clone(),
         &odf::BlockRef::Head,
         None,
     )
@@ -657,7 +682,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
         .unwrap();
 
     harness
-        .target
+        .dataset
         .as_metadata_chain()
         .set_ref(
             &odf::BlockRef::Head,
@@ -1053,6 +1078,473 @@ async fn test_data_writer_optimal_parquet_encoding() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Schema evolution
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_schema_evolution_from_inferred() {
+    let mut harness = Harness::new(vec![]).await;
+
+    // Round 1
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    let schema = harness.get_last_schema().await;
+
+    assert_odf_schema_eq(
+        &schema,
+        &odf::schema::DataSchema::new(vec![
+            odf::schema::DataField::i64("offset"),
+            odf::schema::DataField::i32("op"),
+            odf::schema::DataField::timestamp_millis_utc("system_time"),
+            odf::schema::DataField::timestamp_millis_utc("event_time").optional(),
+            odf::schema::DataField::string("city").optional(),
+            odf::schema::DataField::i64("population").optional(),
+        ]),
+    );
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // Set explicit schema with extra attributes
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time")
+                    .optional()
+                    .extra(odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    )),
+                odf::schema::DataField::string("city")
+                    .optional()
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::i64("population").optional().extra(
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // Round 2
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                D,4000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    let schema = harness.get_last_schema().await;
+
+    assert_odf_schema_eq(
+        &schema,
+        &odf::schema::DataSchema::new(vec![
+            odf::schema::DataField::i64("offset"),
+            odf::schema::DataField::i32("op"),
+            odf::schema::DataField::timestamp_millis_utc("system_time"),
+            odf::schema::DataField::timestamp_millis_utc("event_time")
+                .optional()
+                .extra(odf::metadata::ext::AttrDescription::new(
+                    "Date the census was done rounded to a year mark",
+                )),
+            odf::schema::DataField::string("city")
+                .optional()
+                .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+            odf::schema::DataField::i64("population").optional().extra(
+                odf::metadata::ext::AttrDescription::new("Estimated population"),
+            ),
+        ]),
+    );
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_schema_evolution_from_explicit() {
+    let mut harness = Harness::new(vec![]).await;
+
+    // Set explicit schema with extra attributes
+    // NOTE: All fields are required, while actual Arrow schema will differ in
+    // nullability
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                    odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    ),
+                ),
+                odf::schema::DataField::string("city")
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::i64("population").extra(
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // Round 1: Write conforming data
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    // Ensure no new schema event written
+    assert_eq!(harness.get_last_schema_block().await.1.sequence_number, 1);
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+#[expect(deprecated)]
+async fn test_data_writer_schema_evolution_from_legacy() {
+    use ::datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+
+    let mut harness = Harness::new(vec![]).await;
+
+    // Set explicit schema in legacy format
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new_legacy_raw_arrow(
+            &Schema::new(vec![
+                Field::new("offset", DataType::Int64, false),
+                Field::new("op", DataType::Int32, false),
+                Field::new(
+                    "system_time",
+                    DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                    false,
+                ),
+                Field::new(
+                    "event_time",
+                    DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                    true,
+                ),
+                Field::new("city", DataType::Utf8, true),
+                Field::new("population", DataType::Int64, true),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // Round 1
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    let schema = harness.get_last_schema_block().await.1;
+
+    // Ensure legacy schema is reused by writer without writing new event
+    assert_eq!(schema.sequence_number, 1);
+    assert!(schema.event.raw_arrow_schema.is_some());
+
+    assert_odf_schema_eq(
+        &schema.event.upgrade().schema,
+        &odf::schema::DataSchema::new(vec![
+            odf::schema::DataField::i64("offset"),
+            odf::schema::DataField::i32("op"),
+            odf::schema::DataField::timestamp_millis_utc("system_time"),
+            odf::schema::DataField::timestamp_millis_utc("event_time").optional(),
+            odf::schema::DataField::string("city").optional(),
+            odf::schema::DataField::i64("population").optional(),
+        ]),
+    );
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // Set explicit schema in new format
+    // NOTE: The difference in optionality
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // Round 2
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                D,4000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    let schema = harness.get_last_schema().await;
+
+    assert_odf_schema_eq(
+        &schema,
+        &odf::schema::DataSchema::new(vec![
+            odf::schema::DataField::i64("offset"),
+            odf::schema::DataField::i32("op"),
+            odf::schema::DataField::timestamp_millis_utc("system_time"),
+            odf::schema::DataField::timestamp_millis_utc("event_time"),
+            odf::schema::DataField::string("city"),
+            odf::schema::DataField::i64("population"),
+        ]),
+    );
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ObjectLink
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_object_link() {
+    let mut harness = Harness::new(vec![]).await;
+
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+                odf::schema::DataField::string("census_hash").type_ext(
+                    odf::schema::ext::DataTypeExt::object_link(
+                        odf::schema::ext::DataTypeExt::multihash(),
+                    ),
+                ),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // Round 1: Valid links
+    let repo = harness.dataset.as_data_repo();
+
+    repo.insert_bytes(b"census_a", Default::default())
+        .await
+        .unwrap();
+    repo.insert_bytes(b"census_b", Default::default())
+        .await
+        .unwrap();
+    repo.insert_bytes(b"census_c", Default::default())
+        .await
+        .unwrap();
+
+    harness
+        .write(
+            &indoc::formatdoc!(
+                r#"
+                city,population,census_hash
+                A,1000,{hash_a}
+                B,2000,{hash_b}
+                C,3000,{hash_c}
+                "#,
+                hash_a = odf::Multihash::from_digest_sha3_256(b"census_a"),
+                hash_b = odf::Multihash::from_digest_sha3_256(b"census_b"),
+                hash_c = odf::Multihash::from_digest_sha3_256(b"census_c"),
+            ),
+            "city STRING, population BIGINT, census_hash STRING",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+-----------------------------------------------------------------------+
+            | offset | op | system_time          | event_time           | city | population | census_hash                                                           |
+            +--------+----+----------------------+----------------------+------+------------+-----------------------------------------------------------------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       | f1620ffd8538233905b7fb9a9c7bff1315bbb3f9eaecd1746c6562426328835785dcb |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       | f162068c16896aced6b7498e338dc150640a07a7330c0f158bcb3365795c3f4418976 |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       | f16200846676d7d1ef6da1f516eca9e656d4c1a7058a5f6ba1559d7a2ef1c729303ed |
+            +--------+----+----------------------+----------------------+------+------------+-----------------------------------------------------------------------+
+            "#
+        ),
+    )
+    .await;
+
+    // Round 2: Dangling reference
+    let res = harness
+        .write(
+            &indoc::formatdoc!(
+                r#"
+                city,population,census_hash
+                D,4000,{hash_d}
+                "#,
+                hash_d = odf::Multihash::from_digest_sha3_256(b"census_d"),
+            ),
+            "city STRING, population BIGINT, census_hash STRING",
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(WriteDataError::DataValidation(
+            DataValidationError::DanglingReference(_)
+        ))
+    );
+
+    // Round 3: Invalid value
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,population,census_hash
+                D,4000,not-a-multihash
+                "#,
+            ),
+            "city STRING, population BIGINT, census_hash STRING",
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(WriteDataError::DataValidation(
+            DataValidationError::InvalidValue(_)
+        ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Builder
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1068,12 +1560,12 @@ async fn test_data_writer_builder_scan_no_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
+        DataWriterMetadataState::build(harness.dataset.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
     let head = harness
-        .target
+        .dataset
         .as_metadata_chain()
         .resolve_ref(&odf::BlockRef::Head)
         .await
@@ -1112,7 +1604,7 @@ async fn test_data_writer_builder_scan_polling_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
+        DataWriterMetadataState::build(harness.dataset.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
@@ -1155,7 +1647,7 @@ async fn test_data_writer_builder_scan_push_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
+        DataWriterMetadataState::build(harness.dataset.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
@@ -1205,7 +1697,7 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
+        DataWriterMetadataState::build(harness.dataset.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
@@ -1229,7 +1721,7 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
 
 struct Harness {
     temp_dir: tempfile::TempDir,
-    target: ResolvedDataset,
+    dataset: ResolvedDataset,
     writer: DataWriterDataFusion,
     ctx: SessionContext,
 
@@ -1302,13 +1794,13 @@ impl Harness {
                 .unwrap();
         }
 
-        let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
+        let dataset = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
 
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
 
         let writer = DataWriterDataFusion::from_metadata_chain(
             ctx.clone(),
-            foo_target.clone(),
+            dataset.clone(),
             &odf::BlockRef::Head,
             None,
         )
@@ -1317,7 +1809,7 @@ impl Harness {
 
         Self {
             temp_dir,
-            target: foo_target,
+            dataset,
             writer,
             ctx,
             system_time,
@@ -1336,12 +1828,34 @@ impl Harness {
     async fn reset_writer(&mut self) {
         self.writer = DataWriterDataFusion::from_metadata_chain(
             self.ctx.clone(),
-            self.target.clone(),
+            self.dataset.clone(),
             &odf::BlockRef::Head,
             None,
         )
         .await
         .unwrap();
+    }
+
+    async fn commit_event(
+        &mut self,
+        event: impl Into<odf::metadata::MetadataEvent>,
+    ) -> Result<odf::dataset::CommitResult, odf::dataset::CommitError> {
+        let res = self
+            .dataset
+            .commit_event(
+                event.into(),
+                odf::dataset::CommitOpts {
+                    system_time: Some(self.system_time),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        if res.is_ok() {
+            self.reset_writer().await;
+        }
+
+        res
     }
 
     async fn write_opts(
@@ -1387,7 +1901,7 @@ impl Harness {
             )
             .await?;
 
-        self.target
+        self.dataset
             .as_metadata_chain()
             .set_ref(
                 &odf::BlockRef::Head,
@@ -1407,6 +1921,10 @@ impl Harness {
         self.write_opts(data, schema, None).await
     }
 
+    async fn get_last_schema(&self) -> odf::schema::DataSchema {
+        self.get_last_schema_block().await.1.event.schema.unwrap()
+    }
+
     async fn get_last_schema_block(
         &self,
     ) -> (
@@ -1418,7 +1936,7 @@ impl Harness {
         use odf::metadata::AsTypedBlock;
 
         let (hash, block) = self
-            .target
+            .dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_ok(|(_, b)| b.as_typed::<odf::metadata::SetDataSchema>().is_some())
@@ -1439,7 +1957,7 @@ impl Harness {
         use odf::metadata::AsTypedBlock;
 
         let (_, block) = self
-            .target
+            .dataset
             .as_metadata_chain()
             .iter_blocks()
             .next()
@@ -1453,7 +1971,7 @@ impl Harness {
         let block = self.get_last_data_block().await;
 
         odf::utils::data::local_url::into_local_path(
-            self.target
+            self.dataset
                 .as_data_repo()
                 .get_internal_url(&block.event.new_data.unwrap().physical_hash)
                 .await,

@@ -205,18 +205,19 @@ pub async fn dataset_metadata_handler(
 
     let license = license_visitor.and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event);
 
-    let (schema, schema_format) = schema_visitor
-        .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event)
-        .map(|schema| schema.schema_as_arrow())
-        .transpose()
-        .int_err()?
-        .map(|schema| {
-            (
-                query_types::Schema::new(schema, params.schema_format),
+    let (schema, schema_format) = if let Some(e) =
+        schema_visitor.and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event)
+    {
+        (
+            Some(query_types::Schema::new(
+                &e.upgrade().schema,
                 params.schema_format,
-            )
-        })
-        .unzip();
+            )?),
+            Some(params.schema_format),
+        )
+    } else {
+        (None, None)
+    };
 
     let seed = seed_visitor.and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event);
 

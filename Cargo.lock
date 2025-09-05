@@ -9670,6 +9670,7 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha3",
  "test-log",
  "thiserror 2.0.16",
@@ -9707,6 +9708,7 @@ dependencies = [
 name = "opendatafabric-dataset-impl"
 version = "0.247.0"
 dependencies = [
+ "arrow",
  "async-stream",
  "async-trait",
  "bytes",
@@ -9730,6 +9732,7 @@ dependencies = [
  "regex",
  "reqwest",
  "s3-utils",
+ "serde_json",
  "tempfile",
  "test-group",
  "test-log",

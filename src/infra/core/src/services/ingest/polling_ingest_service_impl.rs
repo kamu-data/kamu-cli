@@ -282,6 +282,7 @@ impl PollingIngestServiceImpl {
             Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
             Err(StageDataError::IncompatibleSchema(e)) => Err(e.into()),
             Err(StageDataError::MergeError(e)) => Err(e.into()),
+            Err(StageDataError::DataValidation(e)) => Err(e.into()),
             Err(StageDataError::EmptyCommit(_)) => Ok(PollingIngestResult::UpToDate {
                 no_source_defined: false,
                 uncacheable,

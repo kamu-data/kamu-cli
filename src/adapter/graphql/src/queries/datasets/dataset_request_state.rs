@@ -12,6 +12,7 @@ use std::ops::Deref;
 
 use kamu_auth_rebac::AuthorizedAccount;
 use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
+use odf::dataset::MetadataChainExt as _;
 use tokio::sync::OnceCell;
 
 use crate::prelude::*;
@@ -26,6 +27,7 @@ pub(crate) struct DatasetRequestState {
     dataset_statistics: OnceCell<Box<kamu_datasets::DatasetStatistics>>,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
     authorized_accounts: OnceCell<Vec<AuthorizedAccount>>,
+    archetype: OnceCell<Option<odf::schema::ext::DatasetArchetype>>,
 }
 
 impl DatasetRequestState {
@@ -36,6 +38,7 @@ impl DatasetRequestState {
             dataset_statistics: OnceCell::new(),
             allowed_dataset_actions: OnceCell::new(),
             authorized_accounts: OnceCell::new(),
+            archetype: OnceCell::new(),
         }
     }
 
@@ -128,6 +131,36 @@ impl DatasetRequestState {
                 Ok(allowed_actions)
             })
             .await
+    }
+
+    pub async fn archetype(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<odf::schema::ext::DatasetArchetype>> {
+        let archetype = self
+            .archetype
+            .get_or_try_init::<GqlError, _, _>(async || {
+                let dataset = self.resolved_dataset(ctx).await?;
+
+                let Some(schema) = dataset
+                    .as_metadata_chain()
+                    .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
+                    .await
+                    .int_err()?
+                    .into_event()
+                    .and_then(|e| e.schema)
+                else {
+                    return Ok(None);
+                };
+
+                let extra = schema.extra.unwrap_or_default();
+                let attr = extra.get::<odf::schema::ext::AttrArchetype>().int_err()?;
+
+                Ok(attr.map(|attr| attr.archetype))
+            })
+            .await?;
+
+        Ok(*archetype)
     }
 }
 

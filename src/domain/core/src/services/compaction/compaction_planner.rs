@@ -86,6 +86,7 @@ pub struct CompactionDataSliceBatchInfo {
     pub data_slices_batch: Vec<Url>,
     pub upper_bound: CompactionDataSliceBatchUpperBound,
     pub lower_bound: CompactionDataSliceBatchLowerBound,
+    pub linked_objects: Option<odf::schema::ext::LinkedObjectsSummary>,
 }
 
 #[derive(Debug, Default, Clone)]

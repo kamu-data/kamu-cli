@@ -50,6 +50,8 @@ pub struct AddData {
     /// should be carried, i.e. only the last state per source is considered
     /// when resuming.
     pub new_source_state: Option<SourceState>,
+    /// ODF extensions.
+    pub extra: Option<ExtraAttributes>,
 }
 
 impl From<odf::metadata::AddData> for AddData {
@@ -61,6 +63,7 @@ impl From<odf::metadata::AddData> for AddData {
             new_checkpoint: v.new_checkpoint.map(Into::into),
             new_watermark: v.new_watermark.map(Into::into),
             new_source_state: v.new_source_state.map(Into::into),
+            extra: v.extra.map(Into::into),
         }
     }
 }
@@ -299,20 +302,12 @@ impl From<odf::metadata::DatasetSnapshot> for DatasetSnapshot {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetVocabulary {
     /// Name of the offset column.
-    ///
-    /// Defaults to: "offset"
     pub offset_column: String,
     /// Name of the operation type column.
-    ///
-    /// Defaults to: "op"
     pub operation_type_column: String,
     /// Name of the system time column.
-    ///
-    /// Defaults to: "system_time"
     pub system_time_column: String,
     /// Name of the event time column.
-    ///
-    /// Defaults to: "event_time"
     pub event_time_column: String,
 }
 
@@ -544,6 +539,52 @@ impl From<odf::metadata::ExecuteTransformInput> for ExecuteTransformInput {
             new_block_hash: v.new_block_hash.map(Into::into),
             prev_offset: v.prev_offset.map(Into::into),
             new_offset: v.new_offset.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for custom key-value extension attributes. Every key must be in
+/// the form of `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully
+/// disambiguate the value in the face of multiple extensions. Values may be any
+/// valid JSON including nested objects.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, Into, PartialEq, Eq))]
+pub struct ExtraAttributes(serde_json::Map<String, serde_json::Value>);
+impl Default for ExtraAttributes {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+impl From<odf::metadata::ExtraAttributes> for ExtraAttributes {
+    fn from(value: odf::metadata::ExtraAttributes) -> Self {
+        Self::new(value.attributes)
+    }
+}
+#[async_graphql::Scalar]
+impl async_graphql::ScalarType for ExtraAttributes {
+    fn parse(gql_value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let async_graphql::Value::Object(gql_map) = &gql_value else {
+            return Err(async_graphql::InputValueError::custom(format!(
+                "Invalid ExtraAttributes value: '{gql_value}'"
+            )));
+        };
+        let json_value = serde_json::to_value(gql_map)?;
+
+        let serde_json::Value::Object(json_map) = json_value else {
+            unreachable!()
+        };
+
+        Ok(Self::new(json_map))
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        match async_graphql::Value::from_json(serde_json::Value::Object(self.as_ref().clone())) {
+            Ok(v) => v,
+            Err(e) => unreachable!("{e}"),
         }
     }
 }
@@ -1593,15 +1634,16 @@ impl From<odf::metadata::SetAttachments> for SetAttachments {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetDataSchema {
-    pub schema: DataSchema,
+    pub schema: crate::prelude::DataSchema,
 }
 
 impl From<odf::metadata::SetDataSchema> for SetDataSchema {
     fn from(v: odf::metadata::SetDataSchema) -> Self {
-        // TODO: Error handling?
-        // TODO: Externalize format decision?
-        let arrow_schema = v.schema_as_arrow().unwrap();
-        let schema = DataSchema::from_arrow_schema(&arrow_schema, DataSchemaFormat::ParquetJson);
+        // TODO: Externalize format decision
+        let schema = crate::prelude::DataSchema::new(
+            std::sync::Arc::new(v.upgrade().schema),
+            DataSchemaFormat::ParquetJson,
+        );
         Self { schema }
     }
 }

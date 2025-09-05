@@ -11,6 +11,7 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 
 use dill::{component, interface};
+use internal_error::*;
 use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -127,6 +128,18 @@ impl CompactionPlannerImpl {
                         if data_slice_batch_info.upper_bound.new_watermark.is_none() {
                             data_slice_batch_info.upper_bound.new_watermark =
                                 add_data_event.new_watermark;
+                        }
+                        let extra = add_data_event.extra.unwrap_or_default();
+                        if let Some(attr) = extra
+                            .get::<odf::schema::ext::AttrLinkedObjects>()
+                            .int_err()?
+                        {
+                            let mut linked_objects =
+                                data_slice_batch_info.linked_objects.unwrap_or_default();
+                            linked_objects.num_objects_naive +=
+                                attr.linked_objects.num_objects_naive;
+                            linked_objects.size_naive += attr.linked_objects.size_naive;
+                            data_slice_batch_info.linked_objects = Some(linked_objects);
                         }
                     }
                     odf::MetadataEvent::Seed(_) => maybe_seed = Some(block_hash),

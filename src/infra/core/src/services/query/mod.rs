@@ -259,7 +259,26 @@ impl KamuTable {
             .into_event();
 
         if let Some(set_data_schema) = maybe_set_data_schema {
-            set_data_schema.schema_as_arrow().int_err()
+            let odf_schema = set_data_schema.upgrade().schema;
+
+            // TODO: Due to stipping of encoding annotations from ODF schema - Arrow schema
+            // restored from it may not be accurate or optimal for reading. Possible edge
+            // cases include millisecond-encoded `Date`` type and 128/256-bit `Decimal`.
+            // It's unclear if Datafusion will fail on mismatch or will try to convert the
+            // Parquet type to conform to the specified schema. We should consider carefully
+            // what schema to use here.
+            let arrow_schema = odf_schema
+                .to_arrow(&odf::metadata::ToArrowSettings {
+                    // NOTE: Using more efficient View encodings as default
+                    // TODO: Make configurable
+                    default_buffer_encoding: Some(odf::metadata::ArrowBufferEncoding::View {
+                        offset_bit_width: Some(32),
+                    }),
+                    ..Default::default()
+                })
+                .int_err()?;
+
+            Ok(Arc::new(arrow_schema))
         } else {
             Ok(Arc::new(Schema::empty()))
         }
@@ -308,8 +327,12 @@ impl KamuTable {
             .await;
 
         let options = ParquetReadOptions {
+            // NOTE: Here we use Arrow schema that was reconstructed from ODF schema in metadata
+            // chain to avoid schema inference step. We must be careful that all Parquet files can
+            // actually be coerced into this schema and it is the most efficient representation for
+            // querying (e.g. uses zero-copy `View` types).
             schema: Some(&schema),
-            // TODO: PERF: potential speedup if we specify `offset`?
+            // TODO: PERF: potential speedup if we specify `offset` and `system_time`?
             file_sort_order: Vec::new(),
             file_extension: "",
             table_partition_cols: Vec::new(),

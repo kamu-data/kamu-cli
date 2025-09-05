@@ -13,11 +13,24 @@ Recommendation: for ease of reading, use the following order:
 
 ## Unreleased
 ### Added
+- Introducing ODF Schema per [ODF RFC-016](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/016-odf-schema.md)
+  - New schema format is supported in GQL and REST endpoints
+- Initial support for `ObjectLink` extended type per [ODF RFC-017](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/017-large-files-linking.md)
+  - Allows use of `ObjectLink[Multihash]` type in root datasets
+  - Ingest will perform validation that linked objects exists in the data repository (i.e. must be uploaded first)
+  - Ingest will produce an error on dangling reference and invalid `multihash` values
+  - The summary of linked objects count and sizes will be written to `AddData` event under `opendatafabric.org/linkedObjects` attribute
+- GQL: Introduced `currentArchetype` endpoint
 - GQL: `Auth::relations()` for getting ReBAC triplets for debugging purposes.
 - GQL: Vectorized access endpoints `Accounts::byIds`, `Accounts::byNames`, `Datasets::byIds`, `Datasets::byRefs`
 - GQL: `Account::ownedDatasets` for accessing datasets owned by an account
 - GQL: `Account::me` for accessing current account
 ### Changed
+- `inspect schema` now defaults to ODF schema instead of DDL
+- `SetDataSchema` events are now populated with ODF schema, with raw arrow schema deprecated
+- `VersionedFile` and `Collection` dataset archetypes are now created with pre-defined schema that uses new `Did` and `ObjectLink` logical types
+- GQL: `asVersionedFile` and `asCollection` endpoints now use `kamu.dev/archetype` annotation to check the dataset archetype
+  - COMPATIBILITY: The existing datasets need to be migrated by applying new schema via commit API in order to be correctly recognized
 - dep: `ringbuf` updated from `0.3` to `0.4`.
 - Flows: each input contribution to batching rule is reflected as an update of start condition,
    so that flow history may show how many accumulated records were present at the moment of each update

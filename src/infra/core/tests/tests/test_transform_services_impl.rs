@@ -381,7 +381,7 @@ async fn test_get_next_operation() {
             prev_offset: None,
             new_offset: Some(9),
             data_slices: vec![foo_slice.physical_hash.clone()],
-            schema: MetadataFactory::set_data_schema().build().schema_as_arrow().unwrap(),
+            schema: MetadataFactory::set_data_schema().build().schema_as_arrow(&odf::metadata::ToArrowSettings::default()).map(Arc::new).unwrap(),
             explicit_watermarks: vec![odf::metadata::Watermark {
                 system_time: foo_block.system_time,
                 event_time: Utc.with_ymd_and_hms(2020, 1, 1, 10, 0, 0).unwrap(),
@@ -437,6 +437,7 @@ async fn test_get_verification_plan_one_to_one() {
                 new_checkpoint: None,
                 new_watermark: Some(t0),
                 new_source_state: None,
+                extra: None,
             })
             .system_time(t1)
             .prev(&root_head_schema, root_initial_sequence_number)
@@ -515,6 +516,7 @@ async fn test_get_verification_plan_one_to_one() {
                 new_checkpoint: None,
                 new_watermark: Some(t2),
                 new_source_state: None,
+                extra: None,
             })
             .system_time(t3)
             .prev(&root_head_t1, root_initial_sequence_number + 1)
@@ -586,6 +588,7 @@ async fn test_get_verification_plan_one_to_one() {
                 new_checkpoint: None,
                 new_watermark: Some(t4),
                 new_source_state: None,
+                extra: None,
             })
             .system_time(t5)
             .prev(&root_head_t3, root_initial_sequence_number + 2)
@@ -827,6 +830,7 @@ async fn test_transform_status() {
                 new_checkpoint: None,
                 new_watermark: Some(t0),
                 new_source_state: None,
+                extra: None,
             })
             .system_time(t1)
             .prev(&root_head_schema, root_initial_sequence_number)
@@ -923,6 +927,7 @@ async fn test_transform_status() {
                 new_checkpoint: None,
                 new_watermark: Some(t2),
                 new_source_state: None,
+                extra: None,
             })
             .system_time(t3)
             .prev(&root_head_t1, root_initial_sequence_number + 1)
