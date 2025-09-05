@@ -42,7 +42,7 @@ pub trait FlowProcessStateQuery: Send + Sync {
     async fn rollup_by_scope(
         &self,
         flow_scope_query: &FlowScopeQuery,
-        for_flow_types: Option<&[&str]>,
+        for_flow_types: Option<&[&'static str]>,
         effective_state_in: Option<&[FlowProcessEffectiveState]>,
     ) -> Result<FlowProcessGroupRollup, InternalError>;
 }
@@ -58,10 +58,6 @@ pub struct FlowProcessListFilter<'a> {
 
     /// Chips / state cuts
     pub effective_state_in: Option<&'a [FlowProcessEffectiveState]>,
-
-    /// Show only paused (true) or only not-paused (false).
-    /// If None, do not filter.
-    pub paused_eq: Option<bool>,
 
     /// Time windows (UTC). Bounds inclusive.
     pub last_attempt_between:
@@ -87,7 +83,6 @@ impl<'a> FlowProcessListFilter<'a> {
             scope,
             for_flow_types: None,
             effective_state_in: None,
-            paused_eq: None,
             last_attempt_between: None,
             last_failure_since: None,
             next_planned_before: None,
@@ -105,10 +100,41 @@ impl<'a> FlowProcessListFilter<'a> {
             ..self
         }
     }
+
+    /// Adding flow types (optional).
+    pub fn for_flow_types_opt(self, for_flow_types: Option<&'a [&'static str]>) -> Self {
+        Self {
+            for_flow_types,
+            ..self
+        }
+    }
+
+    /// Adding effective states.
+    pub fn with_effective_states(
+        self,
+        effective_state_in: &'a [FlowProcessEffectiveState],
+    ) -> Self {
+        Self {
+            effective_state_in: Some(effective_state_in),
+            ..self
+        }
+    }
+
+    /// Adding effective states (optional).
+    pub fn with_effective_states_opt(
+        self,
+        effective_state_in: Option<&'a [FlowProcessEffectiveState]>,
+    ) -> Self {
+        Self {
+            effective_state_in,
+            ..self
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Copy)]
 pub struct FlowProcessOrder {
     pub field: FlowProcessOrderField,
     pub desc: bool,
@@ -132,6 +158,7 @@ impl FlowProcessOrder {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum FlowProcessOrderField {
     /// Default for “recent activity”.
     LastAttemptAt,
@@ -150,9 +177,6 @@ pub enum FlowProcessOrderField {
 
     /// A–Z over sort ke
     NameAlpha,
-
-    /// By dataset ID
-    DatasetId,
 
     /// By flow type
     FlowType,
