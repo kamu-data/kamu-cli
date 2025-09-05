@@ -22,6 +22,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
     async fn insert_process(
         &self,
         flow_binding: FlowBinding,
+        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
         trigger_event_id: EventID,

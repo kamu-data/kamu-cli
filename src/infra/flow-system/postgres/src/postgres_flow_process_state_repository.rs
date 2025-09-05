@@ -39,6 +39,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
     async fn insert_process(
         &self,
         _flow_binding: FlowBinding,
+        _sort_key: String,
         _paused_manual: bool,
         _stop_policy: FlowTriggerStopPolicy,
         _trigger_event_id: EventID,
