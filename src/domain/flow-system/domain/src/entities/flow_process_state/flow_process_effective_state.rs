@@ -7,18 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use strum::EnumCount;
+use strum::{Display, EnumCount, EnumString};
 
 use crate::FlowTriggerStopPolicy;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, EnumCount)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, EnumCount, Display, EnumString,
+)]
 #[cfg_attr(
     feature = "sqlx",
     derive(sqlx::Type),
-    sqlx(type_name = "flow_process_effective_state", rename_all = "lowercase")
+    sqlx(type_name = "flow_process_effective_state", rename_all = "snake_case")
 )]
+#[strum(serialize_all = "snake_case")]
 pub enum FlowProcessEffectiveState {
     StoppedAuto,
     Failing,

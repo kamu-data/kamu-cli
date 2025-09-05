@@ -176,6 +176,21 @@ impl FlowProcessState {
         self.effective_state
     }
 
+    #[inline]
+    pub fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+
+    #[inline]
+    pub fn last_applied_trigger_event_id(&self) -> EventID {
+        self.last_applied_trigger_event_id
+    }
+
+    #[inline]
+    pub fn last_applied_flow_event_id(&self) -> EventID {
+        self.last_applied_flow_event_id
+    }
+
     pub fn update_trigger_state(
         &mut self,
         current_time: DateTime<Utc>,
