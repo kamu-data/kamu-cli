@@ -2430,8 +2430,14 @@ type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult 
 
 type FlowProcess {
 	flowType: DatasetFlowType!
-	flowTrigger: FlowTrigger!
-	runtimeState: FlowProcessRuntimeState!
+	summary: FlowProcessSummary!
+}
+
+enum FlowProcessEffectiveState {
+	ACTIVE
+	FAILING
+	PAUSED_MANUAL
+	STOPPED_AUTO
 }
 
 type FlowProcessGroupRollup {
@@ -2443,20 +2449,14 @@ type FlowProcessGroupRollup {
 	worstConsecutiveFailures: Int!
 }
 
-type FlowProcessRuntimeState {
-	effectiveState: FlowProcessRuntimeStateEnum!
+type FlowProcessSummary {
+	effectiveState: FlowProcessEffectiveState!
 	consecutiveFailures: Int!
+	stopPolicy: FlowTriggerStopPolicy!
 	lastSuccessAt: DateTime
 	lastAttemptAt: DateTime
 	lastFailureAt: DateTime
 	nextPlannedAt: DateTime
-}
-
-enum FlowProcessRuntimeStateEnum {
-	ACTIVE
-	FAILING
-	PAUSED_MANUAL
-	STOPPED_AUTO
 }
 
 input FlowProcessTypeFilterInput @oneOf {
@@ -4344,8 +4344,7 @@ scalar WebhookEventType
 type WebhookFlowSubProcess {
 	id: WebhookSubscriptionID!
 	name: String!
-	flowTrigger: FlowTrigger!
-	runtimeState: FlowProcessRuntimeState!
+	summary: FlowProcessSummary!
 }
 
 type WebhookFlowSubProcessGroup {

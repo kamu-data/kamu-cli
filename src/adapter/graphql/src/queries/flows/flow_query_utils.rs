@@ -17,10 +17,10 @@ use crate::queries::{FlowProcessTypeFilterInput, InitiatorFilterInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn flow_process_runtime_state(
+pub(crate) async fn flow_process_summary(
     ctx: &Context<'_>,
     flow_trigger: &fs::FlowTriggerState,
-) -> Result<FlowProcessRuntimeState> {
+) -> Result<FlowProcessSummary> {
     let flow_event_store = from_catalog_n!(ctx, dyn fs::FlowEventStore);
 
     let flow_binding = &flow_trigger.flow_binding;
@@ -32,13 +32,13 @@ pub(crate) async fn flow_process_runtime_state(
     let effective_state = match flow_trigger.status {
         fs::FlowTriggerStatus::Active => {
             if consecutive_failures == 0 {
-                FlowProcessRuntimeStateEnum::Active
+                FlowProcessEffectiveState::Active
             } else {
-                FlowProcessRuntimeStateEnum::Failing
+                FlowProcessEffectiveState::Failing
             }
         }
-        fs::FlowTriggerStatus::PausedByUser => FlowProcessRuntimeStateEnum::PausedManual,
-        fs::FlowTriggerStatus::StoppedAutomatically => FlowProcessRuntimeStateEnum::StoppedAuto,
+        fs::FlowTriggerStatus::PausedByUser => FlowProcessEffectiveState::PausedManual,
+        fs::FlowTriggerStatus::StoppedAutomatically => FlowProcessEffectiveState::StoppedAuto,
         fs::FlowTriggerStatus::ScopeRemoved => {
             unreachable!("ScopeRemoved triggers are not expected here")
         }
@@ -56,9 +56,10 @@ pub(crate) async fn flow_process_runtime_state(
         None
     };
 
-    Ok(FlowProcessRuntimeState {
+    Ok(FlowProcessSummary {
         effective_state,
         consecutive_failures,
+        stop_policy: flow_trigger.stop_policy.into(),
         last_success_at: run_stats.last_success_time,
         last_attempt_at: run_stats.last_attempt_time,
         last_failure_at: run_stats.last_failure_time,

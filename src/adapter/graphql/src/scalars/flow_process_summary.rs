@@ -14,9 +14,10 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowProcessRuntimeState {
-    pub effective_state: FlowProcessRuntimeStateEnum,
+pub struct FlowProcessSummary {
+    pub effective_state: FlowProcessEffectiveState,
     pub consecutive_failures: u32,
+    pub stop_policy: FlowTriggerStopPolicy,
     pub last_success_at: Option<DateTime<Utc>>,
     pub last_attempt_at: Option<DateTime<Utc>>,
     pub last_failure_at: Option<DateTime<Utc>>,
@@ -26,7 +27,7 @@ pub struct FlowProcessRuntimeState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
-pub enum FlowProcessRuntimeStateEnum {
+pub enum FlowProcessEffectiveState {
     Active,
     Failing,
     PausedManual,
