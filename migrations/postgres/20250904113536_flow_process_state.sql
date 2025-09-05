@@ -8,10 +8,10 @@ CREATE TYPE flow_stop_policy_kind AS ENUM (
 /* ------------------------------ */
 
 CREATE TYPE flow_process_effective_state AS ENUM (
-    'active',
+    'stopped_auto',
     'failing',
     'paused_manual',
-    'stopped_auto'
+    'active'
 );
 
 /* ------------------------------ */
