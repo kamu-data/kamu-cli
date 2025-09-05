@@ -56,7 +56,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
     async fn rollup_by_scope(
         &self,
         _flow_scope_query: &FlowScopeQuery,
-        _for_flow_types: Option<&[&str]>,
+        _for_flow_types: Option<&[&'static str]>,
         _effective_state_in: Option<&[FlowProcessEffectiveState]>,
     ) -> Result<FlowProcessGroupRollup, InternalError> {
         unimplemented!()
