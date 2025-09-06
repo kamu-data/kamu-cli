@@ -29,6 +29,16 @@ impl AccountMut {
         Self { account }
     }
 
+    /// Convert to read-only accessor to an account
+    pub async fn account(&self) -> crate::queries::Account {
+        // NOTE: Not reusing any cached info as it could've been altered by preceeding
+        // mutations
+        crate::queries::Account::new(
+            self.account.id.clone().into(),
+            self.account.account_name.clone().into(),
+        )
+    }
+
     /// Update account name
     #[tracing::instrument(level = "info", name = AccountMut_rename, skip_all)]
     pub async fn rename(

@@ -86,6 +86,9 @@ impl Account {
         Ok(maybe_account.map(Self::from_account))
     }
 
+    // TODO: We should get rid of this method. Whenever resolving a dataset we
+    // should get owner information that resides in the same table and avoid this
+    // extra lookup by account name
     pub(crate) async fn from_dataset_alias(
         ctx: &Context<'_>,
         alias: &odf::DatasetAlias,

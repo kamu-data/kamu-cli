@@ -163,6 +163,10 @@ input AccountLookupFilter {
 
 type AccountMut {
 	"""
+	Convert to read-only accessor to an account
+	"""
+	account: Account!
+	"""
 	Update account name
 	"""
 	rename(newName: AccountName!): RenameAccountResult!
@@ -1354,6 +1358,10 @@ type DatasetMetadataPermissions {
 }
 
 type DatasetMut {
+	"""
+	Convert to read-only accessor to a dataset
+	"""
+	dataset: Dataset!
 	"""
 	Access to the mutable metadata of the dataset
 	"""

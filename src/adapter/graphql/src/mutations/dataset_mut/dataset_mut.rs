@@ -34,6 +34,20 @@ impl DatasetMut {
         }
     }
 
+    /// Convert to read-only accessor to a dataset
+    async fn dataset(&self, ctx: &Context<'_>) -> Result<Dataset> {
+        let owner = Account::from_dataset_alias(ctx, self.dataset_request_state.dataset_alias())
+            .await?
+            .expect("Account must exist");
+
+        // NOTE: Not reusing any cached state as it could've been altered by preceeding
+        // mutations
+        Ok(Dataset::new_access_checked(
+            owner,
+            self.dataset_request_state.dataset_handle().clone(),
+        ))
+    }
+
     /// Access to the mutable metadata of the dataset
     async fn metadata(&self) -> DatasetMetadataMut {
         DatasetMetadataMut::new(&self.dataset_request_state)
