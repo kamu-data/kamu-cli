@@ -82,6 +82,9 @@ pub struct CLIConfig {
 
     /// Did secret key encryption configuration
     pub did_encryption: Option<DidSecretEncryptionConfig>,
+
+    /// Experimental and temporary configuration options
+    pub extra: Option<ExtraConfig>,
 }
 
 impl CLIConfig {
@@ -101,6 +104,7 @@ impl CLIConfig {
             auth: None,
             uploads: None,
             did_encryption: None,
+            extra: None,
         }
     }
 
@@ -124,6 +128,7 @@ impl CLIConfig {
             auth: Some(AuthConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
             did_encryption: Some(DidSecretEncryptionConfig::sample()),
+            extra: Some(ExtraConfig::sample()),
         }
     }
 }
@@ -145,7 +150,25 @@ impl Default for CLIConfig {
             auth: Some(AuthConfig::default()),
             uploads: Some(UploadsConfig::default()),
             did_encryption: Some(DidSecretEncryptionConfig::default()),
+            extra: Some(ExtraConfig::default()),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Extra
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExtraConfig {
+    pub graphql: kamu_adapter_graphql::Config,
+}
+
+impl ExtraConfig {
+    fn sample() -> Self {
+        Self::default()
     }
 }
 

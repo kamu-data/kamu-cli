@@ -11,6 +11,7 @@
 #![feature(int_roundings)]
 #![feature(let_chains)]
 
+pub mod config;
 pub mod extensions;
 pub mod guards;
 pub(crate) mod mutations;
@@ -24,5 +25,6 @@ pub(crate) mod scalars;
 pub mod traits;
 pub(crate) mod utils;
 
+pub use config::*;
 pub use guards::*;
 pub use root::*;

@@ -133,34 +133,96 @@ impl DatasetRequestState {
             .await
     }
 
+    #[expect(deprecated)]
     pub async fn archetype(
         &self,
         ctx: &Context<'_>,
     ) -> Result<Option<odf::schema::ext::DatasetArchetype>> {
+        let config = from_catalog_n!(ctx, crate::Config);
+
         let archetype = self
             .archetype
             .get_or_try_init::<GqlError, _, _>(async || {
-                let dataset = self.resolved_dataset(ctx).await?;
-
-                let Some(schema) = dataset
-                    .as_metadata_chain()
-                    .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
-                    .await
-                    .int_err()?
-                    .into_event()
-                    .and_then(|e| e.schema)
-                else {
-                    return Ok(None);
-                };
-
-                let extra = schema.extra.unwrap_or_default();
-                let attr = extra.get::<odf::schema::ext::AttrArchetype>().int_err()?;
-
-                Ok(attr.map(|attr| attr.archetype))
+                match self.get_archetype_from_schema_attrs(ctx).await? {
+                    Some(a) => Ok(Some(a)),
+                    None if config.enable_archetype_inference => {
+                        self.infer_archetype_from_push_source_schema(ctx).await
+                    }
+                    None => Ok(None),
+                }
             })
             .await?;
 
         Ok(*archetype)
+    }
+
+    async fn get_archetype_from_schema_attrs(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<odf::schema::ext::DatasetArchetype>> {
+        let dataset = self.resolved_dataset(ctx).await?;
+
+        let Some(schema) = dataset
+            .as_metadata_chain()
+            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
+            .await
+            .int_err()?
+            .into_event()
+            .and_then(|e| e.schema)
+        else {
+            return Ok(None);
+        };
+
+        let extra = schema.extra.unwrap_or_default();
+        let attr = extra.get::<odf::schema::ext::AttrArchetype>().int_err()?;
+
+        Ok(attr.map(|attr| attr.archetype))
+    }
+
+    #[deprecated(
+        note = "This will be removed in favor of `get_archetype_from_schema_attrs` after the \
+                schema migration"
+    )]
+    async fn infer_archetype_from_push_source_schema(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<odf::schema::ext::DatasetArchetype>> {
+        let dataset = self.resolved_dataset(ctx).await?;
+
+        let (source, _merge) = match dataset
+            .as_metadata_chain()
+            .accept_one(kamu_core::WriterSourceEventVisitor::new(None))
+            .await
+            .int_err()?
+            .get_source_event_and_merge_strategy()
+        {
+            Ok(src) => src,
+            Err(kamu_core::ScanMetadataError::SourceNotFound(_)) => return Ok(None),
+            Err(err) => return Err(err.int_err().into()),
+        };
+
+        let Some(odf::MetadataEvent::AddPushSource(source)) = source else {
+            return Ok(None);
+        };
+
+        let Some(schema_ddl) = source.read.schema() else {
+            return Ok(None);
+        };
+
+        let push_source_columns: std::collections::BTreeSet<String> = schema_ddl
+            .iter()
+            .filter_map(|c| c.split_once(' ').map(|s| s.0.to_string()))
+            .collect();
+
+        if push_source_columns.contains(kamu_datasets::VERSION_COLUMN_NAME)
+            && push_source_columns.contains(kamu_datasets::CONTENT_HASH_COLUMN_NAME)
+        {
+            Ok(Some(odf::schema::ext::DatasetArchetype::VersionedFile))
+        } else if push_source_columns.contains("path") && push_source_columns.contains("ref") {
+            Ok(Some(odf::schema::ext::DatasetArchetype::Collection))
+        } else {
+            Ok(None)
+        }
     }
 }
 

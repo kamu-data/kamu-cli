@@ -725,6 +725,9 @@ pub fn register_config_in_catalog(
     password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,
 ) -> Result<(), CLIError> {
+    // Extra
+    catalog_builder.add_value(config.extra.as_ref().unwrap().graphql.clone());
+
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
     // Register JupyterConfig used by some commands
