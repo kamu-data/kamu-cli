@@ -729,16 +729,19 @@ input ColumnInput {
 }
 
 interface CommitResult {
+	isSuccess: Boolean!
 	message: String!
 }
 
 type CommitResultAppendError implements CommitResult & UpdateReadmeResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	oldHead: Multihash
 	newHead: Multihash!
+	isSuccess: Boolean!
 	message: String!
 }
 
@@ -2899,6 +2902,7 @@ type NameLookupResultEdge {
 
 type NoChanges implements CommitResult & UpdateReadmeResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 type OdataProtocolDesc {
