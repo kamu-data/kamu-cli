@@ -1139,6 +1139,162 @@ async fn test_append_set_data_schema_legacy_upgrade() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[ignore = "Awaits enabling strict validation"]
+#[test_log::test(tokio::test)]
+async fn test_append_set_data_schema_validates_system_columns() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Offset missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                // odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Operation type missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                // odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // System time missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                // odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Event time missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                // odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Offset is optional
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset").optional(),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Success
+    chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Iteration and visitors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

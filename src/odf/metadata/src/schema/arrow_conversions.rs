@@ -255,14 +255,10 @@ impl DataType {
                 ),
             ),
             ArrowDataType::List(field) => {
-                let (item_type, encoding) =
+                // TODO: Consider what to do with custom encoding that might be specified on
+                // inner type. It may need to be propagated into encoding of the outer field.
+                let (item_type, _encoding) =
                     DataType::new_from_arrow(field.data_type(), field.is_nullable())?;
-
-                if let Some(encoding) = encoding {
-                    return Err(UnsupportedSchema::new(format!(
-                        "List item types with custom encoding {encoding:?} are not supported"
-                    )));
-                }
 
                 (
                     DataType::List(DataTypeList {
@@ -273,14 +269,10 @@ impl DataType {
                 )
             }
             ArrowDataType::ListView(field) => {
-                let (item_type, encoding) =
+                // TODO: Consider what to do with custom encoding that might be specified on
+                // inner type. It may need to be propagated into encoding of the outer field.
+                let (item_type, _encoding) =
                     DataType::new_from_arrow(field.data_type(), field.is_nullable())?;
-
-                if let Some(encoding) = encoding {
-                    return Err(UnsupportedSchema::new(format!(
-                        "List item types with custom encoding {encoding:?} are not supported"
-                    )));
-                }
 
                 (
                     DataType::List(DataTypeList {
@@ -296,14 +288,10 @@ impl DataType {
                 )
             }
             ArrowDataType::FixedSizeList(field, fixed_length) => {
-                let (item_type, encoding) =
+                // TODO: Consider what to do with custom encoding that might be specified on
+                // inner type. It may need to be propagated into encoding of the outer field.
+                let (item_type, _encoding) =
                     DataType::new_from_arrow(field.data_type(), field.is_nullable())?;
-
-                if let Some(encoding) = encoding {
-                    return Err(UnsupportedSchema::new(format!(
-                        "List item types with custom encoding {encoding:?} are not supported"
-                    )));
-                }
 
                 (
                     DataType::List(DataTypeList {
@@ -314,14 +302,10 @@ impl DataType {
                 )
             }
             ArrowDataType::LargeList(field) => {
-                let (item_type, encoding) =
+                // TODO: Consider what to do with custom encoding that might be specified on
+                // inner type. It may need to be propagated into encoding of the outer field.
+                let (item_type, _encoding) =
                     DataType::new_from_arrow(field.data_type(), field.is_nullable())?;
-
-                if let Some(encoding) = encoding {
-                    return Err(UnsupportedSchema::new(format!(
-                        "List item types with custom encoding {encoding:?} are not supported"
-                    )));
-                }
 
                 (
                     DataType::List(DataTypeList {
@@ -337,14 +321,10 @@ impl DataType {
                 )
             }
             ArrowDataType::LargeListView(field) => {
-                let (item_type, encoding) =
+                // TODO: Consider what to do with custom encoding that might be specified on
+                // inner type. It may need to be propagated into encoding of the outer field.
+                let (item_type, _encoding) =
                     DataType::new_from_arrow(field.data_type(), field.is_nullable())?;
-
-                if let Some(encoding) = encoding {
-                    return Err(UnsupportedSchema::new(format!(
-                        "List item types with custom encoding {encoding:?} are not supported"
-                    )));
-                }
 
                 (
                     DataType::List(DataTypeList {

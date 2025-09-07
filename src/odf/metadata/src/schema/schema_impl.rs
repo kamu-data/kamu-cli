@@ -69,6 +69,11 @@ impl DataSchemaBuilder {
         self
     }
 
+    pub fn push(mut self, field: DataField) -> Self {
+        self.fields.push(field);
+        self
+    }
+
     pub fn extend<I>(mut self, fields: I) -> Self
     where
         I: IntoIterator<Item = DataField>,

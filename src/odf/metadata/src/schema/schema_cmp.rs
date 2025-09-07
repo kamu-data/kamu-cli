@@ -70,6 +70,44 @@ impl DataSchema {
 
         res
     }
+
+    /// Checks whether current schema contains all fields of another,
+    /// disregarding the order
+    pub fn is_superset_of(&self, other: &Self, opts: DataSchemaCmpOptions) -> bool {
+        let (
+            DataSchema {
+                fields: fields_lhs,
+                extra: _,
+            },
+            DataSchema {
+                fields: fields_rhs,
+                extra: extra_rhs,
+            },
+        ) = (self, other);
+
+        if extra_rhs.is_some() {
+            unimplemented!("Superset operation does not yet account for schema attributes");
+        }
+
+        for field_rhs in fields_rhs {
+            let Some(field_lhs) = fields_lhs.iter().find(|f| f.name == field_rhs.name) else {
+                return false;
+            };
+
+            match DataField::compare(field_lhs, field_rhs, opts) {
+                DataSchemaCmp::Identical | DataSchemaCmp::Equivalent => (),
+                DataSchemaCmp::Incompatible => return false,
+            }
+        }
+
+        true
+    }
+
+    /// Checks whether all fields of the current schema are fully contained in
+    /// another, disregarding the order
+    pub fn is_subset_of(&self, other: &Self, opts: DataSchemaCmpOptions) -> bool {
+        other.is_superset_of(self, opts)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
