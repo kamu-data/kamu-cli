@@ -70,10 +70,7 @@ pub struct FlowProcessListFilter<'a> {
     pub min_consecutive_failures: Option<u32>,
 
     /// Name search on hierarchical sort key (case-insensitive).
-    pub name_contains: Option<&'a str>, // maps to ILIKE '%q%'
-
-    /// Optimization for A–Z prefixes
-    pub name_prefix: Option<&'a str>, // maps to range on sort key
+    pub name_contains: Option<&'a str>,
 }
 
 impl<'a> FlowProcessListFilter<'a> {
@@ -89,7 +86,6 @@ impl<'a> FlowProcessListFilter<'a> {
             next_planned_after: None,
             min_consecutive_failures: None,
             name_contains: None,
-            name_prefix: None,
         }
     }
 

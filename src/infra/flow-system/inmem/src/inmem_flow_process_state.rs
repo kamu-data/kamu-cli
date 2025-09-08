@@ -128,13 +128,6 @@ impl InMemoryFlowProcessState {
                     }
                 }
 
-                // Name prefix filter (case-sensitive for A-Z optimization)
-                if let Some(prefix) = filter.name_prefix {
-                    if !ps.sort_key().starts_with(prefix) {
-                        return false;
-                    }
-                }
-
                 true
             })
             .collect()
