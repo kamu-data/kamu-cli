@@ -32,7 +32,7 @@ pub trait FlowProcessStateQuery: Send + Sync {
     /// dataset) or account lists.
     async fn list_processes(
         &self,
-        filter: &FlowProcessListFilter<'_>,
+        filter: FlowProcessListFilter<'_>,
         order: FlowProcessOrder,
         limit: usize,
         offset: usize,
@@ -51,7 +51,7 @@ pub trait FlowProcessStateQuery: Send + Sync {
 
 pub struct FlowProcessListFilter<'a> {
     /// Scope filter
-    pub scope: &'a FlowScopeQuery,
+    pub scope: FlowScopeQuery,
 
     /// Optional narrowing by flow type strings
     pub for_flow_types: Option<&'a [&'static str]>,
@@ -78,7 +78,7 @@ pub struct FlowProcessListFilter<'a> {
 
 impl<'a> FlowProcessListFilter<'a> {
     /// Minimal filter: scope only (no extra cuts).
-    pub fn for_scope(scope: &'a FlowScopeQuery) -> Self {
+    pub fn for_scope(scope: FlowScopeQuery) -> Self {
         Self {
             scope,
             for_flow_types: None,
