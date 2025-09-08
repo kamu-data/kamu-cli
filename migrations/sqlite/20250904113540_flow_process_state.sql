@@ -64,6 +64,6 @@ CREATE INDEX idx_fps_last_failure_desc
 -- “Next planned” sorts and filters for updates-only flows
 CREATE INDEX idx_fps_updates_next
   ON flow_process_states (next_planned_at)
-  WHERE flow_type IN ('INGEST','EXECUTE_TRANSFORM');
+  WHERE flow_type IN ('dev.kamu.flow.dataset.ingest','dev.kamu.flow.dataset.transform');
 
 /* ------------------------------ */
