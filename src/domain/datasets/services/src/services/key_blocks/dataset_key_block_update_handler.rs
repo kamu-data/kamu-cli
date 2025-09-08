@@ -16,6 +16,7 @@ use kamu_datasets::{
     DatasetKeyBlockRepository,
     DatasetReferenceMessage,
     DatasetReferenceMessageUpdated,
+    DatasetReferenceMessageUpdating,
     MESSAGE_CONSUMER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
 };
@@ -44,16 +45,41 @@ pub struct DatasetKeyBlockUpdateHandler {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetKeyBlockUpdateHandler {
+    async fn handle_dataset_reference_updating_message(
+        &self,
+        message: &DatasetReferenceMessageUpdating,
+    ) -> Result<(), InternalError> {
+        let target = match self
+            .dataset_registry
+            .get_dataset_by_id(&message.dataset_id)
+            .await
+        {
+            Ok(target) => Ok(target),
+            Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
+                tracing::error!(
+                    %message.dataset_id, err = ?e,
+                    "Updating dataset key blocks skipped. Dataset not found."
+                );
+                return Ok(());
+            }
+            Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
+        }?;
+
+        self.update_dataset_key_blocks(target, message).await?;
+
+        Ok(())
+    }
+
     async fn update_dataset_key_blocks(
         &self,
         target: ResolvedDataset,
-        update_message: &DatasetReferenceMessageUpdated,
+        message: &DatasetReferenceMessageUpdating,
     ) -> Result<(), InternalError> {
         // Try to index in the specified range of HEAD advancement
         match collect_dataset_key_blocks_in_range(
             target.clone(),
-            &update_message.new_block_hash,
-            update_message.maybe_prev_block_hash.as_ref(),
+            &message.new_block_hash,
+            message.maybe_prev_block_hash.as_ref(),
         )
         .await
         {
@@ -64,15 +90,15 @@ impl DatasetKeyBlockUpdateHandler {
                     // In this case we have already collected entire list of key blocks
                     //  from the Head to Seed events
                     tracing::warn!(
-                        %update_message.dataset_id,
-                        new_head = %update_message.new_block_hash,
-                        maybe_prev_head = ?update_message.maybe_prev_block_hash,
+                        %message.dataset_id,
+                        new_head = %message.new_block_hash,
+                        maybe_prev_head = ?message.maybe_prev_block_hash,
                         "Detected the dataset has diverged. Wiping the old index entirely"
                     );
 
                     // Drop existing key blocks, as they might conflict with the new results
                     self.dataset_key_block_repo
-                        .delete_all_for_ref(&update_message.dataset_id, &odf::BlockRef::Head)
+                        .delete_all_for_ref(&message.dataset_id, &odf::BlockRef::Head)
                         .await
                         .int_err()?;
                 }
@@ -80,7 +106,7 @@ impl DatasetKeyBlockUpdateHandler {
                 // Save batch of the key blocks
                 self.dataset_key_block_repo
                     .save_blocks_batch(
-                        &update_message.dataset_id,
+                        &message.dataset_id,
                         &odf::BlockRef::Head,
                         &key_blocks_response.key_blocks,
                     )
@@ -88,9 +114,9 @@ impl DatasetKeyBlockUpdateHandler {
                     .int_err()?;
 
                 tracing::debug!(
-                    %update_message.dataset_id,
-                    new_head = %update_message.new_block_hash,
-                    maybe_prev_head = ?update_message.maybe_prev_block_hash,
+                    %message.dataset_id,
+                    new_head = %message.new_block_hash,
+                    maybe_prev_head = ?message.maybe_prev_block_hash,
                     "Dataset key blocks updated"
                 );
                 Ok(())
@@ -99,9 +125,9 @@ impl DatasetKeyBlockUpdateHandler {
             // Unexpected indexing error
             Err(e) => {
                 tracing::error!(
-                    %update_message.dataset_id,
-                    new_head = %update_message.new_block_hash,
-                    maybe_prev_head = ?update_message.maybe_prev_block_hash,
+                    %message.dataset_id,
+                    new_head = %message.new_block_hash,
+                    maybe_prev_head = ?message.maybe_prev_block_hash,
                     err = ?e,
                     "Failed to index update of dataset key blocks"
                 );
@@ -132,24 +158,13 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetKeyBlockUpdateHandler 
         tracing::debug!(received_message = ?message, "Received dataset reference update message");
 
         match message {
-            DatasetReferenceMessage::Updated(update_message) => {
-                let target = match self
-                    .dataset_registry
-                    .get_dataset_by_id(&update_message.dataset_id)
+            DatasetReferenceMessage::Updating(message) => {
+                self.handle_dataset_reference_updating_message(message)
                     .await
-                {
-                    Ok(target) => Ok(target),
-                    Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
-                        tracing::error!(
-                            %update_message.dataset_id, err = ?e,
-                            "Updating dataset key blocks skipped. Dataset not found."
-                        );
-                        return Ok(());
-                    }
-                    Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
-                }?;
-
-                self.update_dataset_key_blocks(target, update_message).await
+            }
+            DatasetReferenceMessage::Updated(_) => {
+                // No action required
+                Ok(())
             }
         }
     }

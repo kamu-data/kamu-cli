@@ -47,7 +47,37 @@ pub struct DependencyGraphImmediateListener {
     outbox: Arc<dyn Outbox>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl DependencyGraphImmediateListener {
+    async fn handle_dataset_reference_updated_message(
+        &self,
+        message: &DatasetReferenceMessageUpdated,
+    ) -> Result<(), InternalError> {
+        // For now, react only on Head updates
+        if message.block_ref != odf::dataset::BlockRef::Head {
+            return Ok(());
+        }
+
+        // Resolve dataset
+        let target = self
+            .dataset_registry
+            .get_dataset_by_id(&message.dataset_id)
+            .await
+            .int_err()?;
+
+        // Skip non-derived datasets
+        if target.get_kind() != odf::DatasetKind::Derivative {
+            return Ok(());
+        }
+
+        // Deal with potential upstream changes
+        self.handle_derived_dependency_updates(target, message)
+            .await?;
+
+        Ok(())
+    }
+
     async fn handle_derived_dependency_updates(
         &self,
         target: ResolvedDataset,
@@ -144,31 +174,14 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
-            DatasetReferenceMessage::Updated(updated_message) => {
-                // For now, react only on Head updates
-                if updated_message.block_ref != odf::dataset::BlockRef::Head {
-                    return Ok(());
-                }
-
-                // Resolve dataset
-                let target = self
-                    .dataset_registry
-                    .get_dataset_by_id(&updated_message.dataset_id)
-                    .await
-                    .int_err()?;
-
-                // Skip non-derived datasets
-                if target.get_kind() != odf::DatasetKind::Derivative {
-                    return Ok(());
-                }
-
-                // Deal with potential upstream changes
-                self.handle_derived_dependency_updates(target, updated_message)
-                    .await?;
+            DatasetReferenceMessage::Updated(message) => {
+                self.handle_dataset_reference_updated_message(message).await
+            }
+            DatasetReferenceMessage::Updating(_) => {
+                // No action required
+                Ok(())
             }
         }
-
-        Ok(())
     }
 }
 

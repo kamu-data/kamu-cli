@@ -19,11 +19,28 @@ const DATASET_REFERENCE_OUTBOX_VERSION: u32 = 1;
 /// Represents messages related to dataset references.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetReferenceMessage {
+    /// Message indicating that a dataset reference is currently updating.
+    Updating(DatasetReferenceMessageUpdating),
+
     /// Message indicating that a dataset reference has been updated.
     Updated(DatasetReferenceMessageUpdated),
 }
 
 impl DatasetReferenceMessage {
+    pub fn updating(
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
+    ) -> Self {
+        Self::Updating(DatasetReferenceMessageUpdating {
+            dataset_id: dataset_id.clone(),
+            block_ref: block_ref.clone(),
+            maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
+            new_block_hash: new_block_hash.clone(),
+        })
+    }
+
     pub fn updated(
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -47,6 +64,26 @@ impl Message for DatasetReferenceMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about a reference that is currently updating.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetReferenceMessageUpdating {
+    /// The unique identifier of the dataset. +
+    pub dataset_id: odf::DatasetID,
+
+    /// The reference being updated.
+    pub block_ref: odf::BlockRef,
+
+    /// The previous block hash: this value will only be None
+    /// for datasets that were just created. +
+    pub maybe_prev_block_hash: Option<odf::Multihash>,
+
+    /// The new block hash after the update. +
+    pub new_block_hash: odf::Multihash,
+    // pub read_from_storage: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Contains details about an updated dataset reference.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetReferenceMessageUpdated {
@@ -62,22 +99,6 @@ pub struct DatasetReferenceMessageUpdated {
 
     /// The new block hash after the update.
     pub new_block_hash: odf::Multihash,
-}
-
-impl DatasetReferenceMessageUpdated {
-    pub fn new(
-        dataset_id: odf::DatasetID,
-        block_ref: odf::BlockRef,
-        maybe_prev_block_hash: Option<odf::Multihash>,
-        new_block_hash: odf::Multihash,
-    ) -> Self {
-        Self {
-            dataset_id,
-            block_ref,
-            maybe_prev_block_hash,
-            new_block_hash,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

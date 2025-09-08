@@ -101,6 +101,10 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
             ));
         }
 
+        for dataset_id in dataset_entries_resolution.unresolved_entries {
+            upstream_dependencies.push(DatasetDependency::unresolved(dataset_id));
+        }
+
         Ok(upstream_dependencies)
     }
 }

@@ -47,6 +47,31 @@ pub struct DatasetStatisticsUpdateHandler {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetStatisticsUpdateHandler {
+    async fn handle_dataset_reference_updated_message(
+        &self,
+        message: &DatasetReferenceMessageUpdated,
+    ) -> Result<(), InternalError> {
+        let target = match self
+            .dataset_registry
+            .get_dataset_by_id(&message.dataset_id)
+            .await
+        {
+            Ok(target) => Ok(target),
+            Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
+                tracing::error!(
+                    %message.dataset_id, err = ?e,
+                    "Updating dataset statistics skipped. Dataset not found."
+                );
+                return Ok(());
+            }
+            Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
+        }?;
+
+        self.update_dataset_statistics(target, message).await?;
+
+        Ok(())
+    }
+
     async fn update_dataset_statistics(
         &self,
         target: ResolvedDataset,
@@ -71,7 +96,7 @@ impl DatasetStatisticsUpdateHandler {
                 .await
                 .int_err()
         } else {
-            // Otheriwse, load previous stats
+            // Otherwise, load previous stats
             let older_stats = match self
                 .dataset_stats_repo
                 .get_dataset_statistics(&updated_message.dataset_id, &updated_message.block_ref)
@@ -117,25 +142,12 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetStatisticsUpdateHandle
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
-            DatasetReferenceMessage::Updated(updated_message) => {
-                let target = match self
-                    .dataset_registry
-                    .get_dataset_by_id(&updated_message.dataset_id)
-                    .await
-                {
-                    Ok(target) => Ok(target),
-                    Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
-                        tracing::error!(
-                            %updated_message.dataset_id, err = ?e,
-                            "Updating dataset statistics skipped. Dataset not found."
-                        );
-                        return Ok(());
-                    }
-                    Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
-                }?;
-
-                self.update_dataset_statistics(target, updated_message)
-                    .await
+            DatasetReferenceMessage::Updated(message) => {
+                self.handle_dataset_reference_updated_message(message).await
+            }
+            DatasetReferenceMessage::Updating(_) => {
+                // No action required
+                Ok(())
             }
         }
     }
