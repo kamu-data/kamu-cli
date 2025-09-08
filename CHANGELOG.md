@@ -38,10 +38,14 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - Crash when multiple unlabeled webhook subscriptions are defined within the same dataset
 - Restrict dataset creation with duplicate transform inputs.
-- (#1263) DependencyGraphImmediateListener: fix a message processing race condition.
+- (#1263) `DependencyGraphImmediateListener`: fixed a message processing race condition.
   - Parallel processing message of one type, in the case of handlers that were dependent on each other, 
     could lead to incorrect formation of the upstream/downstream dependency list 
     when pulling/pushing existing remote datasets. 
+- (#1263) `OsoDatasetAuthorizer::classify_dataset_ids_by_allowance()`.
+  - Fixed a bug that returned an empty `unresolved_resources` list 
+    when there were no dataset entries. This could happen when pulling a dataset 
+    that had upstream dependencies but no dependencies itself.
 
 ## [0.247.0] - 2025-08-28
 ### Added

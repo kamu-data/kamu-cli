@@ -269,6 +269,16 @@ impl DatasetActionUnauthorizedError {
             .into(),
         ))
     }
+
+    pub fn unresolved(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
+        Self::Access(odf::AccessError::Unauthorized(
+            DatasetActionUnresolvedError {
+                action,
+                dataset_ref,
+            }
+            .into(),
+        ))
+    }
 }
 
 #[derive(Debug, Error)]
@@ -296,6 +306,13 @@ impl std::fmt::Display for DatasetsActionNotEnoughPermissionsError {
         write!(f, "'")?;
         Ok(())
     }
+}
+
+#[derive(Debug, Error)]
+#[error("User attempts to get '{action}' permission for an unresolved dataset '{dataset_ref}'")]
+pub struct DatasetActionUnresolvedError {
+    pub action: DatasetAction,
+    pub dataset_ref: odf::DatasetRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

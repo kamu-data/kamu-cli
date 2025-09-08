@@ -236,6 +236,14 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             }
         }
 
+        for unresolved_dataset_id in dataset_resources_resolution.unresolved_resources {
+            let dataset_ref = unresolved_dataset_id.as_local_ref();
+            unauthorized_ids_with_errors.push((
+                unresolved_dataset_id,
+                DatasetActionUnauthorizedError::unresolved(dataset_ref, action),
+            ));
+        }
+
         Ok(ClassifyByAllowanceIdsResponse {
             authorized_ids,
             unauthorized_ids_with_errors,
