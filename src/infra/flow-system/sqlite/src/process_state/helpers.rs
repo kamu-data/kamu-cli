@@ -25,6 +25,8 @@ pub(crate) async fn load_process_state(
         SqliteFlowProcessStateRowModel,
         r#"
             SELECT
+                flow_type,
+                scope_data as "scope_data: _",
                 paused_manual,
                 stop_policy_kind,
                 stop_policy_data as "stop_policy_data: _",
@@ -55,39 +57,7 @@ pub(crate) async fn load_process_state(
         })
     })?;
 
-    let stop_policy = row
-        .stop_policy_data
-        .map(serde_json::from_value::<FlowTriggerStopPolicy>)
-        .transpose()
-        .int_err()?
-        .unwrap_or_default();
-
-    assert_eq!(
-        stop_policy.kind_to_string(),
-        row.stop_policy_kind,
-        "Inconsistent stop policy kind and data in the database",
-    );
-
-    use std::str::FromStr;
-    let effective_state = FlowProcessEffectiveState::from_str(&row.effective_state).int_err()?;
-
-    let state = FlowProcessState::from_storage_row(
-        flow_binding.clone(),
-        row.sort_key,
-        row.paused_manual != 0,
-        stop_policy,
-        u32::try_from(row.consecutive_failures).unwrap(),
-        row.last_success_at,
-        row.last_failure_at,
-        row.last_attempt_at,
-        row.next_planned_at,
-        effective_state,
-        row.updated_at,
-        EventID::new(row.last_applied_trigger_event_id),
-        EventID::new(row.last_applied_flow_event_id),
-    );
-
-    Ok(state)
+    Ok(row.try_into()?)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

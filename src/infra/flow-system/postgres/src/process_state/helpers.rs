@@ -10,6 +10,8 @@
 use kamu_flow_system::*;
 use sqlx::PgConnection;
 
+use crate::PostgresFlowProcessStateRowModel;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn load_process_state(
@@ -18,9 +20,12 @@ pub(crate) async fn load_process_state(
 ) -> Result<FlowProcessState, FlowProcessLoadError> {
     let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
 
-    let maybe_row = sqlx::query!(
+    let maybe_row = sqlx::query_as!(
+        PostgresFlowProcessStateRowModel,
         r#"
             SELECT
+                flow_type,
+                scope_data,
                 paused_manual,
                 stop_policy_kind as "stop_policy_kind: String",
                 stop_policy_data,
@@ -51,36 +56,7 @@ pub(crate) async fn load_process_state(
         })
     })?;
 
-    let stop_policy = row
-        .stop_policy_data
-        .map(serde_json::from_value::<FlowTriggerStopPolicy>)
-        .transpose()
-        .int_err()?
-        .unwrap_or_default();
-
-    assert_eq!(
-        stop_policy.kind_to_string(),
-        row.stop_policy_kind,
-        "Inconsistent stop policy kind and data in the database",
-    );
-
-    let state = FlowProcessState::from_storage_row(
-        flow_binding.clone(),
-        row.sort_key,
-        row.paused_manual,
-        stop_policy,
-        u32::try_from(row.consecutive_failures).unwrap(),
-        row.last_success_at,
-        row.last_failure_at,
-        row.last_attempt_at,
-        row.next_planned_at,
-        row.effective_state,
-        row.updated_at,
-        EventID::new(row.last_applied_trigger_event_id),
-        EventID::new(row.last_applied_flow_event_id),
-    );
-
-    Ok(state)
+    Ok(row.try_into()?)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
