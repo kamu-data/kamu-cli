@@ -32,6 +32,35 @@ impl PostgresFlowProcessStateQuery {
             transaction: transaction.into(),
         }
     }
+
+    fn generate_ordering_predicate(order: FlowProcessOrder) -> String {
+        let direction = if order.desc { "DESC" } else { "ASC" };
+        let default_tiebreaker = "last_attempt_at DESC NULLS LAST, sort_key ASC, flow_type ASC";
+
+        match order.field {
+            FlowProcessOrderField::LastAttemptAt => {
+                format!("last_attempt_at {direction} NULLS LAST, sort_key ASC, flow_type ASC",)
+            }
+            FlowProcessOrderField::NextPlannedAt => {
+                format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::LastFailureAt => {
+                format!("last_failure_at {direction} NULLS LAST, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::ConsecutiveFailures => {
+                format!("consecutive_failures {direction}, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::EffectiveState => {
+                format!("effective_state {direction}, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::NameAlpha => {
+                format!("sort_key {direction}, last_attempt_at DESC NULLS LAST, flow_type ASC",)
+            }
+            FlowProcessOrderField::FlowType => {
+                format!("flow_type {direction}, last_attempt_at DESC NULLS LAST, sort_key ASC",)
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,16 +85,34 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,
-        _order: FlowProcessOrder,
+        order: FlowProcessOrder,
         limit: usize,
         offset: usize,
     ) -> Result<Vec<FlowProcessState>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
+        // Scope conditions
         let (scope_conditions, _next) =
-            generate_scope_query_condition_clauses(&filter.scope, 5 /* 4 params + 1 */);
+            generate_scope_query_condition_clauses(&filter.scope, 11 /* 10 params + 1 */);
         let scope_values = form_scope_query_condition_values(filter.scope);
+
+        // Normalize optional array parameters to None if empty
+        let maybe_flow_types = filter
+            .for_flow_types
+            .filter(|flow_types| !flow_types.is_empty());
+
+        // Normalize optional array parameters to None if empty
+        let maybe_effective_states = filter
+            .effective_state_in
+            .filter(|states| !states.is_empty());
+
+        // Range as 2-element array
+        let maybe_last_attempt_between =
+            filter.last_attempt_between.map(|(start, end)| [start, end]);
+
+        // ORDER BY clauses
+        let ordering_predicate = Self::generate_ordering_predicate(order);
 
         let sql = format!(
             r#"
@@ -85,12 +132,18 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                 updated_at,
                 last_applied_trigger_event_id,
                 last_applied_flow_event_id
-            FROM flow_process_status
+            FROM flow_process_states
                 WHERE
-                    ({scope_conditions})
-                    AND ($3::text[] IS NULL OR flow_type = ANY($3))
-                    AND ($4::flow_process_effective_state[] IS NULL OR effective_state = ANY($4))
-                ORDER BY last_attempt_at DESC
+                    ({scope_conditions}) AND
+                    ($3::text[] IS NULL OR flow_type = ANY($3)) AND
+                    ($4::flow_process_effective_state[] IS NULL OR effective_state = ANY($4)) AND
+                    ($5::timestamptz[] IS NULL OR (last_attempt_at BETWEEN $5[1] AND $5[2])) AND
+                    ($6 IS NULL OR last_failure_at >= $6) AND
+                    ($7 IS NULL OR next_planned_at < $7) AND
+                    ($8 IS NULL OR next_planned_at > $8) AND
+                    ($9 IS NULL OR consecutive_failures >= $9) AND
+                    ($10 IS NULL OR sort_key >= $10 AND sort_key < $10 || E'\uFFFF')
+                ORDER BY {ordering_predicate}
                 LIMIT $1 OFFSET $2
             "#
         );
@@ -98,8 +151,14 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
         let mut query = sqlx::query_as::<_, PostgresFlowProcessStateRowModel>(&sql)
             .bind(i64::try_from(limit).unwrap())
             .bind(i64::try_from(offset).unwrap())
-            .bind(filter.for_flow_types as Option<&[&str]>)
-            .bind(filter.effective_state_in as Option<&[FlowProcessEffectiveState]>);
+            .bind(maybe_flow_types)
+            .bind(maybe_effective_states)
+            .bind(maybe_last_attempt_between)
+            .bind(filter.last_failure_since)
+            .bind(filter.next_planned_before)
+            .bind(filter.next_planned_after)
+            .bind(filter.min_consecutive_failures.map(i64::from))
+            .bind(filter.name_contains.map(str::to_ascii_lowercase));
 
         for arr in &scope_values {
             query = query.bind(arr);
@@ -128,6 +187,12 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             generate_scope_query_condition_clauses(&flow_scope_query, 3);
         let scope_values = form_scope_query_condition_values(flow_scope_query);
 
+        // Normalize optional array parameters to None if empty
+        let maybe_flow_types = for_flow_types.filter(|flow_types| !flow_types.is_empty());
+
+        // Normalize optional array parameters to None if empty
+        let maybe_effective_states = effective_state_in.filter(|states| !states.is_empty());
+
         let sql = format!(
             r#"
             SELECT
@@ -137,17 +202,17 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                 COALESCE(SUM((effective_state = 'paused_manual')::int), 0)::bigint  AS paused,
                 COALESCE(SUM((effective_state = 'stopped_auto')::int), 0)::bigint   AS stopped,
                 COALESCE(MAX(consecutive_failures), 0)::bigint                      AS worst
-            FROM flow_process_status
+            FROM flow_process_states
                 WHERE
-                    ({scope_conditions})
-                    AND ($1::text[] IS NULL OR flow_type = ANY($1))
-                    AND ($2::flow_process_effective_state[] IS NULL OR effective_state = ANY($2))
+                    ({scope_conditions}) AND
+                    ($1::text[] IS NULL OR flow_type = ANY($1)) AND
+                    ($2::flow_process_effective_state[] IS NULL OR effective_state = ANY($2))
             "#
         );
 
         let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(&sql)
-            .bind(for_flow_types as Option<&[&str]>)
-            .bind(effective_state_in as Option<&[FlowProcessEffectiveState]>);
+            .bind(maybe_flow_types as Option<&[&str]>)
+            .bind(maybe_effective_states as Option<&[FlowProcessEffectiveState]>);
 
         for arr in &scope_values {
             query = query.bind(arr);

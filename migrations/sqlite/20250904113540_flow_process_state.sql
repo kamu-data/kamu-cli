@@ -57,4 +57,13 @@ CREATE INDEX idx_fps_effective_state
 CREATE INDEX idx_fps_last_attempt_desc
   ON flow_process_states (last_attempt_at DESC);
 
+-- “Recent failures” sorts
+CREATE INDEX idx_fps_last_failure_desc
+  ON flow_process_states (last_failure_at DESC);
+
+-- “Next planned” sorts and filters for updates-only flows
+CREATE INDEX idx_fps_updates_next
+  ON flow_process_states (next_planned_at)
+  WHERE flow_type IN ('INGEST','EXECUTE_TRANSFORM');
+
 /* ------------------------------ */
