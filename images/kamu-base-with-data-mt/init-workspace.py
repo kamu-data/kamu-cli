@@ -51,7 +51,7 @@ for did in s3_listdir(S3_REPO_URL):
     account, name = alias.split('/', 1)
 
     subprocess.run(
-        f"kamu --account {account} pull --no-alias {url} --as {name}",
+        f"kamu --account {account} pull --no-alias {url} --as {name} --visibility public",
         shell=True,
         check=True,
     )
