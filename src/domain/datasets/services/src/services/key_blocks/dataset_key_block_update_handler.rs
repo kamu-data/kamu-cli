@@ -15,7 +15,6 @@ use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_datasets::{
     DatasetKeyBlockRepository,
     DatasetReferenceMessage,
-    DatasetReferenceMessageUpdated,
     DatasetReferenceMessageUpdating,
     MESSAGE_CONSUMER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
