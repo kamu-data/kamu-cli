@@ -10,7 +10,7 @@
 use std::num::NonZeroUsize;
 
 use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_list};
-use dill::{Singleton, component, interface, scope};
+use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Sqlite;
 
@@ -27,7 +27,6 @@ pub struct SqliteFlowProcessStateQuery {
 
 #[component(pub)]
 #[interface(dyn FlowProcessStateQuery)]
-#[scope(Singleton)]
 impl SqliteFlowProcessStateQuery {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
@@ -110,21 +109,21 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 flow_type,
                 scope_data,
                 paused_manual,
-                stop_policy_kind as "stop_policy_kind: String",
+                stop_policy_kind,
                 stop_policy_data,
                 consecutive_failures,
                 last_success_at,
                 last_failure_at,
                 last_attempt_at,
                 next_planned_at,
-                effective_state as "effective_state: FlowProcessEffectiveState",
+                effective_state,
                 sort_key,
                 updated_at,
                 last_applied_trigger_event_id,
                 last_applied_flow_event_id
             FROM flow_process_states
                 WHERE
-                    ({scope_conditions})
+                    ({scope_conditions}) AND
                     ($3 = 0 OR $3 IN ({})) AND
                     ($4 = 0 OR $4 IN ({})) AND
                     ($5 IS NULL OR $6 IS NULL OR (last_attempt_at BETWEEN $5 AND $6)) AND
@@ -132,7 +131,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                     ($8 IS NULL OR next_planned_at < $8) AND
                     ($9 IS NULL OR next_planned_at > $9) AND
                     ($10 IS NULL OR consecutive_failures >= $10) AND
-                    ($11 IS NULL OR sort_key >= $11 AND sort_key < $11 || E'\uFFFF')
+                    ($11 IS NULL OR sort_key LIKE $11 || '%')
                 ORDER BY {ordering_predicate}
                 LIMIT $1 OFFSET $2
             "#,

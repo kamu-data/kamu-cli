@@ -17,7 +17,7 @@ use crate::{FlowBinding, FlowProcessEffectiveState, FlowTriggerStopPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FlowProcessState {
     flow_binding: FlowBinding,
     sort_key: String,
