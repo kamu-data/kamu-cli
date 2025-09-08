@@ -14,7 +14,7 @@
             "kind": {
               "Enum": [
                 "never",
-                "after_n_consecutive_failures"
+                "after_consecutive_failures"
               ]
             }
           }

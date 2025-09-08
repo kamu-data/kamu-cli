@@ -7,7 +7,7 @@ CREATE TABLE flow_process_states (
     paused_manual   INTEGER NOT NULL DEFAULT 0, -- 0/1 for booleans
 
     stop_policy_kind TEXT NOT NULL DEFAULT 'never'
-        CHECK (stop_policy_kind IN ('never', 'after_n_consecutive_failures')),
+        CHECK (stop_policy_kind IN ('never', 'after_consecutive_failures')),
     stop_policy_data JSON,
 
     consecutive_failures INTEGER NOT NULL DEFAULT 0,

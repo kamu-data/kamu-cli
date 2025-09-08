@@ -81,6 +81,10 @@ pub struct FlowScopeQuery {
 }
 
 impl FlowScopeQuery {
+    pub fn all() -> Self {
+        Self { attributes: vec![] }
+    }
+
     pub fn build_for_system_scope() -> Self {
         Self {
             attributes: vec![(
