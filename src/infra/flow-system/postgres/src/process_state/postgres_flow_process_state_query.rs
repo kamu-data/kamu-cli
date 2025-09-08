@@ -12,6 +12,7 @@ use dill::{Singleton, component, interface, scope};
 use kamu_flow_system::*;
 use sqlx::Postgres;
 
+use crate::PostgresFlowProcessStateRowModel;
 use crate::helpers::{form_scope_query_condition_values, generate_scope_query_condition_clauses};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,12 +55,63 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
 
     async fn list_processes(
         &self,
-        _filter: &FlowProcessListFilter<'_>,
+        filter: FlowProcessListFilter<'_>,
         _order: FlowProcessOrder,
-        _limit: usize,
-        _offset: usize,
+        limit: usize,
+        offset: usize,
     ) -> Result<Vec<FlowProcessState>, InternalError> {
-        unimplemented!()
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let (scope_conditions, _next) =
+            generate_scope_query_condition_clauses(&filter.scope, 5 /* 4 params + 1 */);
+        let scope_values = form_scope_query_condition_values(filter.scope);
+
+        let sql = format!(
+            r#"
+            SELECT
+                flow_type,
+                scope_data,
+                paused_manual,
+                stop_policy_kind as "stop_policy_kind: String",
+                stop_policy_data,
+                consecutive_failures,
+                last_success_at,
+                last_failure_at,
+                last_attempt_at,
+                next_planned_at,
+                effective_state as "effective_state: FlowProcessEffectiveState",
+                sort_key,
+                updated_at,
+                last_applied_trigger_event_id,
+                last_applied_flow_event_id
+            FROM flow_process_status
+                WHERE
+                    ({scope_conditions})
+                    AND ($3::text[] IS NULL OR flow_type = ANY($3))
+                    AND ($4::flow_process_effective_state[] IS NULL OR effective_state = ANY($4))
+                ORDER BY last_attempt_at DESC
+                LIMIT $1 OFFSET $2
+            "#
+        );
+
+        let mut query = sqlx::query_as::<_, PostgresFlowProcessStateRowModel>(&sql)
+            .bind(i64::try_from(limit).unwrap())
+            .bind(i64::try_from(offset).unwrap())
+            .bind(filter.for_flow_types as Option<&[&str]>)
+            .bind(filter.effective_state_in as Option<&[FlowProcessEffectiveState]>);
+
+        for arr in &scope_values {
+            query = query.bind(arr);
+        }
+
+        let rows = query.fetch_all(connection_mut).await.int_err()?;
+        let mut results = Vec::with_capacity(rows.len());
+        for row in rows {
+            let state = row.try_into()?;
+            results.push(state);
+        }
+        Ok(results)
     }
 
     /// Compute rollup for matching rows.

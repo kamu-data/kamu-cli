@@ -11,6 +11,8 @@ mod helpers;
 
 mod postgres_flow_process_state_query;
 mod postgres_flow_process_state_repository;
+mod postgres_flow_process_state_row_model;
 
 pub use postgres_flow_process_state_query::*;
 pub use postgres_flow_process_state_repository::*;
+pub(crate) use postgres_flow_process_state_row_model::*;

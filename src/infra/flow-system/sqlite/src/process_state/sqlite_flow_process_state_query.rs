@@ -14,6 +14,7 @@ use dill::{Singleton, component, interface, scope};
 use kamu_flow_system::*;
 use sqlx::Sqlite;
 
+use crate::SqliteFlowProcessStateRowModel;
 use crate::helpers::{form_scope_query_condition_values, generate_scope_query_condition_clauses};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,12 +57,95 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
 
     async fn list_processes(
         &self,
-        _filter: &FlowProcessListFilter<'_>,
+        filter: FlowProcessListFilter<'_>,
         _order: FlowProcessOrder,
-        _limit: usize,
-        _offset: usize,
+        limit: usize,
+        offset: usize,
     ) -> Result<Vec<FlowProcessState>, InternalError> {
-        unimplemented!()
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let (scope_conditions, flow_types_parameter_index) =
+            generate_scope_query_condition_clauses(&filter.scope, 5 /* 4 params + 1 */);
+
+        let scope_values = form_scope_query_condition_values(filter.scope);
+
+        let effective_state_parameter_index =
+            flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
+
+        let sql = format!(
+            r#"
+            SELECT
+                flow_type,
+                scope_data,
+                paused_manual,
+                stop_policy_kind as "stop_policy_kind: String",
+                stop_policy_data,
+                consecutive_failures,
+                last_success_at,
+                last_failure_at,
+                last_attempt_at,
+                next_planned_at,
+                effective_state as "effective_state: FlowProcessEffectiveState",
+                sort_key,
+                updated_at,
+                last_applied_trigger_event_id,
+                last_applied_flow_event_id
+            FROM flow_process_status
+                WHERE
+                    ({scope_conditions})
+                    ($3 = 0 OR $3 IN ({})) AND
+                    ($4 = 0 OR $4 IN ({})) AND
+                ORDER BY last_attempt_at DESC
+                LIMIT $1 OFFSET $2
+            "#,
+            filter
+                .for_flow_types
+                .as_ref()
+                .map(|flow_types| sqlite_generate_placeholders_list(
+                    flow_types.len(),
+                    NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                ))
+                .unwrap_or_default(),
+            filter
+                .effective_state_in
+                .as_ref()
+                .map(|states| sqlite_generate_placeholders_list(
+                    states.len(),
+                    NonZeroUsize::new(effective_state_parameter_index).unwrap()
+                ))
+                .unwrap_or_default(),
+        );
+
+        let mut query = sqlx::query_as::<_, SqliteFlowProcessStateRowModel>(&sql)
+            .bind(i64::try_from(limit).unwrap())
+            .bind(i64::try_from(offset).unwrap())
+            .bind(i32::from(filter.for_flow_types.is_some()))
+            .bind(i32::from(filter.effective_state_in.is_some()));
+
+        for scope_value in &scope_values {
+            query = query.bind(scope_value);
+        }
+
+        if let Some(flow_types) = filter.for_flow_types {
+            for flow_type in flow_types {
+                query = query.bind(flow_type);
+            }
+        }
+
+        if let Some(effective_states) = filter.effective_state_in {
+            for state in effective_states {
+                query = query.bind(state);
+            }
+        }
+
+        let rows = query.fetch_all(connection_mut).await.int_err()?;
+        let mut results = Vec::with_capacity(rows.len());
+        for row in rows {
+            let state = row.try_into()?;
+            results.push(state);
+        }
+        Ok(results)
     }
 
     /// Compute rollup for matching rows.

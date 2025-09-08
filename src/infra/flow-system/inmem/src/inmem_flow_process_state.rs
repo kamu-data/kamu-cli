@@ -44,7 +44,7 @@ impl InMemoryFlowProcessState {
         let name_query_lowercase = filter.name_contains.map(str::to_lowercase);
 
         state
-            .list_matching_process_states(filter.scope)
+            .list_matching_process_states(&filter.scope)
             .filter(|ps| {
                 // Flow types filter
                 if let Some(types) = filter.for_flow_types {
@@ -302,7 +302,7 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
 
     async fn list_processes(
         &self,
-        filter: &FlowProcessListFilter<'_>,
+        filter: FlowProcessListFilter<'_>,
         order: FlowProcessOrder,
         limit: usize,
         offset: usize,
@@ -310,7 +310,7 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
         let state = self.state.read().unwrap();
 
         // Apply filtering
-        let mut matching_states = self.apply_filters(&state, filter);
+        let mut matching_states = self.apply_filters(&state, &filter);
 
         // Apply ordering
         self.apply_ordering(&mut matching_states, order);
@@ -331,7 +331,7 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
         let state = self.state.read().unwrap();
 
         // Create a filter using the builder-style API with optional methods
-        let filter = FlowProcessListFilter::for_scope(&flow_scope_query)
+        let filter = FlowProcessListFilter::for_scope(flow_scope_query)
             .for_flow_types_opt(for_flow_types)
             .with_effective_states_opt(effective_state_in);
 

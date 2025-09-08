@@ -1,15 +1,25 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                paused_manual,\n                stop_policy_kind as \"stop_policy_kind: String\",\n                stop_policy_data,\n                consecutive_failures,\n                last_success_at,\n                last_failure_at,\n                last_attempt_at,\n                next_planned_at,\n                effective_state as \"effective_state: FlowProcessEffectiveState\",\n                sort_key,\n                updated_at,\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "query": "\n            SELECT\n                flow_type,\n                scope_data,\n                paused_manual,\n                stop_policy_kind as \"stop_policy_kind: String\",\n                stop_policy_data,\n                consecutive_failures,\n                last_success_at,\n                last_failure_at,\n                last_attempt_at,\n                next_planned_at,\n                effective_state as \"effective_state: FlowProcessEffectiveState\",\n                sort_key,\n                updated_at,\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
+        "name": "flow_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "scope_data",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 2,
         "name": "paused_manual",
         "type_info": "Bool"
       },
       {
-        "ordinal": 1,
+        "ordinal": 3,
         "name": "stop_policy_kind: String",
         "type_info": {
           "Custom": {
@@ -24,37 +34,37 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 4,
         "name": "stop_policy_data",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 3,
+        "ordinal": 5,
         "name": "consecutive_failures",
         "type_info": "Int4"
       },
       {
-        "ordinal": 4,
+        "ordinal": 6,
         "name": "last_success_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 5,
+        "ordinal": 7,
         "name": "last_failure_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 6,
+        "ordinal": 8,
         "name": "last_attempt_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
         "name": "next_planned_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 8,
+        "ordinal": 10,
         "name": "effective_state: FlowProcessEffectiveState",
         "type_info": {
           "Custom": {
@@ -71,22 +81,22 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "sort_key",
         "type_info": "Text"
       },
       {
-        "ordinal": 10,
+        "ordinal": 12,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "last_applied_trigger_event_id",
         "type_info": "Int8"
       },
       {
-        "ordinal": 12,
+        "ordinal": 14,
         "name": "last_applied_flow_event_id",
         "type_info": "Int8"
       }
@@ -98,6 +108,8 @@
       ]
     },
     "nullable": [
+      false,
+      false,
       false,
       false,
       true,
@@ -113,5 +125,5 @@
       false
     ]
   },
-  "hash": "a2dfdce6091cd6af26e451f45ce77065d6b413c35de05b85be98b4cab858b8d8"
+  "hash": "95e12caa247f9bdf584abe4f1cb693993ba3905aa1ecf2cae0776f631abea331"
 }
