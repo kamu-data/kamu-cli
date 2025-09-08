@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 pub enum BlockRef {
     Head,
 }

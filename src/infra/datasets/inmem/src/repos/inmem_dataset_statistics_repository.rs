@@ -70,7 +70,7 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
         Err(GetDatasetStatisticsError::NotFound(
             DatasetStatisticsNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
+                block_ref: *block_ref,
             },
         ))
     }
@@ -86,7 +86,7 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
             .statistics
             .entry(dataset_id.clone())
             .or_default()
-            .insert(block_ref.clone(), statistics);
+            .insert(*block_ref, statistics);
 
         Ok(())
     }

@@ -68,7 +68,7 @@ impl DatasetStatisticsRepository for PostgresDatasetStatisticsRepository {
         } else {
             Err(DatasetStatisticsNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
+                block_ref: *block_ref,
             }
             .into())
         }

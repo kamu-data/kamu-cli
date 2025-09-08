@@ -32,7 +32,7 @@ impl DatasetReferenceMessage {
     ) -> Self {
         Self::Updated(DatasetReferenceMessageUpdated {
             dataset_id: dataset_id.clone(),
-            block_ref: block_ref.clone(),
+            block_ref: *block_ref,
             maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
             new_block_hash: new_block_hash.clone(),
         })

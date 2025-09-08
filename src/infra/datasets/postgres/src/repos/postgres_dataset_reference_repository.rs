@@ -72,7 +72,7 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
         } else {
             Err(DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
+                block_ref: *block_ref,
             }
             .into())
         }
@@ -189,7 +189,7 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
             Err(RemoveDatasetReferenceError::NotFound(
                 DatasetReferenceNotFoundError {
                     dataset_id: dataset_id.clone(),
-                    block_ref: block_ref.clone(),
+                    block_ref: *block_ref,
                 },
             ))
         } else {

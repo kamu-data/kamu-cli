@@ -139,7 +139,7 @@ impl DataWriterMetadataState {
             .map(|e| e.schema);
 
         Ok(Self {
-            block_ref: block_ref.clone(),
+            block_ref: *block_ref,
             head,
             schema,
             source_event,
