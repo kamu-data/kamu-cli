@@ -34,6 +34,35 @@ impl SqliteFlowProcessStateQuery {
             transaction: transaction.into(),
         }
     }
+
+    fn generate_ordering_predicate(order: FlowProcessOrder) -> String {
+        let direction = if order.desc { "DESC" } else { "ASC" };
+        let default_tiebreaker = "last_attempt_at DESC NULLS LAST, sort_key ASC, flow_type ASC";
+
+        match order.field {
+            FlowProcessOrderField::LastAttemptAt => {
+                format!("last_attempt_at {direction} NULLS LAST, sort_key ASC, flow_type ASC",)
+            }
+            FlowProcessOrderField::NextPlannedAt => {
+                format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::LastFailureAt => {
+                format!("last_failure_at {direction} NULLS LAST, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::ConsecutiveFailures => {
+                format!("consecutive_failures {direction}, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::EffectiveState => {
+                format!("effective_state {direction}, {default_tiebreaker}",)
+            }
+            FlowProcessOrderField::NameAlpha => {
+                format!("sort_key {direction}, last_attempt_at DESC NULLS LAST, flow_type ASC",)
+            }
+            FlowProcessOrderField::FlowType => {
+                format!("flow_type {direction}, last_attempt_at DESC NULLS LAST, sort_key ASC",)
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +87,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,
-        _order: FlowProcessOrder,
+        order: FlowProcessOrder,
         limit: usize,
         offset: usize,
     ) -> Result<Vec<FlowProcessState>, InternalError> {
@@ -66,12 +95,14 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         let connection_mut = tr.connection_mut().await?;
 
         let (scope_conditions, flow_types_parameter_index) =
-            generate_scope_query_condition_clauses(&filter.scope, 5 /* 4 params + 1 */);
+            generate_scope_query_condition_clauses(&filter.scope, 12 /* 11 params + 1 */);
 
         let scope_values = form_scope_query_condition_values(filter.scope);
 
         let effective_state_parameter_index =
             flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
+
+        let ordering_predicate = Self::generate_ordering_predicate(order);
 
         let sql = format!(
             r#"
@@ -91,12 +122,18 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 updated_at,
                 last_applied_trigger_event_id,
                 last_applied_flow_event_id
-            FROM flow_process_status
+            FROM flow_process_states
                 WHERE
                     ({scope_conditions})
                     ($3 = 0 OR $3 IN ({})) AND
                     ($4 = 0 OR $4 IN ({})) AND
-                ORDER BY last_attempt_at DESC
+                    ($5 IS NULL OR $6 IS NULL OR (last_attempt_at BETWEEN $5 AND $6)) AND
+                    ($7 IS NULL OR last_failure_at >= $7) AND
+                    ($8 IS NULL OR next_planned_at < $8) AND
+                    ($9 IS NULL OR next_planned_at > $9) AND
+                    ($10 IS NULL OR consecutive_failures >= $10) AND
+                    ($11 IS NULL OR sort_key >= $11 AND sort_key < $11 || E'\uFFFF')
+                ORDER BY {ordering_predicate}
                 LIMIT $1 OFFSET $2
             "#,
             filter
@@ -117,11 +154,22 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .unwrap_or_default(),
         );
 
-        let mut query = sqlx::query_as::<_, SqliteFlowProcessStateRowModel>(&sql)
+        let mut query = sqlx::query_as::<sqlx::Sqlite, SqliteFlowProcessStateRowModel>(&sql)
             .bind(i64::try_from(limit).unwrap())
             .bind(i64::try_from(offset).unwrap())
-            .bind(i32::from(filter.for_flow_types.is_some()))
-            .bind(i32::from(filter.effective_state_in.is_some()));
+            .bind(i32::from(
+                filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
+            ))
+            .bind(i32::from(
+                filter.effective_state_in.is_some_and(|es| !es.is_empty()),
+            ))
+            .bind(filter.last_attempt_between.map(|r| r.0))
+            .bind(filter.last_attempt_between.map(|r| r.1))
+            .bind(filter.last_failure_since)
+            .bind(filter.next_planned_before)
+            .bind(filter.next_planned_after)
+            .bind(filter.min_consecutive_failures.map(i64::from))
+            .bind(filter.name_contains.map(str::to_ascii_lowercase));
 
         for scope_value in &scope_values {
             query = query.bind(scope_value);
@@ -179,7 +227,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 WHERE
                     ({scope_conditions}) AND
                     ($1 = 0 OR $1 IN ({})) AND
-                    ($2 = 0 OR $2 IN ({})) AND
+                    ($2 = 0 OR $2 IN ({}))
             "#,
             for_flow_types
                 .as_ref()
