@@ -45,15 +45,9 @@ CREATE TABLE flow_process_states (
 
 /* ------------------------------ */
 
--- Enable trigram indexing for fast ILIKE/substring search on sort_key
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
--- Fast substring searches (ILIKE '%…%') via trigram GIN
-CREATE INDEX idx_fps_sort_key_trgm ON flow_process_states
-  USING GIN (sort_key gin_trgm_ops);
-
 -- Fast alphabetical ordering / prefix ranges
-CREATE INDEX idx_fps_sort_key_btree ON flow_process_states (sort_key ASC);
+CREATE INDEX idx_fps_sort_key_like
+  ON flow_process_states (sort_key text_pattern_ops);
 
 -- By dataset_id across all scopes (dataset + webhooks)
 CREATE INDEX idx_fps_dataset_id ON flow_process_states ((scope_data->>'dataset_id'));
@@ -71,5 +65,14 @@ CREATE INDEX idx_fps_effective_state ON flow_process_states (effective_state);
 
 -- “Recent activity” sorts
 CREATE INDEX idx_fps_last_attempt_desc ON flow_process_states (last_attempt_at DESC);
+
+-- “Recent failures” sorts
+CREATE INDEX idx_fps_last_failure_desc
+  ON flow_process_states (last_failure_at DESC);
+
+-- “Next planned” sorts and filters for updates-only flows
+CREATE INDEX idx_fps_updates_next
+  ON flow_process_states (next_planned_at)
+  WHERE flow_type IN ('INGEST','EXECUTE_TRANSFORM');
 
 /* ------------------------------ */
