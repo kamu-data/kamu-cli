@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
-use dill::{Singleton, component, interface, scope};
+use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Postgres;
 use time_source::SystemTimeSource;
@@ -27,7 +27,6 @@ pub struct PostgresFlowProcessStateRepository {
 
 #[component(pub)]
 #[interface(dyn FlowProcessStateRepository)]
-#[scope(Singleton)]
 impl PostgresFlowProcessStateRepository {
     pub fn new(transaction: TransactionRef, time_source: Arc<dyn SystemTimeSource>) -> Self {
         Self {

@@ -74,6 +74,11 @@ pub struct FlowProcessListFilter<'a> {
 }
 
 impl<'a> FlowProcessListFilter<'a> {
+    /// Empty filter
+    pub fn all() -> Self {
+        Self::for_scope(FlowScopeQuery::all())
+    }
+
     /// Minimal filter: scope only (no extra cuts).
     pub fn for_scope(scope: FlowScopeQuery) -> Self {
         Self {
