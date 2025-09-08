@@ -16,6 +16,7 @@ use kamu_datasets::{CreateDatasetUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::CreateDatasetUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceStub;
 
 use super::dataset_base_use_case_harness::{
@@ -59,7 +60,7 @@ async fn test_create_root_dataset() {
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Lifecycle Messages: 1
@@ -69,7 +70,13 @@ async fn test_create_root_dataset() {
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <foo_id>
+                Ref: head
+                Prev Head: None
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head

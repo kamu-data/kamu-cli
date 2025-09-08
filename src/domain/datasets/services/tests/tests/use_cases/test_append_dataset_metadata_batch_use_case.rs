@@ -17,6 +17,7 @@ use kamu_core::MockDidGenerator;
 use kamu_datasets::AppendDatasetMetadataBatchUseCase;
 use kamu_datasets_services::AppendDatasetMetadataBatchUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceStub;
 
 use super::dataset_base_use_case_harness::{
@@ -71,10 +72,16 @@ async fn test_append_dataset_metadata_batch() {
         .await;
     assert_matches!(res, Ok(_));
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <foo_id>
+                Ref: head
+                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
@@ -148,11 +155,17 @@ async fn test_append_dataset_metadata_batch_with_same_dependencies() {
         .await;
     assert_matches!(res, Ok(_));
 
-    // No dependency updates, as they havent' changed
-    pretty_assertions::assert_eq!(
+    // No dependency updates, as they haven't changed
+    assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <baz_id>
+                Ref: head
+                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
               Ref Updated {
                 Dataset ID: <baz_id>
                 Ref: head
@@ -220,10 +233,16 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
         .await;
     assert_matches!(res, Ok(_));
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <bar_id>
+                Ref: head
+                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
               Ref Updated {
                 Dataset ID: <bar_id>
                 Ref: head

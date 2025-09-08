@@ -16,6 +16,7 @@ use kamu_core::MockDidGenerator;
 use kamu_datasets::CommitDatasetEventUseCase;
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceStub;
 
 use super::dataset_base_use_case_harness::{
@@ -52,10 +53,16 @@ async fn test_commit_dataset_event() {
         .await;
     assert_matches!(res, Ok(_));
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <foo_id>
+                Ref: head
+                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
@@ -98,7 +105,7 @@ async fn test_commit_event_unauthorized() {
         .await;
     assert_matches!(res, Err(odf::dataset::CommitError::Access(_)));
 
-    pretty_assertions::assert_eq!("", harness.collected_outbox_messages(),);
+    assert_eq!("", harness.collected_outbox_messages(),);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,10 +152,16 @@ async fn test_commit_event_with_same_dependencies() {
     assert_matches!(res, Ok(_));
 
     // No dependency updates happened
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <bar_id>
+                Ref: head
+                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
               Ref Updated {
                 Dataset ID: <bar_id>
                 Ref: head
@@ -213,10 +226,16 @@ async fn test_commit_event_with_new_dependencies() {
     assert_matches!(res, Ok(_));
 
     // No dependency updates happened
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <baz_id>
+                Ref: head
+                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
               Ref Updated {
                 Dataset ID: <baz_id>
                 Ref: head

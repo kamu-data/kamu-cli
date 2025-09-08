@@ -17,6 +17,7 @@ use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceStub;
 
 use super::dataset_base_use_case_harness::{
@@ -48,7 +49,7 @@ async fn test_create_root_dataset_from_snapshot() {
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -57,7 +58,7 @@ async fn test_create_root_dataset_from_snapshot() {
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Lifecycle Messages: 1
@@ -67,7 +68,13 @@ async fn test_create_root_dataset_from_snapshot() {
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
-            Dataset Reference Messages: 1
+            Dataset Reference Messages: 2
+              Ref Updating {
+                Dataset ID: <foo_id>
+                Ref: head
+                Prev Head: None
+                New Head: Multihash<Sha3_256>(<foo_head>)
+              }
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
@@ -129,13 +136,13 @@ async fn test_create_derived_dataset_from_snapshot() {
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
         foo_created.head,
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&bar_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -144,7 +151,7 @@ async fn test_create_derived_dataset_from_snapshot() {
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Lifecycle Messages: 2
@@ -160,12 +167,24 @@ async fn test_create_derived_dataset_from_snapshot() {
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
-            Dataset Reference Messages: 2
+            Dataset Reference Messages: 4
+              Ref Updating {
+                Dataset ID: <foo_id>
+                Ref: head
+                Prev Head: None
+                New Head: Multihash<Sha3_256>(<foo_head>)
+              }
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: None
                 New Head: Multihash<Sha3_256>(<foo_head>)
+              }
+              Ref Updating {
+                Dataset ID: <bar_id>
+                Ref: head
+                Prev Head: None
+                New Head: Multihash<Sha3_256>(<bar_head>)
               }
               Ref Updated {
                 Dataset ID: <bar_id>
@@ -210,7 +229,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -236,7 +255,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
 
     // Compare original account_id from db and id generated from a stored private
     // key
-    pretty_assertions::assert_eq!(foo_created.dataset_handle.id.as_did(), &did_odf);
+    assert_eq!(foo_created.dataset_handle.id.as_did(), &did_odf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
