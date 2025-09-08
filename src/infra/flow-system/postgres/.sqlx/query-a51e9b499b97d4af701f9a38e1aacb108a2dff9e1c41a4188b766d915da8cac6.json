@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                flow_type,\n                scope_data,\n                paused_manual,\n                stop_policy_kind as \"stop_policy_kind: String\",\n                stop_policy_data,\n                consecutive_failures,\n                last_success_at,\n                last_failure_at,\n                last_attempt_at,\n                next_planned_at,\n                effective_state as \"effective_state: FlowProcessEffectiveState\",\n                sort_key,\n                updated_at,\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "query": "\n            SELECT\n                flow_type,\n                scope_data,\n                paused_manual,\n                stop_policy_kind as \"stop_policy_kind: PostgresFlowStopPolicyKind\",\n                stop_policy_data,\n                consecutive_failures,\n                last_success_at,\n                last_failure_at,\n                last_attempt_at,\n                next_planned_at,\n                effective_state as \"effective_state: FlowProcessEffectiveState\",\n                sort_key,\n                updated_at,\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -20,14 +20,14 @@
       },
       {
         "ordinal": 3,
-        "name": "stop_policy_kind: String",
+        "name": "stop_policy_kind: PostgresFlowStopPolicyKind",
         "type_info": {
           "Custom": {
             "name": "flow_stop_policy_kind",
             "kind": {
               "Enum": [
                 "never",
-                "after_n_consecutive_failures"
+                "after_consecutive_failures"
               ]
             }
           }
@@ -125,5 +125,5 @@
       false
     ]
   },
-  "hash": "95e12caa247f9bdf584abe4f1cb693993ba3905aa1ecf2cae0776f631abea331"
+  "hash": "a51e9b499b97d4af701f9a38e1aacb108a2dff9e1c41a4188b766d915da8cac6"
 }

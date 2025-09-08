@@ -10,7 +10,7 @@
 use kamu_flow_system::*;
 use sqlx::PgConnection;
 
-use crate::PostgresFlowProcessStateRowModel;
+use crate::{PostgresFlowProcessStateRowModel, PostgresFlowStopPolicyKind};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +27,7 @@ pub(crate) async fn load_process_state(
                 flow_type,
                 scope_data,
                 paused_manual,
-                stop_policy_kind as "stop_policy_kind: String",
+                stop_policy_kind as "stop_policy_kind: PostgresFlowStopPolicyKind",
                 stop_policy_data,
                 consecutive_failures,
                 last_success_at,

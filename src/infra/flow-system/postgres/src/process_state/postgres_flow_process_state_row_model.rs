@@ -24,9 +24,9 @@ pub(crate) struct PostgresFlowProcessStateRowModel {
     pub flow_type: String,
     pub scope_data: serde_json::Value,
     pub paused_manual: bool,
-    pub stop_policy_kind: String,
+    pub stop_policy_kind: PostgresFlowStopPolicyKind,
     pub stop_policy_data: Option<serde_json::Value>,
-    pub consecutive_failures: i64,
+    pub consecutive_failures: i32,
     pub last_success_at: Option<DateTime<Utc>>,
     pub last_failure_at: Option<DateTime<Utc>>,
     pub last_attempt_at: Option<DateTime<Utc>>,
@@ -58,11 +58,18 @@ impl TryFrom<PostgresFlowProcessStateRowModel> for FlowProcessState {
             .int_err()?
             .unwrap_or_default();
 
-        assert_eq!(
-            stop_policy.kind_to_string(),
-            row.stop_policy_kind,
-            "Inconsistent stop policy kind and data in the database",
-        );
+        match stop_policy {
+            FlowTriggerStopPolicy::AfterConsecutiveFailures { .. } => assert_eq!(
+                row.stop_policy_kind,
+                PostgresFlowStopPolicyKind::AfterConsecutiveFailures,
+                "Inconsistent stop policy kind and data in the database",
+            ),
+            FlowTriggerStopPolicy::Never => assert_eq!(
+                row.stop_policy_kind,
+                PostgresFlowStopPolicyKind::Never,
+                "Inconsistent stop policy kind and data in the database",
+            ),
+        }
 
         Self::rehydrate_from_snapshot(
             flow_binding,
@@ -80,6 +87,15 @@ impl TryFrom<PostgresFlowProcessStateRowModel> for FlowProcessState {
             EventID::new(row.last_applied_flow_event_id),
         )
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone, sqlx::Type, Eq, PartialEq)]
+#[sqlx(type_name = "flow_stop_policy_kind", rename_all = "snake_case")]
+pub enum PostgresFlowStopPolicyKind {
+    Never,
+    AfterConsecutiveFailures,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
