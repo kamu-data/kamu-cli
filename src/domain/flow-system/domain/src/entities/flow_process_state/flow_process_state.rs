@@ -9,6 +9,8 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
+#[cfg(feature = "sqlx")]
+use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{FlowBinding, FlowProcessEffectiveState, FlowTriggerStopPolicy};
@@ -71,9 +73,8 @@ impl FlowProcessState {
         }
     }
 
-    pub fn from_storage_row(
+    pub fn rehydrate_from_snapshot(
         flow_binding: FlowBinding,
-        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
         consecutive_failures: u32,
@@ -82,10 +83,11 @@ impl FlowProcessState {
         last_attempt_at: Option<DateTime<Utc>>,
         next_planned_at: Option<DateTime<Utc>>,
         effective_state: FlowProcessEffectiveState,
+        sort_key: String,
         updated_at: DateTime<Utc>,
         last_applied_trigger_event_id: EventID,
         last_applied_flow_event_id: EventID,
-    ) -> Self {
+    ) -> Result<Self, InternalError> {
         // Ensure sort_key is lowercase for efficient filtering
         debug_assert_eq!(
             sort_key.to_lowercase(),
@@ -93,11 +95,9 @@ impl FlowProcessState {
             "sort_key must be lowercase for efficient filtering"
         );
 
-        let actual_effective_state =
-            FlowProcessEffectiveState::calculate(paused_manual, consecutive_failures, stop_policy);
-
         debug_assert_eq!(
-            effective_state, actual_effective_state,
+            effective_state,
+            FlowProcessEffectiveState::calculate(paused_manual, consecutive_failures, stop_policy,),
             "Inconsistent effective state in storage row"
         );
 
@@ -108,7 +108,7 @@ impl FlowProcessState {
             next_planned_at,
         );
 
-        Self {
+        Ok(Self {
             flow_binding,
             sort_key,
             paused_manual,
@@ -122,7 +122,7 @@ impl FlowProcessState {
             updated_at,
             last_applied_trigger_event_id,
             last_applied_flow_event_id,
-        }
+        })
     }
 
     // Inline getters for public-facing fields
