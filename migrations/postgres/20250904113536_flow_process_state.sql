@@ -2,7 +2,7 @@
 
 CREATE TYPE flow_stop_policy_kind AS ENUM (
     'never',
-    'after_n_consecutive_failures'
+    'after_consecutive_failures'
 );
 
 /* ------------------------------ */

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{TransactionRef, TransactionRefT};
-use dill::{Singleton, component, interface, scope};
+use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Postgres;
 
@@ -25,7 +25,6 @@ pub struct PostgresFlowProcessStateQuery {
 
 #[component(pub)]
 #[interface(dyn FlowProcessStateQuery)]
-#[scope(Singleton)]
 impl PostgresFlowProcessStateQuery {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
@@ -120,14 +119,14 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                 flow_type,
                 scope_data,
                 paused_manual,
-                stop_policy_kind as "stop_policy_kind: String",
+                stop_policy_kind,
                 stop_policy_data,
                 consecutive_failures,
                 last_success_at,
                 last_failure_at,
                 last_attempt_at,
                 next_planned_at,
-                effective_state as "effective_state: FlowProcessEffectiveState",
+                effective_state,
                 sort_key,
                 updated_at,
                 last_applied_trigger_event_id,
