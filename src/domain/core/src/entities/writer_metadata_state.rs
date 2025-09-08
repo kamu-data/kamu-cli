@@ -132,7 +132,7 @@ impl DataWriterMetadataState {
             }
         };
         Ok(Self {
-            block_ref: block_ref.clone(),
+            block_ref: *block_ref,
             head,
             schema: set_data_schema_visitor.into_inner().into_event(),
             source_event,
