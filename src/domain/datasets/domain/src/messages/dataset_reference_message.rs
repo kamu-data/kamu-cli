@@ -67,19 +67,18 @@ impl Message for DatasetReferenceMessage {
 /// Contains details about a reference that is currently updating.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetReferenceMessageUpdating {
-    /// The unique identifier of the dataset. +
+    /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
     /// The reference being updated.
     pub block_ref: odf::BlockRef,
 
     /// The previous block hash: this value will only be None
-    /// for datasets that were just created. +
+    /// for datasets that were just created.
     pub maybe_prev_block_hash: Option<odf::Multihash>,
 
-    /// The new block hash after the update. +
+    /// The new block hash after the update.
     pub new_block_hash: odf::Multihash,
-    // pub read_from_storage: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
