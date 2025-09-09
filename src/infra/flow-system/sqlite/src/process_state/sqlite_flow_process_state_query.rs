@@ -89,7 +89,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         order: FlowProcessOrder,
         limit: usize,
         offset: usize,
-    ) -> Result<Vec<FlowProcessState>, InternalError> {
+    ) -> Result<FlowProcessStateListing, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -101,9 +101,80 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         let effective_state_parameter_index =
             flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
 
+        // First, get the total count (same filters, no ordering/pagination)
+        let count_sql = format!(
+            r#"
+            SELECT COUNT(*) AS total_count
+            FROM flow_process_states
+                WHERE
+                    ({scope_conditions}) AND
+                    ($1 = 0 OR flow_type IN ({})) AND
+                    ($2 = 0 OR effective_state IN ({})) AND
+                    ($3 IS NULL OR $4 IS NULL OR (last_attempt_at BETWEEN $3 AND $4)) AND
+                    ($5 IS NULL OR last_failure_at >= $5) AND
+                    ($6 IS NULL OR next_planned_at < $6) AND
+                    ($7 IS NULL OR next_planned_at > $7) AND
+                    ($8 IS NULL OR consecutive_failures >= $8) AND
+                    ($9 IS NULL OR sort_key LIKE $9 || '%')
+            "#,
+            filter
+                .for_flow_types
+                .as_ref()
+                .map(|flow_types| sqlite_generate_placeholders_list(
+                    flow_types.len(),
+                    NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                ))
+                .unwrap_or_default(),
+            filter
+                .effective_state_in
+                .as_ref()
+                .map(|states| sqlite_generate_placeholders_list(
+                    states.len(),
+                    NonZeroUsize::new(effective_state_parameter_index).unwrap()
+                ))
+                .unwrap_or_default(),
+        );
+
+        let mut count_query = sqlx::query_scalar::<sqlx::Sqlite, i64>(&count_sql)
+            .bind(i32::from(
+                filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
+            ))
+            .bind(i32::from(
+                filter.effective_state_in.is_some_and(|es| !es.is_empty()),
+            ))
+            .bind(filter.last_attempt_between.map(|r| r.0))
+            .bind(filter.last_attempt_between.map(|r| r.1))
+            .bind(filter.last_failure_since)
+            .bind(filter.next_planned_before)
+            .bind(filter.next_planned_after)
+            .bind(filter.min_consecutive_failures.map(i64::from))
+            .bind(filter.name_contains.map(str::to_ascii_lowercase));
+
+        for scope_value in &scope_values {
+            count_query = count_query.bind(scope_value);
+        }
+
+        if let Some(flow_types) = filter.for_flow_types {
+            for flow_type in flow_types {
+                count_query = count_query.bind(flow_type);
+            }
+        }
+
+        if let Some(effective_states) = filter.effective_state_in {
+            for state in effective_states {
+                count_query = count_query.bind(state);
+            }
+        }
+
+        let total_count = count_query
+            .fetch_one(&mut *connection_mut)
+            .await
+            .int_err()?;
+
+        // Then get the paginated results
         let ordering_predicate = Self::generate_ordering_predicate(order);
 
-        let sql = format!(
+        let list_sql = format!(
             r#"
             SELECT
                 flow_type,
@@ -153,46 +224,51 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .unwrap_or_default(),
         );
 
-        let mut query = sqlx::query_as::<sqlx::Sqlite, SqliteFlowProcessStateRowModel>(&sql)
-            .bind(i64::try_from(limit).unwrap())
-            .bind(i64::try_from(offset).unwrap())
-            .bind(i32::from(
-                filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
-            ))
-            .bind(i32::from(
-                filter.effective_state_in.is_some_and(|es| !es.is_empty()),
-            ))
-            .bind(filter.last_attempt_between.map(|r| r.0))
-            .bind(filter.last_attempt_between.map(|r| r.1))
-            .bind(filter.last_failure_since)
-            .bind(filter.next_planned_before)
-            .bind(filter.next_planned_after)
-            .bind(filter.min_consecutive_failures.map(i64::from))
-            .bind(filter.name_contains.map(str::to_ascii_lowercase));
+        let mut list_query =
+            sqlx::query_as::<sqlx::Sqlite, SqliteFlowProcessStateRowModel>(&list_sql)
+                .bind(i64::try_from(limit).unwrap())
+                .bind(i64::try_from(offset).unwrap())
+                .bind(i32::from(
+                    filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
+                ))
+                .bind(i32::from(
+                    filter.effective_state_in.is_some_and(|es| !es.is_empty()),
+                ))
+                .bind(filter.last_attempt_between.map(|r| r.0))
+                .bind(filter.last_attempt_between.map(|r| r.1))
+                .bind(filter.last_failure_since)
+                .bind(filter.next_planned_before)
+                .bind(filter.next_planned_after)
+                .bind(filter.min_consecutive_failures.map(i64::from))
+                .bind(filter.name_contains.map(str::to_ascii_lowercase));
 
         for scope_value in &scope_values {
-            query = query.bind(scope_value);
+            list_query = list_query.bind(scope_value);
         }
 
         if let Some(flow_types) = filter.for_flow_types {
             for flow_type in flow_types {
-                query = query.bind(flow_type);
+                list_query = list_query.bind(flow_type);
             }
         }
 
         if let Some(effective_states) = filter.effective_state_in {
             for state in effective_states {
-                query = query.bind(state);
+                list_query = list_query.bind(state);
             }
         }
 
-        let rows = query.fetch_all(connection_mut).await.int_err()?;
-        let mut results = Vec::with_capacity(rows.len());
+        let rows = list_query.fetch_all(connection_mut).await.int_err()?;
+        let mut processes = Vec::with_capacity(rows.len());
         for row in rows {
             let state = row.try_into()?;
-            results.push(state);
+            processes.push(state);
         }
-        Ok(results)
+
+        Ok(FlowProcessStateListing {
+            processes,
+            total_count: usize::try_from(total_count).unwrap(),
+        })
     }
 
     /// Compute rollup for matching rows.
