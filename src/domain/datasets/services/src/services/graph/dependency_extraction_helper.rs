@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use odf::dataset::AcceptByIntervalOptions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,10 +35,14 @@ pub(crate) async fn extract_modified_dependencies_in_interval(
 
     use odf::dataset::MetadataChainExt;
     metadata_chain
-        .accept_by_interval(
+        .accept_by_interval_ext(
             &mut [&mut set_transform_visitor, &mut seed_visitor],
             Some(head),
             maybe_tail,
+            AcceptByIntervalOptions {
+                inclusive_tail: true,
+                ignore_missing_tail: true,
+            },
         )
         .await
         .int_err()?;
