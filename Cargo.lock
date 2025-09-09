@@ -8062,13 +8062,22 @@ name = "kamu-flow-system-repo-tests"
 version = "0.250.0"
 dependencies = [
  "chrono",
+ "csv",
  "database-common",
  "dill",
+ "event-sourcing",
  "futures",
+ "internal-error",
  "kamu-adapter-flow-dataset",
+ "kamu-adapter-flow-webhook",
  "kamu-flow-system",
  "kamu-task-system",
+ "kamu-webhooks",
  "opendatafabric",
+ "serde",
+ "serde_json",
+ "time-source",
+ "uuid",
 ]
 
 [[package]]

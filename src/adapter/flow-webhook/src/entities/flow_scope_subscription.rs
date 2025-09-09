@@ -115,6 +115,16 @@ impl<'a> FlowScopeSubscription<'a> {
         }
     }
 
+    /// Query for all webhook subscriptions regardless of dataset
+    pub fn query_for_all_subscriptions() -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![(
+                fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
+                vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+            )],
+        }
+    }
+
     pub fn query_for_multiple_subscriptions(
         subscription_ids: &[WebhookSubscriptionID],
     ) -> fs::FlowScopeQuery {
