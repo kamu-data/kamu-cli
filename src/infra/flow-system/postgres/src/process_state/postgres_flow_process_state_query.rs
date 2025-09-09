@@ -93,8 +93,8 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
 
         // Scope conditions
         let (scope_conditions, _next) =
-            generate_scope_query_condition_clauses(&filter.scope, 11 /* 10 params + 1 */);
-        let scope_values = form_scope_query_condition_values(filter.scope);
+            generate_scope_query_condition_clauses(&filter.scope, 9 /* 8 params + 1 */);
+        let scope_values = form_scope_query_condition_values(filter.scope.clone());
 
         // Normalize optional array parameters to None if empty
         let maybe_flow_types = filter
@@ -124,7 +124,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                     ($5 IS NULL OR next_planned_at < $5) AND
                     ($6 IS NULL OR next_planned_at > $6) AND
                     ($7 IS NULL OR consecutive_failures >= $7) AND
-                    ($8 IS NULL OR sort_key >= $8 AND sort_key < $8 || E'\uFFFF')
+                    ($8 IS NULL OR (sort_key LIKE ($8 || '%')))
             "#
         );
 
@@ -148,6 +148,13 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             .int_err()?;
 
         // Then get the paginated results
+        // For the list query, scope parameters start at index 11 (8 filter params +
+        // limit + offset + 1)
+        let (scope_conditions_list, _next) = generate_scope_query_condition_clauses(
+            &filter.scope,
+            11, /* 8 params + limit + offset + 1 */
+        );
+
         // ORDER BY clauses
         let ordering_predicate = Self::generate_ordering_predicate(order);
 
@@ -171,7 +178,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                 last_applied_flow_event_id
             FROM flow_process_states
                 WHERE
-                    ({scope_conditions}) AND
+                    ({scope_conditions_list}) AND
                     ($3::text[] IS NULL OR flow_type = ANY($3)) AND
                     ($4::flow_process_effective_state[] IS NULL OR effective_state = ANY($4)) AND
                     ($5::timestamptz[] IS NULL OR (last_attempt_at BETWEEN $5[1] AND $5[2])) AND
@@ -179,7 +186,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                     ($7 IS NULL OR next_planned_at < $7) AND
                     ($8 IS NULL OR next_planned_at > $8) AND
                     ($9 IS NULL OR consecutive_failures >= $9) AND
-                    ($10 IS NULL OR sort_key >= $10 AND sort_key < $10 || E'\uFFFF')
+                    ($10 IS NULL OR (sort_key LIKE ($10 || '%')))
                 ORDER BY {ordering_predicate}
                 LIMIT $1 OFFSET $2
             "#

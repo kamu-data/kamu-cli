@@ -94,9 +94,9 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         let connection_mut = tr.connection_mut().await?;
 
         let (scope_conditions, flow_types_parameter_index) =
-            generate_scope_query_condition_clauses(&filter.scope, 12 /* 11 params + 1 */);
+            generate_scope_query_condition_clauses(&filter.scope, 10 /* 9 params + 1 */);
 
-        let scope_values = form_scope_query_condition_values(filter.scope);
+        let scope_values = form_scope_query_condition_values(filter.scope.clone());
 
         let effective_state_parameter_index =
             flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
@@ -115,7 +115,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                     ($6 IS NULL OR next_planned_at < $6) AND
                     ($7 IS NULL OR next_planned_at > $7) AND
                     ($8 IS NULL OR consecutive_failures >= $8) AND
-                    ($9 IS NULL OR sort_key LIKE $9 || '%')
+                    ($9 IS NULL OR (sort_key LIKE $9 || '%'))
             "#,
             filter
                 .for_flow_types
@@ -174,6 +174,13 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         // Then get the paginated results
         let ordering_predicate = Self::generate_ordering_predicate(order);
 
+        // For the list query, adjust parameter indices for limit/offset
+        let (list_scope_conditions, list_flow_types_parameter_index) =
+            generate_scope_query_condition_clauses(&filter.scope, 12 /* 11 params + 1 */);
+
+        let list_effective_state_parameter_index =
+            list_flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
+
         let list_sql = format!(
             r#"
             SELECT
@@ -194,7 +201,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 last_applied_flow_event_id
             FROM flow_process_states
                 WHERE
-                    ({scope_conditions}) AND
+                    ({list_scope_conditions}) AND
                     ($3 = 0 OR flow_type IN ({})) AND
                     ($4 = 0 OR effective_state IN ({})) AND
                     ($5 IS NULL OR $6 IS NULL OR (last_attempt_at BETWEEN $5 AND $6)) AND
@@ -202,7 +209,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                     ($8 IS NULL OR next_planned_at < $8) AND
                     ($9 IS NULL OR next_planned_at > $9) AND
                     ($10 IS NULL OR consecutive_failures >= $10) AND
-                    ($11 IS NULL OR sort_key LIKE $11 || '%')
+                    ($11 IS NULL OR (sort_key LIKE $11 || '%'))
                 ORDER BY {ordering_predicate}
                 LIMIT $1 OFFSET $2
             "#,
@@ -211,7 +218,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .as_ref()
                 .map(|flow_types| sqlite_generate_placeholders_list(
                     flow_types.len(),
-                    NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                    NonZeroUsize::new(list_flow_types_parameter_index).unwrap()
                 ))
                 .unwrap_or_default(),
             filter
@@ -219,7 +226,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .as_ref()
                 .map(|states| sqlite_generate_placeholders_list(
                     states.len(),
-                    NonZeroUsize::new(effective_state_parameter_index).unwrap()
+                    NonZeroUsize::new(list_effective_state_parameter_index).unwrap()
                 ))
                 .unwrap_or_default(),
         );
