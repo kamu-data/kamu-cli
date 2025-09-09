@@ -133,6 +133,60 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_next_planned_at_nulls_last,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_last_failure_at_nulls_last,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_consecutive_failures,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_effective_state,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_name_alpha,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_flow_type,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_pagination,
     harness = PostgresFlowProcessStateHarness
 );
