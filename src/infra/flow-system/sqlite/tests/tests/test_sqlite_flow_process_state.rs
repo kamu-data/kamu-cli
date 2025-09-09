@@ -330,7 +330,41 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process_with_history,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process_with_history,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_dataset_page_recent_activity,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_account_dashboard_triage,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_account_dashboard_upcoming_updates,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_failing_webhooks_for_dataset_sorted_az,
     harness = SqliteFlowProcessStateHarness
 );
 
