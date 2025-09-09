@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowProcessGroupRollup {
@@ -35,11 +33,12 @@ pub struct FlowProcessGroupRollupRowModel {
 
 #[cfg(feature = "sqlx")]
 impl TryFrom<FlowProcessGroupRollupRowModel> for FlowProcessGroupRollup {
-    type Error = InternalError;
+    type Error = internal_error::InternalError;
 
     fn try_from(r: FlowProcessGroupRollupRowModel) -> Result<Self, Self::Error> {
         // Helper to keep the conversion readable and uniform
-        fn c(x: i64) -> Result<u32, InternalError> {
+        fn c(x: i64) -> Result<u32, internal_error::InternalError> {
+            use internal_error::ResultIntoInternal;
             u32::try_from(x).int_err()
         }
 

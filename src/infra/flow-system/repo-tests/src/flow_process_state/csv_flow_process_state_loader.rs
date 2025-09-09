@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 /// Represents a single row from the CSV file
 #[derive(Debug, serde::Deserialize)]
-pub struct CsvFlowProcessRecord {
+pub(crate) struct CsvFlowProcessRecord {
     #[serde(rename = "#")]
     pub id: u32,
     pub flow_type: String,
@@ -44,6 +44,7 @@ pub struct CsvFlowProcessRecord {
     #[serde(deserialize_with = "deserialize_optional_datetime")]
     pub last_failure_at: Option<DateTime<Utc>>,
     #[serde(deserialize_with = "deserialize_optional_datetime")]
+    #[allow(dead_code)]
     pub last_attempt_at: Option<DateTime<Utc>>,
     #[serde(deserialize_with = "deserialize_optional_datetime")]
     pub next_planned_at: Option<DateTime<Utc>>,
@@ -54,8 +55,9 @@ pub struct CsvFlowProcessRecord {
 
 /// Helper for loading flow process state data from CSV files and populating
 /// repositories
-pub struct CsvFlowProcessStateLoader {
+pub(crate) struct CsvFlowProcessStateLoader {
     flow_process_repository: Arc<dyn FlowProcessStateRepository>,
+    flow_process_query: Arc<dyn FlowProcessStateQuery>,
     event_id_counter: i64,
 }
 
@@ -63,6 +65,7 @@ impl CsvFlowProcessStateLoader {
     pub fn new(catalog: &Catalog) -> Self {
         Self {
             flow_process_repository: catalog.get_one::<dyn FlowProcessStateRepository>().unwrap(),
+            flow_process_query: catalog.get_one::<dyn FlowProcessStateQuery>().unwrap(),
             event_id_counter: 1,
         }
     }
@@ -78,7 +81,7 @@ impl CsvFlowProcessStateLoader {
 
     /// Load CSV data from the hardcoded file path and populate the repository
     pub async fn populate_from_csv(&mut self) {
-        let csv_path = include_str!("../data/flow_process_states.csv");
+        let csv_path = include_str!("flow_process_states.csv");
         self.load_from_csv(csv_path).await;
     }
 
@@ -154,6 +157,20 @@ impl CsvFlowProcessStateLoader {
 
         // Apply timing-based results if any
         self.apply_results_from_record(&flow_binding, &record).await;
+
+        // Verify effective state matches
+        let current_state = self
+            .flow_process_query
+            .try_get_process_state(&flow_binding)
+            .await
+            .expect("Failed to get flow process state")
+            .expect("Flow process state not found");
+        assert_eq!(
+            current_state.effective_state().to_string(),
+            record.effective_state,
+            "Effective state mismatch for record ID {}",
+            record.id
+        );
     }
 
     /// Map CSV flow types to actual flow type constants
