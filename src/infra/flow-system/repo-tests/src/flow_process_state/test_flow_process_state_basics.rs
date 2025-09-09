@@ -659,7 +659,7 @@ pub async fn test_delete_process_not_found(catalog: &Catalog) {
         FlowProcessDeleteError::NotFound(err) => {
             assert_eq!(err.flow_binding, flow_binding);
         }
-        other => panic!("Expected NotFound error, got: {:?}", other),
+        other => panic!("Expected NotFound error, got: {other:?}",),
     }
 }
 
@@ -712,12 +712,7 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
 
     // Update trigger state
     flow_process_repository
-        .update_trigger_state(
-            flow_binding.clone(),
-            Some(true),
-            None,
-            EventID::new(3),
-        )
+        .update_trigger_state(flow_binding.clone(), Some(true), None, EventID::new(3))
         .await
         .unwrap();
 
