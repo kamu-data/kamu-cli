@@ -128,8 +128,61 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_pagination,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture =
-        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_pagination,
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_flow_types,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_effective_states,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_time_windows,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_consecutive_failures,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_name_contains,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_combined_filters,
     harness = InMemoryFlowProcessStateHarness
 );
 
