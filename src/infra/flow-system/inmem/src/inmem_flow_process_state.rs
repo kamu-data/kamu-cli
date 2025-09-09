@@ -119,11 +119,9 @@ impl InMemoryFlowProcessState {
                     }
                 }
 
-                // Name contains filter (case-insensitive)
-                // Note: sort_key is guaranteed to be lowercase, so we only need to compare
-                // against the pre-lowercased query
+                // Name contains filter (case-insensitive, prefix matching)
                 if let Some(ref name_query_lower) = name_query_lowercase {
-                    if !ps.sort_key().contains(name_query_lower) {
+                    if !ps.sort_key().starts_with(name_query_lower) {
                         return false;
                     }
                 }
