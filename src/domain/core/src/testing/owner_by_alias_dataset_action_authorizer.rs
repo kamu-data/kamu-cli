@@ -20,6 +20,7 @@ use crate::auth::{
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetActionUnauthorizedError,
+    MultipleDatasetActionUnauthorizedError,
 };
 use crate::{DatasetRegistry, DatasetRegistryExt};
 
@@ -111,7 +112,10 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
                     let dataset_ref = dataset_handle.as_local_ref();
                     (
                         dataset_handle,
-                        DatasetActionUnauthorizedError::not_enough_permissions(dataset_ref, action),
+                        MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                            dataset_ref,
+                            action,
+                        ),
                     )
                 })
                 .collect(),
@@ -130,7 +134,7 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
             if self.owns_dataset_by_id(dataset_id).await? {
                 allowed.push(dataset_id.as_ref().clone());
             } else {
-                let error = DatasetActionUnauthorizedError::not_enough_permissions(
+                let error = MultipleDatasetActionUnauthorizedError::not_enough_permissions(
                     dataset_id.as_local_ref(),
                     action,
                 );

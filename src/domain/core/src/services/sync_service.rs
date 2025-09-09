@@ -286,6 +286,7 @@ pub enum IpfsAddError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Remove this error in favor of `odf::DatasetNotFoundError`
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 #[error("Dataset {dataset_ref} not found")]
 pub struct DatasetAnyRefUnresolvedError {
@@ -296,6 +297,14 @@ impl DatasetAnyRefUnresolvedError {
     pub fn new(r: impl Into<odf::DatasetRefAny>) -> Self {
         Self {
             dataset_ref: r.into(),
+        }
+    }
+}
+
+impl From<odf::DatasetNotFoundError> for DatasetAnyRefUnresolvedError {
+    fn from(v: odf::DatasetNotFoundError) -> Self {
+        Self {
+            dataset_ref: v.dataset_ref.as_any_ref(),
         }
     }
 }

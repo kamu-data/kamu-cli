@@ -17,6 +17,7 @@ use kamu_core::auth::{
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetActionUnauthorizedError,
+    MultipleDatasetActionUnauthorizedError,
 };
 use mockall::Predicate;
 use mockall::predicate::{always, eq, function};
@@ -61,6 +62,10 @@ mockall::mock! {
 
 impl MockDatasetActionAuthorizer {
     pub fn denying() -> Self {
+        Self::denying_with_not_found(HashSet::new())
+    }
+
+    pub fn denying_with_not_found(missing_ids: HashSet<odf::DatasetID>) -> Self {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
@@ -70,40 +75,55 @@ impl MockDatasetActionAuthorizer {
                     action,
                 ))
             });
+        let missing_ids_clone = missing_ids.clone();
         mock_dataset_action_authorizer
             .expect_classify_dataset_ids_by_allowance()
-            .returning(|ids, action| {
+            .returning(move |ids, action| {
                 Ok(ClassifyByAllowanceIdsResponse {
                     authorized_ids: Vec::new(),
                     unauthorized_ids_with_errors: ids
                         .iter()
                         .map(|id| {
-                            (
-                                id.as_ref().clone(),
-                                DatasetActionUnauthorizedError::not_enough_permissions(
-                                    id.as_local_ref(),
-                                    action,
-                                ),
-                            )
+                            if missing_ids_clone.contains(id.as_ref()) {
+                                (
+                                    id.as_ref().clone(),
+                                    odf::DatasetNotFoundError::new(id.as_local_ref()).into(),
+                                )
+                            } else {
+                                (
+                                    id.as_ref().clone(),
+                                    MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                                        id.as_local_ref(),
+                                        action,
+                                    ),
+                                )
+                            }
                         })
                         .collect(),
                 })
             });
         mock_dataset_action_authorizer
             .expect_classify_dataset_handles_by_allowance()
-            .returning(|handles, action| {
+            .returning(move |handles, action| {
                 Ok(ClassifyByAllowanceResponse {
                     authorized_handles: Vec::new(),
                     unauthorized_handles_with_errors: handles
                         .into_iter()
                         .map(|hdl| {
-                            (
-                                hdl.clone(),
-                                DatasetActionUnauthorizedError::not_enough_permissions(
-                                    hdl.id.as_local_ref(),
-                                    action,
-                                ),
-                            )
+                            if missing_ids.contains(&hdl.id) {
+                                (
+                                    hdl.clone(),
+                                    odf::DatasetNotFoundError::new(hdl.id.as_local_ref()).into(),
+                                )
+                            } else {
+                                (
+                                    hdl.clone(),
+                                    MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                                        hdl.id.as_local_ref(),
+                                        action,
+                                    ),
+                                )
+                            }
                         })
                         .collect(),
                 })
@@ -253,7 +273,7 @@ impl MockDatasetActionAuthorizer {
                     if authorized.contains(&handle.alias) {
                         good.push(handle);
                     } else {
-                        let error = DatasetActionUnauthorizedError::not_enough_permissions(
+                        let error = MultipleDatasetActionUnauthorizedError::not_enough_permissions(
                             handle.as_local_ref(),
                             action,
                         );
@@ -289,10 +309,11 @@ impl MockDatasetActionAuthorizer {
                         if authorized.contains(dataset_id) {
                             acc.authorized_ids.push(dataset_id.as_ref().clone());
                         } else {
-                            let error = DatasetActionUnauthorizedError::not_enough_permissions(
-                                dataset_id.as_local_ref(),
-                                action,
-                            );
+                            let error =
+                                MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                                    dataset_id.as_local_ref(),
+                                    action,
+                                );
                             acc.unauthorized_ids_with_errors
                                 .push((dataset_id.as_ref().clone(), error));
                         }

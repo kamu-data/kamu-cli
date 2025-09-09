@@ -253,7 +253,11 @@ impl oso::ToPolar for DatasetAction {
 #[derive(Debug, Error)]
 pub enum DatasetActionUnauthorizedError {
     #[error(transparent)]
-    Access(odf::AccessError),
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -263,16 +267,6 @@ impl DatasetActionUnauthorizedError {
     pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
         Self::Access(odf::AccessError::Unauthorized(
             DatasetActionNotEnoughPermissionsError {
-                action,
-                dataset_ref,
-            }
-            .into(),
-        ))
-    }
-
-    pub fn unresolved(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
-        Self::Access(odf::AccessError::Unauthorized(
-            DatasetActionUnresolvedError {
                 action,
                 dataset_ref,
             }
@@ -308,11 +302,34 @@ impl std::fmt::Display for DatasetsActionNotEnoughPermissionsError {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
-#[error("User attempts to get '{action}' permission for an unresolved dataset '{dataset_ref}'")]
-pub struct DatasetActionUnresolvedError {
-    pub action: DatasetAction,
-    pub dataset_ref: odf::DatasetRef,
+pub enum MultipleDatasetActionUnauthorizedError {
+    #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl MultipleDatasetActionUnauthorizedError {
+    pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
+        Self::Access(odf::AccessError::Unauthorized(
+            DatasetActionNotEnoughPermissionsError {
+                action,
+                dataset_ref,
+            }
+            .into(),
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -320,7 +337,8 @@ pub struct DatasetActionUnresolvedError {
 #[derive(Debug)]
 pub struct ClassifyByAllowanceResponse {
     pub authorized_handles: Vec<odf::DatasetHandle>,
-    pub unauthorized_handles_with_errors: Vec<(odf::DatasetHandle, DatasetActionUnauthorizedError)>,
+    pub unauthorized_handles_with_errors:
+        Vec<(odf::DatasetHandle, MultipleDatasetActionUnauthorizedError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -399,7 +417,7 @@ where
 #[derive(Debug)]
 pub struct ClassifyByAllowanceIdsResponse {
     pub authorized_ids: Vec<odf::DatasetID>,
-    pub unauthorized_ids_with_errors: Vec<(odf::DatasetID, DatasetActionUnauthorizedError)>,
+    pub unauthorized_ids_with_errors: Vec<(odf::DatasetID, MultipleDatasetActionUnauthorizedError)>,
 }
 
 #[cfg(any(feature = "testing", test))]

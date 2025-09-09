@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
@@ -486,9 +486,92 @@ async fn test_apply_roles_matrix_not_authorized() {
                 ),
             ],)
             .await,
-        Err(ApplyRelationMatrixError::Access(odf::AccessError::Unauthorized(e))) if {
+        Err(ApplyRelationMatrixError::BatchError(e)) if {
             let error_message = harness.replace_ids_with_pseudonyms(e.to_string());
-            error_message == "User has no 'maintain' permission in datasets: 'Dataset1, Dataset2, Dataset3'"
+            error_message == "User has no 'maintain' permission in datasets: 'Dataset1, Dataset2, Dataset3'; not found: ''"
+        }
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_apply_roles_matrix_not_found() {
+    let missed_dataset_id_2 = odf::DatasetID::new_generated_ed25519().1;
+    let missed_dataset_id_3 = odf::DatasetID::new_generated_ed25519().1;
+
+    let mut harness = Harness::new(MockDatasetActionAuthorizer::denying_with_not_found(
+        HashSet::from([missed_dataset_id_2.clone(), missed_dataset_id_3.clone()]),
+    ));
+
+    let account_id_1 = odf::AccountID::new_generated_ed25519().1;
+    let account_id_2 = odf::AccountID::new_generated_ed25519().1;
+    let account_id_3 = odf::AccountID::new_generated_ed25519().1;
+
+    let dataset_id_1 = odf::DatasetID::new_generated_ed25519().1;
+    let dataset_id_2 = missed_dataset_id_2;
+    let dataset_id_3 = missed_dataset_id_3;
+
+    harness.register_id_pseudonyms(
+        &[&account_id_1, &account_id_2, &account_id_3],
+        &[&dataset_id_1, &dataset_id_2, &dataset_id_3],
+    );
+
+    assert_matches!(
+        harness
+            .use_case
+            .execute(&[
+                // Account1
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account2
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account3
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+            ],)
+            .await,
+        Err(ApplyRelationMatrixError::BatchError(e)) if {
+            let error_message = harness.replace_ids_with_pseudonyms(e.to_string());
+            error_message == "User has no 'maintain' permission in datasets: 'Dataset1'; not found: 'Dataset2, Dataset3'"
         }
     );
 }
