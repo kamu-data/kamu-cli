@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use dill::Catalog;
 use kamu_adapter_flow_dataset::{FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM};
 use kamu_adapter_flow_webhook::FLOW_TYPE_WEBHOOK_DELIVER;
@@ -311,23 +312,26 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
+pub async fn test_list_processes_filter_by_last_attempt_between(catalog: &Catalog) {
     let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
     csv_loader.populate_from_csv().await;
 
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
+    // Define time constants
+    const START_TIME_STR: &str = "2025-09-08T07:00:00Z";
+    const END_TIME_STR: &str = "2025-09-08T12:00:00Z";
+    let start_time = DateTime::parse_from_rfc3339(START_TIME_STR)
+        .unwrap()
+        .with_timezone(&Utc);
+    let end_time = DateTime::parse_from_rfc3339(END_TIME_STR)
+        .unwrap()
+        .with_timezone(&Utc);
+
     // Test filtering by last_attempt_between
     let time_window_attempts = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter::all().with_last_attempt_between(
-                chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
-                    .unwrap()
-                    .with_timezone(&chrono::Utc),
-                chrono::DateTime::parse_from_rfc3339("2025-09-08T12:00:00Z")
-                    .unwrap()
-                    .with_timezone(&chrono::Utc),
-            ),
+            FlowProcessListFilter::all().with_last_attempt_between(start_time, end_time),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -343,12 +347,6 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
     assert_flow_type_distribution(&time_window_attempts.processes, 4, 3, 8);
     assert_effective_state_distribution(&time_window_attempts.processes, 6, 7, 0, 2);
 
-    let start_time = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
-        .unwrap()
-        .with_timezone(&chrono::Utc);
-    let end_time = chrono::DateTime::parse_from_rfc3339("2025-09-08T12:00:00Z")
-        .unwrap()
-        .with_timezone(&chrono::Utc);
     // All results should have last_attempt_at within the specified range
     // (inclusive)
     for process in &time_window_attempts.processes {
@@ -360,15 +358,26 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
             );
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_list_processes_filter_by_last_failure_since(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Define time constant
+    const FAILURE_SINCE_STR: &str = "2025-09-08T07:00:00Z";
+    let failure_since = DateTime::parse_from_rfc3339(FAILURE_SINCE_STR)
+        .unwrap()
+        .with_timezone(&Utc);
 
     // Test filtering by last_failure_since
     let recent_failures = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter::all().with_last_failure_since(
-                chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
-                    .unwrap()
-                    .with_timezone(&chrono::Utc),
-            ),
+            FlowProcessListFilter::all().with_last_failure_since(failure_since),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -386,23 +395,29 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
     // All results should have last_failure_at >= 2025-09-08T07:00:00Z
     for process in &recent_failures.processes {
         if let Some(last_failure) = process.last_failure_at() {
-            assert!(
-                last_failure
-                    >= chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
-                        .unwrap()
-                        .with_timezone(&chrono::Utc)
-            );
+            assert!(last_failure >= failure_since);
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_list_processes_filter_by_planned_before(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Define time constant
+    const PLANNED_BEFORE_STR: &str = "2025-09-08T10:00:00Z";
+    let planned_before = DateTime::parse_from_rfc3339(PLANNED_BEFORE_STR)
+        .unwrap()
+        .with_timezone(&Utc);
 
     // Test filtering by next_planned_before
     let upcoming_soon = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter::all().with_next_planned_before(
-                chrono::DateTime::parse_from_rfc3339("2025-09-08T10:00:00Z")
-                    .unwrap()
-                    .with_timezone(&chrono::Utc),
-            ),
+            FlowProcessListFilter::all().with_next_planned_before(planned_before),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -413,7 +428,7 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
     // Should find processes scheduled before 10:00
     assert!(!upcoming_soon.processes.is_empty());
 
-    // Now all implementations should consistently return 9 processes
+    // All implementations should consistently return 9 processes
     // (excluding the process at exactly 2025-09-08T10:00:00Z)
     assert_eq!(upcoming_soon.processes.len(), 9);
     assert_eq!(upcoming_soon.total_count, 9);
@@ -422,12 +437,50 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
 
     for process in &upcoming_soon.processes {
         if let Some(next_planned) = process.next_planned_at() {
-            assert!(
-                next_planned
-                    <= chrono::DateTime::parse_from_rfc3339("2025-09-08T10:00:00Z")
-                        .unwrap()
-                        .with_timezone(&chrono::Utc)
-            );
+            assert!(next_planned <= planned_before);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_list_processes_filter_by_planned_after(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Define time constant
+    const PLANNED_AFTER_STR: &str = "2025-09-08T11:30:00Z";
+    let planned_after = DateTime::parse_from_rfc3339(PLANNED_AFTER_STR)
+        .unwrap()
+        .with_timezone(&Utc);
+
+    // Test filtering by next_planned_after
+    let future_scheduled = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all().with_next_planned_after(planned_after),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find processes scheduled after 11:30 on 2025-09-08
+    // From CSV: 12:00:00Z (zeta/metrics.daily), 12:00:00Z (acme/logs webhook),
+    // 14:00:00Z (gamma/audit) The filter is "after" so 11:30:00Z should be
+    // excluded, leaving 3 results
+    assert!(!future_scheduled.processes.is_empty());
+    assert_eq!(future_scheduled.processes.len(), 3);
+    assert_eq!(future_scheduled.total_count, 3);
+    assert_flow_type_distribution(&future_scheduled.processes, 1, 1, 1);
+    assert_effective_state_distribution(&future_scheduled.processes, 1, 2, 0, 0);
+
+    // All results should have next_planned_at > 2025-09-08T11:30:00Z
+    for process in &future_scheduled.processes {
+        if let Some(next_planned) = process.next_planned_at() {
+            assert!(next_planned > planned_after);
         }
     }
 }
