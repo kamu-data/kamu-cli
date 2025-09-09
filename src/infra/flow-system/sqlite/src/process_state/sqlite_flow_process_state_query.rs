@@ -52,7 +52,17 @@ impl SqliteFlowProcessStateQuery {
                 format!("consecutive_failures {direction}, {default_tiebreaker}",)
             }
             FlowProcessOrderField::EffectiveState => {
-                format!("effective_state {direction}, {default_tiebreaker}",)
+                let main_ordering = r#"
+                        CASE effective_state
+                            WHEN 'stopped_auto'  THEN 0
+                            WHEN 'failing'       THEN 1
+                            WHEN 'paused_manual' THEN 2
+                            WHEN 'active'        THEN 3
+                            ELSE 3
+                        END
+                    "#
+                .to_string();
+                format!("{main_ordering} {direction}, {default_tiebreaker}",)
             }
             FlowProcessOrderField::NameAlpha => {
                 format!("sort_key {direction}, last_attempt_at DESC NULLS LAST, flow_type ASC",)

@@ -125,3 +125,248 @@ pub(crate) fn assert_last_attempt_at_ordering(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn assert_next_planned_at_ordering(
+    processes: &[FlowProcessState],
+    desc: bool,
+    context: &str,
+) {
+    // Check NULLS LAST behavior: non-null values should come before null values
+    let mut found_null = false;
+    for process in processes {
+        match process.next_planned_at() {
+            Some(_) => {
+                // If we already found a null, this violates NULLS LAST
+                assert!(
+                    !found_null,
+                    "Found non-null next_planned_at after null value when ordering {} in {}",
+                    if desc { "DESC" } else { "ASC" },
+                    context
+                );
+            }
+            None => {
+                found_null = true;
+            }
+        }
+    }
+
+    // Check ordering among non-null values
+    let non_null_dates: Vec<_> = processes
+        .iter()
+        .filter_map(FlowProcessState::next_planned_at)
+        .collect();
+
+    for i in 1..non_null_dates.len() {
+        if desc {
+            // DESC: future dates should come first (dates[i-1] >= dates[i])
+            assert!(
+                non_null_dates[i - 1] >= non_null_dates[i],
+                "Dates not in descending order in {}: {:?} should be >= {:?}",
+                context,
+                non_null_dates[i - 1],
+                non_null_dates[i]
+            );
+        } else {
+            // ASC: sooner dates should come first (dates[i-1] <= dates[i])
+            assert!(
+                non_null_dates[i - 1] <= non_null_dates[i],
+                "Dates not in ascending order in {}: {:?} should be <= {:?}",
+                context,
+                non_null_dates[i - 1],
+                non_null_dates[i]
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn assert_last_failure_at_ordering(
+    processes: &[FlowProcessState],
+    desc: bool,
+    context: &str,
+) {
+    // Check NULLS LAST behavior: non-null values should come before null values
+    let mut found_null = false;
+    for process in processes {
+        match process.last_failure_at() {
+            Some(_) => {
+                // If we already found a null, this violates NULLS LAST
+                assert!(
+                    !found_null,
+                    "Found non-null last_failure_at after null value when ordering {} in {}",
+                    if desc { "DESC" } else { "ASC" },
+                    context
+                );
+            }
+            None => {
+                found_null = true;
+            }
+        }
+    }
+
+    // Check ordering among non-null values
+    let non_null_dates: Vec<_> = processes
+        .iter()
+        .filter_map(FlowProcessState::last_failure_at)
+        .collect();
+
+    for i in 1..non_null_dates.len() {
+        if desc {
+            // DESC: recent failures should come first (dates[i-1] >= dates[i])
+            assert!(
+                non_null_dates[i - 1] >= non_null_dates[i],
+                "Dates not in descending order in {}: {:?} should be >= {:?}",
+                context,
+                non_null_dates[i - 1],
+                non_null_dates[i]
+            );
+        } else {
+            // ASC: older failures should come first (dates[i-1] <= dates[i])
+            assert!(
+                non_null_dates[i - 1] <= non_null_dates[i],
+                "Dates not in ascending order in {}: {:?} should be <= {:?}",
+                context,
+                non_null_dates[i - 1],
+                non_null_dates[i]
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn assert_consecutive_failures_ordering(
+    processes: &[FlowProcessState],
+    desc: bool,
+    context: &str,
+) {
+    let failure_counts: Vec<_> = processes
+        .iter()
+        .map(FlowProcessState::consecutive_failures)
+        .collect();
+
+    for i in 1..failure_counts.len() {
+        if desc {
+            // DESC: higher failure counts should come first
+            assert!(
+                failure_counts[i - 1] >= failure_counts[i],
+                "Consecutive failures not in descending order in {}: {} should be >= {}",
+                context,
+                failure_counts[i - 1],
+                failure_counts[i]
+            );
+        } else {
+            // ASC: lower failure counts should come first
+            assert!(
+                failure_counts[i - 1] <= failure_counts[i],
+                "Consecutive failures not in ascending order in {}: {} should be <= {}",
+                context,
+                failure_counts[i - 1],
+                failure_counts[i]
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn assert_effective_state_ordering(
+    processes: &[FlowProcessState],
+    desc: bool,
+    context: &str,
+) {
+    let states: Vec<_> = processes
+        .iter()
+        .map(FlowProcessState::effective_state)
+        .collect();
+
+    for i in 1..states.len() {
+        if desc {
+            // DESC: higher enum values should come first (Active > PausedManual > Failing >
+            // StoppedAuto)
+            assert!(
+                states[i - 1] >= states[i],
+                "Effective states not in descending order in {}: {:?} should be >= {:?}",
+                context,
+                states[i - 1],
+                states[i]
+            );
+        } else {
+            // ASC: lower enum values should come first (StoppedAuto < Failing <
+            // PausedManual < Active)
+            assert!(
+                states[i - 1] <= states[i],
+                "Effective states not in ascending order in {}: {:?} should be <= {:?}",
+                context,
+                states[i - 1],
+                states[i]
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn assert_name_alpha_ordering(
+    processes: &[FlowProcessState],
+    desc: bool,
+    context: &str,
+) {
+    let sort_keys: Vec<_> = processes.iter().map(FlowProcessState::sort_key).collect();
+
+    for i in 1..sort_keys.len() {
+        if desc {
+            // DESC: Z-A alphabetical order
+            assert!(
+                sort_keys[i - 1] >= sort_keys[i],
+                "Sort keys not in descending alphabetical order in {}: '{}' should be >= '{}'",
+                context,
+                sort_keys[i - 1],
+                sort_keys[i]
+            );
+        } else {
+            // ASC: A-Z alphabetical order
+            assert!(
+                sort_keys[i - 1] <= sort_keys[i],
+                "Sort keys not in ascending alphabetical order in {}: '{}' should be <= '{}'",
+                context,
+                sort_keys[i - 1],
+                sort_keys[i]
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn assert_flow_type_ordering(processes: &[FlowProcessState], desc: bool, context: &str) {
+    let flow_types: Vec<_> = processes
+        .iter()
+        .map(|p| p.flow_binding().flow_type.as_str())
+        .collect();
+
+    for i in 1..flow_types.len() {
+        if desc {
+            // DESC: Z-A alphabetical order of flow types
+            assert!(
+                flow_types[i - 1] >= flow_types[i],
+                "Flow types not in descending alphabetical order in {}: '{}' should be >= '{}'",
+                context,
+                flow_types[i - 1],
+                flow_types[i]
+            );
+        } else {
+            // ASC: A-Z alphabetical order of flow types
+            assert!(
+                flow_types[i - 1] <= flow_types[i],
+                "Flow types not in ascending alphabetical order in {}: '{}' should be <= '{}'",
+                context,
+                flow_types[i - 1],
+                flow_types[i]
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
