@@ -16,30 +16,30 @@ const DATASET_REFERENCE_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents messages related to dataset references.
+/// Represents messages related to dataset key blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DatasetReferenceMessage {
-    /// Message indicating that a dataset reference has been updated.
-    Updated(DatasetReferenceMessageUpdated),
+pub enum DatasetKeyBlocksMessage {
+    /// Message indicating that dataset key blocks have been introduced.
+    Introduced(DatasetKeyBlocksMessageIntroduced),
 }
 
-impl DatasetReferenceMessage {
-    pub fn updated(
+impl DatasetKeyBlocksMessage {
+    pub fn introduced(
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-        maybe_prev_block_hash: Option<&odf::Multihash>,
-        new_block_hash: &odf::Multihash,
+        tail_key_block_hash: &odf::Multihash,
+        head_key_block_hash: &odf::Multihash,
     ) -> Self {
-        Self::Updated(DatasetReferenceMessageUpdated {
+        Self::Introduced(DatasetKeyBlocksMessageIntroduced {
             dataset_id: dataset_id.clone(),
             block_ref: block_ref.clone(),
-            maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
-            new_block_hash: new_block_hash.clone(),
+            tail_key_block_hash: tail_key_block_hash.clone(),
+            head_key_block_hash: head_key_block_hash.clone(),
         })
     }
 }
 
-impl Message for DatasetReferenceMessage {
+impl Message for DatasetKeyBlocksMessage {
     fn version() -> u32 {
         DATASET_REFERENCE_OUTBOX_VERSION
     }
@@ -47,21 +47,23 @@ impl Message for DatasetReferenceMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Contains details about an updated dataset reference.
+/// Contains details about introduced dataset key blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetReferenceMessageUpdated {
+pub struct DatasetKeyBlocksMessageIntroduced {
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
-    /// The reference being updated.
+    /// The reference for which key blocks were introduced.
     pub block_ref: odf::BlockRef,
 
-    /// The previous block hash: this value will only be None
-    /// for datasets that were just created.
-    pub maybe_prev_block_hash: Option<odf::Multihash>,
+    /// The tail interval key block hash (inclusive).
+    /// Note: Data blocks might be present within the interval (exclusive).
+    pub tail_key_block_hash: odf::Multihash,
 
-    /// The new block hash after the update.
-    pub new_block_hash: odf::Multihash,
+    /// The head interval key block hash (inclusive) where key blocks are
+    /// present.
+    /// Note: Data blocks might be present within the interval (exclusive).
+    pub head_key_block_hash: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

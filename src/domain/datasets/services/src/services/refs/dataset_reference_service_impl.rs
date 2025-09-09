@@ -108,25 +108,12 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
             "Setting dataset reference in persistent storage"
         );
 
-        // Signal the beginning of the reference update process
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-                DatasetReferenceMessage::updating(
-                    dataset_id,
-                    block_ref,
-                    maybe_prev_block_hash,
-                    new_block_hash,
-                ),
-            )
-            .await?;
-
         // Try to set the reference in the repository
         self.dataset_reference_repo
             .set_dataset_reference(dataset_id, block_ref, maybe_prev_block_hash, new_block_hash)
             .await?;
 
-        // Signal the completion of the reference update process
+        // Send an outbox message
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
@@ -164,10 +151,6 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
         match message {
             DatasetReferenceMessage::Updated(message) => {
                 self.handle_dataset_reference_updated_message(message).await
-            }
-            DatasetReferenceMessage::Updating(_) => {
-                // No action required
-                Ok(())
             }
         }
     }

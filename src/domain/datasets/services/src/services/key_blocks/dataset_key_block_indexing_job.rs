@@ -166,6 +166,7 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
     // Resulting blocks
     let mut key_blocks = Vec::new();
 
+    // TODO: PERF: iterate only over key blocks
     // Iterate over blocks in the dataset in the specified range.
     // Note: don't ignore missing tail, we want to detect InvalidInterval error
     let mut blocks_stream = target

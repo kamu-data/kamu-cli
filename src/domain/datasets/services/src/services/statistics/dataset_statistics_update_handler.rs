@@ -145,10 +145,6 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetStatisticsUpdateHandle
             DatasetReferenceMessage::Updated(message) => {
                 self.handle_dataset_reference_updated_message(message).await
             }
-            DatasetReferenceMessage::Updating(_) => {
-                // No action required
-                Ok(())
-            }
         }
     }
 }

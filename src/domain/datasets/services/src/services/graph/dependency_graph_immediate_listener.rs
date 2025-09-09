@@ -16,11 +16,12 @@ use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetDependencyRepository,
-    DatasetReferenceMessage,
-    DatasetReferenceMessageUpdated,
+    DatasetKeyBlocksMessage,
+    DatasetKeyBlocksMessageIntroduced,
     DependencyGraphService,
     MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
 };
 use messaging_outbox::*;
@@ -31,10 +32,11 @@ use crate::{DependencyChange, extract_modified_dependencies_in_interval};
 
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<DatasetReferenceMessage>)]
+#[interface(dyn MessageConsumerT<DatasetKeyBlocksMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER,
     feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
@@ -50,9 +52,9 @@ pub struct DependencyGraphImmediateListener {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DependencyGraphImmediateListener {
-    async fn handle_dataset_reference_updated_message(
+    async fn handle_dataset_key_blocks_introduced_message(
         &self,
-        message: &DatasetReferenceMessageUpdated,
+        message: &DatasetKeyBlocksMessageIntroduced,
     ) -> Result<(), InternalError> {
         // For now, react only on Head updates
         if message.block_ref != odf::dataset::BlockRef::Head {
@@ -81,13 +83,13 @@ impl DependencyGraphImmediateListener {
     async fn handle_derived_dependency_updates(
         &self,
         target: ResolvedDataset,
-        message: &DatasetReferenceMessageUpdated,
+        message: &DatasetKeyBlocksMessageIntroduced,
     ) -> Result<(), InternalError> {
         // Compute if there are modified dependencies
         let dependency_change = extract_modified_dependencies_in_interval(
             target.as_metadata_chain(),
-            &message.new_block_hash,
-            message.maybe_prev_block_hash.as_ref(),
+            &message.head_key_block_hash,
+            Some(&message.tail_key_block_hash),
         )
         .await?;
 
@@ -160,26 +162,23 @@ impl MessageConsumer for DependencyGraphImmediateListener {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListener {
+impl MessageConsumerT<DatasetKeyBlocksMessage> for DependencyGraphImmediateListener {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "DependencyGraphImmediateListener[DatasetReferenceMessage]"
+        name = "DependencyGraphImmediateListener[DatasetKeyBlocksMessage]"
     )]
     async fn consume_message(
         &self,
         _: &Catalog,
-        message: &DatasetReferenceMessage,
+        message: &DatasetKeyBlocksMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
-            DatasetReferenceMessage::Updated(message) => {
-                self.handle_dataset_reference_updated_message(message).await
-            }
-            DatasetReferenceMessage::Updating(_) => {
-                // No action required
-                Ok(())
+            DatasetKeyBlocksMessage::Introduced(message) => {
+                self.handle_dataset_key_blocks_introduced_message(message)
+                    .await
             }
         }
     }
