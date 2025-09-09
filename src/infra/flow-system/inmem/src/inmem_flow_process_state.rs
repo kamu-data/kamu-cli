@@ -343,19 +343,25 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
         order: FlowProcessOrder,
         limit: usize,
         offset: usize,
-    ) -> Result<Vec<FlowProcessState>, InternalError> {
+    ) -> Result<FlowProcessStateListing, InternalError> {
         let state = self.state.read().unwrap();
 
         // Apply filtering
         let mut matching_states = self.apply_filters(&state, &filter);
 
+        // Store total count before pagination
+        let total_count = matching_states.len();
+
         // Apply ordering
         self.apply_ordering(&mut matching_states, order);
 
         // Apply pagination
-        let paged_states = self.apply_pagination(matching_states, limit, offset);
+        let processes = self.apply_pagination(matching_states, limit, offset);
 
-        Ok(paged_states)
+        Ok(FlowProcessStateListing {
+            processes,
+            total_count,
+        })
     }
 
     /// Compute rollup for matching rows.
