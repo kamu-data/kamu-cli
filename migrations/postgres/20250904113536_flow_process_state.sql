@@ -47,7 +47,7 @@ CREATE TABLE flow_process_states (
 
 -- Fast alphabetical ordering / prefix ranges
 CREATE INDEX idx_fps_sort_key_like
-  ON flow_process_states (sort_key text_pattern_ops);
+  ON flow_process_states (sort_key COLLATE "C" text_pattern_ops);
 
 -- By dataset_id across all scopes (dataset + webhooks)
 CREATE INDEX idx_fps_dataset_id ON flow_process_states ((scope_data->>'dataset_id'));
