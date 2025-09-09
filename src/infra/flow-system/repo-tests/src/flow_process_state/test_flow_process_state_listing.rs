@@ -9,8 +9,12 @@
 
 use chrono::{DateTime, Utc};
 use dill::Catalog;
-use kamu_adapter_flow_dataset::{FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM};
-use kamu_adapter_flow_webhook::FLOW_TYPE_WEBHOOK_DELIVER;
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_TRANSFORM,
+    FlowScopeDataset,
+};
+use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 use kamu_flow_system::*;
 
 use super::csv_flow_process_state_loader::CsvFlowProcessStateLoader;
@@ -746,6 +750,211 @@ pub async fn test_list_processes_filter_by_name_contains(catalog: &Catalog) {
                 .starts_with("beta/catalog")
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Create dataset IDs for reuse throughout tests
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"acme/orders");
+    let dataset_id2 = odf::DatasetID::new_seeded_ed25519(b"acme/users");
+    let dataset_id3 = odf::DatasetID::new_seeded_ed25519(b"beta/catalog");
+
+    // Test 1: Filter by single dataset scope
+    let single_dataset_query = FlowScopeDataset::query_for_single_dataset(&dataset_id);
+
+    let single_dataset_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::for_scope(single_dataset_query),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find processes for acme/orders dataset (rows 1, 5, 6, 7 = 4 total)
+    assert_eq!(single_dataset_listing.processes.len(), 4);
+    assert_eq!(single_dataset_listing.total_count, 4);
+    assert_flow_type_distribution(&single_dataset_listing.processes, 1, 0, 3);
+    assert_effective_state_distribution(&single_dataset_listing.processes, 2, 1, 1, 0);
+
+    // Verify all processes are related to acme/orders dataset
+    for process in &single_dataset_listing.processes {
+        let scope = &process.flow_binding().scope;
+        match scope.scope_type() {
+            "Dataset" => {
+                let dataset_scope = FlowScopeDataset::new(scope);
+                assert_eq!(dataset_scope.dataset_id(), dataset_id.clone());
+            }
+            "WebhookSubscription" => {
+                let webhook_scope = FlowScopeSubscription::new(scope);
+                assert_eq!(webhook_scope.maybe_dataset_id(), Some(dataset_id.clone()));
+            }
+            _ => panic!("Unexpected scope type: {}", scope.scope_type()),
+        }
+    }
+
+    // Test 2: Filter by multiple datasets scope
+    let multi_dataset_query =
+        FlowScopeDataset::query_for_multiple_datasets(&[&dataset_id, &dataset_id2, &dataset_id3]);
+
+    let multi_dataset_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::for_scope(multi_dataset_query),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // acme/orders (4) + acme/users (3) + beta/catalog (4) = 11 total
+    assert_eq!(multi_dataset_listing.processes.len(), 11);
+    assert_eq!(multi_dataset_listing.total_count, 11);
+    assert_flow_type_distribution(&multi_dataset_listing.processes, 3, 0, 8);
+    assert_effective_state_distribution(&multi_dataset_listing.processes, 3, 5, 1, 2);
+
+    // Test 3: Filter by webhook subscriptions for single dataset
+    let subscription_query = FlowScopeSubscription::query_for_subscriptions_of_dataset(&dataset_id);
+
+    let subscription_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::for_scope(subscription_query),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find webhook subscription processes for acme/orders dataset (rows 5,
+    // 6, 7 = 3 total)
+    assert_eq!(subscription_listing.processes.len(), 3);
+    assert_eq!(subscription_listing.total_count, 3);
+    assert_flow_type_distribution(&subscription_listing.processes, 0, 0, 3);
+    assert_effective_state_distribution(&subscription_listing.processes, 1, 1, 1, 0);
+
+    // Verify all processes are webhook subscriptions for the correct dataset
+    for process in &subscription_listing.processes {
+        let scope = &process.flow_binding().scope;
+        assert_eq!(scope.scope_type(), "WebhookSubscription");
+        let webhook_scope = FlowScopeSubscription::new(scope);
+        assert_eq!(webhook_scope.maybe_dataset_id(), Some(dataset_id.clone()));
+        assert_eq!(process.flow_binding().flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
+    }
+
+    // Test 4: Filter by dataset scopes only (exclude webhook subscriptions)
+    let dataset_only_query = FlowScopeDataset::query_for_single_dataset_only(&dataset_id);
+
+    let dataset_only_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::for_scope(dataset_only_query),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find only Dataset scope processes for acme/orders (row 1 = 1 total)
+    assert_eq!(dataset_only_listing.processes.len(), 1);
+    assert_eq!(dataset_only_listing.total_count, 1);
+    assert_flow_type_distribution(&dataset_only_listing.processes, 1, 0, 0);
+    assert_effective_state_distribution(&dataset_only_listing.processes, 1, 0, 0, 0);
+
+    // Verify the process is a dataset scope, not webhook subscription
+    let process = &dataset_only_listing.processes[0];
+    let scope = &process.flow_binding().scope;
+    assert_eq!(scope.scope_type(), "Dataset");
+    let dataset_scope = FlowScopeDataset::new(scope);
+    assert_eq!(dataset_scope.dataset_id(), dataset_id.clone());
+
+    // Test 5: Filter by webhook subscriptions regardless of dataset
+    let all_webhooks_query = FlowScopeSubscription::query_for_all_subscriptions();
+
+    let all_webhooks_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::for_scope(all_webhooks_query),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find all webhook subscription processes (12 total from CSV)
+    assert_eq!(all_webhooks_listing.processes.len(), 12);
+    assert_eq!(all_webhooks_listing.total_count, 12);
+    assert_flow_type_distribution(&all_webhooks_listing.processes, 0, 0, 12);
+    assert_effective_state_distribution(&all_webhooks_listing.processes, 4, 4, 1, 3);
+
+    // Verify all processes are webhook subscriptions
+    for process in &all_webhooks_listing.processes {
+        let scope = &process.flow_binding().scope;
+        assert_eq!(scope.scope_type(), "WebhookSubscription");
+        assert_eq!(process.flow_binding().flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
+    }
+
+    // Test 6: Filter by webhook subscriptions for multiple datasets
+    let multi_webhook_query =
+        FlowScopeSubscription::query_for_subscriptions_of_multiple_datasets(&[
+            &dataset_id,
+            &dataset_id2,
+        ]);
+
+    let multi_webhook_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::for_scope(multi_webhook_query),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find webhook subscriptions for acme/orders and acme/users (5 total)
+    assert_eq!(multi_webhook_listing.processes.len(), 5);
+    assert_eq!(multi_webhook_listing.total_count, 5);
+    assert_flow_type_distribution(&multi_webhook_listing.processes, 0, 0, 5);
+    assert_effective_state_distribution(&multi_webhook_listing.processes, 2, 2, 1, 0);
+
+    // Verify all processes are webhook subscriptions for the correct datasets
+    for process in &multi_webhook_listing.processes {
+        let scope = &process.flow_binding().scope;
+        assert_eq!(scope.scope_type(), "WebhookSubscription");
+        let webhook_scope = FlowScopeSubscription::new(scope);
+        let process_dataset_id = webhook_scope.maybe_dataset_id();
+        assert!(
+            process_dataset_id == Some(dataset_id.clone())
+                || process_dataset_id == Some(dataset_id2.clone())
+        );
+        assert_eq!(process.flow_binding().flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
+    }
+
+    // Test 7: Filter by system flows (should return empty since our CSV has no
+    // system flows)
+    let system_query = FlowScopeQuery::build_for_system_scope();
+
+    let system_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::for_scope(system_query),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find no system flows in our test data
+    assert!(system_listing.processes.is_empty());
+    assert_eq!(system_listing.processes.len(), 0);
+    assert_eq!(system_listing.total_count, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
