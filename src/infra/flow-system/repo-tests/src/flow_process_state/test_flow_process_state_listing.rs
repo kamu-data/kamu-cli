@@ -258,6 +258,38 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
     assert_eq!(failing_listing.total_count, 9);
     assert_effective_state_distribution(&failing_listing.processes, 0, 9, 0, 0);
 
+    // Test filtering by paused manual state only
+    let paused_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all()
+                .with_effective_states(&[FlowProcessEffectiveState::PausedManual]),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(paused_listing.processes.len(), 3);
+    assert_eq!(paused_listing.total_count, 3);
+    assert_effective_state_distribution(&paused_listing.processes, 0, 0, 3, 0);
+
+    // Test filtering by stopped auto state only
+    let stopped_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all()
+                .with_effective_states(&[FlowProcessEffectiveState::StoppedAuto]),
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(stopped_listing.processes.len(), 3);
+    assert_eq!(stopped_listing.total_count, 3);
+    assert_effective_state_distribution(&stopped_listing.processes, 0, 0, 0, 3);
+
     // Test filtering by multiple states
     let multi_state_listing = flow_process_state_query
         .list_processes(
@@ -284,6 +316,60 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
     csv_loader.populate_from_csv().await;
 
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Test filtering by last_attempt_between
+    let time_window_attempts = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter {
+                scope: FlowScopeQuery::all(),
+                for_flow_types: None,
+                effective_state_in: None,
+                last_attempt_between: Some((
+                    chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                    chrono::DateTime::parse_from_rfc3339("2025-09-08T12:00:00Z")
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                )),
+                last_failure_since: None,
+                next_planned_before: None,
+                next_planned_after: None,
+                min_consecutive_failures: None,
+                name_contains: None,
+            },
+            FlowProcessOrder::recent(),
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+
+    // Should find processes with last attempts between 07:00 and 12:00 on
+    // 2025-09-08
+    assert!(!time_window_attempts.processes.is_empty());
+    assert_eq!(time_window_attempts.processes.len(), 15);
+    assert_eq!(time_window_attempts.total_count, 15);
+    assert_flow_type_distribution(&time_window_attempts.processes, 4, 3, 8);
+    assert_effective_state_distribution(&time_window_attempts.processes, 6, 7, 0, 2);
+
+    let start_time = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let end_time = chrono::DateTime::parse_from_rfc3339("2025-09-08T12:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    // All results should have last_attempt_at within the specified range
+    // (inclusive)
+    for process in &time_window_attempts.processes {
+        if let Some(last_attempt) = process.last_attempt_at() {
+            assert!(
+                last_attempt >= start_time && last_attempt <= end_time,
+                "last_attempt_at {last_attempt:?} should be between {start_time:?} and \
+                 {end_time:?}"
+            );
+        }
+    }
 
     // Test filtering by last_failure_since
     let recent_failures = flow_process_state_query
@@ -312,6 +398,11 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
 
     // Should find processes that failed after 07:00 on 2025-09-08
     assert!(!recent_failures.processes.is_empty());
+    assert_eq!(recent_failures.processes.len(), 9);
+    assert_eq!(recent_failures.total_count, 9);
+    assert_flow_type_distribution(&recent_failures.processes, 2, 2, 5);
+    assert_effective_state_distribution(&recent_failures.processes, 0, 7, 0, 2);
+
     // All results should have last_failure_at >= 2025-09-08T07:00:00Z
     for process in &recent_failures.processes {
         if let Some(last_failure) = process.last_failure_at() {
@@ -351,6 +442,14 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
 
     // Should find processes scheduled before 10:00
     assert!(!upcoming_soon.processes.is_empty());
+
+    // Now all implementations should consistently return 9 processes
+    // (excluding the process at exactly 2025-09-08T10:00:00Z)
+    assert_eq!(upcoming_soon.processes.len(), 9);
+    assert_eq!(upcoming_soon.total_count, 9);
+    assert_flow_type_distribution(&upcoming_soon.processes, 4, 1, 4); // (4 ingest, 1 transform, 4 webhook)
+    assert_effective_state_distribution(&upcoming_soon.processes, 5, 1, 3, 0); // (5 active, 1 failing, 3 paused, 0 stopped)
+
     for process in &upcoming_soon.processes {
         if let Some(next_planned) = process.next_planned_at() {
             assert!(
@@ -394,6 +493,11 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
 
     // Should find processes with 3 or more consecutive failures
     assert!(!chronic_failures.processes.is_empty());
+    assert_eq!(chronic_failures.processes.len(), 4);
+    assert_eq!(chronic_failures.total_count, 4);
+    assert_flow_type_distribution(&chronic_failures.processes, 1, 0, 3);
+    assert_effective_state_distribution(&chronic_failures.processes, 0, 2, 0, 2);
+
     for process in &chronic_failures.processes {
         assert!(process.consecutive_failures() >= 3);
     }
@@ -420,6 +524,11 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .unwrap();
 
     // Should find only the most severe cases (10+ failures)
+    assert_eq!(severe_failures.processes.len(), 1);
+    assert_eq!(severe_failures.total_count, 1);
+    assert_flow_type_distribution(&severe_failures.processes, 0, 0, 1);
+    assert_effective_state_distribution(&severe_failures.processes, 0, 0, 0, 1);
+
     for process in &severe_failures.processes {
         assert!(process.consecutive_failures() >= 10);
     }
@@ -456,6 +565,11 @@ pub async fn test_list_processes_filter_by_name_contains(catalog: &Catalog) {
 
     // Should find processes with sort keys starting with "acme" (prefix matching)
     assert!(!acme_processes.processes.is_empty());
+    assert_eq!(acme_processes.processes.len(), 13);
+    assert_eq!(acme_processes.total_count, 13);
+    assert_flow_type_distribution(&acme_processes.processes, 3, 4, 6);
+    assert_effective_state_distribution(&acme_processes.processes, 5, 5, 3, 0);
+
     for process in &acme_processes.processes {
         assert!(process.sort_key().to_lowercase().starts_with("acme"));
     }
@@ -483,6 +597,11 @@ pub async fn test_list_processes_filter_by_name_contains(catalog: &Catalog) {
 
     // Should find processes with sort keys starting with "beta" (prefix matching)
     assert!(!beta_processes.processes.is_empty());
+    assert_eq!(beta_processes.processes.len(), 5);
+    assert_eq!(beta_processes.total_count, 5);
+    assert_flow_type_distribution(&beta_processes.processes, 1, 1, 3);
+    assert_effective_state_distribution(&beta_processes.processes, 0, 3, 0, 2);
+
     for process in &beta_processes.processes {
         assert!(process.sort_key().to_lowercase().starts_with("beta"));
     }
@@ -567,8 +686,6 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
         assert!(process.sort_key().to_lowercase().contains("acme"));
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
