@@ -91,7 +91,7 @@ impl InMemoryFlowProcessState {
                 // Next planned before filter
                 if let Some(before) = filter.next_planned_before {
                     if let Some(next_planned) = ps.next_planned_at() {
-                        if before < next_planned {
+                        if next_planned >= before {
                             return false;
                         }
                     } else {
