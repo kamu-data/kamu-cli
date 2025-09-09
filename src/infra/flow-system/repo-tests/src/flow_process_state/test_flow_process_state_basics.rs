@@ -553,3 +553,204 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_process(catalog: &Catalog) {
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+    let flow_process_repository = catalog.get_one::<dyn FlowProcessStateRepository>().unwrap();
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
+    let flow_binding = ingest_dataset_binding(&dataset_id);
+    let sort_key = "kamu/random-dataset-id".to_string();
+
+    // Insert a process first
+    flow_process_repository
+        .insert_process(
+            flow_binding.clone(),
+            sort_key.clone(),
+            false,
+            FlowTriggerStopPolicy::default(),
+            EventID::new(1),
+        )
+        .await
+        .unwrap();
+
+    // Verify it exists
+    let single_state = flow_process_state_query
+        .try_get_process_state(&flow_binding)
+        .await
+        .unwrap();
+    assert!(single_state.is_some());
+
+    let listing_before = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all(),
+            FlowProcessOrder {
+                field: FlowProcessOrderField::LastAttemptAt,
+                desc: true,
+            },
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+    assert_eq!(listing_before.processes.len(), 1);
+
+    let rollup_before = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .await
+        .unwrap();
+    assert_eq!(rollup_before.total, 1);
+
+    // Delete the process
+    flow_process_repository
+        .delete_process(flow_binding.clone())
+        .await
+        .unwrap();
+
+    // Verify it's gone
+    let single_state_after = flow_process_state_query
+        .try_get_process_state(&flow_binding)
+        .await
+        .unwrap();
+    assert!(single_state_after.is_none());
+
+    let listing_after = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all(),
+            FlowProcessOrder {
+                field: FlowProcessOrderField::LastAttemptAt,
+                desc: true,
+            },
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+    assert!(listing_after.processes.is_empty());
+
+    let rollup_after = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .await
+        .unwrap();
+    assert_eq!(rollup_after.total, 0);
+    assert_eq!(rollup_after.active, 0);
+    assert_eq!(rollup_after.failing, 0);
+    assert_eq!(rollup_after.paused, 0);
+    assert_eq!(rollup_after.stopped, 0);
+    assert_eq!(rollup_after.worst_consecutive_failures, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_process_not_found(catalog: &Catalog) {
+    let flow_process_repository = catalog.get_one::<dyn FlowProcessStateRepository>().unwrap();
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"nonexistent-dataset-id");
+    let flow_binding = ingest_dataset_binding(&dataset_id);
+
+    // Try to delete a process that doesn't exist
+    let result = flow_process_repository
+        .delete_process(flow_binding.clone())
+        .await;
+
+    // Should return NotFound error
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        FlowProcessDeleteError::NotFound(err) => {
+            assert_eq!(err.flow_binding, flow_binding);
+        }
+        other => panic!("Expected NotFound error, got: {:?}", other),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_process_with_history(catalog: &Catalog) {
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+    let flow_process_repository = catalog.get_one::<dyn FlowProcessStateRepository>().unwrap();
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
+    let flow_binding = ingest_dataset_binding(&dataset_id);
+    let sort_key = "kamu/random-dataset-id".to_string();
+
+    // Insert a process
+    flow_process_repository
+        .insert_process(
+            flow_binding.clone(),
+            sort_key.clone(),
+            false,
+            FlowTriggerStopPolicy::default(),
+            EventID::new(1),
+        )
+        .await
+        .unwrap();
+
+    // Apply some flow results to create history
+    let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    flow_process_repository
+        .apply_flow_result(
+            flow_binding.clone(),
+            true,
+            success_time,
+            Some(success_time + Duration::hours(1)),
+            EventID::new(1),
+        )
+        .await
+        .unwrap();
+
+    let failure_time = success_time + Duration::hours(1);
+    flow_process_repository
+        .apply_flow_result(
+            flow_binding.clone(),
+            false,
+            failure_time,
+            Some(failure_time + Duration::hours(1)),
+            EventID::new(2),
+        )
+        .await
+        .unwrap();
+
+    // Update trigger state
+    flow_process_repository
+        .update_trigger_state(
+            flow_binding.clone(),
+            Some(true),
+            None,
+            EventID::new(3),
+        )
+        .await
+        .unwrap();
+
+    // Verify the process exists and has the expected state
+    let single_state = flow_process_state_query
+        .try_get_process_state(&flow_binding)
+        .await
+        .unwrap();
+    assert!(single_state.is_some());
+    let state = single_state.unwrap();
+    assert_eq!(state.consecutive_failures(), 1);
+    assert_eq!(state.last_success_at(), Some(success_time));
+    assert_eq!(state.last_failure_at(), Some(failure_time));
+    assert!(state.paused_manual());
+
+    // Delete the process
+    flow_process_repository
+        .delete_process(flow_binding.clone())
+        .await
+        .unwrap();
+
+    // Verify it's completely gone
+    let single_state_after = flow_process_state_query
+        .try_get_process_state(&flow_binding)
+        .await
+        .unwrap();
+    assert!(single_state_after.is_none());
+
+    let rollup_after = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .await
+        .unwrap();
+    assert_eq!(rollup_after.total, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
