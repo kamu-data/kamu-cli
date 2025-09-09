@@ -192,6 +192,38 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_pagination_edge_cases,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_pagination_with_filters,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_pagination_different_orderings,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_pagination_boundary_conditions,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture =
         kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_flow_types,
     harness = SqliteFlowProcessStateHarness
