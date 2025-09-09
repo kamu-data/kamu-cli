@@ -53,7 +53,10 @@ impl PostgresFlowProcessStateQuery {
                 format!("effective_state {direction}, {default_tiebreaker}",)
             }
             FlowProcessOrderField::NameAlpha => {
-                format!("sort_key {direction}, last_attempt_at DESC NULLS LAST, flow_type ASC",)
+                format!(
+                    "sort_key COLLATE \"C\" {direction}, last_attempt_at DESC NULLS LAST, \
+                     flow_type ASC",
+                )
             }
             FlowProcessOrderField::FlowType => {
                 format!("flow_type {direction}, last_attempt_at DESC NULLS LAST, sort_key ASC",)
