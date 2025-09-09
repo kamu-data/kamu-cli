@@ -310,6 +310,31 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process_not_found,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process_with_history,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryFlowProcessStateHarness {
     catalog: Catalog,
 }
