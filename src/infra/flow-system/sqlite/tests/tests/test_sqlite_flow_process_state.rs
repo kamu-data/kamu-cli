@@ -135,6 +135,60 @@ database_transactional_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_flow_types,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_effective_states,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_time_windows,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_consecutive_failures,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_name_contains,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_combined_filters,
+    harness = SqliteFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
