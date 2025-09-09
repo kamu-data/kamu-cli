@@ -146,40 +146,78 @@ impl InMemoryFlowProcessState {
             // Primary sort field with NULLS LAST for datetime fields
             let primary_ordering = match order.field {
                 FlowProcessOrderField::LastAttemptAt => {
-                    // NULLS LAST: (is_none, value) ensures None sorts after Some
-                    let key_a = (a.last_attempt_at().is_none(), a.last_attempt_at());
-                    let key_b = (b.last_attempt_at().is_none(), b.last_attempt_at());
-                    key_a.cmp(&key_b)
+                    // NULLS LAST: compare non-null values first, then handle nulls
+                    match (a.last_attempt_at(), b.last_attempt_at()) {
+                        (Some(a_val), Some(b_val)) => {
+                            if order.desc {
+                                b_val.cmp(&a_val) // DESC: largest first
+                            } else {
+                                a_val.cmp(&b_val) // ASC: smallest first
+                            }
+                        }
+                        (Some(_), None) => std::cmp::Ordering::Less, // Some < None (NULLS LAST)
+                        (None, Some(_)) => std::cmp::Ordering::Greater, // None > Some (NULLS LAST)
+                        (None, None) => std::cmp::Ordering::Equal,   // None == None
+                    }
                 }
                 FlowProcessOrderField::NextPlannedAt => {
-                    // NULLS LAST: (is_none, value) ensures None sorts after Some
-                    let key_a = (a.next_planned_at().is_none(), a.next_planned_at());
-                    let key_b = (b.next_planned_at().is_none(), b.next_planned_at());
-                    key_a.cmp(&key_b)
+                    // NULLS LAST: compare non-null values first, then handle nulls
+                    match (a.next_planned_at(), b.next_planned_at()) {
+                        (Some(a_val), Some(b_val)) => {
+                            if order.desc {
+                                b_val.cmp(&a_val) // DESC: largest first
+                            } else {
+                                a_val.cmp(&b_val) // ASC: smallest first
+                            }
+                        }
+                        (Some(_), None) => std::cmp::Ordering::Less, // Some < None (NULLS LAST)
+                        (None, Some(_)) => std::cmp::Ordering::Greater, // None > Some (NULLS LAST)
+                        (None, None) => std::cmp::Ordering::Equal,   // None == None
+                    }
                 }
                 FlowProcessOrderField::LastFailureAt => {
-                    // NULLS LAST: (is_none, value) ensures None sorts after Some
-                    let key_a = (a.last_failure_at().is_none(), a.last_failure_at());
-                    let key_b = (b.last_failure_at().is_none(), b.last_failure_at());
-                    key_a.cmp(&key_b)
+                    // NULLS LAST: compare non-null values first, then handle nulls
+                    match (a.last_failure_at(), b.last_failure_at()) {
+                        (Some(a_val), Some(b_val)) => {
+                            if order.desc {
+                                b_val.cmp(&a_val) // DESC: largest first
+                            } else {
+                                a_val.cmp(&b_val) // ASC: smallest first
+                            }
+                        }
+                        (Some(_), None) => std::cmp::Ordering::Less, // Some < None (NULLS LAST)
+                        (None, Some(_)) => std::cmp::Ordering::Greater, // None > Some (NULLS LAST)
+                        (None, None) => std::cmp::Ordering::Equal,   // None == None
+                    }
                 }
                 FlowProcessOrderField::ConsecutiveFailures => {
-                    a.consecutive_failures().cmp(&b.consecutive_failures())
+                    if order.desc {
+                        b.consecutive_failures().cmp(&a.consecutive_failures())
+                    } else {
+                        a.consecutive_failures().cmp(&b.consecutive_failures())
+                    }
                 }
                 FlowProcessOrderField::EffectiveState => {
-                    a.effective_state().cmp(&b.effective_state())
+                    if order.desc {
+                        b.effective_state().cmp(&a.effective_state())
+                    } else {
+                        a.effective_state().cmp(&b.effective_state())
+                    }
                 }
-                FlowProcessOrderField::NameAlpha => a.sort_key().cmp(b.sort_key()),
+                FlowProcessOrderField::NameAlpha => {
+                    if order.desc {
+                        b.sort_key().cmp(a.sort_key())
+                    } else {
+                        a.sort_key().cmp(b.sort_key())
+                    }
+                }
                 FlowProcessOrderField::FlowType => {
-                    a.flow_binding().flow_type.cmp(&b.flow_binding().flow_type)
+                    if order.desc {
+                        b.flow_binding().flow_type.cmp(&a.flow_binding().flow_type)
+                    } else {
+                        a.flow_binding().flow_type.cmp(&b.flow_binding().flow_type)
+                    }
                 }
-            };
-
-            // Apply desc flag to primary ordering
-            let primary_ordering = if order.desc {
-                primary_ordering.reverse()
-            } else {
-                primary_ordering
             };
 
             // If primary field values are equal, use tie-breakers
@@ -190,10 +228,16 @@ impl InMemoryFlowProcessState {
                     // Tie-breaker 1: Last attempt time (newest first) - skip if it's the primary
                     // field
                     if !matches!(order.field, FlowProcessOrderField::LastAttemptAt) {
-                        // NULLS LAST for tie-breaker, reversed for newest first (DESC)
-                        let key_a = (a.last_attempt_at().is_none(), a.last_attempt_at());
-                        let key_b = (b.last_attempt_at().is_none(), b.last_attempt_at());
-                        let attempt_ordering = key_b.cmp(&key_a); // reversed for newest first
+                        // NULLS LAST for tie-breaker, newest first (DESC)
+                        let attempt_ordering = match (a.last_attempt_at(), b.last_attempt_at()) {
+                            // reversed for newest first
+                            (Some(a_val), Some(b_val)) => b_val.cmp(&a_val),
+                            (Some(_), None) => std::cmp::Ordering::Less, /* Some < None (NULLS */
+                            // LAST)
+                            (None, Some(_)) => std::cmp::Ordering::Greater, /* None > Some */
+                            // (NULLS LAST)
+                            (None, None) => std::cmp::Ordering::Equal, // None == None
+                        };
                         if attempt_ordering != Ordering::Equal {
                             return attempt_ordering;
                         }
