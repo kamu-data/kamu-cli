@@ -87,7 +87,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
         order: FlowProcessOrder,
         limit: usize,
         offset: usize,
-    ) -> Result<Vec<FlowProcessState>, InternalError> {
+    ) -> Result<FlowProcessStateListing, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -110,10 +110,48 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
         let maybe_last_attempt_between =
             filter.last_attempt_between.map(|(start, end)| [start, end]);
 
+        // First, get the total count (same filters, no ordering/pagination)
+        let count_sql = format!(
+            r#"
+            SELECT COUNT(*)::bigint AS total_count
+            FROM flow_process_states
+                WHERE
+                    ({scope_conditions}) AND
+                    ($1::text[] IS NULL OR flow_type = ANY($1)) AND
+                    ($2::flow_process_effective_state[] IS NULL OR effective_state = ANY($2)) AND
+                    ($3::timestamptz[] IS NULL OR (last_attempt_at BETWEEN $3[1] AND $3[2])) AND
+                    ($4 IS NULL OR last_failure_at >= $4) AND
+                    ($5 IS NULL OR next_planned_at < $5) AND
+                    ($6 IS NULL OR next_planned_at > $6) AND
+                    ($7 IS NULL OR consecutive_failures >= $7) AND
+                    ($8 IS NULL OR sort_key >= $8 AND sort_key < $8 || E'\uFFFF')
+            "#
+        );
+
+        let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql)
+            .bind(maybe_flow_types)
+            .bind(maybe_effective_states)
+            .bind(maybe_last_attempt_between)
+            .bind(filter.last_failure_since)
+            .bind(filter.next_planned_before)
+            .bind(filter.next_planned_after)
+            .bind(filter.min_consecutive_failures.map(i64::from))
+            .bind(filter.name_contains.map(str::to_ascii_lowercase));
+
+        for arr in &scope_values {
+            count_query = count_query.bind(arr);
+        }
+
+        let total_count = count_query
+            .fetch_one(&mut *connection_mut)
+            .await
+            .int_err()?;
+
+        // Then get the paginated results
         // ORDER BY clauses
         let ordering_predicate = Self::generate_ordering_predicate(order);
 
-        let sql = format!(
+        let list_sql = format!(
             r#"
             SELECT
                 flow_type,
@@ -147,7 +185,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             "#
         );
 
-        let mut query = sqlx::query_as::<_, PostgresFlowProcessStateRowModel>(&sql)
+        let mut list_query = sqlx::query_as::<_, PostgresFlowProcessStateRowModel>(&list_sql)
             .bind(i64::try_from(limit).unwrap())
             .bind(i64::try_from(offset).unwrap())
             .bind(maybe_flow_types)
@@ -160,16 +198,20 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             .bind(filter.name_contains.map(str::to_ascii_lowercase));
 
         for arr in &scope_values {
-            query = query.bind(arr);
+            list_query = list_query.bind(arr);
         }
 
-        let rows = query.fetch_all(connection_mut).await.int_err()?;
-        let mut results = Vec::with_capacity(rows.len());
+        let rows = list_query.fetch_all(connection_mut).await.int_err()?;
+        let mut processes = Vec::with_capacity(rows.len());
         for row in rows {
             let state = row.try_into()?;
-            results.push(state);
+            processes.push(state);
         }
-        Ok(results)
+
+        Ok(FlowProcessStateListing {
+            processes,
+            total_count: usize::try_from(total_count).unwrap(),
+        })
     }
 
     /// Compute rollup for matching rows.

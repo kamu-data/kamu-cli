@@ -37,7 +37,7 @@ pub async fn test_empty_state_table_initially(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert!(listing.is_empty());
+    assert!(listing.processes.is_empty());
 
     let rollup = flow_process_state_query
         .rollup_by_scope(FlowScopeQuery::all(), None, None)
@@ -109,8 +109,8 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert_eq!(listing.len(), 1);
-    assert_eq!(listing[0], single_state);
+    assert_eq!(listing.processes.len(), 1);
+    assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
         .rollup_by_scope(FlowScopeQuery::all(), None, None)
@@ -206,8 +206,8 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert_eq!(listing.len(), 1);
-    assert_eq!(listing[0], single_state);
+    assert_eq!(listing.processes.len(), 1);
+    assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
         .rollup_by_scope(FlowScopeQuery::all(), None, None)
@@ -318,8 +318,8 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert_eq!(listing.len(), 1);
-    assert_eq!(listing[0], single_state);
+    assert_eq!(listing.processes.len(), 1);
+    assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
         .rollup_by_scope(FlowScopeQuery::all(), None, None)
@@ -444,8 +444,8 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert_eq!(listing.len(), 1);
-    assert_eq!(listing[0], single_state);
+    assert_eq!(listing.processes.len(), 1);
+    assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
         .rollup_by_scope(FlowScopeQuery::all(), None, None)
@@ -537,8 +537,8 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert_eq!(listing.len(), 1);
-    assert_eq!(listing[0], single_state);
+    assert_eq!(listing.processes.len(), 1);
+    assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
         .rollup_by_scope(FlowScopeQuery::all(), None, None)

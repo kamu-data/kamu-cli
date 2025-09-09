@@ -36,7 +36,7 @@ pub trait FlowProcessStateQuery: Send + Sync {
         order: FlowProcessOrder,
         limit: usize,
         offset: usize,
-    ) -> Result<Vec<FlowProcessState>, InternalError>;
+    ) -> Result<FlowProcessStateListing, InternalError>;
 
     /// Compute rollup for matching rows.
     async fn rollup_by_scope(
@@ -45,6 +45,14 @@ pub trait FlowProcessStateQuery: Send + Sync {
         for_flow_types: Option<&[&'static str]>,
         effective_state_in: Option<&[FlowProcessEffectiveState]>,
     ) -> Result<FlowProcessGroupRollup, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct FlowProcessStateListing {
+    pub processes: Vec<FlowProcessState>,
+    pub total_count: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
