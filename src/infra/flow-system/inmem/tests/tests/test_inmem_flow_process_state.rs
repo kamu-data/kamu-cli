@@ -335,6 +335,39 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_dataset_page_recent_activity,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_account_dashboard_triage,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_account_dashboard_upcoming_updates,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_failing_webhooks_for_dataset_sorted_az,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryFlowProcessStateHarness {
     catalog: Catalog,
 }
