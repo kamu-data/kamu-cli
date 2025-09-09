@@ -320,24 +320,14 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
     // Test filtering by last_attempt_between
     let time_window_attempts = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: None,
-                effective_state_in: None,
-                last_attempt_between: Some((
-                    chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
-                        .unwrap()
-                        .with_timezone(&chrono::Utc),
-                    chrono::DateTime::parse_from_rfc3339("2025-09-08T12:00:00Z")
-                        .unwrap()
-                        .with_timezone(&chrono::Utc),
-                )),
-                last_failure_since: None,
-                next_planned_before: None,
-                next_planned_after: None,
-                min_consecutive_failures: None,
-                name_contains: None,
-            },
+            FlowProcessListFilter::all().with_last_attempt_between(
+                chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                chrono::DateTime::parse_from_rfc3339("2025-09-08T12:00:00Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            ),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -374,21 +364,11 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
     // Test filtering by last_failure_since
     let recent_failures = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: None,
-                effective_state_in: None,
-                last_attempt_between: None,
-                last_failure_since: Some(
-                    chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
-                        .unwrap()
-                        .with_timezone(&chrono::Utc),
-                ),
-                next_planned_before: None,
-                next_planned_after: None,
-                min_consecutive_failures: None,
-                name_contains: None,
-            },
+            FlowProcessListFilter::all().with_last_failure_since(
+                chrono::DateTime::parse_from_rfc3339("2025-09-08T07:00:00Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            ),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -418,21 +398,11 @@ pub async fn test_list_processes_filter_by_time_windows(catalog: &Catalog) {
     // Test filtering by next_planned_before
     let upcoming_soon = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: None,
-                effective_state_in: None,
-                last_attempt_between: None,
-                last_failure_since: None,
-                next_planned_before: Some(
-                    chrono::DateTime::parse_from_rfc3339("2025-09-08T10:00:00Z")
-                        .unwrap()
-                        .with_timezone(&chrono::Utc),
-                ),
-                next_planned_after: None,
-                min_consecutive_failures: None,
-                name_contains: None,
-            },
+            FlowProcessListFilter::all().with_next_planned_before(
+                chrono::DateTime::parse_from_rfc3339("2025-09-08T10:00:00Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            ),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -473,17 +443,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
     // Test filtering by minimum consecutive failures
     let chronic_failures = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: None,
-                effective_state_in: None,
-                last_attempt_between: None,
-                last_failure_since: None,
-                next_planned_before: None,
-                next_planned_after: None,
-                min_consecutive_failures: Some(3),
-                name_contains: None,
-            },
+            FlowProcessListFilter::all().with_min_consecutive_failures(3),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -505,17 +465,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
     // Test filtering by very high consecutive failures
     let severe_failures = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: None,
-                effective_state_in: None,
-                last_attempt_between: None,
-                last_failure_since: None,
-                next_planned_before: None,
-                next_planned_after: None,
-                min_consecutive_failures: Some(10),
-                name_contains: None,
-            },
+            FlowProcessListFilter::all().with_min_consecutive_failures(10),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -545,17 +495,7 @@ pub async fn test_list_processes_filter_by_name_contains(catalog: &Catalog) {
     // Test filtering by name containing "acme"
     let acme_processes = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: None,
-                effective_state_in: None,
-                last_attempt_between: None,
-                last_failure_since: None,
-                next_planned_before: None,
-                next_planned_after: None,
-                min_consecutive_failures: None,
-                name_contains: Some("acme"),
-            },
+            FlowProcessListFilter::all().with_name_contains("acme"),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -577,17 +517,7 @@ pub async fn test_list_processes_filter_by_name_contains(catalog: &Catalog) {
     // Test filtering by name starting with "beta"
     let beta_processes = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: None,
-                effective_state_in: None,
-                last_attempt_between: None,
-                last_failure_since: None,
-                next_planned_before: None,
-                next_planned_after: None,
-                min_consecutive_failures: None,
-                name_contains: Some("beta"),
-            },
+            FlowProcessListFilter::all().with_name_contains("beta"),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -647,20 +577,13 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
     // Test combining multiple filters
     let complex_filter = flow_process_state_query
         .list_processes(
-            FlowProcessListFilter {
-                scope: FlowScopeQuery::all(),
-                for_flow_types: Some(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]),
-                effective_state_in: Some(&[
+            FlowProcessListFilter::all()
+                .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM])
+                .with_effective_states(&[
                     FlowProcessEffectiveState::Active,
                     FlowProcessEffectiveState::Failing,
-                ]),
-                last_attempt_between: None,
-                last_failure_since: None,
-                next_planned_before: None,
-                next_planned_after: None,
-                min_consecutive_failures: None,
-                name_contains: Some("acme"),
-            },
+                ])
+                .with_name_contains("acme"),
             FlowProcessOrder::recent(),
             100,
             0,
