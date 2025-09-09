@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
-#[cfg(feature = "sqlx")]
 use internal_error::InternalError;
 use thiserror::Error;
 
