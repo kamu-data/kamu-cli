@@ -266,8 +266,7 @@ pub async fn test_list_processes_pagination_different_orderings(catalog: &Catalo
         assert_eq!(
             paginated_results.len(),
             full_list.processes.len(),
-            "Paginated results should match full list length for order {:?}",
-            order
+            "Paginated results should match full list length for order {order:?}",
         );
 
         for (i, (paginated, full)) in paginated_results
@@ -277,8 +276,7 @@ pub async fn test_list_processes_pagination_different_orderings(catalog: &Catalo
         {
             assert_eq!(
                 paginated, full,
-                "Record {} should match between paginated and full results for order {:?}",
-                i, order
+                "Record {i} should match between paginated and full results for order {order:?}",
             );
         }
     }
@@ -324,10 +322,7 @@ pub async fn test_list_processes_pagination_boundary_conditions(catalog: &Catalo
         assert_eq!(
             result.processes.len(),
             expected_len,
-            "Failed for case: {} (limit={}, offset={})",
-            description,
-            limit,
-            offset
+            "Failed for case: {description} (limit={limit}, offset={offset})",
         );
 
         // Verify all returned records are unique
@@ -335,8 +330,7 @@ pub async fn test_list_processes_pagination_boundary_conditions(catalog: &Catalo
             for j in (i + 1)..result.processes.len() {
                 assert_ne!(
                     result.processes[i], result.processes[j],
-                    "All returned records should be unique for case: {}",
-                    description
+                    "All returned records should be unique for case: {description}",
                 );
             }
         }
