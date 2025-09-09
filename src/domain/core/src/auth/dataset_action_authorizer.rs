@@ -282,26 +282,6 @@ pub struct DatasetActionNotEnoughPermissionsError {
     pub dataset_ref: odf::DatasetRef,
 }
 
-#[derive(Debug, Error)]
-pub struct DatasetsActionNotEnoughPermissionsError {
-    pub action: DatasetAction,
-    pub dataset_refs: Vec<odf::DatasetRef>,
-}
-
-impl std::fmt::Display for DatasetsActionNotEnoughPermissionsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "User has no '{}' permission in datasets: '", self.action)?;
-        for (i, item) in self.dataset_refs.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{item}")?;
-        }
-        write!(f, "'")?;
-        Ok(())
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
