@@ -28,27 +28,34 @@ pub async fn test_list_processes_from_csv_unfiltered(catalog: &Catalog) {
     let limit = 100;
     let offset = 0;
 
-    let processes = flow_process_state_query
+    let listing = flow_process_state_query
         .list_processes(filter, order, limit, offset)
         .await
         .unwrap();
 
     // Should get all 24 processes from CSV
-    assert_eq!(processes.len(), 24);
+    assert_eq!(listing.processes.len(), 24);
 
     // Verify ordering: recent first (by last_attempt_at DESC)
-    assert_last_attempt_at_ordering(&processes, true, "test_list_processes_from_csv_unfiltered");
+    assert_last_attempt_at_ordering(
+        &listing.processes,
+        true,
+        "test_list_processes_from_csv_unfiltered",
+    );
 
     // Verify that we have the expected distribution of flow types
-    let ingest_count = processes
+    let ingest_count = listing
+        .processes
         .iter()
         .filter(|p| p.flow_binding().flow_type == FLOW_TYPE_DATASET_INGEST)
         .count();
-    let transform_count = processes
+    let transform_count = listing
+        .processes
         .iter()
         .filter(|p| p.flow_binding().flow_type == FLOW_TYPE_DATASET_TRANSFORM)
         .count();
-    let webhook_count = processes
+    let webhook_count = listing
+        .processes
         .iter()
         .filter(|p| p.flow_binding().flow_type == FLOW_TYPE_WEBHOOK_DELIVER)
         .count();
@@ -58,19 +65,23 @@ pub async fn test_list_processes_from_csv_unfiltered(catalog: &Catalog) {
     assert_eq!(webhook_count, 12);
 
     // Verify that we have the expected distribution of effective states
-    let active_count = processes
+    let active_count = listing
+        .processes
         .iter()
         .filter(|p| p.effective_state() == FlowProcessEffectiveState::Active)
         .count();
-    let failing_count = processes
+    let failing_count = listing
+        .processes
         .iter()
         .filter(|p| p.effective_state() == FlowProcessEffectiveState::Failing)
         .count();
-    let paused_count = processes
+    let paused_count = listing
+        .processes
         .iter()
         .filter(|p| p.effective_state() == FlowProcessEffectiveState::PausedManual)
         .count();
-    let stopped_count = processes
+    let stopped_count = listing
+        .processes
         .iter()
         .filter(|p| p.effective_state() == FlowProcessEffectiveState::StoppedAuto)
         .count();
@@ -86,7 +97,7 @@ pub async fn test_list_processes_from_csv_unfiltered(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(first_page.len(), 10);
+    assert_eq!(first_page.processes.len(), 10);
 
     // Get second page
     let second_page = flow_process_state_query
@@ -94,7 +105,7 @@ pub async fn test_list_processes_from_csv_unfiltered(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(second_page.len(), 10);
+    assert_eq!(second_page.processes.len(), 10);
 
     // Get third page (should have 4 remaining)
     let third_page = flow_process_state_query
@@ -102,18 +113,18 @@ pub async fn test_list_processes_from_csv_unfiltered(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(third_page.len(), 4);
+    assert_eq!(third_page.processes.len(), 4);
 
     // Verify that the pages don't overlap and together form the complete list
     let mut all_pages = Vec::new();
-    all_pages.extend(first_page);
-    all_pages.extend(second_page);
-    all_pages.extend(third_page);
+    all_pages.extend(first_page.processes);
+    all_pages.extend(second_page.processes);
+    all_pages.extend(third_page.processes);
 
     assert_eq!(all_pages.len(), 24);
 
     // Verify that the paginated results match the full list
-    assert_eq!(all_pages, processes);
+    assert_eq!(all_pages, listing.processes);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,9 +135,8 @@ pub async fn test_list_processes_ordering_last_attempt_at_nulls_last(catalog: &C
 
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
-    // Test ordering by last_attempt_at ASC - should have non-nulls first, nulls
-    // last
-    let processes_asc = flow_process_state_query
+    // ordering by last_attempt_at ASC - should have non-nulls first, nulls last
+    let listing_asc = flow_process_state_query
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder {
@@ -140,11 +150,11 @@ pub async fn test_list_processes_ordering_last_attempt_at_nulls_last(catalog: &C
         .unwrap();
 
     // Verify ASC ordering with NULLS LAST
-    assert_last_attempt_at_ordering(&processes_asc, false, "ASC ordering test");
+    assert_last_attempt_at_ordering(&listing_asc.processes, false, "ASC ordering test");
 
-    // Test ordering by last_attempt_at DESC - should have non-nulls first
+    // ordering by last_attempt_at DESC - should have non-nulls first
     // (newest first), nulls last
-    let processes_desc = flow_process_state_query
+    let listing_desc = flow_process_state_query
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder {
@@ -158,7 +168,7 @@ pub async fn test_list_processes_ordering_last_attempt_at_nulls_last(catalog: &C
         .unwrap();
 
     // Verify DESC ordering with NULLS LAST
-    assert_last_attempt_at_ordering(&processes_desc, true, "DESC ordering test");
+    assert_last_attempt_at_ordering(&listing_desc.processes, true, "DESC ordering test");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
