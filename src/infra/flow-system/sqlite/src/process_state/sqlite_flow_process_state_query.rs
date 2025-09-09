@@ -124,8 +124,8 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             FROM flow_process_states
                 WHERE
                     ({scope_conditions}) AND
-                    ($3 = 0 OR $3 IN ({})) AND
-                    ($4 = 0 OR $4 IN ({})) AND
+                    ($3 = 0 OR flow_type IN ({})) AND
+                    ($4 = 0 OR effective_state IN ({})) AND
                     ($5 IS NULL OR $6 IS NULL OR (last_attempt_at BETWEEN $5 AND $6)) AND
                     ($7 IS NULL OR last_failure_at >= $7) AND
                     ($8 IS NULL OR next_planned_at < $8) AND
@@ -225,8 +225,8 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             FROM flow_process_states
                 WHERE
                     ({scope_conditions}) AND
-                    ($1 = 0 OR $1 IN ({})) AND
-                    ($2 = 0 OR $2 IN ({}))
+                    ($1 = 0 OR flow_type IN ({})) AND
+                    ($2 = 0 OR effective_state IN ({}))
             "#,
             for_flow_types
                 .as_ref()
