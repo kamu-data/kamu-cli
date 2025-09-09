@@ -139,6 +139,130 @@ impl<'a> FlowProcessListFilter<'a> {
             ..self
         }
     }
+
+    /// Adding last attempt time window filter.
+    pub fn with_last_attempt_between(
+        self,
+        start: chrono::DateTime<chrono::Utc>,
+        end: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        Self {
+            last_attempt_between: Some((start, end)),
+            ..self
+        }
+    }
+
+    /// Adding last attempt time window filter (optional).
+    pub fn with_last_attempt_between_opt(
+        self,
+        last_attempt_between: Option<(
+            chrono::DateTime<chrono::Utc>,
+            chrono::DateTime<chrono::Utc>,
+        )>,
+    ) -> Self {
+        Self {
+            last_attempt_between,
+            ..self
+        }
+    }
+
+    /// Adding last failure since filter.
+    pub fn with_last_failure_since(
+        self,
+        last_failure_since: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        Self {
+            last_failure_since: Some(last_failure_since),
+            ..self
+        }
+    }
+
+    /// Adding last failure since filter (optional).
+    pub fn with_last_failure_since_opt(
+        self,
+        last_failure_since: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Self {
+        Self {
+            last_failure_since,
+            ..self
+        }
+    }
+
+    /// Adding next planned before filter.
+    pub fn with_next_planned_before(
+        self,
+        next_planned_before: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        Self {
+            next_planned_before: Some(next_planned_before),
+            ..self
+        }
+    }
+
+    /// Adding next planned before filter (optional).
+    pub fn with_next_planned_before_opt(
+        self,
+        next_planned_before: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Self {
+        Self {
+            next_planned_before,
+            ..self
+        }
+    }
+
+    /// Adding next planned after filter.
+    pub fn with_next_planned_after(
+        self,
+        next_planned_after: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        Self {
+            next_planned_after: Some(next_planned_after),
+            ..self
+        }
+    }
+
+    /// Adding next planned after filter (optional).
+    pub fn with_next_planned_after_opt(
+        self,
+        next_planned_after: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Self {
+        Self {
+            next_planned_after,
+            ..self
+        }
+    }
+
+    /// Adding minimum consecutive failures filter.
+    pub fn with_min_consecutive_failures(self, min_consecutive_failures: u32) -> Self {
+        Self {
+            min_consecutive_failures: Some(min_consecutive_failures),
+            ..self
+        }
+    }
+
+    /// Adding minimum consecutive failures filter (optional).
+    pub fn with_min_consecutive_failures_opt(self, min_consecutive_failures: Option<u32>) -> Self {
+        Self {
+            min_consecutive_failures,
+            ..self
+        }
+    }
+
+    /// Adding name contains filter.
+    pub fn with_name_contains(self, name_contains: &'a str) -> Self {
+        Self {
+            name_contains: Some(name_contains),
+            ..self
+        }
+    }
+
+    /// Adding name contains filter (optional).
+    pub fn with_name_contains_opt(self, name_contains: Option<&'a str>) -> Self {
+        Self {
+            name_contains,
+            ..self
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
