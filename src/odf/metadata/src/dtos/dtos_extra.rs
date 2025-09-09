@@ -412,8 +412,11 @@ impl MetadataEventTypeFlags {
     pub const DATA_BLOCK: Self =
         Self::from_bits_retain(Self::ADD_DATA.bits() | Self::EXECUTE_TRANSFORM.bits());
 
+    pub const KEY_BLOCK: Self =
+        Self::from_bits_retain(Self::all().difference(Self::DATA_BLOCK).bits());
+
     pub fn has_data_flags(&self) -> bool {
-        self.bits() & Self::DATA_BLOCK.bits() != 0
+        !(*self & Self::DATA_BLOCK).is_empty()
     }
 }
 
