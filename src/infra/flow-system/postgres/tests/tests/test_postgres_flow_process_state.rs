@@ -160,7 +160,34 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture =
-        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_time_windows,
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_last_attempt_between,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_last_failure_since,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_planned_before,
+    harness = PostgresFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_planned_after,
     harness = PostgresFlowProcessStateHarness
 );
 
