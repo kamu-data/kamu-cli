@@ -209,6 +209,15 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_scope,
+    harness = InMemoryFlowProcessStateHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
         kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_combined_filters,
     harness = InMemoryFlowProcessStateHarness
 );
