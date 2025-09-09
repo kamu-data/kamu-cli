@@ -245,7 +245,7 @@ pub enum FlowProcessOrderField {
     /// Severity bucketing
     EffectiveState,
 
-    /// A–Z over sort ke
+    /// A–Z over sort key
     NameAlpha,
 
     /// By flow type
