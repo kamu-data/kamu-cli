@@ -70,23 +70,27 @@ async fn test_create_root_dataset() {
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <foo_id>
-                Ref: head
-                Prev Head: None
-                New Head: Multihash<Sha3_256>(<new_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: None
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <key_head>
+                Key Block Head: <new_head>
+              }
             "#
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
-        .replace("<new_head>", foo_created.head.to_string().as_str()),
+        .replace("<new_head>", foo_created.head.to_string().as_str())
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<key_tail>", foo_created.head.to_string().as_str())
+        .replace("<key_head>", foo_created.head.to_string().as_str()),
         harness.collected_outbox_messages()
     );
 }

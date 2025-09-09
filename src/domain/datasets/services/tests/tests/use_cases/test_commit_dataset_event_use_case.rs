@@ -53,27 +53,32 @@ async fn test_commit_dataset_event() {
         .await;
     assert_matches!(res, Ok(_));
 
+    let foo_new_head = res.unwrap().new_head.to_string();
     assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <foo_id>
-                Ref: head
-                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
-                New Head: Multihash<Sha3_256>(<new_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: Some(Multihash<Sha3_256>(<old_head>))
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
             "#
         )
         .replace("<foo_id>", dataset_id_foo.to_string().as_str())
         .replace("<old_head>", foo_old_head.to_string().as_str())
-        .replace("<new_head>", res.unwrap().new_head.to_string().as_str()),
+        .replace("<new_head>", foo_new_head.as_str())
+        .replace("<foo_id>", dataset_id_foo.to_string().as_str())
+        .replace("<foo_key_tail>", foo_new_head.as_str())
+        .replace("<foo_key_head>", foo_new_head.as_str()),
         harness.collected_outbox_messages(),
     );
 }
@@ -152,27 +157,31 @@ async fn test_commit_event_with_same_dependencies() {
     assert_matches!(res, Ok(_));
 
     // No dependency updates happened
+    let bar_new_head = res.unwrap().new_head.to_string();
     assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <bar_id>
-                Ref: head
-                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
-                New Head: Multihash<Sha3_256>(<new_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <bar_id>
                 Ref: head
                 Prev Head: Some(Multihash<Sha3_256>(<old_head>))
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <bar_id>
+                Ref: head
+                Key Block Tail: <bar_key_tail>
+                Key Block Head: <bar_key_head>
+              }
             "#
         )
         .replace("<bar_id>", dataset_id_bar.to_string().as_str())
         .replace("<old_head>", bar_old_head.to_string().as_str())
-        .replace("<new_head>", res.unwrap().new_head.to_string().as_str()),
+        .replace("<new_head>", bar_new_head.as_str())
+        .replace("<bar_key_tail>", bar_new_head.as_str())
+        .replace("<bar_key_head>", bar_new_head.as_str()),
         harness.collected_outbox_messages(),
     );
 }
@@ -226,16 +235,11 @@ async fn test_commit_event_with_new_dependencies() {
     assert_matches!(res, Ok(_));
 
     // No dependency updates happened
+    let baz_new_head = res.unwrap().new_head.to_string();
     assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <baz_id>
-                Ref: head
-                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
-                New Head: Multihash<Sha3_256>(<new_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <baz_id>
                 Ref: head
@@ -248,13 +252,23 @@ async fn test_commit_event_with_new_dependencies() {
                 Added: [<bar_id>]
                 Removed: [<foo_id>]
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <baz_id>
+                Ref: head
+                Key Block Tail: <baz_key_tail>
+                Key Block Head: <baz_key_head>
+              }
             "#
         )
         .replace("<foo_id>", dataset_id_foo.to_string().as_str())
         .replace("<bar_id>", dataset_id_bar.to_string().as_str())
         .replace("<baz_id>", dataset_id_baz.to_string().as_str())
         .replace("<old_head>", baz_old_head.to_string().as_str())
-        .replace("<new_head>", res.unwrap().new_head.to_string().as_str()),
+        .replace("<new_head>", baz_new_head.as_str())
+        .replace("<baz_id>", dataset_id_baz.to_string().as_str())
+        .replace("<baz_key_tail>", baz_new_head.as_str())
+        .replace("<baz_key_head>", baz_new_head.as_str()),
         harness.collected_outbox_messages(),
     );
 }

@@ -15,8 +15,8 @@ use pretty_assertions::assert_eq;
 fn test_metadata_event_type_flags_consts() {
     use opendatafabric_metadata::MetadataEventTypeFlags;
 
-    assert_eq!(0, MetadataEventTypeFlags::DATA_BLOCK.bits());
-    assert_eq!(0, MetadataEventTypeFlags::KEY_BLOCK.bits());
+    assert_eq!(3, MetadataEventTypeFlags::DATA_BLOCK.bits());
+    assert_eq!(8188, MetadataEventTypeFlags::KEY_BLOCK.bits());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

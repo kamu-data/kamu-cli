@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use kamu::testing::BaseRepoHarness;
 use kamu_accounts::{DidEntity, DidSecretEncryptionConfig, DidSecretKeyRepository};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
@@ -36,6 +37,16 @@ async fn test_create_root_dataset_from_snapshot() {
         MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id.clone()]);
     let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
+    let hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+        system_time: harness.system_time_source().now(),
+        prev_block_hash: None,
+        sequence_number: 0,
+        event: odf::MetadataEvent::Seed(
+            MetadataFactory::seed(odf::DatasetKind::Root)
+                .id(predefined_foo_id.clone())
+                .build(),
+        ),
+    });
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
         .kind(odf::DatasetKind::Root)
@@ -68,23 +79,27 @@ async fn test_create_root_dataset_from_snapshot() {
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <foo_id>
-                Ref: head
-                Prev Head: None
-                New Head: Multihash<Sha3_256>(<foo_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: None
                 New Head: Multihash<Sha3_256>(<foo_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
             "#
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
-        .replace("<foo_head>", foo_created.head.to_string().as_str()),
+        .replace("<foo_head>", foo_created.head.to_string().as_str())
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<foo_key_tail>", hash_seed_block.to_string().as_str())
+        .replace("<foo_key_head>", foo_created.head.to_string().as_str()),
         harness.collected_outbox_messages(),
     );
 }
@@ -104,12 +119,32 @@ async fn test_create_derived_dataset_from_snapshot() {
     ]);
     let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
+    let foo_hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+        system_time: harness.system_time_source().now(),
+        prev_block_hash: None,
+        sequence_number: 0,
+        event: odf::MetadataEvent::Seed(
+            MetadataFactory::seed(odf::DatasetKind::Root)
+                .id(predefined_foo_id.clone())
+                .build(),
+        ),
+    });
     let snapshot_root = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
         .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
+    let bar_hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+        system_time: harness.system_time_source().now(),
+        prev_block_hash: None,
+        sequence_number: 0,
+        event: odf::MetadataEvent::Seed(
+            MetadataFactory::seed(odf::DatasetKind::Derivative)
+                .id(predefined_bar_id.clone())
+                .build(),
+        ),
+    });
     let snapshot_derived = MetadataFactory::dataset_snapshot()
         .name(alias_bar.clone())
         .kind(odf::DatasetKind::Derivative)
@@ -167,24 +202,12 @@ async fn test_create_derived_dataset_from_snapshot() {
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
-            Dataset Reference Messages: 4
-              Ref Updating {
-                Dataset ID: <foo_id>
-                Ref: head
-                Prev Head: None
-                New Head: Multihash<Sha3_256>(<foo_head>)
-              }
+            Dataset Reference Messages: 2
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: None
                 New Head: Multihash<Sha3_256>(<foo_head>)
-              }
-              Ref Updating {
-                Dataset ID: <bar_id>
-                Ref: head
-                Prev Head: None
-                New Head: Multihash<Sha3_256>(<bar_head>)
               }
               Ref Updated {
                 Dataset ID: <bar_id>
@@ -198,12 +221,31 @@ async fn test_create_derived_dataset_from_snapshot() {
                 Added: [<foo_id>]
                 Removed: []
               }
+            Dataset Key Block Messages: 2
+              Key Blocks Introduced {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
+              Key Blocks Introduced {
+                Dataset ID: <bar_id>
+                Ref: head
+                Key Block Tail: <bar_key_tail>
+                Key Block Head: <bar_key_head>
+              }
             "#
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
         .replace("<bar_id>", predefined_bar_id.to_string().as_str())
         .replace("<foo_head>", foo_created.head.to_string().as_str())
-        .replace("<bar_head>", bar_created.head.to_string().as_str()),
+        .replace("<bar_head>", bar_created.head.to_string().as_str())
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<foo_key_tail>", foo_hash_seed_block.to_string().as_str())
+        .replace("<foo_key_head>", foo_created.head.to_string().as_str())
+        .replace("<bar_id>", predefined_bar_id.to_string().as_str())
+        .replace("<bar_key_tail>", bar_hash_seed_block.to_string().as_str())
+        .replace("<bar_key_head>", bar_created.head.to_string().as_str()),
         harness.collected_outbox_messages(),
     );
 }

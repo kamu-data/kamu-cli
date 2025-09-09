@@ -58,7 +58,7 @@ async fn test_append_dataset_metadata_batch() {
     let hash_set_license_block = BaseRepoHarness::hash_from_block(&set_license_block);
 
     let new_blocks = VecDeque::from([
-        (hash_set_info_block, set_info_block),
+        (hash_set_info_block.clone(), set_info_block),
         (hash_set_license_block.clone(), set_license_block),
     ]);
 
@@ -75,24 +75,31 @@ async fn test_append_dataset_metadata_batch() {
     assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <foo_id>
-                Ref: head
-                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
-                New Head: Multihash<Sha3_256>(<new_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: Some(Multihash<Sha3_256>(<old_head>))
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
             "#
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
         .replace("<old_head>", foo_old_head.to_string().as_str())
-        .replace("<new_head>", hash_set_license_block.to_string().as_str()),
+        .replace("<new_head>", hash_set_license_block.to_string().as_str())
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<foo_key_tail>", hash_set_info_block.to_string().as_str())
+        .replace(
+            "<foo_key_head>",
+            hash_set_license_block.to_string().as_str()
+        ),
         harness.collected_outbox_messages(),
     );
 }
@@ -159,24 +166,34 @@ async fn test_append_dataset_metadata_batch_with_same_dependencies() {
     assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <baz_id>
-                Ref: head
-                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
-                New Head: Multihash<Sha3_256>(<new_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <baz_id>
                 Ref: head
                 Prev Head: Some(Multihash<Sha3_256>(<old_head>))
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <baz_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
             "#
         )
         .replace("<old_head>", baz_old_head.to_string().as_str())
         .replace("<new_head>", hash_set_transform_block.to_string().as_str())
-        .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str()),
+        .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str())
+        .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str())
+        .replace(
+            "<foo_key_tail>",
+            hash_set_transform_block.to_string().as_str()
+        )
+        .replace(
+            "<foo_key_head>",
+            hash_set_transform_block.to_string().as_str()
+        ),
         harness.collected_outbox_messages(),
     );
 }
@@ -236,13 +253,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
     assert_eq!(
         indoc::indoc!(
             r#"
-            Dataset Reference Messages: 2
-              Ref Updating {
-                Dataset ID: <bar_id>
-                Ref: head
-                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
-                New Head: Multihash<Sha3_256>(<new_head>)
-              }
+            Dataset Reference Messages: 1
               Ref Updated {
                 Dataset ID: <bar_id>
                 Ref: head
@@ -255,13 +266,23 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
                 Added: [<baz_id>]
                 Removed: [<foo_id>]
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Introduced {
+                Dataset ID: <bar_id>
+                Ref: head
+                Key Block Tail: <key_tail>
+                Key Block Head: <key_head>
+              }
             "#
         )
         .replace("<old_head>", bar_old_head.to_string().as_str())
         .replace("<new_head>", hash_set_transform_block.to_string().as_str())
         .replace("<foo_id>", foo.dataset_handle.id.to_string().as_str())
         .replace("<bar_id>", bar.dataset_handle.id.to_string().as_str())
-        .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str()),
+        .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str())
+        .replace("<bar_id>", bar.dataset_handle.id.to_string().as_str())
+        .replace("<key_tail>", hash_set_transform_block.to_string().as_str())
+        .replace("<key_head>", hash_set_transform_block.to_string().as_str()),
         harness.collected_outbox_messages(),
     );
 }

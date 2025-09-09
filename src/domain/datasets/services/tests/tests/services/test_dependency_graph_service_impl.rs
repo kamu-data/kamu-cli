@@ -29,6 +29,7 @@ use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -664,7 +665,8 @@ impl DependencyGraphHarness {
         .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
-        .add::<InMemoryDatasetKeyBlockRepository>();
+        .add::<InMemoryDatasetKeyBlockRepository>()
+        .add::<DatasetKeyBlockUpdateHandler>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,
@@ -679,6 +681,11 @@ impl DependencyGraphHarness {
         register_message_dispatcher::<DatasetDependenciesMessage>(
             &mut b,
             MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+        );
+
+        register_message_dispatcher::<DatasetKeyBlocksMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
         );
 
         let catalog_without_subject = b.build();
