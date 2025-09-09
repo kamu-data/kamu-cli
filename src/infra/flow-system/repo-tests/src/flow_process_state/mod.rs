@@ -7,11 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
+pub(crate) mod csv_flow_process_state_loader;
 
-pub mod test_flow_configuration_event_store;
-pub mod test_flow_event_store;
-pub mod test_flow_trigger_event_store;
+mod test_flow_process_state_basics;
+mod test_flow_process_state_listing;
+mod test_flow_process_state_rollup;
 
-mod flow_process_state;
-pub use flow_process_state::*;
+pub mod test_flow_process_state {
+    pub use super::test_flow_process_state_basics::*;
+    pub use super::test_flow_process_state_listing::*;
+    pub use super::test_flow_process_state_rollup::*;
+}
