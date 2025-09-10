@@ -288,7 +288,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         }
     }
 
-    async fn schedule_flow(
+    async fn on_flow_scheduled(
         &self,
         flow_binding: FlowBinding,
         planned_at: DateTime<Utc>,
