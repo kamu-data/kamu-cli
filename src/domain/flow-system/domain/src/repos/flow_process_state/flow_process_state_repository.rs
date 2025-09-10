@@ -19,7 +19,7 @@ use crate::{FlowBinding, FlowTriggerStopPolicy};
 #[async_trait::async_trait]
 pub trait FlowProcessStateRepository: Send + Sync {
     /// Insert a new row when a trigger is created.
-    async fn insert_process(
+    async fn insert_process_state(
         &self,
         flow_binding: FlowBinding,
         sort_key: String,
@@ -31,7 +31,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
     /// Update trigger-related fields
     async fn update_trigger_state(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         paused_manual: Option<bool>,
         stop_policy: Option<FlowTriggerStopPolicy>,
         trigger_event_id: EventID,
@@ -40,7 +40,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
     /// Apply a flow result (success or failure).
     async fn apply_flow_result(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
         flow_event_id: EventID,
@@ -49,14 +49,16 @@ pub trait FlowProcessStateRepository: Send + Sync {
     /// React to flow being scheduled.
     async fn on_flow_scheduled(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError>;
 
     /// Remove row when trigger is deleted.
-    async fn delete_process(&self, flow_binding: FlowBinding)
-    -> Result<(), FlowProcessDeleteError>;
+    async fn delete_process_state(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<(), FlowProcessDeleteError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

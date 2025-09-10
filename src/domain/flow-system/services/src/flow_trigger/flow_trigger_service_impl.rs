@@ -69,8 +69,12 @@ impl FlowTriggerServiceImpl {
                 .await
                 .int_err()?;
 
-            self.publish_flow_trigger_modified(&flow_trigger, request_time)
-                .await?;
+            self.publish_flow_trigger_modified(
+                &flow_trigger,
+                flow_trigger.last_stored_event_id().is_none(),
+                request_time,
+            )
+            .await?;
         }
 
         Ok(flow_trigger.into())
@@ -79,13 +83,16 @@ impl FlowTriggerServiceImpl {
     async fn publish_flow_trigger_modified(
         &self,
         state: &FlowTriggerState,
+        is_new: bool,
         request_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         let message = FlowTriggerUpdatedMessage {
             event_time: request_time,
             flow_binding: state.flow_binding.clone(),
             rule: state.rule.clone(),
+            stop_policy: state.stop_policy,
             trigger_status: state.status,
+            is_new_trigger: is_new,
         };
 
         self.outbox

@@ -44,6 +44,15 @@ impl WebhookSubscription {
         )
     }
 
+    pub fn sort_key(&self) -> String {
+        let label = self.label();
+        if label.as_ref().is_empty() {
+            self.id().to_string()
+        } else {
+            label.to_string()
+        }
+    }
+
     pub fn enable(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventEnabled {
             event_time: chrono::Utc::now(),

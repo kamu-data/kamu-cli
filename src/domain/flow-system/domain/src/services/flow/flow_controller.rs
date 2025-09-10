@@ -47,6 +47,9 @@ pub trait FlowController: Send + Sync {
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError>;
+
+    async fn make_flow_sort_key(&self, flow_binding: &FlowBinding)
+    -> Result<String, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,6 +14,7 @@ use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::{LogicalPlanDatasetHardCompact, TaskResultDatasetHardCompact};
 use kamu_core::CompactionResult;
+use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::InMemoryFlowEventStore;
 use kamu_task_system::LogicalPlan;
@@ -163,7 +164,8 @@ impl FlowControllerCompactHarness {
         b.add::<FlowControllerCompact>()
             .add::<InMemoryFlowEventStore>()
             .add_value(mock_flow_sensor_dispatcher)
-            .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>();
+            .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
+            .add::<FakeDatasetEntryService>();
 
         let catalog = b.build();
         Self {
