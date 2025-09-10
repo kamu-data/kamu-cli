@@ -188,8 +188,8 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
     async fn update_trigger_state(
         &self,
         flow_binding: &FlowBinding,
-        paused_manual: Option<bool>,
-        stop_policy: Option<FlowTriggerStopPolicy>,
+        paused_manual: bool,
+        stop_policy: FlowTriggerStopPolicy,
         trigger_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state

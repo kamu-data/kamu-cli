@@ -521,7 +521,12 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
         .unwrap();
 
     flow_process_repository
-        .update_trigger_state(&flow_binding, Some(true), None, EventID::new(4))
+        .update_trigger_state(
+            &flow_binding,
+            true,
+            FlowTriggerStopPolicy::default(),
+            EventID::new(4),
+        )
         .await
         .unwrap();
 
@@ -745,7 +750,12 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
 
     // Update trigger state
     flow_process_repository
-        .update_trigger_state(&flow_binding, Some(true), None, EventID::new(3))
+        .update_trigger_state(
+            &flow_binding,
+            true,
+            FlowTriggerStopPolicy::default(),
+            EventID::new(3),
+        )
         .await
         .unwrap();
 
