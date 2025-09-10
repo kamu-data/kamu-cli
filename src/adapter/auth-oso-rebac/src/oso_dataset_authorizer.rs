@@ -195,7 +195,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = dataset_handle.as_local_ref();
                 unauthorized_handles_with_errors.push((
                     dataset_handle,
-                    MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
                         dataset_ref,
                         action,
                     ),
@@ -255,7 +255,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = dataset_id.as_local_ref();
                 unauthorized_ids_with_errors.push((
                     dataset_id,
-                    MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
                         dataset_ref,
                         action,
                     ),

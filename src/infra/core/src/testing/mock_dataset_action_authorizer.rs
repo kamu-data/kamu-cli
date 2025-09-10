@@ -12,12 +12,12 @@ use std::collections::HashSet;
 
 use internal_error::InternalError;
 use kamu_core::auth::{
+    ClassifyByAllowanceDatasetActionUnauthorizedError,
     ClassifyByAllowanceIdsResponse,
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetActionUnauthorizedError,
-    MultipleDatasetActionUnauthorizedError,
 };
 use mockall::Predicate;
 use mockall::predicate::{always, eq, function};
@@ -92,7 +92,7 @@ impl MockDatasetActionAuthorizer {
                             } else {
                                 (
                                     id.as_ref().clone(),
-                                    MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
                                         id.as_local_ref(),
                                         action,
                                     ),
@@ -118,7 +118,7 @@ impl MockDatasetActionAuthorizer {
                             } else {
                                 (
                                     hdl.clone(),
-                                    MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
                                         hdl.id.as_local_ref(),
                                         action,
                                     ),
@@ -273,7 +273,7 @@ impl MockDatasetActionAuthorizer {
                     if authorized.contains(&handle.alias) {
                         good.push(handle);
                     } else {
-                        let error = MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                        let error = ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
                             handle.as_local_ref(),
                             action,
                         );
@@ -310,7 +310,7 @@ impl MockDatasetActionAuthorizer {
                             acc.authorized_ids.push(dataset_id.as_ref().clone());
                         } else {
                             let error =
-                                MultipleDatasetActionUnauthorizedError::not_enough_permissions(
+                                ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
                                     dataset_id.as_local_ref(),
                                     action,
                                 );

@@ -63,7 +63,7 @@ impl PushDatasetUseCaseImpl {
                 local_handle: Some(hdl),
                 target: push_target.cloned(),
                 result: Err(PushError::SyncError({
-                    use kamu_core::auth::MultipleDatasetActionUnauthorizedError as E;
+                    use kamu_core::auth::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
 
                     match error {
                         E::NotFound(e) => SyncError::DatasetNotFound(e.into()),

@@ -54,7 +54,7 @@ impl ApplyAccountDatasetRelationsUseCaseImpl {
         let mut not_found_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         let mut unauthorized_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         for (dataset_id, e) in unauthorized_ids_with_errors {
-            use kamu_core::auth::MultipleDatasetActionUnauthorizedError as E;
+            use kamu_core::auth::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
 
             match e {
                 E::NotFound(_) => {

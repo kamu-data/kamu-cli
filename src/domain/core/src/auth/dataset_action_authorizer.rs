@@ -285,7 +285,7 @@ pub struct DatasetActionNotEnoughPermissionsError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum MultipleDatasetActionUnauthorizedError {
+pub enum ClassifyByAllowanceDatasetActionUnauthorizedError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 
@@ -300,7 +300,7 @@ pub enum MultipleDatasetActionUnauthorizedError {
     Internal(#[from] InternalError),
 }
 
-impl MultipleDatasetActionUnauthorizedError {
+impl ClassifyByAllowanceDatasetActionUnauthorizedError {
     pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
         Self::Access(odf::AccessError::Unauthorized(
             DatasetActionNotEnoughPermissionsError {
@@ -317,8 +317,10 @@ impl MultipleDatasetActionUnauthorizedError {
 #[derive(Debug)]
 pub struct ClassifyByAllowanceResponse {
     pub authorized_handles: Vec<odf::DatasetHandle>,
-    pub unauthorized_handles_with_errors:
-        Vec<(odf::DatasetHandle, MultipleDatasetActionUnauthorizedError)>,
+    pub unauthorized_handles_with_errors: Vec<(
+        odf::DatasetHandle,
+        ClassifyByAllowanceDatasetActionUnauthorizedError,
+    )>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -397,7 +399,10 @@ where
 #[derive(Debug)]
 pub struct ClassifyByAllowanceIdsResponse {
     pub authorized_ids: Vec<odf::DatasetID>,
-    pub unauthorized_ids_with_errors: Vec<(odf::DatasetID, MultipleDatasetActionUnauthorizedError)>,
+    pub unauthorized_ids_with_errors: Vec<(
+        odf::DatasetID,
+        ClassifyByAllowanceDatasetActionUnauthorizedError,
+    )>,
 }
 
 #[cfg(any(feature = "testing", test))]
