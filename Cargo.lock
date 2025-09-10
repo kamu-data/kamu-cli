@@ -4795,6 +4795,7 @@ dependencies = [
  "event-sourcing-macros",
  "futures",
  "internal-error",
+ "serde",
  "thiserror 2.0.16",
  "tokio",
  "tokio-stream",

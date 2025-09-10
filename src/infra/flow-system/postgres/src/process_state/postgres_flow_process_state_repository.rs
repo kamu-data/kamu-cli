@@ -117,19 +117,19 @@ impl PostgresFlowProcessStateRepository {
 impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
     async fn insert_process_state(
         &self,
+        trigger_event_id: EventID,
         flow_binding: FlowBinding,
         sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-        trigger_event_id: EventID,
     ) -> Result<(), FlowProcessInsertError> {
         let state = FlowProcessState::new(
+            trigger_event_id,
             self.time_source.now(),
             flow_binding,
             sort_key,
             paused_manual,
             stop_policy,
-            trigger_event_id,
         );
 
         let scope_data_json = serde_json::to_value(&state.flow_binding().scope).int_err()?;
@@ -188,9 +188,9 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
     async fn update_trigger_state(
         &self,
         flow_binding: &FlowBinding,
+        trigger_event_id: EventID,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-        trigger_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
         let mut process_state = match self.load_process_state(flow_binding).await {
@@ -212,10 +212,10 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         // Apply updates in memory
         process_state
             .update_trigger_state(
+                trigger_event_id,
                 self.time_source.now(),
                 paused_manual,
                 stop_policy,
-                trigger_event_id,
             )
             .int_err()?;
 
@@ -238,10 +238,10 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
     async fn apply_flow_result(
         &self,
+        flow_event_id: EventID,
         flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-        flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
         let mut process_state = match self.load_process_state(flow_binding).await {
@@ -263,11 +263,11 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         // Apply updates in memory
         if success {
             process_state
-                .on_success(self.time_source.now(), event_time, flow_event_id)
+                .on_success(flow_event_id, self.time_source.now(), event_time)
                 .int_err()?;
         } else {
             process_state
-                .on_failure(self.time_source.now(), event_time, flow_event_id)
+                .on_failure(flow_event_id, self.time_source.now(), event_time)
                 .int_err()?;
         }
 
@@ -290,9 +290,9 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
     async fn on_flow_scheduled(
         &self,
+        flow_event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-        flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
         let mut process_state = match self.load_process_state(flow_binding).await {
@@ -313,7 +313,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
         // Apply flow scheduling
         process_state
-            .on_scheduled(self.time_source.now(), planned_at, flow_event_id)
+            .on_scheduled(flow_event_id, self.time_source.now(), planned_at)
             .int_err()?;
 
         // Try saving back

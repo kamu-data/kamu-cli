@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use event_sourcing::EventID;
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +25,9 @@ const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 4;
 pub struct FlowTriggerUpdatedMessage {
     /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
+
+    /// The unique identifier for the event
+    pub event_id: EventID,
 
     /// The unique binding identifying the flow
     pub flow_binding: FlowBinding,
