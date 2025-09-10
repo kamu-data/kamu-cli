@@ -87,7 +87,7 @@ async fn test_create_root_dataset_from_snapshot() {
                 New Head: Multihash<Sha3_256>(<foo_head>)
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <foo_id>
                 Ref: head
                 Key Block Tail: <foo_key_tail>
@@ -222,13 +222,13 @@ async fn test_create_derived_dataset_from_snapshot() {
                 Removed: []
               }
             Dataset Key Block Messages: 2
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <foo_id>
                 Ref: head
                 Key Block Tail: <foo_key_tail>
                 Key Block Head: <foo_key_head>
               }
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <bar_id>
                 Ref: head
                 Key Block Tail: <bar_key_tail>

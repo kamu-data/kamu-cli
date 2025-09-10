@@ -81,7 +81,7 @@ impl DatasetKeyBlockUpdateHandler {
             self.outbox
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
-                    DatasetKeyBlocksMessage::introduced(
+                    DatasetKeyBlocksMessage::appended(
                         &message.dataset_id,
                         &message.block_ref,
                         &tail_key_block.block_hash,

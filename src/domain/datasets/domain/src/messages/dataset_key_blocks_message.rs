@@ -19,12 +19,12 @@ const DATASET_REFERENCE_OUTBOX_VERSION: u32 = 1;
 /// Represents messages related to dataset key blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetKeyBlocksMessage {
-    /// Message indicating that dataset key blocks have been introduced.
-    Introduced(DatasetKeyBlocksMessageIntroduced),
+    /// Message indicating that dataset key blocks have been appended.
+    Appended(DatasetKeyBlocksMessageAppended),
 }
 
 impl DatasetKeyBlocksMessage {
-    pub fn introduced(
+    pub fn appended(
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         tail_key_block_hash: &odf::Multihash,
@@ -32,7 +32,7 @@ impl DatasetKeyBlocksMessage {
         key_blocks_event_flags: odf::metadata::MetadataEventTypeFlags,
         divergence_detected: bool,
     ) -> Self {
-        Self::Introduced(DatasetKeyBlocksMessageIntroduced {
+        Self::Appended(DatasetKeyBlocksMessageAppended {
             dataset_id: dataset_id.clone(),
             block_ref: block_ref.clone(),
             tail_key_block_hash: tail_key_block_hash.clone(),
@@ -51,13 +51,13 @@ impl Message for DatasetKeyBlocksMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Contains details about introduced dataset key blocks.
+/// Contains details about appended dataset key blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetKeyBlocksMessageIntroduced {
+pub struct DatasetKeyBlocksMessageAppended {
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
-    /// The reference for which key blocks were introduced.
+    /// The reference for which key blocks were appended.
     pub block_ref: odf::BlockRef,
 
     /// The tail interval key block hash (inclusive).

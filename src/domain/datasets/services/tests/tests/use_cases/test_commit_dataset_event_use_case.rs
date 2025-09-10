@@ -65,7 +65,7 @@ async fn test_commit_dataset_event() {
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <foo_id>
                 Ref: head
                 Key Block Tail: <foo_key_tail>
@@ -169,7 +169,7 @@ async fn test_commit_event_with_same_dependencies() {
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <bar_id>
                 Ref: head
                 Key Block Tail: <bar_key_tail>
@@ -253,7 +253,7 @@ async fn test_commit_event_with_new_dependencies() {
                 Removed: [<foo_id>]
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <baz_id>
                 Ref: head
                 Key Block Tail: <baz_key_tail>

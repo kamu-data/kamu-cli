@@ -83,7 +83,7 @@ async fn test_append_dataset_metadata_batch() {
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <foo_id>
                 Ref: head
                 Key Block Tail: <foo_key_tail>
@@ -174,7 +174,7 @@ async fn test_append_dataset_metadata_batch_with_same_dependencies() {
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <baz_id>
                 Ref: head
                 Key Block Tail: <foo_key_tail>
@@ -267,7 +267,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
                 Removed: [<foo_id>]
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <bar_id>
                 Ref: head
                 Key Block Tail: <key_tail>

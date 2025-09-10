@@ -227,8 +227,8 @@ impl std::fmt::Display for TestDatasetOutboxListener {
 
             for msg in &guard.dataset_key_blocks_messages {
                 match msg {
-                    DatasetKeyBlocksMessage::Introduced(msg) => {
-                        writeln!(f, "  Key Blocks Introduced {{",)?;
+                    DatasetKeyBlocksMessage::Appended(msg) => {
+                        writeln!(f, "  Key Blocks Appended {{",)?;
                         writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
                         writeln!(f, "    Ref: {}", msg.block_ref)?;
                         writeln!(f, "    Key Block Tail: {}", msg.tail_key_block_hash)?;

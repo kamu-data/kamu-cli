@@ -17,7 +17,7 @@ use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetDependencyRepository,
     DatasetKeyBlocksMessage,
-    DatasetKeyBlocksMessageIntroduced,
+    DatasetKeyBlocksMessageAppended,
     DependencyGraphService,
     MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
@@ -52,9 +52,9 @@ pub struct DependencyGraphImmediateListener {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DependencyGraphImmediateListener {
-    async fn handle_dataset_key_blocks_introduced_message(
+    async fn handle_dataset_key_blocks_appended_message(
         &self,
-        message: &DatasetKeyBlocksMessageIntroduced,
+        message: &DatasetKeyBlocksMessageAppended,
     ) -> Result<(), InternalError> {
         // For now, react only on Head updates
         if message.block_ref != odf::dataset::BlockRef::Head {
@@ -83,7 +83,7 @@ impl DependencyGraphImmediateListener {
     async fn handle_derived_dependency_updates(
         &self,
         target: ResolvedDataset,
-        message: &DatasetKeyBlocksMessageIntroduced,
+        message: &DatasetKeyBlocksMessageAppended,
     ) -> Result<(), InternalError> {
         // Compute if there are modified dependencies
         let dependency_change = extract_modified_dependencies_in_interval(
@@ -176,8 +176,8 @@ impl MessageConsumerT<DatasetKeyBlocksMessage> for DependencyGraphImmediateListe
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
-            DatasetKeyBlocksMessage::Introduced(message) => {
-                self.handle_dataset_key_blocks_introduced_message(message)
+            DatasetKeyBlocksMessage::Appended(message) => {
+                self.handle_dataset_key_blocks_appended_message(message)
                     .await
             }
         }

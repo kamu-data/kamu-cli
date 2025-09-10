@@ -78,7 +78,7 @@ async fn test_create_root_dataset() {
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
             Dataset Key Block Messages: 1
-              Key Blocks Introduced {
+              Key Blocks Appended {
                 Dataset ID: <foo_id>
                 Ref: head
                 Key Block Tail: <key_head>
