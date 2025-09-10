@@ -70,7 +70,8 @@ impl DatasetKeyBlockUpdateHandler {
 
         let CollectKeyBlockResponse {
             key_blocks,
-            divergence_detected: _, // We don't care about divergence here
+            key_event_flags,
+            divergence_detected,
         } = self.update_dataset_key_blocks(target, message).await?;
 
         if !key_blocks.is_empty() {
@@ -85,6 +86,8 @@ impl DatasetKeyBlockUpdateHandler {
                         &message.block_ref,
                         &tail_key_block.block_hash,
                         &head_key_block.block_hash,
+                        key_event_flags,
+                        divergence_detected,
                     ),
                 )
                 .await?;

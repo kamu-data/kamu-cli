@@ -29,12 +29,16 @@ impl DatasetKeyBlocksMessage {
         block_ref: &odf::BlockRef,
         tail_key_block_hash: &odf::Multihash,
         head_key_block_hash: &odf::Multihash,
+        key_blocks_event_flags: odf::metadata::MetadataEventTypeFlags,
+        divergence_detected: bool,
     ) -> Self {
         Self::Introduced(DatasetKeyBlocksMessageIntroduced {
             dataset_id: dataset_id.clone(),
             block_ref: block_ref.clone(),
             tail_key_block_hash: tail_key_block_hash.clone(),
             head_key_block_hash: head_key_block_hash.clone(),
+            key_blocks_event_flags,
+            divergence_detected,
         })
     }
 }
@@ -64,6 +68,13 @@ pub struct DatasetKeyBlocksMessageIntroduced {
     /// present.
     /// Note: Data blocks might be present within the interval (exclusive).
     pub head_key_block_hash: odf::Multihash,
+
+    /// Key blocks event flags present within the interval.
+    pub key_blocks_event_flags: odf::metadata::MetadataEventTypeFlags,
+
+    /// A flag indicating that a chain of blocks has been rewritten.
+    /// This can happen as a result of a dataset reset or force push.
+    pub divergence_detected: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
