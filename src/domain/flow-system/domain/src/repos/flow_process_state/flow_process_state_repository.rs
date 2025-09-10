@@ -43,7 +43,14 @@ pub trait FlowProcessStateRepository: Send + Sync {
         flow_binding: FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-        next_planned_at: Option<DateTime<Utc>>,
+        flow_event_id: EventID,
+    ) -> Result<(), FlowProcessUpdateError>;
+
+    /// Schedule a flow to run at a specific time.
+    async fn schedule_flow(
+        &self,
+        flow_binding: FlowBinding,
+        planned_at: DateTime<Utc>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError>;
 
