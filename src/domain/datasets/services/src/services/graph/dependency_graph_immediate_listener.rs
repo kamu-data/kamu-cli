@@ -90,6 +90,7 @@ impl DependencyGraphImmediateListener {
             target.as_metadata_chain(),
             &message.head_key_block_hash,
             Some(&message.tail_key_block_hash),
+            Some(message.key_blocks_event_flags),
         )
         .await?;
 

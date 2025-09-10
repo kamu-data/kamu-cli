@@ -93,8 +93,13 @@ impl DependencyGraphIndexer {
 
             // Compute if there are some dependencies
             if let DependencyChange::Changed(upstream_ids) =
-                extract_modified_dependencies_in_interval(dataset.as_metadata_chain(), &head, None)
-                    .await?
+                extract_modified_dependencies_in_interval(
+                    dataset.as_metadata_chain(),
+                    &head,
+                    None,
+                    None,
+                )
+                .await?
             {
                 self.dataset_dependency_repo
                     .add_upstream_dependencies(
