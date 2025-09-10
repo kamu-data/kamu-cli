@@ -465,26 +465,18 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
 
         if success {
             process_state
-                .on_success(
-                    self.time_source.now(),
-                    event_time,
-                    flow_event_id,
-                )
+                .on_success(self.time_source.now(), event_time, flow_event_id)
                 .int_err()?;
         } else {
             process_state
-                .on_failure(
-                    self.time_source.now(),
-                    event_time,
-                    flow_event_id,
-                )
+                .on_failure(self.time_source.now(), event_time, flow_event_id)
                 .int_err()?;
         }
 
         Ok(())
     }
 
-    async fn schedule_flow(
+    async fn on_flow_scheduled(
         &self,
         flow_binding: FlowBinding,
         planned_at: DateTime<Utc>,

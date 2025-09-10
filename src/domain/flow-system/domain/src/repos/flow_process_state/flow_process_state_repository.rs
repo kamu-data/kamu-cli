@@ -46,8 +46,8 @@ pub trait FlowProcessStateRepository: Send + Sync {
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError>;
 
-    /// Schedule a flow to run at a specific time.
-    async fn schedule_flow(
+    /// React to flow being scheduled.
+    async fn on_flow_scheduled(
         &self,
         flow_binding: FlowBinding,
         planned_at: DateTime<Utc>,
