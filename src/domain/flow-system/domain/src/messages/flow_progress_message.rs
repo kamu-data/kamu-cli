@@ -11,96 +11,11 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    FlowBinding,
-    FlowConfigurationRule,
-    FlowID,
-    FlowOutcome,
-    FlowTriggerRule,
-    FlowTriggerStatus,
-};
+use crate::{FlowBinding, FlowID, FlowOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const FLOW_AGENT_UPDATE_OUTBOX_VERSION: u32 = 1;
-const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 2;
-const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 3;
-const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents a message indicating that a flow's configuration has been updated
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowConfigurationUpdatedMessage {
-    /// The time at which the event was recorded
-    pub event_time: DateTime<Utc>,
-
-    /// The unique key identifying the flow
-    pub flow_binding: FlowBinding,
-
-    /// The updated configuration rule for the flow
-    pub rule: FlowConfigurationRule,
-}
-
-impl Message for FlowConfigurationUpdatedMessage {
-    fn version() -> u32 {
-        FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents a message indicating that a flow's trigger has been updated
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowTriggerUpdatedMessage {
-    /// The time at which the event was recorded
-    pub event_time: DateTime<Utc>,
-
-    /// The unique binding identifying the flow
-    pub flow_binding: FlowBinding,
-
-    /// Status of the trigger
-    pub trigger_status: FlowTriggerStatus,
-
-    /// The updated trigger rule for the flow
-    pub rule: FlowTriggerRule,
-}
-
-impl Message for FlowTriggerUpdatedMessage {
-    fn version() -> u32 {
-        FLOW_TRIGGER_UPDATE_OUTBOX_VERSION
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents a message indicating that a flow agent has been updated
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowAgentUpdatedMessage {
-    /// The time at which the update occurred
-    pub update_time: DateTime<Utc>,
-
-    /// The details of the agent update.
-    pub update_details: FlowAgentUpdateDetails,
-}
-
-impl Message for FlowAgentUpdatedMessage {
-    fn version() -> u32 {
-        FLOW_AGENT_UPDATE_OUTBOX_VERSION
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents different types of updates to a flow agent
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FlowAgentUpdateDetails {
-    /// Indicates that the agent has been loaded
-    Loaded,
-
-    /// Indicates that the agent has executed a timeslot
-    ExecutedTimeslot,
-}
+const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -134,47 +49,93 @@ impl FlowProgressMessage {
     pub fn scheduled(
         event_time: DateTime<Utc>,
         flow_id: FlowID,
+        flow_binding: FlowBinding,
         scheduled_for_activation_at: DateTime<Utc>,
     ) -> Self {
         Self::Scheduled(FlowProgressMessageScheduled {
             event_time,
             flow_id,
+            flow_binding,
             scheduled_for_activation_at,
         })
     }
 
-    pub fn running(event_time: DateTime<Utc>, flow_id: FlowID) -> Self {
+    pub fn running(event_time: DateTime<Utc>, flow_id: FlowID, flow_binding: FlowBinding) -> Self {
         Self::Running(FlowProgressMessageRunning {
             event_time,
             flow_id,
+            flow_binding,
         })
     }
 
     pub fn retry_scheduled(
         event_time: DateTime<Utc>,
         flow_id: FlowID,
+        flow_binding: FlowBinding,
         scheduled_for_activation_at: DateTime<Utc>,
     ) -> Self {
         Self::RetryScheduled(FlowProgressMessageRetryScheduled {
             event_time,
             flow_id,
+            flow_binding,
             scheduled_for_activation_at,
         })
     }
 
-    pub fn finished(event_time: DateTime<Utc>, flow_id: FlowID, outcome: FlowOutcome) -> Self {
+    pub fn finished(
+        event_time: DateTime<Utc>,
+        flow_id: FlowID,
+        flow_binding: FlowBinding,
+        outcome: FlowOutcome,
+    ) -> Self {
         Self::Finished(FlowProgressMessageFinished {
             event_time,
             flow_id,
+            flow_binding,
             outcome,
         })
     }
 
-    pub fn cancelled(event_time: DateTime<Utc>, flow_id: FlowID) -> Self {
+    pub fn cancelled(
+        event_time: DateTime<Utc>,
+        flow_id: FlowID,
+        flow_binding: FlowBinding,
+    ) -> Self {
         Self::Cancelled(FlowProgressMessageCancelled {
             event_time,
             flow_id,
+            flow_binding,
         })
+    }
+
+    pub fn event_time(&self) -> DateTime<Utc> {
+        match self {
+            FlowProgressMessage::Scheduled(msg) => msg.event_time,
+            FlowProgressMessage::Running(msg) => msg.event_time,
+            FlowProgressMessage::RetryScheduled(msg) => msg.event_time,
+            FlowProgressMessage::Finished(msg) => msg.event_time,
+            FlowProgressMessage::Cancelled(msg) => msg.event_time,
+        }
+    }
+
+    pub fn flow_id(&self) -> &FlowID {
+        match self {
+            FlowProgressMessage::Scheduled(msg) => &msg.flow_id,
+            FlowProgressMessage::Running(msg) => &msg.flow_id,
+            FlowProgressMessage::RetryScheduled(msg) => &msg.flow_id,
+            FlowProgressMessage::Finished(msg) => &msg.flow_id,
+            FlowProgressMessage::Cancelled(msg) => &msg.flow_id,
+        }
+    }
+
+    pub fn flow_binding(&self) -> &FlowBinding {
+        match self {
+            FlowProgressMessage::Scheduled(msg) => &msg.flow_binding,
+            FlowProgressMessage::Running(msg) => &msg.flow_binding,
+            FlowProgressMessage::RetryScheduled(msg) => &msg.flow_binding,
+            FlowProgressMessage::Finished(msg) => &msg.flow_binding,
+            FlowProgressMessage::Cancelled(msg) => &msg.flow_binding,
+        }
     }
 }
 
@@ -186,6 +147,9 @@ pub struct FlowProgressMessageScheduled {
 
     /// The unique identifier of the flow
     pub flow_id: FlowID,
+
+    /// Flow binding
+    pub flow_binding: FlowBinding,
 
     /// The scheduled activation time for the flow
     pub scheduled_for_activation_at: DateTime<Utc>,
@@ -199,6 +163,9 @@ pub struct FlowProgressMessageRunning {
 
     /// The unique identifier of the flow
     pub flow_id: FlowID,
+
+    /// Flow binding
+    pub flow_binding: FlowBinding,
 }
 
 /// Contains details about a retrying flow
@@ -209,6 +176,9 @@ pub struct FlowProgressMessageRetryScheduled {
 
     /// The unique identifier of the flow
     pub flow_id: FlowID,
+
+    /// Flow binding
+    pub flow_binding: FlowBinding,
 
     /// The scheduled activation time for the flow
     pub scheduled_for_activation_at: DateTime<Utc>,
@@ -223,6 +193,9 @@ pub struct FlowProgressMessageFinished {
     /// The unique identifier of the flow
     pub flow_id: FlowID,
 
+    /// Flow binding
+    pub flow_binding: FlowBinding,
+
     /// The outcome of the flow execution
     pub outcome: FlowOutcome,
 }
@@ -235,6 +208,9 @@ pub struct FlowProgressMessageCancelled {
 
     /// The unique identifier of the flow
     pub flow_id: FlowID,
+
+    /// Flow binding
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

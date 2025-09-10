@@ -45,7 +45,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
         event_time: DateTime<Utc>,
         next_planned_at: Option<DateTime<Utc>>,
         flow_event_id: EventID,
-    ) -> Result<(), FlowProcessApplyResultError>;
+    ) -> Result<(), FlowProcessUpdateError>;
 
     /// Remove row when trigger is deleted.
     async fn delete_process(&self, flow_binding: FlowBinding)
@@ -67,20 +67,6 @@ pub enum FlowProcessInsertError {
 
 #[derive(Error, Debug)]
 pub enum FlowProcessUpdateError {
-    #[error(transparent)]
-    NotFound(FlowProcessNotFoundError),
-
-    #[error(transparent)]
-    ConcurrentModification(FlowProcessConcurrentModificationError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum FlowProcessApplyResultError {
     #[error(transparent)]
     NotFound(FlowProcessNotFoundError),
 
