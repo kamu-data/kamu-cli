@@ -13,8 +13,6 @@
 // Re-exports
 pub use event_sourcing::*;
 
-mod flow_messages_types;
-
 mod agents;
 mod aggregates;
 mod entities;
@@ -26,7 +24,6 @@ mod services;
 pub use agents::*;
 pub use aggregates::*;
 pub use entities::*;
-pub use flow_messages_types::*;
 pub use jobs::*;
 pub use messages::*;
 pub use repos::*;

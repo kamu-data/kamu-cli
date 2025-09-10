@@ -49,7 +49,11 @@ impl FlowAbortHelper {
                 self.outbox
                     .post_message(
                         MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                        FlowProgressMessage::cancelled(self.time_source.now(), flow.flow_id),
+                        FlowProgressMessage::cancelled(
+                            self.time_source.now(),
+                            flow.flow_id,
+                            flow.flow_binding.clone(),
+                        ),
                     )
                     .await?;
             }

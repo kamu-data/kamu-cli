@@ -235,6 +235,7 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
 
 #[async_trait::async_trait]
 impl FlowScopeRemovalHandler for FlowSensorDispatcherImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(flow_scope = ?flow_scope))]
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
 

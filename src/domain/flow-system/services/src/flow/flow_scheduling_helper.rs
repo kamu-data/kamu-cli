@@ -517,7 +517,12 @@ impl FlowSchedulingHelper {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                FlowProgressMessage::scheduled(self.time_source.now(), flow.flow_id, activate_at),
+                FlowProgressMessage::scheduled(
+                    self.time_source.now(),
+                    flow.flow_id,
+                    flow.flow_binding.clone(),
+                    activate_at,
+                ),
             )
             .await
     }
