@@ -51,6 +51,15 @@ impl FlowProcessEffectiveState {
             FlowProcessEffectiveState::Active
         }
     }
+
+    /// Returns true if the flow process is in a running state (Active or
+    /// Failing), false if it's stopped or paused
+    pub fn is_running(self) -> bool {
+        matches!(
+            self,
+            FlowProcessEffectiveState::Active | FlowProcessEffectiveState::Failing
+        )
+    }
 }
 
 impl<T> std::ops::Index<FlowProcessEffectiveState> for [T] {
@@ -87,6 +96,17 @@ mod tests {
             },
         );
         assert_eq!(state, FlowProcessEffectiveState::Active);
+    }
+
+    #[test]
+    fn test_is_running() {
+        // Active and Failing states should be considered running
+        assert!(FlowProcessEffectiveState::Active.is_running());
+        assert!(FlowProcessEffectiveState::Failing.is_running());
+
+        // StoppedAuto and PausedManual should not be considered running
+        assert!(!FlowProcessEffectiveState::StoppedAuto.is_running());
+        assert!(!FlowProcessEffectiveState::PausedManual.is_running());
     }
 
     #[test]
