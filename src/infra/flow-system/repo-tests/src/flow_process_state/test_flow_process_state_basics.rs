@@ -151,8 +151,17 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
             flow_binding.clone(),
             true,
             success_time,
-            Some(success_time + Duration::hours(1)),
             EventID::new(1),
+        )
+        .await
+        .unwrap();
+    
+    // Schedule flow after success
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            success_time + Duration::hours(1),
+            EventID::new(2),
         )
         .await
         .unwrap();
@@ -163,8 +172,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
             flow_binding.clone(),
             false,
             failure_time,
-            None,
-            EventID::new(2),
+            EventID::new(3),
         )
         .await
         .unwrap();
@@ -192,7 +200,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
         single_state.last_applied_trigger_event_id(),
         EventID::new(1)
     );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(2));
+    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(3));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -250,8 +258,17 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
             flow_binding.clone(),
             true,
             success_time,
-            Some(success_time + Duration::hours(1)),
-            EventID::new(1),
+            EventID::new(2),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after success
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            success_time + Duration::hours(1),
+            EventID::new(3),
         )
         .await
         .unwrap();
@@ -262,8 +279,17 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
             flow_binding.clone(),
             false,
             failure_time,
-            Some(failure_time + Duration::hours(1)),
-            EventID::new(2),
+            EventID::new(4),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after failure
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            failure_time + Duration::hours(1),
+            EventID::new(5),
         )
         .await
         .unwrap();
@@ -275,11 +301,22 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
             flow_binding.clone(),
             false,
             second_failure_time,
-            next_run_time,
-            EventID::new(3),
+            EventID::new(6),
         )
         .await
         .unwrap();
+
+    // Schedule after second failure if needed
+    if let Some(planned_at) = next_run_time {
+        flow_process_repository
+            .schedule_flow(
+                flow_binding.clone(),
+                planned_at,
+                EventID::new(7),
+            )
+            .await
+            .unwrap();
+    }
 
     let single_state = flow_process_state_query
         .try_get_process_state(&ingest_dataset_binding(&dataset_id))
@@ -304,7 +341,7 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
         single_state.last_applied_trigger_event_id(),
         EventID::new(1)
     );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(3));
+    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(7));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -362,8 +399,17 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
             flow_binding.clone(),
             true,
             success_time,
-            Some(success_time + Duration::hours(1)),
-            EventID::new(1),
+            EventID::new(2),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after success
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            success_time + Duration::hours(1),
+            EventID::new(3),
         )
         .await
         .unwrap();
@@ -374,8 +420,17 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
             flow_binding.clone(),
             false,
             failure_time,
-            Some(failure_time + Duration::hours(1)),
-            EventID::new(2),
+            EventID::new(4),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after failure
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            failure_time + Duration::hours(1),
+            EventID::new(5),
         )
         .await
         .unwrap();
@@ -386,8 +441,17 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
             flow_binding.clone(),
             false,
             second_failure_time,
-            Some(second_failure_time + Duration::hours(1)),
-            EventID::new(3),
+            EventID::new(6),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after second failure
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            second_failure_time + Duration::hours(1),
+            EventID::new(7),
         )
         .await
         .unwrap();
@@ -398,8 +462,17 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
             flow_binding.clone(),
             true,
             recovery_time,
-            Some(recovery_time + Duration::hours(1)),
-            EventID::new(4),
+            EventID::new(8),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after recovery
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            recovery_time + Duration::hours(1),
+            EventID::new(9),
         )
         .await
         .unwrap();
@@ -430,7 +503,7 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
         single_state.last_applied_trigger_event_id(),
         EventID::new(1)
     );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(4));
+    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(9));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -486,14 +559,23 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
             flow_binding.clone(),
             true,
             success_time,
-            Some(success_time + Duration::hours(1)),
-            EventID::new(1),
+            EventID::new(2),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after success
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            success_time + Duration::hours(1),
+            EventID::new(3),
         )
         .await
         .unwrap();
 
     flow_process_repository
-        .update_trigger_state(flow_binding.clone(), Some(true), None, EventID::new(2))
+        .update_trigger_state(flow_binding.clone(), Some(true), None, EventID::new(4))
         .await
         .unwrap();
 
@@ -515,15 +597,12 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
     assert_eq!(single_state.last_success_at(), Some(success_time));
     assert_eq!(single_state.last_failure_at(), None);
     assert_eq!(single_state.last_attempt_at(), Some(success_time));
-    assert_eq!(
-        single_state.next_planned_at(),
-        Some(success_time + Duration::hours(1)),
-    );
+    assert_eq!(single_state.next_planned_at(), None); // Cleared when paused
     assert_eq!(
         single_state.last_applied_trigger_event_id(),
-        EventID::new(2)
+        EventID::new(4) // Updated to match new event ID sequence
     );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(1));
+    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(3));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -692,8 +771,17 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
             flow_binding.clone(),
             true,
             success_time,
-            Some(success_time + Duration::hours(1)),
-            EventID::new(1),
+            EventID::new(2),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after success
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            success_time + Duration::hours(1),
+            EventID::new(3),
         )
         .await
         .unwrap();
@@ -704,8 +792,17 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
             flow_binding.clone(),
             false,
             failure_time,
-            Some(failure_time + Duration::hours(1)),
-            EventID::new(2),
+            EventID::new(4),
+        )
+        .await
+        .unwrap();
+
+    // Schedule after failure
+    flow_process_repository
+        .schedule_flow(
+            flow_binding.clone(),
+            failure_time + Duration::hours(1),
+            EventID::new(5),
         )
         .await
         .unwrap();
