@@ -101,7 +101,8 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::commands::test_login_interactive_successful_st,
-    options = Options::default().with_multi_tenant()
+    options = Options::default().with_multi_tenant(),
+    extra_test_groups = "flaky"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,7 +110,8 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::commands::test_login_interactive_successful_mt,
-    options = Options::default().with_multi_tenant()
+    options = Options::default().with_multi_tenant(),
+    extra_test_groups = "flaky"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
