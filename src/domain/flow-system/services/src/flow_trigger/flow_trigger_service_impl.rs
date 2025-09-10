@@ -64,17 +64,15 @@ impl FlowTriggerServiceImpl {
     ) -> Result<FlowTriggerState, InternalError> {
         // Skip saving and publishing events if nothing changed
         if flow_trigger.has_updates() {
+            let is_new_trigger = flow_trigger.last_stored_event_id().is_none();
+
             flow_trigger
                 .save(self.flow_trigger_event_store.as_ref())
                 .await
                 .int_err()?;
 
-            self.publish_flow_trigger_modified(
-                &flow_trigger,
-                flow_trigger.last_stored_event_id().is_none(),
-                request_time,
-            )
-            .await?;
+            self.publish_flow_trigger_modified(&flow_trigger, is_new_trigger, request_time)
+                .await?;
         }
 
         Ok(flow_trigger.into())
@@ -82,17 +80,21 @@ impl FlowTriggerServiceImpl {
 
     async fn publish_flow_trigger_modified(
         &self,
-        state: &FlowTriggerState,
-        is_new: bool,
+        trigger: &FlowTrigger,
+        is_new_trigger: bool,
         request_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         let message = FlowTriggerUpdatedMessage {
             event_time: request_time,
-            flow_binding: state.flow_binding.clone(),
-            rule: state.rule.clone(),
-            stop_policy: state.stop_policy,
-            trigger_status: state.status,
-            is_new_trigger: is_new,
+            event_id: trigger
+                .last_stored_event_id()
+                .copied()
+                .expect("must have event id"),
+            flow_binding: trigger.flow_binding.clone(),
+            rule: trigger.rule.clone(),
+            stop_policy: trigger.stop_policy,
+            trigger_status: trigger.status,
+            is_new_trigger,
         };
 
         self.outbox
