@@ -15,8 +15,10 @@ use kamu_webhooks::{
     CreateWebhookSubscriptionUseCase,
     WebhookEventTypeCatalog,
     WebhookSubscriptionLabel,
+    WebhookSubscriptionQueryMode,
 };
 use kamu_webhooks_services::{CreateWebhookSubscriptionUseCaseImpl, WebhookSecretGeneratorImpl};
+use messaging_outbox::{MockOutbox, Outbox};
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -26,8 +28,15 @@ use super::WebhookSubscriptionUseCaseHarness;
 async fn test_create_in_dataset_success() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let harness = CreateWebhookSubscriptionUseCaseHarness::new();
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&dataset_id),
+        1,
+    );
 
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
     let res = harness
         .use_case
         .execute(
@@ -46,7 +55,7 @@ async fn test_create_in_dataset_success() {
 async fn test_invalid_target_url_rejected() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let harness = CreateWebhookSubscriptionUseCaseHarness::new();
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
 
     let invalid_urls = vec![
         "http://example.com",
@@ -79,7 +88,7 @@ async fn test_invalid_target_url_rejected() {
 async fn test_no_event_types_rejected() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let harness = CreateWebhookSubscriptionUseCaseHarness::new();
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
 
     let res = harness
         .use_case
@@ -102,7 +111,15 @@ async fn test_no_event_types_rejected() {
 async fn test_event_types_deduplicated() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let harness = CreateWebhookSubscriptionUseCaseHarness::new();
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&dataset_id),
+        1,
+    );
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
 
     let res = harness
         .use_case
@@ -121,7 +138,10 @@ async fn test_event_types_deduplicated() {
     // Find the subscription and ensure it has only one event type
 
     let subscription = harness
-        .find_subscription(res.unwrap().subscription_id)
+        .find_subscription(
+            res.unwrap().subscription_id,
+            WebhookSubscriptionQueryMode::Active,
+        )
         .await
         .unwrap();
 
@@ -139,7 +159,21 @@ async fn test_label_unique_in_dataset() {
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let harness = CreateWebhookSubscriptionUseCaseHarness::new();
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&dataset_id_1),
+        1,
+    );
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&dataset_id_2),
+        1,
+    );
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
 
     // First subscription
     let res = harness
@@ -191,12 +225,14 @@ struct CreateWebhookSubscriptionUseCaseHarness {
 }
 
 impl CreateWebhookSubscriptionUseCaseHarness {
-    fn new() -> Self {
+    fn new(mock_outbox: MockOutbox) -> Self {
         let base_harness = WebhookSubscriptionUseCaseHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<CreateWebhookSubscriptionUseCaseImpl>();
         b.add::<WebhookSecretGeneratorImpl>();
+        b.add_value(mock_outbox);
+        b.bind::<dyn Outbox, MockOutbox>();
 
         let catalog = b.build();
 

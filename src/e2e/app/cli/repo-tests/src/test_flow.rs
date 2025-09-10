@@ -307,72 +307,58 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       ingestResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
-                          __typename
                         }
                         ... on FlowDescriptionUpdateResultSuccess {
                           numBlocks
                           numRecords
                           updatedWatermark
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionDatasetPushIngest {
                       sourceName
-                      inputRecordsCount
                       ingestResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
-                          __typename
                         }
                         ... on FlowDescriptionUpdateResultSuccess {
                           numBlocks
                           numRecords
                           updatedWatermark
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionDatasetExecuteTransform {
                       transformResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
-                          __typename
                         }
                         ... on FlowDescriptionUpdateResultSuccess {
                           numBlocks
                           numRecords
                           updatedWatermark
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionDatasetHardCompaction {
                       compactionResult {
-                        ... on FlowDescriptionHardCompactionSuccess {
+                        ... on FlowDescriptionReorganizationSuccess {
                           originalBlocksCount
                           resultingBlocksCount
                           newHead
-                          __typename
                         }
-                        ... on FlowDescriptionHardCompactionNothingToDo {
+                        ... on FlowDescriptionReorganizationNothingToDo {
                           message
                           dummy
-                          __typename
                         }
                         __typename
                       }
-                      __typename
                     }
                     ... on FlowDescriptionSystemGC {
                       dummy
-                      __typename
                     }
                     ... on FlowDescriptionDatasetReset {
                       resetResult {
@@ -380,6 +366,20 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                         __typename
                       }
                       __typename
+                    }
+                    ... on FlowDescriptionDatasetResetToMetadata {
+                      resetToMetadataResult {
+                        ... on FlowDescriptionReorganizationSuccess {
+                          originalBlocksCount
+                          resultingBlocksCount
+                          newHead
+                        }
+                        ... on FlowDescriptionReorganizationNothingToDo {
+                          message
+                          dummy
+                        }
+                        __typename
+                      }
                     }
                     __typename
                   }
@@ -407,18 +407,21 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       shiftedFrom
                       __typename
                     }
-                    ... on FlowStartConditionBatching {
+                    ... on FlowStartConditionReactive {
                       activeBatchingRule {
-                        minRecordsToAwait
-                        maxBatchingInterval {
-                          ...TimeDeltaData
-                          __typename
+                        ... on FlowTriggerBatchingRuleBuffering {
+                          minRecordsToAwait
+                          maxBatchingInterval {
+                            ...TimeDeltaData
+                            __typename
+                          }
                         }
                         __typename
                       }
                       batchingDeadline
                       accumulatedRecordsCount
                       watermarkModified
+                      forBreakingChange
                       __typename
                     }
                     ... on FlowStartConditionSchedule {
@@ -433,13 +436,10 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   configSnapshot {
                     ... on FlowConfigRuleIngest {
                       fetchUncacheable
-                      __typename
                     }
                     ... on FlowConfigRuleCompaction {
-                      compactionMode {
-                        __typename
-                      }
-                      __typename
+                      maxSliceSize
+                      maxSliceRecords
                     }
                     __typename
                   }
@@ -465,6 +465,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     reason {
                       ... on TaskFailureReasonGeneral {
                         message
+                        recoverable
                         __typename
                       }
                       ... on TaskFailureReasonInputDatasetCompacted {
@@ -1186,6 +1187,115 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_trigger_flow_reset_metadata_only(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await;
+    let dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
+
+    // Ingesting data in multiple chunks
+
+    for chunk in [
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    ] {
+        kamu_api_server_client
+            .dataset()
+            .ingest_data(&dataset_alias, RequestBody::NdJson(chunk.into()))
+            .await;
+    }
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            op,system_time,match_time,match_id,player_id,score
+            0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
+            0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
+            0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
+            0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
+            0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
+            0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
+        ),
+        kamu_api_server_client
+            .odf_query()
+            .query_player_scores_dataset()
+            .await
+    );
+
+    // Verify that there are multiple date blocks (3 AddData)
+
+    pretty_assertions::assert_eq!(
+        vec![
+            (6, odf::metadata::MetadataEventTypeFlags::ADD_DATA),
+            (5, odf::metadata::MetadataEventTypeFlags::ADD_DATA),
+            (4, odf::metadata::MetadataEventTypeFlags::ADD_DATA),
+            (3, odf::metadata::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::metadata::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::metadata::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset()
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_reset_to_metadata_only(&root_dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
+
+    pretty_assertions::assert_eq!(
+        "", // empty, as we have reset all data records
+        kamu_api_server_client
+            .odf_query()
+            .query_player_scores_dataset()
+            .await
+    );
+
+    // Checking that there is now only one block of data
+
+    pretty_assertions::assert_eq!(
+        vec![
+            (3, odf::metadata::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::metadata::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::metadata::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset()
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServerClient) {
     let temp_dir = tempfile::tempdir().unwrap();
 
@@ -1235,7 +1345,7 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
         "alias",
         "add",
         &dataset_alias.dataset_name,
-        "http://foo",
+        "http://foo", // Invalid URL to trigger recoverable failure
         "--pull",
     ])
     .await
@@ -1292,7 +1402,8 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                     "__typename": "FlowFailedError",
                                     "reason": {
                                       "__typename": "TaskFailureReasonGeneral",
-                                      "message": "FAILED"
+                                      "message": "FAILED",
+                                      "recoverable": true
                                     }
                                   },
                                   "startCondition": null,
@@ -1325,7 +1436,8 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                   "__typename": "FlowFailedError",
                                   "reason": {
                                     "__typename": "TaskFailureReasonGeneral",
-                                    "message": "FAILED"
+                                    "message": "FAILED",
+                                    "recoverable": true
                                   }
                                 },
                                 "startCondition": null,
@@ -1357,7 +1469,8 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                   "__typename": "FlowFailedError",
                                   "reason": {
                                     "__typename": "TaskFailureReasonGeneral",
-                                    "message": "FAILED"
+                                    "message": "FAILED",
+                                    "recoverable": true
                                   }
                                 },
                                 "status": "FINISHED",
@@ -1589,79 +1702,78 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               ingestResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
-                  __typename
                 }
                 ... on FlowDescriptionUpdateResultSuccess {
                   numBlocks
                   numRecords
                   updatedWatermark
-                  __typename
                 }
-                __typename
               }
               __typename
             }
             ... on FlowDescriptionDatasetPushIngest {
               sourceName
-              inputRecordsCount
               ingestResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
-                  __typename
                 }
                 ... on FlowDescriptionUpdateResultSuccess {
                   numBlocks
                   numRecords
                   updatedWatermark
-                  __typename
                 }
                 __typename
               }
-              __typename
             }
             ... on FlowDescriptionDatasetExecuteTransform {
               transformResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
-                  __typename
                 }
                 ... on FlowDescriptionUpdateResultSuccess {
                   numBlocks
                   numRecords
                   updatedWatermark
-                  __typename
                 }
                 __typename
               }
-              __typename
             }
             ... on FlowDescriptionDatasetHardCompaction {
               compactionResult {
-                ... on FlowDescriptionHardCompactionSuccess {
+                ... on FlowDescriptionReorganizationSuccess {
                   originalBlocksCount
                   resultingBlocksCount
                   newHead
-                  __typename
                 }
-                ... on FlowDescriptionHardCompactionNothingToDo {
+                ... on FlowDescriptionReorganizationNothingToDo {
                   message
                   dummy
-                  __typename
                 }
                 __typename
               }
-              __typename
             }
             ... on FlowDescriptionSystemGC {
               dummy
-              __typename
             }
             ... on FlowDescriptionDatasetReset {
               resetResult {
                 newHead
                 __typename
               }
-              __typename
+            }
+            ... on FlowDescriptionDatasetResetToMetadata {
+              resetToMetadataResult {
+                ... on FlowDescriptionReorganizationSuccess {
+                  originalBlocksCount
+                  resultingBlocksCount
+                  newHead
+                }
+                ... on FlowDescriptionReorganizationNothingToDo {
+                  message
+                  dummy
+                }
+                __typename
+              }
             }
             __typename
           }
@@ -1686,18 +1798,23 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               shiftedFrom
               __typename
             }
-            ... on FlowStartConditionBatching {
+            ... on FlowStartConditionReactive {
               activeBatchingRule {
-                minRecordsToAwait
-                maxBatchingInterval {
-                  ...TimeDeltaData
-                  __typename
+                ... on FlowTriggerBatchingRule {
+                  ... on FlowTriggerBatchingRuleBuffering {
+                    minRecordsToAwait
+                    maxBatchingInterval {
+                      ...TimeDeltaData
+                      __typename
+                    }
+                  }
                 }
                 __typename
               }
               batchingDeadline
               accumulatedRecordsCount
               watermarkModified
+              forBreakingChange
               __typename
             }
             ... on FlowStartConditionSchedule {
@@ -1714,9 +1831,8 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               fetchUncacheable
             }
             ... on FlowConfigRuleCompaction {
-              compactionMode {
-                  __typename
-              }
+              maxSliceSize
+              maxSliceRecords
             }
             __typename
           }
@@ -1742,6 +1858,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
             reason {
               ... on TaskFailureReasonGeneral {
                 message
+                recoverable
                 __typename
               }
               ... on TaskFailureReasonInputDatasetCompacted {

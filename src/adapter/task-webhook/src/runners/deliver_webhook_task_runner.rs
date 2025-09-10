@@ -11,9 +11,14 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_task_system::*;
-use kamu_webhooks::WebhookDeliveryWorker;
+use kamu_webhooks::{
+    WebhookDeliveryError,
+    WebhookDeliveryID,
+    WebhookDeliveryWorker,
+    WebhookSendError,
+};
 
-use crate::TaskDefinitionWebhookDeliver;
+use crate::{TaskDefinitionWebhookDeliver, TaskErrorWebhookDelivery};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,19 +37,46 @@ impl DeliverWebhookTaskRunner {
         &self,
         task_webhook: TaskDefinitionWebhookDeliver,
     ) -> Result<TaskOutcome, InternalError> {
+        let webhook_delivery_id = WebhookDeliveryID::new(uuid::Uuid::new_v4());
+        let webhook_subscription_id = task_webhook.webhook_subscription_id;
+
         match self
             .webhook_delivery_worker
             .deliver_webhook(
-                task_webhook.task_id,
-                task_webhook.webhook_subscription_id,
-                task_webhook.webhook_event_id,
+                webhook_delivery_id,
+                webhook_subscription_id,
+                task_webhook.webhook_event_type,
+                task_webhook.webhook_payload,
             )
             .await
         {
             Ok(_) => Ok(TaskOutcome::Success(TaskResult::empty())),
             Err(err) => {
-                tracing::error!(error = ?err, "Send webhook failed");
-                Ok(TaskOutcome::Failed(TaskError::empty()))
+                tracing::error!(
+                    error = ?err,
+                    error_msg = %err,
+                    "Webhook delivery failed"
+                );
+
+                match err {
+                    WebhookDeliveryError::UnsuccessfulResponse(e) => Ok(TaskOutcome::Failed(
+                        TaskErrorWebhookDelivery::UnsuccessfulResponse(e).into_task_error(),
+                    )),
+                    WebhookDeliveryError::SendError(WebhookSendError::FailedToConnect(e)) => {
+                        Ok(TaskOutcome::Failed(
+                            TaskErrorWebhookDelivery::FailedToConnect(e).into_task_error(),
+                        ))
+                    }
+                    WebhookDeliveryError::SendError(WebhookSendError::ConnectionTimeout(e)) => {
+                        Ok(TaskOutcome::Failed(
+                            TaskErrorWebhookDelivery::ConnectionTimeout(e).into_task_error(),
+                        ))
+                    }
+                    WebhookDeliveryError::SendError(WebhookSendError::Internal(_))
+                    | WebhookDeliveryError::Internal(_) => {
+                        Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+                    }
+                }
             }
         }
     }

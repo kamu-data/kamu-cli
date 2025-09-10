@@ -12,43 +12,46 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
+    FlowActivationCause,
     FlowBinding,
     FlowConfigurationRule,
     FlowID,
     FlowNotFoundError,
     FlowState,
-    FlowTriggerInstance,
     FlowTriggerRule,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowRunService: Sync + Send {
     /// Initiates the specified flow manually, unless it's already waiting
     async fn run_flow_manually(
         &self,
-        trigger_time: DateTime<Utc>,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError>;
 
-    /// Initiates the specified flow with custom trigger instance,
+    /// Initiates the specified flow with custom activation cause,
     /// unless it's already waiting
-    async fn run_flow_with_trigger(
+    async fn run_flow_automatically(
         &self,
         flow_binding: &FlowBinding,
-        trigger_instance: FlowTriggerInstance,
+        activation_causes: Vec<FlowActivationCause>,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError>;
 
-    /// Attempts to cancel the tasks already scheduled for the given flow
-    async fn cancel_scheduled_tasks(
+    /// Attempts to cancel the tasks already scheduled for the given flow.
+    /// Will result in auto-stopping a flow trigger for periodic flows.
+    async fn cancel_flow_run(
         &self,
+        cancellation_time: DateTime<Utc>,
         flow_id: FlowID,
-    ) -> Result<FlowState, CancelScheduledTasksError>;
+    ) -> Result<FlowState, CancelFlowRunError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,16 +65,17 @@ pub enum RunFlowError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum CancelScheduledTasksError {
+pub enum CancelFlowRunError {
     #[error(transparent)]
     NotFound(#[from] FlowNotFoundError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<LoadError<FlowState>> for CancelScheduledTasksError {
+impl From<LoadError<FlowState>> for CancelFlowRunError {
     fn from(value: LoadError<FlowState>) -> Self {
         match value {
             LoadError::NotFound(err) => Self::NotFound(FlowNotFoundError { flow_id: err.query }),

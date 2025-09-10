@@ -185,7 +185,7 @@ fn normalize_transform(transform: &mut Transform) -> Result<(), InvalidSnapshotE
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves dataset references in transform intputs and ensures that:
+/// Resolves dataset references in transform inputs and ensures that:
 /// - input datasets are always references by unique IDs
 /// - that query alias is populated (manually or from the initial reference)
 async fn resolve_transform_inputs(
@@ -219,15 +219,15 @@ async fn resolve_transform_inputs(
     }
 
     if !missing_inputs.is_empty() {
-        Err(ValidateDatasetSnapshotError::MissingInputs(
+        return Err(ValidateDatasetSnapshotError::MissingInputs(
             MissingInputsError {
                 dataset_ref: output_dataset_alias.into(),
                 missing_inputs,
             },
-        ))
-    } else {
-        Ok(())
+        ));
     }
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

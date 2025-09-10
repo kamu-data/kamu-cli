@@ -270,7 +270,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     let event_2_3 = TaskEventFinished {
         event_time: Utc::now(),
         task_id: task_id_2,
-        outcome: TaskOutcome::Failed(TaskError::empty()),
+        outcome: TaskOutcome::Failed(TaskError::empty_recoverable()),
     };
 
     event_store

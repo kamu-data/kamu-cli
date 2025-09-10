@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::WebhookResponse;
 
@@ -21,7 +23,38 @@ pub trait WebhookSender: Send + Sync {
         target_url: url::Url,
         payload_bytes: bytes::Bytes,
         headers: http::HeaderMap,
-    ) -> Result<WebhookResponse, InternalError>;
+    ) -> Result<WebhookResponse, WebhookSendError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum WebhookSendError {
+    #[error(transparent)]
+    FailedToConnect(#[from] WebhookSendFailedToConnectError),
+
+    #[error(transparent)]
+    ConnectionTimeout(#[from] WebhookSendConnectionTimeoutError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[error("Failed to connect to webhook target URL: '{target_url}'")]
+pub struct WebhookSendFailedToConnectError {
+    pub target_url: url::Url,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[error("Webhook target URL '{target_url}' timed out after {timeout:?}")]
+pub struct WebhookSendConnectionTimeoutError {
+    pub target_url: url::Url,
+    pub timeout: std::time::Duration,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

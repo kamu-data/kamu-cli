@@ -42,7 +42,11 @@ impl PostgresWebhookSubscriptionEventStore {
             .iter()
             .map(|t| t.as_ref().to_string())
             .collect::<Vec<_>>();
-        let label = created_event.label.as_ref();
+        let label = if created_event.label.as_ref().is_empty() {
+            None
+        } else {
+            Some(created_event.label.as_ref())
+        };
 
         sqlx::query!(
             r#"
@@ -147,6 +151,12 @@ impl PostgresWebhookSubscriptionEventStore {
         if let Some(updated_label) = updated_label {
             let connection_mut = tr.connection_mut().await?;
 
+            let label = if updated_label.as_ref().is_empty() {
+                None
+            } else {
+                Some(updated_label.as_ref())
+            };
+
             sqlx::query!(
                 r#"
                 UPDATE webhook_subscriptions
@@ -154,7 +164,7 @@ impl PostgresWebhookSubscriptionEventStore {
                     WHERE id = $1
                 "#,
                 event_subscription_id,
-                updated_label.as_ref(),
+                label,
             )
             .execute(connection_mut)
             .await

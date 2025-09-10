@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
+use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::upload_service::{
     FileUploadLimitConfig,
@@ -40,10 +41,12 @@ use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AccountServiceImpl,
     AuthenticationServiceImpl,
+    CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
+    UpdateAccountUseCaseImpl,
 };
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -52,7 +55,7 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_core::{MediaType, TenancyConfig};
+use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -110,6 +113,8 @@ impl Harness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
                 .add::<InMemoryRebacRepository>()
+                .add::<UpdateAccountUseCaseImpl>()
+                .add::<CreateAccountUseCaseImpl>()
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()

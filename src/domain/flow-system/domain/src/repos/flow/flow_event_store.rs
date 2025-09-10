@@ -29,11 +29,10 @@ pub trait FlowEventStore: EventStore<FlowState> {
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowID>, InternalError>;
 
-    /// Attempts to access all the pending (unfinished) flow ID for the given
-    /// dataset
-    async fn try_get_all_dataset_pending_flows(
+    /// Attempts to access all the pending flow IDs for the given scope
+    async fn try_get_all_scope_pending_flows(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowID>, InternalError>;
 
     /// Returns last run statistics for certain type
@@ -41,6 +40,12 @@ pub trait FlowEventStore: EventStore<FlowState> {
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<FlowRunStats, InternalError>;
+
+    /// Returns current number of consecutive failures for the given flow
+    async fn get_current_consecutive_flow_failures_count(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<u32, InternalError>;
 
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError>;
@@ -51,66 +56,31 @@ pub trait FlowEventStore: EventStore<FlowState> {
         scheduled_for_activation_at: DateTime<Utc>,
     ) -> Result<Vec<FlowID>, InternalError>;
 
-    /// Returns IDs of the flows associated with the specified
-    /// dataset in reverse chronological order based on creation time.
+    /// Returns IDs of the flows where scope matches the pattern,
+    /// in reverse chronological order based on creation time.
     /// Applies filters/pagination, if specified
-    fn get_all_flow_ids_by_dataset(
+    fn get_all_flow_ids_matching_scope_query(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream;
 
-    /// Returns IDs of the flow initiators associated with the specified
-    /// dataset in reverse chronological order based on creation time.
-    fn get_unique_flow_initiator_ids_by_dataset(
+    /// Returns number of flows associated matching filters, if specified
+    async fn get_count_flows_matching_scope_query(
         &self,
-        dataset_id: &odf::DatasetID,
-    ) -> InitiatorIDStream;
-
-    /// Returns number of flows associated with the specified dataset and
-    /// matching filters, if specified
-    async fn get_count_flows_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope_query: &FlowScopeQuery,
         filters: &FlowFilters,
     ) -> Result<usize, InternalError>;
 
-    /// Returns number of flows associated with the specified datasets and
-    /// matching filters, if specified
-    async fn get_count_flows_by_multiple_datasets(
-        &self,
-        dataset_ids: &[&odf::DatasetID],
-        filters: &FlowFilters,
-    ) -> Result<usize, InternalError>;
+    /// Returns IDs of the flow initiators, where flow scope matches the pattern
+    fn list_scoped_flow_initiators(&self, scope_query: FlowScopeQuery) -> InitiatorIDStream;
 
-    /// Returns IDs of the datasets who have any flows associated with them
-    async fn filter_datasets_having_flows(
+    /// Returns scopes having any flows associated with them
+    async fn filter_flow_scopes_having_flows(
         &self,
-        dataset_ids: &[&odf::DatasetID],
-    ) -> Result<Vec<odf::DatasetID>, InternalError>;
-
-    /// Returns IDs of the flows associated with the specified
-    /// dataset in reverse chronological order based on creation time.
-    /// Applies filters/pagination, if specified
-    fn get_all_flow_ids_by_datasets(
-        &self,
-        dataset_ids: &[&odf::DatasetID],
-        filters: &FlowFilters,
-        pagination: PaginationOpts,
-    ) -> FlowIDStream;
-
-    /// Returns IDs of the system flows  in reverse chronological order based on
-    /// creation time
-    /// Applies filters/pagination, if specified
-    fn get_all_system_flow_ids(
-        &self,
-        filters: &FlowFilters,
-        pagination: PaginationOpts,
-    ) -> FlowIDStream;
-
-    /// Returns number of system flows matching filters, if specified
-    async fn get_count_system_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError>;
+        flow_scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError>;
 
     /// Returns IDs of the flows of any type matching the given filters in
     /// reverse chronological order based on creation time
@@ -123,6 +93,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Returns number of all flows, matching filters
     async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError>;
 
+    /// Returns stream of flow states for the given flow IDs
     fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream;
 }
 
@@ -130,14 +101,6 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
 #[derive(Default, Debug, Clone)]
 pub struct FlowFilters {
-    pub by_flow_type: Option<String>,
-    pub by_flow_status: Option<FlowStatus>,
-    pub by_initiator: Option<InitiatorFilter>,
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct AccountFlowFilters {
-    pub by_dataset_ids: HashSet<odf::DatasetID>,
     pub by_flow_type: Option<String>,
     pub by_flow_status: Option<FlowStatus>,
     pub by_initiator: Option<InitiatorFilter>,

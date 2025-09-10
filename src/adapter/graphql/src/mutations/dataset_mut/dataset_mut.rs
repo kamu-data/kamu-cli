@@ -34,6 +34,20 @@ impl DatasetMut {
         }
     }
 
+    /// Convert to read-only accessor to a dataset
+    async fn dataset(&self, ctx: &Context<'_>) -> Result<Dataset> {
+        let owner = Account::from_dataset_alias(ctx, self.dataset_request_state.dataset_alias())
+            .await?
+            .expect("Account must exist");
+
+        // NOTE: Not reusing any cached state as it could've been altered by preceeding
+        // mutations
+        Ok(Dataset::new_access_checked(
+            owner,
+            self.dataset_request_state.dataset_handle().clone(),
+        ))
+    }
+
     /// Access to the mutable metadata of the dataset
     async fn metadata(&self) -> DatasetMetadataMut {
         DatasetMetadataMut::new(&self.dataset_request_state)
@@ -208,27 +222,25 @@ impl DatasetMut {
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = DatasetMut_as_versioned_file, skip_all)]
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileMut>> {
-        if !Dataset::is_versioned_file(self.dataset_request_state.resolved_dataset(ctx).await?)
-            .await?
-        {
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
             return Ok(None);
         }
 
-        Ok(Some(VersionedFileMut::new(
-            self.dataset_request_state.resolved_dataset(ctx).await?,
-        )))
+        Ok(Some(VersionedFileMut::new(&self.dataset_request_state)))
     }
 
     /// Downcast a dataset to a collection interface
     #[tracing::instrument(level = "info", name = DatasetMut_as_collection, skip_all)]
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<CollectionMut>> {
-        if !Dataset::is_collection(self.dataset_request_state.resolved_dataset(ctx).await?).await? {
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {
             return Ok(None);
         }
 
-        Ok(Some(CollectionMut::new(
-            self.dataset_request_state.resolved_dataset(ctx).await?,
-        )))
+        Ok(Some(CollectionMut::new(&self.dataset_request_state)))
     }
 }
 

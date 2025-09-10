@@ -42,7 +42,7 @@ impl HardCompactDatasetTaskPlanner {
         let compaction_options = CompactionOptions {
             max_slice_size: args.max_slice_size,
             max_slice_records: args.max_slice_records,
-            keep_metadata_only: args.keep_metadata_only,
+            keep_metadata_only: false,
         };
 
         let compaction_plan = compaction_planner

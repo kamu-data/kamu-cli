@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_adapter_task_dataset::{TaskErrorDatasetReset, TaskErrorDatasetUpdate};
+use kamu_adapter_task_webhook::TaskErrorWebhookDelivery;
 use kamu_core::DatasetRegistry;
 use kamu_task_system as ts;
 
@@ -72,16 +73,24 @@ pub struct TaskOutcomeFailed {
 pub enum TaskFailureReason {
     General(TaskFailureReasonGeneral),
     InputDatasetCompacted(TaskFailureReasonInputDatasetCompacted),
+    WebhookDeliveryProblem(TaskFailureReasonWebhookDeliveryProblem),
 }
 
 #[derive(SimpleObject, Debug)]
 pub struct TaskFailureReasonGeneral {
     message: String,
+    recoverable: bool,
 }
 
 #[derive(SimpleObject, Debug)]
 pub struct TaskFailureReasonInputDatasetCompacted {
     input_dataset: Dataset,
+    message: String,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct TaskFailureReasonWebhookDeliveryProblem {
+    target_url: url::Url,
     message: String,
 }
 
@@ -94,6 +103,7 @@ impl TaskFailureReason {
             ts::TaskError::TASK_ERROR_EMPTY => {
                 TaskFailureReason::General(TaskFailureReasonGeneral {
                     message: "FAILED".to_owned(),
+                    recoverable: e.recoverable,
                 })
             }
 
@@ -128,15 +138,42 @@ impl TaskFailureReason {
                     TaskErrorDatasetReset::ResetHeadNotFound => {
                         TaskFailureReason::General(TaskFailureReasonGeneral {
                             message: "New head hash to reset not found".to_owned(),
+                            recoverable: e.recoverable,
                         })
                     }
                 }
+            }
+
+            TaskErrorWebhookDelivery::TYPE_ID => {
+                let webhook_error = TaskErrorWebhookDelivery::from_task_error(e)?;
+                TaskFailureReason::WebhookDeliveryProblem(TaskFailureReasonWebhookDeliveryProblem {
+                    target_url: webhook_error.target_url().clone(),
+                    message: match webhook_error {
+                        TaskErrorWebhookDelivery::ConnectionTimeout(e) => {
+                            format!("Response timeout after {} seconds", e.timeout.as_secs())
+                        }
+                        TaskErrorWebhookDelivery::FailedToConnect(_) => {
+                            "Failed to connect".to_owned()
+                        }
+                        TaskErrorWebhookDelivery::UnsuccessfulResponse(e) => {
+                            format!(
+                                "Unsuccessful response code: {} {}",
+                                e.status_code,
+                                ::http::StatusCode::from_u16(e.status_code)
+                                    .unwrap()
+                                    .canonical_reason()
+                                    .unwrap_or("Unknown")
+                            )
+                        }
+                    },
+                })
             }
 
             _ => {
                 tracing::error!("Unexpected task error type: {}", e.error_type,);
                 TaskFailureReason::General(TaskFailureReasonGeneral {
                     message: "Unexpected task error type".to_owned(),
+                    recoverable: e.recoverable,
                 })
             }
         })

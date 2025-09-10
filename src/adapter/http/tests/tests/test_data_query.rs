@@ -500,14 +500,14 @@ async fn test_data_query_handler_success() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620915b49981013b71a52ce28ade79ed0eb3c3a020f4c403963237b0ebdb90d2fa1",
+                    "inputHash": "f1620e171eff1f41f0f28e7ee96786ea5ec261a5580ea1b571da7d9049aa308f94df3",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "ulReG_0c_7hJF1cVjScJgdwF30-EseOSgPs-EBf_9sWvzBabcYZ_FiX6fPO8XfvrCIaOeVhEgmF99wh7Ha15HCQ",
+                    "proofValue": "u5GvSnQTuMFJIs8Xk--52DsPqy3Mqlq0KE_27bRfHDbhxxS-YmSCzz7O3VTaAoE23eMG-hhROZZycgVCbMNnbCg",
                 }
             }),
             response
@@ -658,14 +658,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f162080423739210aa75bec32c3d31726e2d9c5244baf81c26b2c49afdc947a25b2e7",
+                    "inputHash": "f162022d6314a38b9b816309b470408e6d25fd8b91b7e6cf596c391d82e8ca5e4d515",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u7eDhEsumYHz3IXKM7eu6eKNISId61T-NakbmccUJBQf1wfuAYbxoaN0ZQe6seFiXDSQgN0Fujy2EjkgVnuIKBw",
+                    "proofValue": "uDxDvHwRohhOwQMKpRpQ5RZsRQIjWNupGLqFKzXL18JtqUJ_qz5RxpE8Fr4cmMQCzq2SxBX4pyF333Lh4f11MAA",
                 }
             }),
             response
@@ -1276,6 +1276,77 @@ async fn test_data_query_handler_schema_formats() {
             harness.dataset_handle.alias
         );
         let query_url = format!("{}query", harness.root_url);
+
+        let res = cl
+            .get(&query_url)
+            .query(&[("query", query.as_str()), ("schemaFormat", "odf-json")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        let resp = res.json::<serde_json::Value>().await.unwrap();
+        let ignore_data = &resp["output"]["data"];
+
+        pretty_assertions::assert_eq!(
+            json!({
+                "output": {
+                    "schemaFormat": "OdfJson",
+                    "schema": {
+                        "fields": [{
+                            "name": "offset",
+                            "type": {
+                                "kind": "Int64",
+                            },
+                        }, {
+                            "name": "city",
+                            "type": {
+                                "kind": "String",
+                            },
+                        }, {
+                            "name": "population",
+                            "type": {
+                                "kind": "UInt64",
+                            },
+                        }],
+                    },
+                    "data": ignore_data,
+                    "dataFormat": "JsonAoS",
+                }
+            }),
+            resp
+        );
+
+        let res = cl
+            .get(&query_url)
+            .query(&[("query", query.as_str()), ("schemaFormat", "odf-yaml")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        pretty_assertions::assert_eq!(
+            indoc::indoc!(
+                r#"
+                fields:
+                - name: offset
+                  type:
+                    kind: Int64
+                - name: city
+                  type:
+                    kind: String
+                - name: population
+                  type:
+                    kind: UInt64
+                "#
+            ),
+            res.json::<serde_json::Value>().await.unwrap()["output"]["schema"]
+                .as_str()
+                .unwrap(),
+        );
+
         let res = cl
             .get(&query_url)
             .query(&[("query", query.as_str()), ("schemaFormat", "arrow-json")])
@@ -1553,6 +1624,122 @@ async fn test_metadata_handler_schema_formats() {
 
     let client = async move {
         let cl = reqwest::Client::new();
+
+        let query_url = format!("{}/metadata", harness.dataset_url);
+        let res = cl
+            .get(&query_url)
+            .query(&[("include", "schema"), ("schemaFormat", "OdfJson")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        pretty_assertions::assert_eq!(
+            json!({
+                "output": {
+                    "schemaFormat": "OdfJson",
+                    "schema": {
+                        "fields": [
+                            {
+                                "name": "offset",
+                                "type": {
+                                    "kind": "Int64",
+                                }
+                            },
+                            {
+                                "name": "op",
+                                "type": {
+                                    "kind": "Int32",
+                                },
+                            },
+                            {
+                                "name": "system_time",
+                                "type": {
+                                    "kind": "Timestamp",
+                                    "unit": "Millisecond",
+                                    "timezone": "UTC",
+                                },
+                            },
+                            {
+                                "name": "event_time",
+                                "type": {
+                                    "kind": "Option",
+                                    "inner": {
+                                        "kind": "Timestamp",
+                                        "unit": "Millisecond",
+                                        "timezone": "UTC",
+                                    },
+                                },
+                            },
+                            {
+                                "name": "city",
+                                "type": {
+                                    "kind": "String",
+                                },
+                            },
+                            {
+                                "name": "population",
+                                "type": {
+                                    "kind": "UInt64",
+                                }
+                            }
+                        ],
+                    },
+                }
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
+        );
+
+        let query_url = format!("{}/metadata", harness.dataset_url);
+        let res = cl
+            .get(&query_url)
+            .query(&[("include", "schema"), ("schemaFormat", "OdfYaml")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        let schema_yaml = indoc::indoc!(
+            r#"
+            fields:
+            - name: offset
+              type:
+                kind: Int64
+            - name: op
+              type:
+                kind: Int32
+            - name: system_time
+              type:
+                kind: Timestamp
+                unit: Millisecond
+                timezone: UTC
+            - name: event_time
+              type:
+                kind: Option
+                inner:
+                  kind: Timestamp
+                  unit: Millisecond
+                  timezone: UTC
+            - name: city
+              type:
+                kind: String
+            - name: population
+              type:
+                kind: UInt64
+            "#
+        );
+
+        pretty_assertions::assert_eq!(
+            json!({
+                "output": {
+                    "schemaFormat": "OdfYaml",
+                    "schema": schema_yaml,
+                }
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
+        );
 
         let query_url = format!("{}/metadata", harness.dataset_url);
         let res = cl

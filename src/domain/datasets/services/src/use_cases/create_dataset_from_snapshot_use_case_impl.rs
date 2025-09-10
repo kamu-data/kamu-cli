@@ -156,8 +156,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             &store_result.seed,
             system_time,
         )
-        .await
-        .int_err()?;
+        .await?;
 
         // TODO: HACK: SEC: When creating a dataaset under another account we currently
         // give subject a "maintainer" role on it. In future this should be refactored

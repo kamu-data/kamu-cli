@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
-use super::{FlowStartCondition, FlowTriggerInstance};
+use super::{FlowActivationCause, FlowStartCondition};
 use crate::prelude::*;
 use crate::queries::Task;
 use crate::utils;
@@ -31,8 +31,8 @@ pub enum FlowEvent {
     ConfigSnapshotModified(FlowConfigSnapshotModified),
     /// Flow scheduled for activation
     ScheduledForActivation(FlowEventScheduledForActivation),
-    /// Secondary trigger added
-    TriggerAdded(FlowEventTriggerAdded),
+    /// Secondary activation cause added
+    ActivationCauseAdded(FlowEventActivationCauseAdded),
     /// Associated task has changed status
     TaskChanged(FlowEventTaskChanged),
     /// Aborted flow (user cancellation or system factor, such as ds delete)
@@ -51,12 +51,8 @@ impl FlowEvent {
                 Self::Initiated(FlowEventInitiated::build(event_id, e, ctx).await?)
             }
             fs::FlowEvent::StartConditionUpdated(e) => {
-                let start_condition = FlowStartCondition::create_from_raw_flow_data(
-                    &e.start_condition,
-                    &flow_state.triggers[0..e.last_trigger_index],
-                    ctx,
-                )
-                .await?;
+                let start_condition =
+                    FlowStartCondition::create_from_raw_flow_data(flow_state, &e.start_condition);
                 Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(
                     event_id,
                     e.event_time,
@@ -66,9 +62,9 @@ impl FlowEvent {
             fs::FlowEvent::ConfigSnapshotModified(e) => {
                 Self::ConfigSnapshotModified(FlowConfigSnapshotModified::build(event_id, e))
             }
-            fs::FlowEvent::TriggerAdded(e) => {
-                Self::TriggerAdded(FlowEventTriggerAdded::build(event_id, e, ctx).await?)
-            }
+            fs::FlowEvent::ActivationCauseAdded(e) => Self::ActivationCauseAdded(
+                FlowEventActivationCauseAdded::build(event_id, e, ctx).await?,
+            ),
             fs::FlowEvent::ScheduledForActivation(e) => {
                 Self::ScheduledForActivation(FlowEventScheduledForActivation::new(
                     event_id,
@@ -108,7 +104,7 @@ impl FlowEvent {
 pub struct FlowEventInitiated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    trigger: FlowTriggerInstance,
+    activation_cause: FlowActivationCause,
 }
 
 impl FlowEventInitiated {
@@ -120,7 +116,7 @@ impl FlowEventInitiated {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTriggerInstance::build(&event.trigger, ctx).await?,
+            activation_cause: FlowActivationCause::build(&event.activation_cause, ctx).await?,
         })
     }
 }
@@ -151,22 +147,22 @@ impl FlowEventStartConditionUpdated {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct FlowEventTriggerAdded {
+pub struct FlowEventActivationCauseAdded {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    trigger: FlowTriggerInstance,
+    activation_cause: FlowActivationCause,
 }
 
-impl FlowEventTriggerAdded {
+impl FlowEventActivationCauseAdded {
     pub(crate) async fn build(
         event_id: evs::EventID,
-        event: fs::FlowEventTriggerAdded,
+        event: fs::FlowEventActivationCauseAdded,
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTriggerInstance::build(&event.trigger, ctx).await?,
+            activation_cause: FlowActivationCause::build(&event.activation_cause, ctx).await?,
         })
     }
 }

@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
+use std::sync::Arc;
+
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::TransformRequestInputExt;
 use kamu_core::{
@@ -21,7 +22,6 @@ use kamu_core::{
     TransformPreliminaryRequestExt,
     VerifyTransformPlanError,
 };
-use random_strings::get_random_name;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +29,6 @@ use thiserror::Error;
 #[tracing::instrument(level = "info", skip_all)]
 pub async fn build_preliminary_request_ext(
     target: ResolvedDataset,
-    system_time: DateTime<Utc>,
 ) -> Result<TransformPreliminaryRequestExt, BuildPreliminaryTransformRequestError> {
     let output_chain = target.as_metadata_chain();
 
@@ -65,9 +64,10 @@ pub async fn build_preliminary_request_ext(
             set_data_schema_visitor
                 .into_event()
                 .as_ref()
-                .map(odf::metadata::SetDataSchema::schema_as_arrow)
-                .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
-                .int_err()?,
+                .map(|e| e.schema_as_arrow(&odf::metadata::ToArrowSettings::default()))
+                .transpose() // Option<Result<Schema, E>> -> Result<Option<Schema>, E>
+                .int_err()?
+                .map(Arc::new),
             set_vocab_visitor.into_event(),
             execute_transform_visitor.into_event(),
         )
@@ -96,12 +96,10 @@ pub async fn build_preliminary_request_ext(
 
     // Build preliminary transform request
     Ok(TransformPreliminaryRequestExt {
-        operation_id: get_random_name(None, 10),
         dataset_handle: target.get_handle().clone(),
         block_ref,
         head,
         transform: source.transform,
-        system_time,
         schema,
         prev_offset: prev_query
             .as_ref()
@@ -109,6 +107,62 @@ pub async fn build_preliminary_request_ext(
         vocab: set_vocab.unwrap_or_default().into(),
         input_states,
         prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn get_transform_query_input(
+    input_decl: odf::metadata::TransformInput,
+    input_state: Option<odf::metadata::ExecuteTransformInput>,
+    datasets_map: &ResolvedDatasetsMap,
+) -> Result<odf::metadata::ExecuteTransformInput, GetTransformQueryInputError> {
+    let dataset_id = input_decl.dataset_ref.id().unwrap();
+    if let Some(input_state) = &input_state {
+        assert_eq!(*dataset_id, input_state.dataset_id);
+    }
+
+    let target = datasets_map.get_by_id(dataset_id);
+    let input_chain = target.as_metadata_chain();
+
+    // Determine last processed input block and offset
+    let last_processed_block = input_state.as_ref().and_then(|i| i.last_block_hash());
+    let last_processed_offset = input_state
+        .as_ref()
+        .and_then(odf::metadata::ExecuteTransformInput::last_offset);
+
+    // Determine unprocessed block and offset range
+    let last_unprocessed_block = input_chain
+        .resolve_ref(&odf::BlockRef::Head)
+        .await
+        .int_err()?;
+
+    use odf::dataset::MetadataChainExt;
+    let last_unprocessed_offset = input_chain
+        .accept_one_by_hash(
+            &last_unprocessed_block,
+            odf::dataset::SearchSingleDataBlockVisitor::next(),
+        )
+        .await
+        .int_err()?
+        .into_event()
+        .and_then(|event| event.last_offset())
+        .or(last_processed_offset);
+
+    Ok(odf::metadata::ExecuteTransformInput {
+        dataset_id: dataset_id.clone(),
+        prev_block_hash: last_processed_block.cloned(),
+        new_block_hash: if Some(&last_unprocessed_block) != last_processed_block {
+            Some(last_unprocessed_block)
+        } else {
+            None
+        },
+        prev_offset: last_processed_offset,
+        new_offset: if last_unprocessed_offset != last_processed_offset {
+            last_unprocessed_offset
+        } else {
+            None
+        },
     })
 }
 
@@ -132,7 +186,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         .await
         .int_err()?
         .into_event()
-        .map(|e| e.schema_as_arrow())
+        .map(|e| e.schema_as_arrow(&odf::metadata::ToArrowSettings::default()))
         .transpose()
         .int_err()?
         .ok_or_else(|| InputSchemaNotDefinedError {
@@ -196,7 +250,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         prev_offset: query_input.prev_offset,
         new_offset: query_input.new_offset,
         data_slices,
-        schema,
+        schema: Arc::new(schema),
         explicit_watermarks,
     };
 
@@ -247,6 +301,26 @@ impl From<BuildPreliminaryTransformRequestError> for TransformPlanError {
                 Self::TransformNotDefined(e)
             }
             BuildPreliminaryTransformRequestError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub(crate) enum GetTransformQueryInputError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetTransformQueryInputError> for TransformElaborateError {
+    fn from(value: GetTransformQueryInputError) -> Self {
+        match value {
+            GetTransformQueryInputError::Internal(e) => Self::Internal(e),
         }
     }
 }

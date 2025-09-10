@@ -219,7 +219,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Implementing this trait for [`Option`] significantly simplifes passing
+/// Implementing this trait for [`Option`] significantly simplifies passing
 /// multiple optional visitors into [`MetadataChainExt::accept()`]
 impl<T> MetadataChainVisitor for Option<T>
 where

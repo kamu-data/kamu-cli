@@ -15,13 +15,22 @@ use crate::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn assert_odf_schema_eq(
+    actual: &odf_metadata::DataSchema,
+    expected: &odf_metadata::DataSchema,
+) {
+    let actual_yaml = crate::schema::format::format_schema_odf_yaml(actual);
+    let expected_yaml = crate::schema::format::format_schema_odf_yaml(expected);
+    assert_eq!(expected_yaml, actual_yaml);
+}
+
 pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {
     let parquet_schema = crate::schema::convert::dataframe_schema_to_parquet_schema(schema);
     let actual = crate::schema::format::format_schema_parquet(&parquet_schema);
     assert_eq!(expected.trim(), actual.trim());
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub fn assert_arrow_schema_eq(schema: &Schema, expected: serde_json::Value) {
     let actual = serde_json::to_value(schema).unwrap();
     assert_eq!(expected, actual);

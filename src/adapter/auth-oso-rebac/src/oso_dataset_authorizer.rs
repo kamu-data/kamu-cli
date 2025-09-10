@@ -153,8 +153,6 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         let user_actor = self.user_actor().await?;
-        let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
-        let mut unmatched_results = Vec::new();
 
         let dataset_ids = dataset_handles
             .iter()
@@ -165,6 +163,11 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .get_multiple_dataset_resources(&dataset_ids)
             .await
             .int_err()?;
+        let mut authorized_handles =
+            Vec::with_capacity(dataset_resources_resolution.resolved_resources.len());
+        let mut unauthorized_handles_with_errors =
+            Vec::with_capacity(dataset_resources_resolution.unresolved_resources.len());
+
         let dataset_handle_id_mapping =
             dataset_handles
                 .into_iter()
@@ -187,19 +190,38 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 .int_err()?;
 
             if is_allowed {
-                matched_dataset_handles.push(dataset_handle);
+                authorized_handles.push(dataset_handle);
             } else {
                 let dataset_ref = dataset_handle.as_local_ref();
-                unmatched_results.push((
+                unauthorized_handles_with_errors.push((
                     dataset_handle,
-                    DatasetActionUnauthorizedError::not_enough_permissions(dataset_ref, action),
+                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                        dataset_ref,
+                        action,
+                    ),
                 ));
             }
         }
 
+        for unresolved_dataset_id in dataset_resources_resolution.unresolved_resources {
+            let dataset_handle = dataset_handle_id_mapping
+                .get(&unresolved_dataset_id)
+                .ok_or_else(|| {
+                    format!("Unexpectedly, dataset_handle not was found: {unresolved_dataset_id}")
+                        .int_err()
+                })?
+                .clone();
+            let dataset_ref = dataset_handle.as_local_ref();
+
+            unauthorized_handles_with_errors.push((
+                dataset_handle,
+                odf::DatasetNotFoundError::new(dataset_ref).into(),
+            ));
+        }
+
         Ok(ClassifyByAllowanceResponse {
-            authorized_handles: matched_dataset_handles,
-            unauthorized_handles_with_errors: unmatched_results,
+            authorized_handles,
+            unauthorized_handles_with_errors,
         })
     }
 
@@ -210,14 +232,16 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         let user_actor = self.user_actor().await?;
-        let mut authorized_ids = Vec::with_capacity(dataset_ids.len());
-        let mut unauthorized_ids_with_errors = Vec::new();
 
         let dataset_resources_resolution = self
             .oso_resource_service
             .get_multiple_dataset_resources(dataset_ids)
             .await
             .int_err()?;
+        let mut authorized_ids =
+            Vec::with_capacity(dataset_resources_resolution.resolved_resources.len());
+        let mut unauthorized_ids_with_errors =
+            Vec::with_capacity(dataset_resources_resolution.unresolved_resources.len());
 
         for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
             let is_allowed = self
@@ -231,9 +255,20 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = dataset_id.as_local_ref();
                 unauthorized_ids_with_errors.push((
                     dataset_id,
-                    DatasetActionUnauthorizedError::not_enough_permissions(dataset_ref, action),
+                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                        dataset_ref,
+                        action,
+                    ),
                 ));
             }
+        }
+
+        for unresolved_dataset_id in dataset_resources_resolution.unresolved_resources {
+            let dataset_ref = unresolved_dataset_id.as_local_ref();
+            unauthorized_ids_with_errors.push((
+                unresolved_dataset_id,
+                odf::DatasetNotFoundError::new(dataset_ref).into(),
+            ));
         }
 
         Ok(ClassifyByAllowanceIdsResponse {

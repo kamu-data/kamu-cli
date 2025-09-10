@@ -291,7 +291,15 @@ impl DatasetFactoryImpl {
 
     #[cfg(feature = "http")]
     async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, InternalError> {
-        let r = hickory_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
+        use hickory_resolver::Resolver;
+        use hickory_resolver::config::ResolverConfig;
+        use hickory_resolver::name_server::TokioConnectionProvider;
+
+        let r = Resolver::builder_with_config(
+            ResolverConfig::default(),
+            TokioConnectionProvider::default(),
+        )
+        .build();
         let query = format!("_dnslink.{domain}");
         let result = r.txt_lookup(&query).await.int_err()?;
 

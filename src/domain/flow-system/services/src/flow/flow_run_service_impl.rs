@@ -22,6 +22,9 @@ use crate::{FlowAbortHelper, FlowSchedulingHelper};
 pub struct FlowRunServiceImpl {
     flow_scheduling_helper: Arc<FlowSchedulingHelper>,
     flow_abort_helper: Arc<FlowAbortHelper>,
+    flow_trigger_service: Arc<dyn FlowTriggerService>,
+    flow_event_store: Arc<dyn FlowEventStore>,
+
     agent_config: Arc<FlowAgentConfig>,
 }
 
@@ -37,21 +40,21 @@ impl FlowRunService for FlowRunServiceImpl {
     )]
     async fn run_flow_manually(
         &self,
-        trigger_time: DateTime<Utc>,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError> {
-        let activation_time = self.agent_config.round_time(trigger_time)?;
+        let activation_time = self.agent_config.round_time(activation_time)?;
 
         self.flow_scheduling_helper
             .trigger_flow_common(
                 flow_binding,
                 None,
-                FlowTriggerInstance::Manual(FlowTriggerManual {
-                    trigger_time: activation_time,
+                vec![FlowActivationCause::Manual(FlowActivationCauseManual {
+                    activation_time,
                     initiator_account_id,
-                }),
+                })],
                 maybe_forced_flow_config_rule,
             )
             .await
@@ -60,10 +63,10 @@ impl FlowRunService for FlowRunServiceImpl {
 
     /// Triggers the specified flow with custom trigger instance,
     /// unless it's already waiting
-    async fn run_flow_with_trigger(
+    async fn run_flow_automatically(
         &self,
         flow_binding: &FlowBinding,
-        trigger_instance: FlowTriggerInstance,
+        activation_causes: Vec<FlowActivationCause>,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError> {
@@ -71,7 +74,7 @@ impl FlowRunService for FlowRunServiceImpl {
             .trigger_flow_common(
                 flow_binding,
                 maybe_flow_trigger_rule,
-                trigger_instance,
+                activation_causes,
                 maybe_forced_flow_config_rule,
             )
             .await
@@ -84,15 +87,42 @@ impl FlowRunService for FlowRunServiceImpl {
         skip_all,
         fields(%flow_id)
     )]
-    async fn cancel_scheduled_tasks(
+    async fn cancel_flow_run(
         &self,
+        cancellation_time: DateTime<Utc>,
         flow_id: FlowID,
-    ) -> Result<FlowState, CancelScheduledTasksError> {
+    ) -> Result<FlowState, CancelFlowRunError> {
+        // Load flow to ensure it exists
+        let mut flow = match Flow::load(flow_id, self.flow_event_store.as_ref()).await {
+            Ok(flow) => flow,
+            Err(LoadError::NotFound(_)) => {
+                return Err(CancelFlowRunError::NotFound(FlowNotFoundError { flow_id }));
+            }
+            Err(LoadError::ProjectionError(e)) => {
+                return Err(CancelFlowRunError::Internal(e.int_err()));
+            }
+            Err(LoadError::Internal(e)) => {
+                return Err(CancelFlowRunError::Internal(e));
+            }
+        };
+
         // Abort current flow and it's scheduled tasks
-        self.flow_abort_helper
-            .abort_flow(flow_id)
-            .await
-            .map_err(Into::into)
+        self.flow_abort_helper.abort_flow(&mut flow).await?;
+
+        // Find a trigger and pause it if it's periodic
+        let maybe_active_schedule = self
+            .flow_trigger_service
+            .try_get_flow_active_schedule_rule(&flow.flow_binding)
+            .await?;
+        if maybe_active_schedule.is_some() {
+            // TODO: avoid double-loading the trigger
+            self.flow_trigger_service
+                .pause_flow_trigger(cancellation_time, &flow.flow_binding) // pause (user), not stop (system)
+                .await
+                .int_err()?;
+        }
+
+        Ok(flow.into())
     }
 }
 

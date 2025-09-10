@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 
 use internal_error::InternalError;
-use kamu_core::auth::{DatasetAction, DatasetsActionNotEnoughPermissionsError};
+use kamu_core::auth::DatasetAction;
 
 use crate::AccountToDatasetRelation;
 
@@ -57,31 +57,41 @@ pub enum DatasetRoleOperation {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
+pub struct ApplyRelationMatrixBatchError {
+    pub action: DatasetAction,
+    pub unauthorized_dataset_refs: Vec<odf::DatasetRef>,
+    pub not_found_dataset_refs: Vec<odf::DatasetRef>,
+}
+
+impl std::fmt::Display for ApplyRelationMatrixBatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "User has no '{}' permission in datasets: '", self.action)?;
+        for (i, item) in self.unauthorized_dataset_refs.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{item}")?;
+        }
+        write!(f, "'; not found: '")?;
+        for (i, item) in self.not_found_dataset_refs.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{item}")?;
+        }
+        write!(f, "'")?;
+
+        Ok(())
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
 pub enum ApplyRelationMatrixError {
     #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
+    BatchError(#[from] ApplyRelationMatrixBatchError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl ApplyRelationMatrixError {
-    pub fn not_enough_permissions(
-        dataset_refs: Vec<odf::DatasetRef>,
-        action: DatasetAction,
-    ) -> Self {
-        Self::Access(odf::AccessError::Unauthorized(
-            DatasetsActionNotEnoughPermissionsError {
-                action,
-                dataset_refs,
-            }
-            .into(),
-        ))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

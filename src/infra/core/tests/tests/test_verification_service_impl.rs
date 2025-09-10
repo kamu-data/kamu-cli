@@ -93,6 +93,7 @@ async fn test_verify_data_consistency() {
                 prev_checkpoint: None,
                 prev_offset: None,
                 new_offset_interval: Some(odf::metadata::OffsetInterval { start: 0, end: 0 }),
+                new_linked_objects: None,
                 new_watermark: None,
                 new_source_state: None,
             },

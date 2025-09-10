@@ -10,10 +10,11 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use file_utils::MediaType;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DataWriterMetadataState, MediaType, ResolvedDataset, SchemaInferenceOpts};
+use crate::{DataWriterMetadataState, ResolvedDataset, SchemaInferenceOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,6 +72,13 @@ pub enum PushIngestPlanningError {
         #[from]
         #[backtrace]
         PushSourceNotFoundError,
+    ),
+
+    #[error(transparent)]
+    HeadNotFound(
+        #[from]
+        #[backtrace]
+        odf::storage::BlockNotFoundError,
     ),
 
     #[error(transparent)]

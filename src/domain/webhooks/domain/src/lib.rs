@@ -18,6 +18,7 @@ mod messages;
 mod repos;
 mod services;
 mod use_cases;
+mod webhooks_config;
 
 pub use aggregates::*;
 pub use entities::*;
@@ -25,3 +26,4 @@ pub use messages::*;
 pub use repos::*;
 pub use services::*;
 pub use use_cases::*;
+pub use webhooks_config::*;

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method1;
 use internal_error::InternalError;
+use kamu_core::engine::EngineError;
 use kamu_core::*;
 use kamu_task_system::*;
 
@@ -86,7 +87,11 @@ impl UpdateDatasetTaskRunner {
                 }
                 .into_task_result(),
             )),
-            Err(_) => Ok(TaskOutcome::Failed(TaskError::empty())),
+            Err(_) =>
+            // TODO: classify sync errors as recoverable/unrecoverable
+            {
+                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+            }
         }
     }
 
@@ -127,7 +132,18 @@ impl UpdateDatasetTaskRunner {
                     .into_task_result(),
                 ))
             }
-            Err(_) => Ok(TaskOutcome::Failed(TaskError::empty())),
+            Err(e) => match e {
+                PollingIngestError::ParameterNotFound(_)
+                | PollingIngestError::ReadError(_)
+                | PollingIngestError::EngineError(EngineError::InvalidQuery(_))
+                | PollingIngestError::BadInputSchema(_)
+                | PollingIngestError::IncompatibleSchema(_)
+                | PollingIngestError::InvalidParameterFormat(_)
+                | PollingIngestError::TemplateError(_) => {
+                    Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
+                }
+                _ => Ok(TaskOutcome::Failed(TaskError::empty_recoverable())),
+            },
         }
     }
 
@@ -156,8 +172,15 @@ impl UpdateDatasetTaskRunner {
                 ));
             }
             Err(e) => {
-                tracing::error!(error = ?e, "Update failed");
-                Err("Transform request elaboration failed".int_err())
+                tracing::error!(error = ?e, "Transform elaboration failed");
+                match e {
+                    TransformElaborateError::InputSchemaNotDefined(_)
+                    | TransformElaborateError::InvalidInputInterval(_) => {
+                        return Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()));
+                    }
+
+                    _ => return Ok(TaskOutcome::Failed(TaskError::empty_recoverable())),
+                }
             }
         }?;
 
@@ -189,7 +212,13 @@ impl UpdateDatasetTaskRunner {
                     }
                     Err(e) => {
                         tracing::error!(error = ?e, "Transform execution failed");
-                        Ok(TaskOutcome::Failed(TaskError::empty()))
+                        match e {
+                            TransformExecuteError::EngineError(EngineError::InvalidQuery(_)) => {
+                                Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
+                            }
+
+                            _ => Ok(TaskOutcome::Failed(TaskError::empty_recoverable())),
+                        }
                     }
                 }
             }

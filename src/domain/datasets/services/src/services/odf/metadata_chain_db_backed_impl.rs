@@ -260,8 +260,8 @@ where
                             &key_block.block_hash,
                             &key_block.block_payload,
                         )
-                        .int_err()
                         .map(|metadata_block| (key_block.block_hash, metadata_block))
+                        .int_err()
                     })
                     .collect::<Result<Vec<_>, InternalError>>()?;
 

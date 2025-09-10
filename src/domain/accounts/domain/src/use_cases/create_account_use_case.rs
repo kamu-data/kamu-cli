@@ -21,6 +21,12 @@ use crate::{Account, CreateAccountError, Password};
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(
         &self,
+        account: &Account,
+        password: &Password,
+    ) -> Result<Account, CreateAccountError>;
+
+    async fn execute_derived(
+        &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
         options: CreateAccountUseCaseOptions,
@@ -38,6 +44,7 @@ pub trait CreateAccountUseCase: Send + Sync {
 pub struct CreateAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
+    pub display_name: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

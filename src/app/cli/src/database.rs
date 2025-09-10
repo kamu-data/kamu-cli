@@ -129,7 +129,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_auth_rebac_postgres::PostgresRebacRepository>();
 
-            b.add::<kamu_webhooks_postgres::PostgresWebhookEventRepository>();
             b.add::<kamu_webhooks_postgres::PostgresWebhookDeliveryRepository>();
             b.add::<kamu_webhooks_postgres::PostgresWebhookSubscriptionEventStore>();
 
@@ -164,7 +163,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
-            b.add::<kamu_webhooks_inmem::InMemoryWebhookEventRepository>();
             b.add::<kamu_webhooks_inmem::InMemoryWebhookDeliveryRepository>();
             b.add::<kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore>();
 
@@ -196,7 +194,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_auth_rebac_sqlite::SqliteRebacRepository>();
 
-            b.add::<kamu_webhooks_sqlite::SqliteWebhookEventRepository>();
             b.add::<kamu_webhooks_sqlite::SqliteWebhookDeliveryRepository>();
             b.add::<kamu_webhooks_sqlite::SqliteWebhookSubscriptionEventStore>();
 
@@ -236,7 +233,6 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
-    b.add::<kamu_webhooks_inmem::InMemoryWebhookEventRepository>();
     b.add::<kamu_webhooks_inmem::InMemoryWebhookDeliveryRepository>();
     b.add::<kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore>();
 

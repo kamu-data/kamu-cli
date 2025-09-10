@@ -12,6 +12,7 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
+use kamu_accounts_services::{CreateAccountUseCaseImpl, UpdateAccountUseCaseImpl};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
@@ -48,33 +49,37 @@ impl BaseGQLDatasetHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
-            b.add_builder(
-                OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DidGeneratorDefault>()
-            .add_value(tenancy_config)
-            .add::<DatabaseTransactionRunner>()
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-                datasets_dir,
-            ))
-            .add::<DatasetLfsBuilderDatabaseBackedImpl>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<CreateDatasetUseCaseHelper>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<DependencyGraphImmediateListener>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<RebacDatasetRegistryFacadeImpl>()
-            .add::<InMemoryDatasetKeyBlockRepository>()
-            .add::<InMemoryDidSecretKeyRepository>()
-            .add::<DatasetKeyBlockUpdateHandler>()
-            .add_value(RunInfoDir::new(run_info_dir));
+            b.add_value(kamu_adapter_graphql::Config::default())
+                .add_builder(
+                    OutboxImmediateImpl::builder()
+                        .with_consumer_filter(ConsumerFilter::AllConsumers),
+                )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
+                .add::<DidGeneratorDefault>()
+                .add_value(tenancy_config)
+                .add::<DatabaseTransactionRunner>()
+                .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                    datasets_dir,
+                ))
+                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
+                .add::<UpdateAccountUseCaseImpl>()
+                .add::<CreateAccountUseCaseImpl>()
+                .add::<CreateDatasetUseCaseHelper>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<DatasetReferenceServiceImpl>()
+                .add::<InMemoryDatasetReferenceRepository>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
+                .add::<DependencyGraphImmediateListener>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<RebacDatasetRegistryFacadeImpl>()
+                .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add::<DatasetKeyBlockUpdateHandler>()
+                .add_value(RunInfoDir::new(run_info_dir));
 
             if let Some(mock) = mock_dataset_action_authorizer {
                 b.add_value(mock)
@@ -98,6 +103,11 @@ impl BaseGQLDatasetHarness {
             register_message_dispatcher::<DatasetDependenciesMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetKeyBlocksMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
             );
 
             b.build()

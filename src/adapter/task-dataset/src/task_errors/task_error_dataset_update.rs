@@ -13,7 +13,7 @@ kamu_task_system::task_error_enum! {
     pub enum TaskErrorDatasetUpdate {
         InputDatasetCompacted(InputDatasetCompactedError),
     }
-    => "UpdateDatasetError"
+    => "UpdateDatasetError", recoverable: false
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

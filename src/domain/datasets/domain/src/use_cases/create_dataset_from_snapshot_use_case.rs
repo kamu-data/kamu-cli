@@ -47,6 +47,9 @@ pub enum CreateDatasetFromSnapshotError {
     MissingInputs(#[from] odf::dataset::MissingInputsError),
 
     #[error(transparent)]
+    InvalidBlock(#[from] InvalidBlockError),
+
+    #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
 
     #[error(transparent)]
@@ -61,6 +64,25 @@ pub enum CreateDatasetFromSnapshotError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+pub struct InvalidBlockError {
+    pub dataset_ref: odf::DatasetRef,
+    pub message: String,
+}
+
+impl std::fmt::Display for InvalidBlockError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Dataset {} contains invalid block: {}",
+            self.dataset_ref, self.message
+        )?;
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

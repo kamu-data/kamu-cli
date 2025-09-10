@@ -20,8 +20,10 @@ use kamu_accounts::{
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
+    CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
+    UpdateAccountUseCaseImpl,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
@@ -286,6 +288,8 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
         .add::<InMemoryRebacRepository>()
+        .add::<UpdateAccountUseCaseImpl>()
+        .add::<CreateAccountUseCaseImpl>()
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add_value(PredefinedAccountsConfig {

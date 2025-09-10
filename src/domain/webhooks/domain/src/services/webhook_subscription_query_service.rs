@@ -29,7 +29,16 @@ pub trait WebhookSubscriptionQueryService: Send + Sync {
     async fn find_webhook_subscription(
         &self,
         subscription_id: WebhookSubscriptionID,
+        query_mode: WebhookSubscriptionQueryMode,
     ) -> Result<Option<WebhookSubscription>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+pub enum WebhookSubscriptionQueryMode {
+    Active,
+    IncludingRemoved,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

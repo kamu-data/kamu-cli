@@ -15,7 +15,6 @@ kamu_task_system::logical_plan_struct! {
         pub dataset_id: odf::DatasetID,
         pub new_head_hash: Option<odf::Multihash>,
         pub old_head_hash: Option<odf::Multihash>,
-        pub recursive: bool,
     }
     => "ResetDataset"
 }

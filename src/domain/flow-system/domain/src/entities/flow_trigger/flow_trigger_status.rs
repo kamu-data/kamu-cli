@@ -11,18 +11,19 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowTriggerStatus {
     Active,
-    PausedTemporarily,
-    StoppedPermanently,
+    PausedByUser,
+    StoppedAutomatically,
+    ScopeRemoved,
 }
 
 impl FlowTriggerStatus {
     pub fn is_active(&self) -> bool {
         match self {
             Self::Active => true,
-            Self::PausedTemporarily | Self::StoppedPermanently => false,
+            Self::PausedByUser | Self::StoppedAutomatically | Self::ScopeRemoved => false,
         }
     }
 }

@@ -17,21 +17,18 @@ use internal_error::*;
 use kamu_accounts::*;
 use kamu_auth_rebac::{AccountPropertyName, RebacService, boolean_property_value};
 use kamu_auth_rebac_services::DefaultAccountProperties;
-use messaging_outbox::OutboxExt;
 use odf::AccountID;
-
-use crate::LoginPasswordAuthProvider;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A service that aims to register accounts on a one-time basis
 pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-    login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
-    outbox: Arc<dyn messaging_outbox::Outbox>,
+    update_account_use_case: Arc<dyn UpdateAccountUseCase>,
+    create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
 
 #[component(pub)]
@@ -44,19 +41,19 @@ pub struct PredefinedAccountsRegistrator {
 impl PredefinedAccountsRegistrator {
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
         account_service: Arc<dyn AccountService>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
-        outbox: Arc<dyn messaging_outbox::Outbox>,
+        update_account_use_case: Arc<dyn UpdateAccountUseCase>,
+        create_account_use_case: Arc<dyn CreateAccountUseCase>,
     ) -> Self {
         Self {
             predefined_accounts_config,
-            login_password_auth_provider,
             account_service,
             rebac_service,
             default_account_properties,
-            outbox,
+            update_account_use_case,
+            create_account_use_case,
         }
     }
 
@@ -91,18 +88,12 @@ impl PredefinedAccountsRegistrator {
         &self,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
-        let account = account_config.into();
+        let account: Account = account_config.into();
 
-        self.account_service
-            .save_account(&account)
+        self.create_account_use_case
+            .execute(&account, &account_config.password)
             .await
             .int_err()?;
-
-        if account_config.provider == <&'static str>::from(AccountProvider::Password) {
-            self.login_password_auth_provider
-                .save_password(&account, &account_config.password)
-                .await?;
-        }
 
         Ok(())
     }
@@ -142,34 +133,11 @@ impl PredefinedAccountsRegistrator {
             tracing::info!(
                 "Updating modified predefined account: old: {account:?}, new: {updated_account:?}",
             );
-            let new_account_name = updated_account.account_name.clone();
 
-            self.account_service
-                .update_account(&updated_account)
+            self.update_account_use_case
+                .execute_internal(&updated_account, &account)
                 .await
                 .int_err()?;
-
-            // Renaming is a bit special event, and we have associated handlers for it
-            if account.account_name != new_account_name {
-                tracing::info!(
-                    "Detected rename of predefined account from '{}' to '{}'",
-                    account.account_name,
-                    new_account_name
-                );
-
-                self.outbox
-                    .post_message(
-                        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                        AccountLifecycleMessage::renamed(
-                            account.id.clone(),
-                            account.email.clone(),
-                            account.account_name.clone(),
-                            new_account_name,
-                            account.display_name.clone(),
-                        ),
-                    )
-                    .await?;
-            }
         }
 
         Ok(())

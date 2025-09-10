@@ -66,7 +66,7 @@ impl DatasetsMut {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl DatasetsMut {
-    /// Returns a mutable dataset by its ID
+    /// Returns a mutable dataset by its ID, if found
     #[tracing::instrument(level = "info", name = DatasetsMut_by_id, skip_all, fields(%dataset_id))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn by_id(
@@ -74,9 +74,9 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         dataset_id: DatasetID<'_>,
     ) -> Result<Option<DatasetMut>> {
-        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
-
         use kamu_core::DatasetRegistryExt;
+
+        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
 
         let maybe_dataset_handle = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
@@ -98,6 +98,73 @@ impl DatasetsMut {
             )),
             DatasetActionAccess::Forbidden => Ok(None),
         }
+    }
+
+    /// Returns mutable datasets by their IDs
+    #[tracing::instrument(level = "info", name = DatasetsMut_by_ids, skip_all, fields(?dataset_ids))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn by_ids(
+        &self,
+        ctx: &Context<'_>,
+        dataset_ids: Vec<DatasetID<'_>>,
+        #[graphql(
+            desc = "Whether to skip unresolved datasets or return an error if one or more are \
+                    missing"
+        )]
+        skip_missing: bool,
+    ) -> Result<Vec<DatasetMut>> {
+        let dataset_ids: Vec<std::borrow::Cow<odf::DatasetID>> = dataset_ids
+            .into_iter()
+            .map(|id| std::borrow::Cow::Owned(id.into()))
+            .collect();
+
+        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
+
+        let resolution = dataset_registry
+            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
+            .await
+            .int_err()?;
+
+        if !skip_missing && !resolution.unresolved_datasets.is_empty() {
+            return Err(GqlError::gql(format!(
+                "Unresolved dataset: {}",
+                resolution.unresolved_datasets.into_iter().next().unwrap().0
+            )));
+        }
+
+        let mut res = Vec::new();
+
+        // TODO: PERF: Vectorize access checks
+        for hdl in resolution.resolved_handles {
+            let dataset_request_state = DatasetRequestState::new(hdl);
+            let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+            let current_dataset_action = auth::DatasetAction::Write;
+
+            let dataset = match auth::DatasetAction::resolve_access(
+                allowed_actions,
+                current_dataset_action,
+            ) {
+                DatasetActionAccess::Full => DatasetMut::new_access_checked(dataset_request_state),
+                DatasetActionAccess::Limited => {
+                    return Err(utils::make_dataset_access_error(
+                        dataset_request_state.dataset_handle(),
+                    ));
+                }
+                DatasetActionAccess::Forbidden => {
+                    if skip_missing {
+                        continue;
+                    }
+                    return Err(GqlError::gql(format!(
+                        "Unresolved dataset: {}",
+                        dataset_request_state.dataset_handle().id
+                    )));
+                }
+            };
+
+            res.push(dataset);
+        }
+
+        Ok(res)
     }
 
     /// Creates a new empty dataset
@@ -222,6 +289,11 @@ impl DatasetsMut {
                         .collect(),
                 })
             }
+            Err(CreateDatasetFromSnapshotError::InvalidBlock(e)) => {
+                CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot { message: e.message },
+                )
+            }
             Err(CreateDatasetFromSnapshotError::CASFailed(e)) => return Err(e.int_err().into()),
             Err(CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
         };
@@ -259,11 +331,20 @@ impl DatasetsMut {
             Err(Err(err)) => return Err(err),
         };
 
-        let snapshot = crate::queries::VersionedFile::dataset_shapshot(
+        let snapshot = match crate::queries::VersionedFile::dataset_snapshot(
             dataset_alias.into(),
             extra_columns.unwrap_or_default(),
             extra_events_parsed,
-        );
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                return Ok(CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot {
+                        message: e.to_string(),
+                    },
+                ));
+            }
+        };
 
         self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
             .await
@@ -299,11 +380,20 @@ impl DatasetsMut {
             Err(Err(err)) => return Err(err),
         };
 
-        let snapshot = crate::queries::Collection::dataset_shapshot(
+        let snapshot = match crate::queries::Collection::dataset_snapshot(
             dataset_alias.into(),
             extra_columns.unwrap_or_default(),
             extra_events_parsed,
-        );
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                return Ok(CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot {
+                        message: e.to_string(),
+                    },
+                ));
+            }
+        };
 
         self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
             .await

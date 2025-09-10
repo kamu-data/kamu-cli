@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
@@ -18,11 +18,7 @@ use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
-use kamu_datasets::{
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
-};
+use kamu_datasets::JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use messaging_outbox::{
@@ -37,14 +33,7 @@ use messaging_outbox::{
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
-use crate::{
-    FlowAbortHelper,
-    FlowSchedulingHelper,
-    MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
+use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,6 +41,7 @@ pub struct FlowAgentImpl {
     catalog: Catalog,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
+    agent_started: Arc<Mutex<bool>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,15 +51,12 @@ pub struct FlowAgentImpl {
 #[interface(dyn FlowAgentTestDriver)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
     feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-        MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
@@ -77,7 +64,9 @@ pub struct FlowAgentImpl {
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
     job_name: JOB_KAMU_FLOW_AGENT_RECOVERY,
-    depends_on: &[],
+    depends_on: &[
+        JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER
+    ],
     requires_transaction: false,
 })]
 #[scope(Singleton)]
@@ -91,26 +80,18 @@ impl FlowAgentImpl {
             catalog,
             time_source,
             agent_config,
+            agent_started: Arc::new(Mutex::new(false)),
         }
     }
 
-    fn get_flow_dispatcher(
-        &self,
-        target_catalog: &Catalog,
-        flow_type: &str,
-    ) -> Result<Arc<dyn FlowDispatcher>, InternalError> {
-        // Find a dispatcher for this flow type in dependency catalog
-        target_catalog
-            .builders_for_with_meta::<dyn FlowDispatcher, _>(|meta: &FlowDispatcherMeta| {
-                meta.flow_type == flow_type
-            })
-            .next()
-            .map(|builder| builder.get(target_catalog))
-            .transpose()
-            .int_err()?
-            .ok_or_else(|| {
-                InternalError::new(format!("Flow dispatcher for type '{flow_type}' not found",))
-            })
+    fn has_agent_started(&self) -> bool {
+        let engine_started = self.agent_started.lock().unwrap();
+        *engine_started
+    }
+
+    fn mark_engine_as_started(&self) {
+        let mut engine_started = self.agent_started.lock().unwrap();
+        *engine_started = true;
     }
 
     #[transactional_method]
@@ -184,15 +165,17 @@ impl FlowAgentImpl {
             let mut state_stream = flow_event_store.get_stream(waiting_flow_ids);
 
             while let Some(flow) = state_stream.try_next().await? {
-                // We need to re-evaluate batching conditions only
-                if let Some(FlowStartCondition::Batching(b)) = &flow.start_condition {
+                // We need to re-evaluate reactive conditions only
+                if let Some(FlowStartCondition::Reactive(b)) = &flow.start_condition {
                     scheduling_helper
                         .trigger_flow_common(
                             &flow.flow_binding,
-                            Some(FlowTriggerRule::Batching(b.active_batching_rule)),
-                            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                                trigger_time: start_time,
-                            }),
+                            Some(FlowTriggerRule::Reactive(b.active_rule)),
+                            vec![FlowActivationCause::AutoPolling(
+                                FlowActivationCauseAutoPolling {
+                                    activation_time: start_time,
+                                },
+                            )],
                             None,
                         )
                         .await?;
@@ -229,7 +212,7 @@ impl FlowAgentImpl {
         // (this i.e. forces all root datasets to be updated earlier than the derived)
         //
         // Thought: maybe we need topological sorting by derived relations as well to
-        // optimize the initial execution order, but batching rules may work just fine
+        // optimize the initial execution order, but reactive rules may work just fine
         for enabled_trigger in schedule_triggers
             .into_iter()
             .chain(non_schedule_triggers.into_iter())
@@ -241,6 +224,7 @@ impl FlowAgentImpl {
             if maybe_pending_flow_id.is_none() {
                 scheduling_helper
                     .activate_flow_trigger(
+                        target_catalog,
                         start_time,
                         &enabled_trigger.flow_binding,
                         enabled_trigger.rule,
@@ -348,13 +332,13 @@ impl FlowAgentImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        // Find a dispatcher for this flow type
-        let flow_dispatcher =
-            self.get_flow_dispatcher(&target_catalog, &flow.flow_binding.flow_type)?;
+        // Find a controller for this flow type
+        let flow_controller =
+            get_flow_controller_from_catalog(&target_catalog, &flow.flow_binding.flow_type)?;
 
-        // Dispatcher should create a logical plan that corresponds to the flow type
-        let logical_plan = flow_dispatcher
-            .build_task_logical_plan(&flow.flow_binding, flow.config_snapshot.as_ref())
+        // Controller should create a logical plan that corresponds to the flow type
+        let logical_plan = flow_controller
+            .build_task_logical_plan(flow)
             .await
             .int_err()?;
 
@@ -424,7 +408,11 @@ impl FlowAgent for FlowAgentImpl {
 impl InitOnStartup for FlowAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         let start_time = self.agent_config.round_time(self.time_source.now())?;
-        self.recover_initial_flows_state(start_time).await
+        self.recover_initial_flows_state(start_time).await?;
+
+        self.mark_engine_as_started();
+
+        Ok(())
     }
 }
 
@@ -529,49 +517,22 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         if let Some(task_result) = flow.try_task_result_as_ref()
                             && !task_result.is_empty()
                         {
-                            let flow_dispatcher = self.get_flow_dispatcher(
+                            let flow_controller = get_flow_controller_from_catalog(
                                 target_catalog,
                                 &flow.flow_binding.flow_type,
                             )?;
 
-                            let trigger_instance = match &flow.flow_binding.scope {
-                                FlowScope::Dataset { dataset_id } => {
-                                    FlowTriggerInstance::InputDatasetFlow(
-                                        FlowTriggerInputDatasetFlow {
-                                            trigger_time: finish_time,
-                                            dataset_id: dataset_id.clone(),
-                                            flow_type: flow.flow_binding.flow_type.clone(),
-                                            flow_id: flow.flow_id,
-                                            task_result: task_result.clone(),
-                                        },
-                                    )
-                                }
-                                FlowScope::System => {
-                                    // TODO: revise this, but there is no better trigger yet
-                                    FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                                        trigger_time: finish_time,
-                                    })
-                                }
-                            };
-
-                            flow_dispatcher
-                                .propagate_success(
-                                    &flow.flow_binding,
-                                    trigger_instance,
-                                    flow.config_snapshot.clone(),
-                                )
+                            flow_controller
+                                .propagate_success(&flow, task_result, finish_time)
                                 .await
                                 .int_err()?;
                         }
 
                         // In case of success:
-                        //  - schedule next auto-polling flow cycle
+                        //  - schedule next flow, if we had any late activation cause
                         if message.outcome.is_success() {
                             scheduling_helper
-                                .try_schedule_auto_polling_flow_if_enabled(
-                                    finish_time,
-                                    &flow.flow_binding,
-                                )
+                                .try_schedule_late_flow_activations(&flow)
                                 .await?;
                         }
 
@@ -580,15 +541,42 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
                         if let Some(flow_outcome) = flow.outcome.as_ref() {
-                            // In case of failure after retries:
-                            //  - disable trigger
-                            if message.outcome.is_failed() {
+                            // Handle flow failure if it reached a terminal state
+                            if message.outcome.is_failure() {
+                                let recoverable = message.outcome.is_recoverable_failure();
+                                if recoverable {
+                                    tracing::warn!(
+                                        flow_id = %flow.flow_id,
+                                        "Flow has reached a failed state after exhausting all retries"
+                                    );
+                                } else {
+                                    tracing::warn!(
+                                        flow_id = %flow.flow_id,
+                                        "Flow has reached a failed state after unrecoverable failure"
+                                    );
+                                }
+
+                                // Trigger should make a decision about auto-stopping
                                 let flow_trigger_service =
                                     target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
                                 flow_trigger_service
-                                    .pause_flow_trigger(finish_time, &flow.flow_binding)
+                                    .evaluate_trigger_on_failure(
+                                        finish_time,
+                                        &flow.flow_binding,
+                                        !recoverable,
+                                    )
                                     .await?;
                             }
+
+                            // Try to schedule auto-polling flow, if applicable.
+                            // We don't care whether we failed or succeeded,
+                            // that is determined with the stop policy in the trigger.
+                            scheduling_helper
+                                .try_schedule_auto_polling_flow_if_enabled(
+                                    finish_time,
+                                    &flow.flow_binding,
+                                )
+                                .await?;
 
                             // Notify about finished flow
                             outbox
@@ -646,87 +634,35 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
         target_catalog: &Catalog,
         message: &FlowTriggerUpdatedMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received flow configuration message");
+        tracing::debug!(received_message = ?message, "Received flow trigger message");
 
-        if message.paused {
-            let maybe_pending_flow_id = {
-                let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-                flow_event_store
-                    .try_get_pending_flow(&message.flow_binding)
-                    .await?
-            };
+        if !self.has_agent_started() {
+            // If the agent is not started yet, we do not process flow trigger updates
+            // as they are only relevant after the agent has started.
+            return Ok(());
+        }
 
-            if let Some(flow_id) = maybe_pending_flow_id {
-                let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-                abort_helper.abort_flow(flow_id).await?;
-            }
-        } else {
+        // Active trigger => activate it
+        if message.trigger_status.is_active() {
             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
             scheduling_helper
                 .activate_flow_trigger(
+                    target_catalog,
                     self.agent_config.round_time(message.event_time)?,
                     &message.flow_binding,
                     message.rule.clone(),
                 )
                 .await?;
+        } else {
+            // Inactive trigger => abort it
+            let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
+            abort_helper
+                .deactivate_flow_trigger(target_catalog, &message.flow_binding)
+                .await?;
         }
 
         Ok(())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowAgentImpl[DatasetLifecycleMessage]"
-    )]
-    async fn consume_message(
-        &self,
-        target_catalog: &Catalog,
-        message: &DatasetLifecycleMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
-
-        match message {
-            DatasetLifecycleMessage::Deleted(message) => {
-                let flow_ids_2_abort = {
-                    let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-                    // For every possible dataset flow:
-                    //  - drop queued activations
-                    //  - collect ID of aborted flow
-                    flow_event_store
-                        .try_get_all_dataset_pending_flows(&message.dataset_id)
-                        .await?
-                };
-
-                // Abort matched flows
-                for flow_id in flow_ids_2_abort {
-                    let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-                    abort_helper.abort_flow(flow_id).await?;
-                }
-            }
-
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
-                // No action required
-            }
-        }
-
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum FlowTriggerContext {
-    Unconditional,
-    Scheduled(Schedule),
-    Batching(BatchingRule),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

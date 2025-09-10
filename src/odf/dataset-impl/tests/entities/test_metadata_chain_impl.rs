@@ -19,7 +19,10 @@ use odf::metadata::*;
 use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use odf::storage::{GetRefError, MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 use opendatafabric_dataset_impl::MetadataChainImpl;
+use serde_json::json;
 use thiserror::Error;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn init_chain(root: &Path) -> impl MetadataChain {
     let blocks_dir = root.join("blocks");
@@ -37,6 +40,8 @@ fn init_chain(root: &Path) -> impl MetadataChain {
     MetadataChainImpl::new(meta_block_repo, meta_ref_repo)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_empty() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -46,6 +51,8 @@ async fn test_empty() {
         Err(GetRefError::NotFound(_))
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_append_and_get() {
@@ -79,6 +86,8 @@ async fn test_append_and_get() {
     assert_eq!(chain.get_block(&hash_1).await.unwrap(), block_1);
     assert_eq!(chain.get_block(&hash_2).await.unwrap(), block_2);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_set_ref() {
@@ -139,6 +148,10 @@ async fn test_set_ref() {
     assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Append validation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_append_hash_mismatch() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -164,6 +177,8 @@ async fn test_append_hash_mismatch() {
         ))
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_append_prev_block_not_found() {
@@ -196,6 +211,8 @@ async fn test_append_prev_block_not_found() {
 
     assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_append_prev_block_sequence_integrity_broken() {
@@ -329,6 +346,8 @@ async fn test_append_unexpected_ref() {
     assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_append_first_block_not_seed() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -343,6 +362,8 @@ async fn test_append_first_block_not_seed() {
         ))
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_append_seed_block_not_first() {
@@ -369,6 +390,8 @@ async fn test_append_seed_block_not_first() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_append_system_time_non_monotonic() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -394,6 +417,8 @@ async fn test_append_system_time_non_monotonic() {
         ))
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_append_watermark_non_monotonic() {
@@ -493,6 +518,8 @@ async fn test_append_watermark_non_monotonic() {
     chain.append(block, AppendOpts::default()).await.unwrap();
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_append_add_data_empty_commit() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -555,6 +582,8 @@ async fn test_append_add_data_empty_commit() {
         )))
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_append_execute_transform_empty_commit() {
@@ -634,6 +663,8 @@ async fn test_append_execute_transform_empty_commit() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_append_add_push_source_does_not_require_explicit_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -658,6 +689,8 @@ async fn test_append_add_push_source_does_not_require_explicit_schema() {
         .await;
     assert_matches!(res, Ok(_));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_append_add_data_must_be_preseeded_by_schema() {
@@ -734,6 +767,8 @@ async fn test_append_add_data_must_be_preseeded_by_schema() {
         .await
         .unwrap();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_append_execute_transform_must_be_preseeded_by_schema() {
@@ -843,6 +878,425 @@ async fn test_append_execute_transform_must_be_preseeded_by_schema() {
         .await
         .unwrap();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_append_set_data_schema_evolution() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Initial schema
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Setting identical schema should result in no-op error
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(AppendValidationError::NoOpEvent(
+            _
+        )))
+    );
+
+    // Adding annotations is OK
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").extra_json(json!({"kamu.dev/test": "foo"})),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Removing annotations is OK
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 2)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Incompatible schemas are rejected (city -> pity)
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("pity"),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 3)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Incompatible schemas are rejected (city made optional)
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 3)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+#[expect(deprecated)]
+async fn test_append_set_data_schema_legacy_upgrade() {
+    use ::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Initial schema
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new_legacy_raw_arrow(&Schema::new(
+                vec![
+                    Field::new("offset", DataType::Int64, false),
+                    Field::new("op", DataType::Int32, false),
+                    Field::new(
+                        "system_time",
+                        DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                        false,
+                    ),
+                    Field::new(
+                        "event_time",
+                        DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                        true,
+                    ),
+                    Field::new("city", DataType::Utf8, true),
+                    Field::new("population", DataType::Int64, true),
+                ],
+            )))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Incompatible schemas are rejected (city -> pity)
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("pity"),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // During the first migration from legacy to new schema optionality differences
+    // are allowed
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Later attempts to change optionality will be considered as incompatible
+    // schemas (for now, until schema evolution is supported)
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 2)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[ignore = "Awaits enabling strict validation"]
+#[test_log::test(tokio::test)]
+async fn test_append_set_data_schema_validates_system_columns() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Offset missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                // odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Operation type missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                // odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // System time missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                // odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Event time missing
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                // odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Offset is optional
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset").optional(),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Success
+    chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city").optional(),
+                odf::schema::DataField::i64("population"),
+            ])))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Iteration and visitors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_iter_blocks() {
@@ -959,6 +1413,8 @@ async fn test_iter_blocks() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_accept() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -1019,6 +1475,8 @@ async fn test_accept() {
         Ok(_)
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_accept_stop_on_first_error() {

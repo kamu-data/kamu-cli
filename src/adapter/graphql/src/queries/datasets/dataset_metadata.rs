@@ -137,10 +137,7 @@ impl<'a> DatasetMetadata<'a> {
             .await
             .int_err()?
         {
-            Ok(Option::from(DataSchema::from_arrow_schema(
-                schema.as_ref(),
-                format,
-            )))
+            Ok(Option::from(DataSchema::new(schema, format)))
         } else {
             Ok(None)
         }
@@ -439,6 +436,14 @@ impl<'a> DatasetMetadata<'a> {
         let result = futures::future::try_join_all(futures_iter).await?;
 
         Ok(result)
+    }
+
+    /// Experimental: Current archetype as per `kamu.dev/archetype` annotation,
+    /// if any
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_readme, skip_all)]
+    async fn current_archetype(&self, ctx: &Context<'_>) -> Result<Option<DatasetArchetype>> {
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
+        Ok(archetype.map(Into::into))
     }
 }
 

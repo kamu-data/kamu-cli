@@ -466,21 +466,24 @@ pub struct SetDataSchemaBuilder {
 }
 
 impl SetDataSchemaBuilder {
-    #[cfg(feature = "arrow")]
     pub fn new() -> Self {
-        use datafusion::arrow::datatypes::*;
-        let schema = Schema::new(vec![
-            Field::new("city", DataType::Utf8, false),
-            Field::new("population", DataType::Int64, false),
+        let schema = DataSchema::new(vec![
+            DataField::string("city"),
+            DataField::i64("population"),
         ]);
         Self {
-            v: SetDataSchema::new(&schema),
+            v: SetDataSchema::new(schema),
         }
     }
 
-    #[cfg(feature = "arrow")]
-    pub fn schema(mut self, schema: &datafusion::arrow::datatypes::Schema) -> Self {
+    pub fn schema(mut self, schema: DataSchema) -> Self {
         self.v = SetDataSchema::new(schema);
+        self
+    }
+
+    #[cfg(feature = "arrow")]
+    pub fn schema_from_arrow(mut self, schema: &datafusion::arrow::datatypes::Schema) -> Self {
+        self.v = SetDataSchema::new(DataSchema::new_from_arrow(schema).unwrap().strip_encoding());
         self
     }
 
@@ -507,6 +510,7 @@ impl AddDataBuilder {
                 new_checkpoint: None,
                 new_watermark: None,
                 new_source_state: None,
+                extra: None,
             },
         }
     }

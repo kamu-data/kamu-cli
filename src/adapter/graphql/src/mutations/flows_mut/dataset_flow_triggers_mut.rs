@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService};
+use kamu_adapter_flow_dataset::FlowScopeDataset;
+use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService, FlowTriggerStopPolicy};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -43,10 +44,10 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        paused: bool,
-        trigger_input: FlowTriggerInput,
+        trigger_rule_input: FlowTriggerRuleInput,
+        trigger_stop_policy_input: FlowTriggerStopPolicyInput,
     ) -> Result<SetFlowTriggerResult> {
-        if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
+        if let Err(err) = trigger_rule_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         }
 
@@ -56,9 +57,15 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }
 
-        let trigger_rule: FlowTriggerRule = match trigger_input.try_into() {
+        let trigger_rule: FlowTriggerRule = match trigger_rule_input.try_into() {
             Ok(rule) => rule,
-            Err(e) => return Ok(SetFlowTriggerResult::FlowInvalidTriggerInput(e)),
+            Err(e) => return Ok(SetFlowTriggerResult::InvalidTriggerInput(e)),
+        };
+
+        let triggest_stop_policy: FlowTriggerStopPolicy = match trigger_stop_policy_input.try_into()
+        {
+            Ok(policy) => policy,
+            Err(e) => return Ok(SetFlowTriggerResult::InvalidTriggerStopPolicyInput(e)),
         };
 
         if let Some(e) =
@@ -69,15 +76,14 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
-        let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let flow_binding = FlowBinding::for_dataset(
-            dataset_handle.id.clone(),
+        let flow_binding = FlowBinding::new(
             map_dataset_flow_type(dataset_flow_type),
+            FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
         );
 
         let res = flow_trigger_service
-            .set_trigger(Utc::now(), flow_binding, paused, trigger_rule)
+            .set_trigger(Utc::now(), flow_binding, trigger_rule, triggest_stop_policy)
             .await
             .int_err()?;
 
@@ -86,23 +92,56 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }))
     }
 
-    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flows, skip_all)]
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn pause_flows(
+    async fn pause_flow(
         &self,
         ctx: &Context<'_>,
-        dataset_flow_type: Option<DatasetFlowType>,
+        dataset_flow_type: DatasetFlowType,
     ) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_handle = self.dataset_request_state.dataset_handle();
+        let flow_binding = FlowBinding::new(
+            map_dataset_flow_type(dataset_flow_type),
+            FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
+        );
 
         flow_trigger_service
-            .pause_dataset_flows(
-                Utc::now(),
-                &dataset_handle.id,
-                dataset_flow_type.map(map_dataset_flow_type),
-            )
+            .pause_flow_trigger(Utc::now(), &flow_binding)
+            .await?;
+
+        Ok(true)
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flows, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn pause_flows(&self, ctx: &Context<'_>) -> Result<bool> {
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
+        flow_trigger_service
+            .pause_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
+            .await?;
+
+        Ok(true)
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flow, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn resume_flow(
+        &self,
+        ctx: &Context<'_>,
+        dataset_flow_type: DatasetFlowType,
+    ) -> Result<bool> {
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let flow_binding = FlowBinding::new(
+            map_dataset_flow_type(dataset_flow_type),
+            FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
+        );
+
+        flow_trigger_service
+            .resume_flow_trigger(Utc::now(), &flow_binding)
             .await?;
 
         Ok(true)
@@ -110,21 +149,12 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resume_flows(
-        &self,
-        ctx: &Context<'_>,
-        dataset_flow_type: Option<DatasetFlowType>,
-    ) -> Result<bool> {
+    async fn resume_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_handle = self.dataset_request_state.dataset_handle();
-
+        let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
         flow_trigger_service
-            .resume_dataset_flows(
-                Utc::now(),
-                &dataset_handle.id,
-                dataset_flow_type.map(map_dataset_flow_type),
-            )
+            .resume_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
             .await?;
 
         Ok(true)
@@ -140,7 +170,8 @@ enum SetFlowTriggerResult {
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     PreconditionsNotMet(FlowPreconditionsNotMet),
     TypeIsNotSupported(FlowTypeIsNotSupported),
-    FlowInvalidTriggerInput(FlowInvalidTriggerInputError),
+    InvalidTriggerInput(FlowInvalidTriggerInputError),
+    InvalidTriggerStopPolicyInput(FlowInvalidTriggerStopPolicyInputError),
 }
 
 #[derive(SimpleObject)]
@@ -164,6 +195,19 @@ pub struct FlowInvalidTriggerInputError {
 
 #[ComplexObject]
 impl FlowInvalidTriggerInputError {
+    pub async fn message(&self) -> String {
+        self.reason.clone()
+    }
+}
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct FlowInvalidTriggerStopPolicyInputError {
+    pub reason: String,
+}
+
+#[ComplexObject]
+impl FlowInvalidTriggerStopPolicyInputError {
     pub async fn message(&self) -> String {
         self.reason.clone()
     }

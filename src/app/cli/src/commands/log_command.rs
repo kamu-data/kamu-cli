@@ -197,12 +197,31 @@ impl AsciiRenderer {
         )?;
 
         match &block.event {
-            odf::MetadataEvent::SetDataSchema(e @ odf::metadata::SetDataSchema { .. }) => {
-                let schema = e.schema_as_arrow().unwrap();
+            odf::MetadataEvent::SetDataSchema(
+                e @ odf::metadata::SetDataSchema {
+                    raw_arrow_schema: Some(_),
+                    schema: None,
+                },
+            ) => {
+                let schema = e
+                    .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
+                    .unwrap();
                 let schema_str = odf::utils::schema::format::format_schema_arrow(&schema);
 
                 self.render_property(output, 0, "Kind", "SetDataSchema")?;
-                self.render_property(output, 0, "Schema", schema_str)?;
+                self.render_property_multiline(output, 0, "RawArrowSchema", &schema_str)?;
+            }
+            odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema {
+                raw_arrow_schema: None,
+                schema: Some(schema),
+            }) => {
+                let schema_str = odf::utils::schema::format::format_schema_odf_yaml(schema);
+
+                self.render_property(output, 0, "Kind", "SetDataSchema")?;
+                self.render_property_multiline(output, 0, "Schema", &schema_str)?;
+            }
+            odf::MetadataEvent::SetDataSchema(e) => {
+                unreachable!("Invalid event {e:?}")
             }
             odf::MetadataEvent::AddData(odf::metadata::AddData {
                 prev_checkpoint,
@@ -211,6 +230,7 @@ impl AsciiRenderer {
                 new_checkpoint,
                 new_watermark,
                 new_source_state,
+                extra,
             }) => {
                 self.render_property(output, 0, "Kind", "AddData")?;
 
@@ -246,6 +266,10 @@ impl AsciiRenderer {
                         "NewWatermark",
                         wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
                     )?;
+                }
+
+                if let Some(extra) = extra {
+                    self.render_extra(output, 0, extra)?;
                 }
             }
             odf::MetadataEvent::ExecuteTransform(odf::metadata::ExecuteTransform {
@@ -462,6 +486,35 @@ impl AsciiRenderer {
             style(":").dim(),
             value
         )
+    }
+
+    fn render_property_multiline(
+        &self,
+        output: &mut impl Write,
+        indent: i32,
+        name: &str,
+        value: &str,
+    ) -> Result<(), std::io::Error> {
+        self.indent(output, indent)?;
+        writeln!(output, "{}{}", style(name).dim(), style(":").dim(),)?;
+        for line in value.trim_end().split('\n') {
+            self.indent(output, indent + 1)?;
+            writeln!(output, "{line}")?;
+        }
+        Ok(())
+    }
+
+    fn render_extra(
+        &self,
+        output: &mut impl Write,
+        indent: i32,
+        extra: &odf::metadata::ExtraAttributes,
+    ) -> Result<(), std::io::Error> {
+        let mut buf = Vec::new();
+        let mut serializer = serde_yaml::Serializer::new(&mut buf);
+        odf::metadata::serde::yaml::ExtraAttributesDef::serialize(extra, &mut serializer).unwrap();
+
+        self.render_property_multiline(output, indent, "Extra", &String::from_utf8(buf).unwrap())
     }
 
     fn indent(&self, output: &mut impl Write, level: i32) -> Result<(), std::io::Error> {

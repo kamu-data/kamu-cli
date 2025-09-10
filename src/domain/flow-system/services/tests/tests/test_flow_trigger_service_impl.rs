@@ -15,7 +15,12 @@ use chrono::{Duration, Utc};
 use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
-use kamu_adapter_flow_dataset::{FLOW_TYPE_DATASET_COMPACT, FLOW_TYPE_DATASET_INGEST};
+use kamu_adapter_flow_dataset::{
+    FlowDatasetsEventBridge,
+    FlowScopeDataset,
+    compaction_dataset_binding,
+    ingest_dataset_binding,
+};
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -35,10 +40,9 @@ async fn test_visibility() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
-    let binding_foo_compaction =
-        FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
-    let binding_bar_ingest = FlowBinding::for_dataset(bar_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
+    let binding_foo_compaction = compaction_dataset_binding(&foo_id);
+    let binding_bar_ingest = ingest_dataset_binding(&bar_id);
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
@@ -80,7 +84,7 @@ async fn test_pause_resume_individual_dataset_flows() {
 
     // Make a dataset and configure daily ingestion schedule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
@@ -106,10 +110,7 @@ async fn test_pause_resume_individual_dataset_flows() {
     let flow_trigger_state = harness
         .get_flow_trigger_from_store(&binding_foo_ingest)
         .await;
-    assert_eq!(
-        flow_trigger_state.status,
-        FlowTriggerStatus::PausedTemporarily
-    );
+    assert_eq!(flow_trigger_state.status, FlowTriggerStatus::PausedByUser);
     assert_eq!(flow_trigger_state.rule, foo_ingest_trigger.clone());
 
     // Now, resume the trigger
@@ -135,14 +136,13 @@ async fn test_pause_resume_all_dataset_flows() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
 
     let foo_compaction_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_compaction =
-        FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
+    let binding_foo_compaction = compaction_dataset_binding(&foo_id);
     harness
         .set_flow_trigger(
             binding_foo_compaction.clone(),
@@ -158,7 +158,7 @@ async fn test_pause_resume_all_dataset_flows() {
     assert_eq!(2, harness.trigger_events_count());
 
     // Now, pause all flows of this dataset
-    harness.pause_all_dataset_flows(foo_id.clone()).await;
+    harness.pause_all_dataset_flows(&foo_id).await;
 
     // Both should disappear from the list of enabled triggers,
     // and both should produce events
@@ -173,7 +173,7 @@ async fn test_pause_resume_all_dataset_flows() {
         .await;
     assert_eq!(
         flow_trigger_ingest_state.status,
-        FlowTriggerStatus::PausedTemporarily
+        FlowTriggerStatus::PausedByUser
     );
     assert_eq!(flow_trigger_ingest_state.rule, foo_ingest_trigger.clone());
 
@@ -182,7 +182,7 @@ async fn test_pause_resume_all_dataset_flows() {
         .await;
     assert_eq!(
         flow_trigger_compaction_state.status,
-        FlowTriggerStatus::PausedTemporarily
+        FlowTriggerStatus::PausedByUser
     );
     assert_eq!(
         flow_trigger_compaction_state.rule,
@@ -190,7 +190,7 @@ async fn test_pause_resume_all_dataset_flows() {
     );
 
     // Now, resume all triggers
-    harness.resume_all_dataset_flows(foo_id.clone()).await;
+    harness.resume_all_dataset_flows(&foo_id).await;
 
     // They should be visible in the list of active triggers again, and again,we
     // should get 2 extra events
@@ -211,7 +211,7 @@ async fn test_pause_resume_individual_system_flows() {
 
     // Configure GC schedule
     let gc_schedule: Schedule = Duration::minutes(30).into();
-    let binding_gc = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
+    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
     harness
         .set_system_flow_schedule(FLOW_TYPE_SYSTEM_GC, gc_schedule.clone())
         .await
@@ -234,10 +234,7 @@ async fn test_pause_resume_individual_system_flows() {
 
     // Still, we should see it's state as paused in the repository directly
     let flow_trigger_state = harness.get_flow_trigger_from_store(&binding_gc).await;
-    assert_eq!(
-        flow_trigger_state.status,
-        FlowTriggerStatus::PausedTemporarily
-    );
+    assert_eq!(flow_trigger_state.status, FlowTriggerStatus::PausedByUser);
     assert_eq!(
         flow_trigger_state.rule,
         FlowTriggerRule::Schedule(gc_schedule.clone())
@@ -264,7 +261,7 @@ async fn test_dataset_deleted() {
     // Make a dataset and configure ingest trigger
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
@@ -310,7 +307,10 @@ impl FlowTriggerHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowTriggerTestListener>()
             .add::<FlowTriggerServiceImpl>()
+            .add::<FlowDatasetsEventBridge>()
+            .add::<FlowSensorDispatcherImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
+            .add::<InMemoryFlowEventStore>()
             .add::<SystemTimeSourceDefault>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -360,9 +360,9 @@ impl FlowTriggerHarness {
         flow_trigger_service
             .set_trigger(
                 Utc::now(),
-                FlowBinding::for_system(system_flow_type),
-                false,
+                FlowBinding::new(system_flow_type, FlowScope::make_system_scope()),
                 FlowTriggerRule::Schedule(schedule),
+                FlowTriggerStopPolicy::default(),
             )
             .await?;
         Ok(())
@@ -370,7 +370,12 @@ impl FlowTriggerHarness {
 
     async fn set_flow_trigger(&self, flow_binding: FlowBinding, trigger_rule: FlowTriggerRule) {
         self.flow_trigger_service
-            .set_trigger(Utc::now(), flow_binding, false, trigger_rule)
+            .set_trigger(
+                Utc::now(),
+                flow_binding,
+                trigger_rule,
+                FlowTriggerStopPolicy::default(),
+            )
             .await
             .unwrap();
     }
@@ -397,7 +402,7 @@ impl FlowTriggerHarness {
         system_flow_type: &str,
         expected_schedule: &Schedule,
     ) {
-        let flow_binding = FlowBinding::for_system(system_flow_type);
+        let flow_binding = FlowBinding::new(system_flow_type, FlowScope::make_system_scope());
         assert_matches!(
             enabled_triggers.get(&flow_binding),
             Some(FlowTriggerState {
@@ -416,49 +421,31 @@ impl FlowTriggerHarness {
     }
 
     async fn pause_flow(&self, flow_binding: &FlowBinding) {
-        match &flow_binding.scope {
-            FlowScope::Dataset { dataset_id } => {
-                self.flow_trigger_service
-                    .pause_dataset_flows(Utc::now(), dataset_id, Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-            FlowScope::System => {
-                self.flow_trigger_service
-                    .pause_system_flows(Utc::now(), Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-        }
+        self.flow_trigger_service
+            .pause_flow_trigger(Utc::now(), flow_binding)
+            .await
+            .unwrap();
     }
 
-    async fn pause_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
+    async fn pause_all_dataset_flows(&self, dataset_id: &odf::DatasetID) {
+        let lookup_scopes = vec![FlowScopeDataset::make_scope(dataset_id)];
         self.flow_trigger_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, None)
+            .pause_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
             .await
             .unwrap();
     }
 
     async fn resume_flow(&self, flow_binding: &FlowBinding) {
-        match &flow_binding.scope {
-            FlowScope::Dataset { dataset_id } => {
-                self.flow_trigger_service
-                    .resume_dataset_flows(Utc::now(), dataset_id, Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-            FlowScope::System => {
-                self.flow_trigger_service
-                    .resume_system_flows(Utc::now(), Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-        }
+        self.flow_trigger_service
+            .resume_flow_trigger(Utc::now(), flow_binding)
+            .await
+            .unwrap();
     }
 
-    async fn resume_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
+    async fn resume_all_dataset_flows(&self, dataset_id: &odf::DatasetID) {
+        let lookup_scopes = vec![FlowScopeDataset::make_scope(dataset_id)];
         self.flow_trigger_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, None)
+            .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
             .await
             .unwrap();
     }

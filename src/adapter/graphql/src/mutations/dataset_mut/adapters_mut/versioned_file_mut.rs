@@ -7,148 +7,91 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::io::Cursor;
+
+use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
+use tokio::io::BufReader;
 
 use crate::prelude::*;
-use crate::queries::{FileVersion, VersionedFileEntry, VersionedFileRecord};
+use crate::queries::{DatasetRequestState, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct VersionedFileMut<'a> {
-    dataset: &'a domain::ResolvedDataset,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 impl<'a> VersionedFileMut<'a> {
-    pub fn new(dataset: &'a domain::ResolvedDataset) -> Self {
-        Self { dataset }
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn get_latest_version(&self, ctx: &Context<'_>) -> Result<(FileVersion, odf::Multihash)> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        // TODO: Consider retractons / corrections
-        let query_res = query_svc
-            .tail(
-                &self.dataset.get_handle().as_local_ref(),
-                0,
-                1,
-                domain::GetDataOptions::default(),
-            )
-            .await
-            .int_err()?;
-
-        let Some(df) = query_res.df else {
-            return Ok((0, query_res.block_hash));
-        };
-
-        let last_version = df
-            .select_columns(&["version"])
-            .int_err()?
-            .collect_scalar::<datafusion::arrow::datatypes::Int32Type>()
-            .await
-            .int_err()?;
-
-        let last_version = FileVersion::try_from(last_version.unwrap_or(0)).unwrap();
-
-        Ok((last_version, query_res.block_hash))
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn get_latest_entry(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileEntry>> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        // TODO: Consider retractons / corrections
-        let query_res = query_svc
-            .tail(
-                &self.dataset.get_handle().as_local_ref(),
-                0,
-                1,
-                domain::GetDataOptions::default(),
-            )
-            .await
-            .int_err()?;
-
-        let Some(df) = query_res.df else {
-            return Ok(None);
-        };
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        assert_eq!(records.len(), 1);
-        let record = records.into_iter().next().unwrap();
-
-        let entry = VersionedFileEntry::from_json(self.dataset.clone(), record)?;
-
-        Ok(Some(entry))
-    }
-
-    // Push ingest the new record
-    // TODO: Handle errors on invalid extra data columns
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn write_record(
-        &self,
+    async fn get_content_args(
+        &'a self,
         ctx: &Context<'_>,
-        record: VersionedFileRecord,
-        expected_head: Option<Multihash<'static>>,
-    ) -> Result<UpdateVersionResult> {
-        let push_ingest_use_case = from_catalog_n!(ctx, dyn domain::PushIngestDataUseCase);
+        content_source: ContentSource<'a>,
+        content_type: Option<MediaType>,
+    ) -> Result<ContentArgs> {
+        use sha3::Digest;
+        use tokio::io::AsyncReadExt;
 
-        let new_version = record.version;
-        let content_hash = record.content_hash.clone();
-        let record_string = serde_json::to_string(&record).int_err()?;
+        match content_source {
+            ContentSource::Bytes(bytes) => {
+                let reader = BufReader::new(Cursor::new(bytes.to_owned()));
 
-        tracing::debug!(record = %record_string, "Writing new versioned file record");
-        let data_source =
-            kamu_core::DataSource::Buffer(bytes::Bytes::from(record_string.into_bytes()));
-
-        let ingest_result = match push_ingest_use_case
-            .execute(
-                self.dataset,
-                data_source,
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(kamu_core::MediaType::NDJSON.to_owned()),
-                    expected_head: expected_head.map(Into::into),
-                },
-                None,
-            )
-            .await
-        {
-            Ok(res) => res,
-            Err(domain::PushIngestDataError::Execution(domain::PushIngestError::CommitError(
-                odf::dataset::CommitError::MetadataAppendError(
-                    odf::dataset::AppendError::RefCASFailed(e),
-                ),
-            ))) => {
-                return Ok(UpdateVersionResult::CasFailed(
-                    UpdateVersionErrorCasFailed {
-                        expected_head: e.expected.unwrap().into(),
-                        actual_head: e.actual.unwrap().into(),
-                    },
-                ));
+                Ok(ContentArgs {
+                    content_length: bytes.len(),
+                    content_stream: Some(Box::new(reader)),
+                    content_hash: odf::Multihash::from_digest_sha3_256(bytes),
+                    content_type,
+                })
             }
-            Err(err) => {
-                return Err(err.int_err().into());
-            }
-        };
+            ContentSource::Token(token) => {
+                let upload_token: domain::UploadTokenBase64Json =
+                    token
+                        .parse()
+                        .map_err(|e: domain::UploadTokenBase64JsonDecodeError| {
+                            async_graphql::Error::new(e.message)
+                        })?;
 
-        match ingest_result {
-            kamu_core::PushIngestResult::Updated {
-                old_head,
-                new_head,
-                num_blocks: _,
-            } => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
-                new_version,
-                old_head: old_head.into(),
-                new_head: new_head.into(),
-                content_hash: content_hash.into(),
-            })),
-            kamu_core::PushIngestResult::UpToDate => unreachable!(),
+                let upload_service = from_catalog_n!(ctx, dyn domain::UploadService);
+
+                let mut stream = upload_service
+                    .upload_token_into_stream(&upload_token.0)
+                    .await
+                    .int_err()?;
+
+                let mut digest = sha3::Sha3_256::new();
+                let mut buf = [0u8; 2048];
+
+                loop {
+                    let read = stream.read(&mut buf).await.int_err()?;
+                    if read == 0 {
+                        break;
+                    }
+                    digest.update(&buf[..read]);
+                }
+
+                let content_hash =
+                    odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest.finalize())
+                        .unwrap();
+
+                // Get the stream again and copy data from uploads to storage using computed
+                // hash
+                // TODO: PERF: Should we create file in the final storage directly to avoid
+                // copying?
+                let content_stream = upload_service
+                    .upload_token_into_stream(&upload_token.0)
+                    .await
+                    .int_err()?;
+
+                Ok(ContentArgs {
+                    content_length: upload_token.0.content_length,
+                    content_hash,
+                    content_stream: Some(content_stream),
+                    content_type: upload_token.0.content_type,
+                })
+            }
         }
     }
 }
@@ -157,7 +100,14 @@ impl<'a> VersionedFileMut<'a> {
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl VersionedFileMut<'_> {
+impl<'a> VersionedFileMut<'a> {
+    #[graphql(skip)]
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
+    }
+
     /// Uploads a new version of content in-band. Can be used for very small
     /// files only.
     #[tracing::instrument(level = "info", name = VersionedFileMut_upload_new_version, skip_all)]
@@ -175,32 +125,43 @@ impl VersionedFileMut<'_> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        // Get the latest version and head
-        let (latest_version, _) = self.get_latest_version(ctx).await?;
-        let new_version = latest_version + 1;
-        let content_length = content.len();
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
-        // Upload data object
-        // TODO: Link data object to the new block
-        let data_repo = self.dataset.as_data_repo();
-        let insert_data_res = data_repo
-            .insert_bytes(&content, odf::storage::InsertOpts::default())
+        let content_args = self
+            .get_content_args(
+                ctx,
+                ContentSource::Bytes(&content),
+                content_type.map(Into::into),
+            )
+            .await?;
+
+        match update_version_file_use_case
+            .execute(
+                self.dataset_request_state.dataset_handle(),
+                Some(content_args),
+                expected_head.map(Into::into),
+                extra_data.map(Into::into),
+            )
             .await
-            .int_err()?;
-        let content_hash = insert_data_res.hash;
-
-        // Form and write a new record
-        let entry = VersionedFileEntry::new(
-            self.dataset.clone(),
-            new_version,
-            content_hash.clone(),
-            content_length,
-            content_type,
-            extra_data,
-        );
-
-        self.write_record(ctx, entry.into_input_record(), expected_head)
-            .await
+        {
+            Ok(res) => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
+                new_version: res.new_version,
+                old_head: res.old_head.into(),
+                new_head: res.new_head.into(),
+                content_hash: res.content_hash.into(),
+            })),
+            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
+                return Ok(UpdateVersionResult::CasFailed(
+                    UpdateVersionErrorCasFailed {
+                        expected_head: err.expected.unwrap().into(),
+                        actual_head: err.actual.unwrap().into(),
+                    },
+                ));
+            }
+            Err(err) => {
+                return Err(err.int_err().into());
+            }
+        }
     }
 
     /// Returns a pre-signed URL and upload token for direct uploads of large
@@ -222,12 +183,11 @@ impl VersionedFileMut<'_> {
             domain::FileUploadLimitConfig
         );
 
-        // TODO: Enforce limits
         let upload_context = match upload_svc
             .make_upload_context(
                 subject.account_id(),
                 uuid::Uuid::new_v4().to_string(),
-                content_type.map(domain::MediaType),
+                content_type.map(MediaType),
                 content_length,
             )
             .await
@@ -265,91 +225,39 @@ impl VersionedFileMut<'_> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        use sha3::Digest;
-        use tokio::io::AsyncReadExt;
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
-        let upload_svc = from_catalog_n!(ctx, dyn domain::UploadService);
+        let content_args = self
+            .get_content_args(ctx, ContentSource::Token(upload_token), None)
+            .await?;
 
-        let upload_token: domain::UploadTokenBase64Json =
-            upload_token
-                .parse()
-                .map_err(|e: domain::UploadTokenBase64JsonDecodeError| {
-                    async_graphql::Error::new(e.message)
-                })?;
-        let content_length = upload_token.0.content_length;
-
-        // Get the latest version and head
-        let (latest_version, head) = self.get_latest_version(ctx).await?;
-        let new_version = latest_version + 1;
-
-        // Early concurrency check
-        if let Some(expected_head) = &expected_head
-            && **expected_head != head
-        {
-            return Ok(UpdateVersionResult::CasFailed(
-                UpdateVersionErrorCasFailed {
-                    expected_head: expected_head.clone(),
-                    actual_head: head.into(),
-                },
-            ));
-        }
-
-        // Compute the object hash
-        // TODO: Hide digest logic into upload service or object repository?
-        let mut stream = upload_svc
-            .upload_token_into_stream(&upload_token.0)
-            .await
-            .int_err()?;
-
-        let mut digest = sha3::Sha3_256::new();
-        let mut buf = [0u8; 2048];
-
-        loop {
-            let read = stream.read(&mut buf).await.int_err()?;
-            if read == 0 {
-                break;
-            }
-            digest.update(&buf[..read]);
-        }
-
-        let digest = digest.finalize();
-        let content_hash =
-            odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest).unwrap();
-
-        // Get the stream again and copy data from uploads to storage using computed
-        // hash
-        // TODO: PERF: Should we create file in the final storage directly to avoid
-        // copying?
-        let stream = upload_svc
-            .upload_token_into_stream(&upload_token.0)
-            .await
-            .int_err()?;
-
-        let data_repo = self.dataset.as_data_repo();
-        data_repo
-            .insert_stream(
-                stream,
-                odf::storage::InsertOpts {
-                    precomputed_hash: Some(&content_hash),
-                    size_hint: Some(content_length as u64),
-                    ..Default::default()
-                },
+        match update_version_file_use_case
+            .execute(
+                self.dataset_request_state.dataset_handle(),
+                Some(content_args),
+                expected_head.map(Into::into),
+                extra_data.map(Into::into),
             )
             .await
-            .int_err()?;
-
-        // Form and write a new record
-        let entry = VersionedFileEntry::new(
-            self.dataset.clone(),
-            new_version,
-            content_hash.clone(),
-            content_length,
-            upload_token.0.content_type,
-            extra_data,
-        );
-
-        self.write_record(ctx, entry.into_input_record(), expected_head)
-            .await
+        {
+            Ok(res) => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
+                new_version: res.new_version,
+                old_head: res.old_head.into(),
+                new_head: res.new_head.into(),
+                content_hash: res.content_hash.into(),
+            })),
+            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
+                return Ok(UpdateVersionResult::CasFailed(
+                    UpdateVersionErrorCasFailed {
+                        expected_head: err.expected.unwrap().into(),
+                        actual_head: err.actual.unwrap().into(),
+                    },
+                ));
+            }
+            Err(err) => {
+                return Err(err.int_err().into());
+            }
+        }
     }
 
     /// Creating a new version with that has updated values of extra columns but
@@ -363,22 +271,35 @@ impl VersionedFileMut<'_> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        // Get the latest record and head
-        let entry = self.get_latest_entry(ctx).await?;
-        let Some(mut entry) = entry else {
-            return Ok(UpdateVersionResult::InvalidExtraData(
-                UpdateVersionErrorInvalidExtraData {
-                    message: "Can't update extra data without initial content version".to_string(),
-                },
-            ));
-        };
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
-        // Form and write a new record
-        entry.version += 1;
-        entry.extra_data = extra_data;
-
-        self.write_record(ctx, entry.into_input_record(), expected_head)
+        match update_version_file_use_case
+            .execute(
+                self.dataset_request_state.dataset_handle(),
+                None,
+                expected_head.map(Into::into),
+                Some(extra_data.into()),
+            )
             .await
+        {
+            Ok(res) => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
+                new_version: res.new_version,
+                old_head: res.old_head.into(),
+                new_head: res.new_head.into(),
+                content_hash: res.content_hash.into(),
+            })),
+            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
+                return Ok(UpdateVersionResult::CasFailed(
+                    UpdateVersionErrorCasFailed {
+                        expected_head: err.expected.unwrap().into(),
+                        actual_head: err.actual.unwrap().into(),
+                    },
+                ));
+            }
+            Err(err) => {
+                return Err(err.int_err().into());
+            }
+        }
     }
 }
 
@@ -516,6 +437,13 @@ impl From<domain::UploadContext> for UploadContext {
             upload_token: value.upload_token.to_string(),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum ContentSource<'a> {
+    Bytes(&'a [u8]),
+    Token(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

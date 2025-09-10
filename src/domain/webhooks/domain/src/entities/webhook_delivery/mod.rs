@@ -10,9 +10,11 @@
 #[cfg(feature = "sqlx")]
 mod webhook_delivery_record;
 
+mod webhook_delivery_id;
 mod webhook_request;
 mod webhook_response;
 
+pub use webhook_delivery_id::*;
 #[cfg(feature = "sqlx")]
 pub use webhook_delivery_record::*;
 pub use webhook_request::*;

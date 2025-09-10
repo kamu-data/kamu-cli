@@ -16,6 +16,7 @@ use kamu_datasets::{CreateDatasetUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::CreateDatasetUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceStub;
 
 use super::dataset_base_use_case_harness::{
@@ -59,7 +60,7 @@ async fn test_create_root_dataset() {
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Lifecycle Messages: 1
@@ -76,10 +77,20 @@ async fn test_create_root_dataset() {
                 Prev Head: None
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Appended {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <key_head>
+                Key Block Head: <new_head>
+              }
             "#
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
-        .replace("<new_head>", foo_created.head.to_string().as_str()),
+        .replace("<new_head>", foo_created.head.to_string().as_str())
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<key_tail>", foo_created.head.to_string().as_str())
+        .replace("<key_head>", foo_created.head.to_string().as_str()),
         harness.collected_outbox_messages()
     );
 }

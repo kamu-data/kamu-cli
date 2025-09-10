@@ -58,6 +58,10 @@ impl DatasetDependency {
             owner_name,
         })
     }
+
+    pub fn unresolved(dataset_id: odf::DatasetID) -> Self {
+        Self::Unresolved(dataset_id)
+    }
 }
 
 impl PartialOrd for DatasetDependency {

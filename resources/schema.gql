@@ -68,6 +68,10 @@ type Account {
 	Access to the flow configurations of this account
 	"""
 	accessTokens: AccountAccessTokens!
+	"""
+	Returns datasets belonging to this account
+	"""
+	ownedDatasets(page: Int, perPage: Int): DatasetConnection!
 }
 
 type AccountAccessTokens {
@@ -159,6 +163,10 @@ input AccountLookupFilter {
 
 type AccountMut {
 	"""
+	Convert to read-only accessor to an account
+	"""
+	account: Account!
+	"""
 	Update account name
 	"""
 	rename(newName: AccountName!): RenameAccountResult!
@@ -230,24 +238,68 @@ type AccountWithRoleEdge {
 
 type Accounts {
 	"""
-	Returns account by its ID
+	Returns the account that is making the call (authorized subject)
+	"""
+	me: Account!
+	"""
+	Returns an account by its ID, if found
 	"""
 	byId(accountId: AccountID!): Account
 	"""
-	Returns account by its name
+	Returns accounts by their IDs
+	"""
+	byIds(		accountIds: [AccountID!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Account!]!
+	"""
+	Returns an account by its name, if found
 	"""
 	byName(name: AccountName!): Account
+	"""
+	Returns accounts by their names
+	"""
+	byNames(		accountNames: [AccountName!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Account!]!
 }
 
 type AccountsMut {
+	"""
+	Returns the mutable account that is making the call (authorized subject)
+	"""
+	me: AccountMut!
 	"""
 	Returns a mutable account by its id
 	"""
 	byId(accountId: AccountID!): AccountMut
 	"""
+	Returns mutable accounts by their IDs
+	"""
+	byIds(		accountIds: [AccountID!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [AccountMut!]!
+	"""
 	Returns a mutable account by its name
 	"""
 	byName(accountName: AccountName!): AccountMut
+	"""
+	Returns accounts by their names
+	"""
+	byNames(		accountNames: [AccountName!]!,
+		"""
+		Whether to skip unresolved accounts or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [AccountMut!]!
 	"""
 	Create a new account
 	"""
@@ -298,6 +350,10 @@ type AddData {
 	when resuming.
 	"""
 	newSourceState: SourceState
+	"""
+	ODF extensions.
+	"""
+	extra: ExtraAttributes
 }
 
 """
@@ -371,6 +427,7 @@ type AttachmentsEmbedded {
 
 type Auth {
 	enabledProviders: [AccountProvider!]!
+	relations(accountIds: [AccountID!]!, page: Int, perPage: Int): AuthRelationConnection!
 }
 
 type AuthMut {
@@ -382,6 +439,32 @@ type AuthMut {
 	accountDetails(accessToken: String!): Account!
 }
 
+type AuthRelation {
+	account: Account!
+	role: DatasetAccessRole!
+	dataset: Dataset!
+}
+
+type AuthRelationConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [AuthRelation!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [AuthRelationEdge!]!
+}
+
+type AuthRelationEdge {
+	node: AuthRelation!
+}
+
 type AuthWeb3Mut {
 	eip4361AuthNonce(account: EvmWalletAddress!): Eip4361AuthNonceResponse!
 }
@@ -390,11 +473,6 @@ type AuthWeb3Mut {
 Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
-
-input BatchingInput {
-	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDeltaInput!
-}
 
 """
 A big integer scalar type.
@@ -422,11 +500,11 @@ type BuildInfo {
 	cargoOptLevel: String
 }
 
-interface CancelScheduledTasksResult {
+interface CancelFlowRunResult {
 	message: String!
 }
 
-type CancelScheduledTasksSuccess implements CancelScheduledTasksResult {
+type CancelFlowRunSuccess implements CancelFlowRunResult {
 	flow: Flow!
 	message: String!
 }
@@ -577,7 +655,7 @@ type CollectionProjection {
 
 type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
 	expectedHead: Multihash!
-	actualHead: Multihash!
+	actualHead: Multihash
 	isSuccess: Boolean!
 	message: String!
 }
@@ -656,16 +734,19 @@ input ColumnInput {
 }
 
 interface CommitResult {
+	isSuccess: Boolean!
 	message: String!
 }
 
 type CommitResultAppendError implements CommitResult & UpdateReadmeResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	oldHead: Multihash
 	newHead: Multihash!
+	isSuccess: Boolean!
 	message: String!
 }
 
@@ -893,9 +974,11 @@ type DataSchema {
 }
 
 enum DataSchemaFormat {
+	ARROW_JSON
+	ODF_JSON
+	ODF_YAML
 	PARQUET
 	PARQUET_JSON
-	ARROW_JSON
 }
 
 """
@@ -1031,6 +1114,11 @@ enum DatasetAccessRole {
 
 scalar DatasetAlias
 
+enum DatasetArchetype {
+	COLLECTION
+	VERSIONED_FILE
+}
+
 type DatasetCollaboration {
 	"""
 	Accounts (and their roles) that have access to the dataset
@@ -1161,7 +1249,8 @@ type DatasetFlowRunsMut {
 	triggerTransformFlow: TriggerFlowResult!
 	triggerCompactionFlow(compactionConfigInput: FlowConfigCompactionInput): TriggerFlowResult!
 	triggerResetFlow(resetConfigInput: FlowConfigResetInput): TriggerFlowResult!
-	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
+	triggerResetToMetadataFlow: TriggerFlowResult!
+	cancelFlowRun(flowId: FlowID!): CancelFlowRunResult!
 }
 
 type DatasetFlowTriggers {
@@ -1176,9 +1265,11 @@ type DatasetFlowTriggers {
 }
 
 type DatasetFlowTriggersMut {
-	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerInput: FlowTriggerInput!): SetFlowTriggerResult!
-	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
-	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
+	setTrigger(datasetFlowType: DatasetFlowType!, triggerRuleInput: FlowTriggerRuleInput!, triggerStopPolicyInput: FlowTriggerStopPolicyInput!): SetFlowTriggerResult!
+	pauseFlow(datasetFlowType: DatasetFlowType!): Boolean!
+	pauseFlows: Boolean!
+	resumeFlow(datasetFlowType: DatasetFlowType!): Boolean!
+	resumeFlows: Boolean!
 }
 
 enum DatasetFlowType {
@@ -1186,6 +1277,7 @@ enum DatasetFlowType {
 	EXECUTE_TRANSFORM
 	HARD_COMPACTION
 	RESET
+	RESET_TO_METADATA
 }
 
 type DatasetFlows {
@@ -1287,6 +1379,11 @@ type DatasetMetadata {
 	"""
 	currentVocab: SetVocab
 	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
+	"""
+	Experimental: Current archetype as per `kamu.dev/archetype` annotation,
+	if any
+	"""
+	currentArchetype: DatasetArchetype
 }
 
 type DatasetMetadataMut {
@@ -1305,6 +1402,10 @@ type DatasetMetadataPermissions {
 }
 
 type DatasetMut {
+	"""
+	Convert to read-only accessor to a dataset
+	"""
+	dataset: Dataset!
 	"""
 	Access to the mutable metadata of the dataset
 	"""
@@ -1442,9 +1543,31 @@ type DatasetWebhooksPermissions {
 
 type Datasets {
 	"""
-	Returns dataset by its ID
+	Returns a dataset by its ID, if found
 	"""
 	byId(datasetId: DatasetID!): Dataset
+	"""
+	Returns multiple datasets by their IDs
+	"""
+	byIds(		datasetIds: [DatasetID!]!,
+		"""
+		Whether to skip unresolved datasets or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Dataset!]!
+	"""
+	Returns a dataset by a ID or alias, if found
+	"""
+	byRef(datasetRef: DatasetRef!): Dataset
+	"""
+	Returns multiple datasets by their IDs or aliases
+	"""
+	byRefs(		datasetRefs: [DatasetRef!]!,
+		"""
+		Whether to skip unresolved datasets or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [Dataset!]!
 	"""
 	Returns dataset by its owner and name
 	"""
@@ -1461,9 +1584,18 @@ type Datasets {
 
 type DatasetsMut {
 	"""
-	Returns a mutable dataset by its ID
+	Returns a mutable dataset by its ID, if found
 	"""
 	byId(datasetId: DatasetID!): DatasetMut
+	"""
+	Returns mutable datasets by their IDs
+	"""
+	byIds(		datasetIds: [DatasetID!]!,
+		"""
+		Whether to skip unresolved datasets or return an error if one or more are missing
+		"""
+		skipMissing: Boolean!
+	): [DatasetMut!]!
 	"""
 	Creates a new empty dataset
 	"""
@@ -1791,6 +1923,8 @@ type ExecuteTransformInput {
 	newOffset: Int
 }
 
+scalar ExtraAttributes
+
 scalar ExtraData
 
 """
@@ -1979,9 +2113,9 @@ type Flow {
 	"""
 	initiator: Account
 	"""
-	Primary flow trigger
+	Primary flow activation cause
 	"""
-	primaryTrigger: FlowTriggerInstance!
+	primaryActivationCause: FlowActivationCause!
 	"""
 	Start condition
 	"""
@@ -1994,27 +2128,53 @@ type Flow {
 	Flow retry policy
 	"""
 	retryPolicy: FlowRetryPolicy
+	"""
+	Associated flow trigger
+	"""
+	relatedTrigger: FlowTrigger
 }
 
 type FlowAbortedResult {
 	message: String!
 }
 
-input FlowConfigCompactionInput @oneOf {
-	full: FlowConfigInputCompactionFull
-	metadataOnly: FlowConfigInputCompactionMetadataOnly
+union FlowActivationCause = FlowActivationCauseManual | FlowActivationCauseAutoPolling | FlowActivationCauseDatasetUpdate
+
+type FlowActivationCauseAutoPolling {
+	dummy: Boolean!
 }
 
-union FlowConfigCompactionMode = FlowConfigCompactionModeFull | FlowConfigCompactionModeMetadataOnly
+type FlowActivationCauseDatasetUpdate {
+	dataset: Dataset!
+	source: FlowActivationCauseDatasetUpdateSource!
+}
 
-type FlowConfigCompactionModeFull {
+union FlowActivationCauseDatasetUpdateSource = FlowActivationCauseDatasetUpdateSourceUpstreamFlow | FlowActivationCauseDatasetUpdateSourceHttpIngest | FlowActivationCauseDatasetUpdateSourceSmartProtocolPush | FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange
+
+type FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange {
+	dummy: Boolean!
+}
+
+type FlowActivationCauseDatasetUpdateSourceHttpIngest {
+	sourceName: String
+}
+
+type FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
+	accountName: AccountName
+	isForce: Boolean!
+}
+
+type FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+	flowId: FlowID!
+}
+
+type FlowActivationCauseManual {
+	initiator: Account!
+}
+
+input FlowConfigCompactionInput {
 	maxSliceSize: Int!
 	maxSliceRecords: Int!
-	recursive: Boolean!
-}
-
-type FlowConfigCompactionModeMetadataOnly {
-	recursive: Boolean!
 }
 
 input FlowConfigIngestInput {
@@ -2022,16 +2182,6 @@ input FlowConfigIngestInput {
 	Flag indicates to ignore cache during ingest step for API calls
 	"""
 	fetchUncacheable: Boolean!
-}
-
-input FlowConfigInputCompactionFull {
-	maxSliceSize: Int!
-	maxSliceRecords: Int!
-	recursive: Boolean!
-}
-
-input FlowConfigInputCompactionMetadataOnly {
-	recursive: Boolean!
 }
 
 input FlowConfigInputResetPropagationMode @oneOf {
@@ -2050,7 +2200,6 @@ input FlowConfigInputResetPropagationModeToSeed {
 input FlowConfigResetInput {
 	mode: FlowConfigInputResetPropagationMode!
 	oldHeadHash: Multihash
-	recursive: Boolean!
 }
 
 union FlowConfigResetPropagationMode = FlowConfigResetPropagationModeCustom | FlowConfigResetPropagationModeToSeed
@@ -2066,7 +2215,8 @@ type FlowConfigResetPropagationModeToSeed {
 union FlowConfigRule = FlowConfigRuleIngest | FlowConfigRuleCompaction | FlowConfigRuleReset
 
 type FlowConfigRuleCompaction {
-	compactionMode: FlowConfigCompactionMode!
+	maxSliceSize: Int!
+	maxSliceRecords: Int!
 }
 
 type FlowConfigRuleIngest {
@@ -2076,7 +2226,6 @@ type FlowConfigRuleIngest {
 type FlowConfigRuleReset {
 	mode: FlowConfigResetPropagationMode!
 	oldHeadHash: Multihash
-	recursive: Boolean!
 }
 
 type FlowConfigSnapshotModified implements FlowEvent {
@@ -2106,7 +2255,7 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC
+union FlowDescription = FlowDescriptionUnknown | FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionDatasetResetToMetadata | FlowDescriptionSystemGC | FlowDescriptionWebhookDeliver
 
 type FlowDescriptionDatasetExecuteTransform {
 	transformResult: FlowDescriptionUpdateResult
@@ -2114,10 +2263,8 @@ type FlowDescriptionDatasetExecuteTransform {
 }
 
 type FlowDescriptionDatasetHardCompaction {
-	compactionResult: FlowDescriptionDatasetHardCompactionResult
+	compactionResult: FlowDescriptionDatasetReorganizationResult
 }
-
-union FlowDescriptionDatasetHardCompactionResult = FlowDescriptionHardCompactionNothingToDo | FlowDescriptionHardCompactionSuccess
 
 type FlowDescriptionDatasetPollingIngest {
 	ingestResult: FlowDescriptionUpdateResult
@@ -2126,21 +2273,26 @@ type FlowDescriptionDatasetPollingIngest {
 
 type FlowDescriptionDatasetPushIngest {
 	sourceName: String
-	inputRecordsCount: Int!
 	ingestResult: FlowDescriptionUpdateResult
 	message: String!
 }
+
+union FlowDescriptionDatasetReorganizationResult = FlowDescriptionReorganizationNothingToDo | FlowDescriptionReorganizationSuccess
 
 type FlowDescriptionDatasetReset {
 	resetResult: FlowDescriptionResetResult
 }
 
-type FlowDescriptionHardCompactionNothingToDo {
+type FlowDescriptionDatasetResetToMetadata {
+	resetToMetadataResult: FlowDescriptionDatasetReorganizationResult
+}
+
+type FlowDescriptionReorganizationNothingToDo {
 	dummy: String
 	message: String!
 }
 
-type FlowDescriptionHardCompactionSuccess {
+type FlowDescriptionReorganizationSuccess {
 	originalBlocksCount: Int!
 	resultingBlocksCount: Int!
 	newHead: Multihash!
@@ -2152,6 +2304,10 @@ type FlowDescriptionResetResult {
 
 type FlowDescriptionSystemGC {
 	dummy: Boolean!
+}
+
+type FlowDescriptionUnknown {
+	message: String!
 }
 
 union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess | FlowDescriptionUpdateResultUnknown
@@ -2173,6 +2329,12 @@ type FlowDescriptionUpdateResultUpToDate {
 	uncacheable: Boolean!
 }
 
+type FlowDescriptionWebhookDeliver {
+	targetUrl: Url!
+	label: String!
+	eventType: String!
+}
+
 type FlowEdge {
 	node: Flow!
 }
@@ -2187,10 +2349,16 @@ type FlowEventAborted implements FlowEvent {
 	eventTime: DateTime!
 }
 
+type FlowEventActivationCauseAdded implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	activationCause: FlowActivationCause!
+}
+
 type FlowEventInitiated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	trigger: FlowTriggerInstance!
+	activationCause: FlowActivationCause!
 }
 
 type FlowEventScheduledForActivation implements FlowEvent {
@@ -2212,12 +2380,6 @@ type FlowEventTaskChanged implements FlowEvent {
 	taskStatus: TaskStatus!
 	nextAttemptAt: DateTime
 	task: Task!
-}
-
-type FlowEventTriggerAdded implements FlowEvent {
-	eventId: EventID!
-	eventTime: DateTime!
-	trigger: FlowTriggerInstance!
 }
 
 type FlowFailedError {
@@ -2247,7 +2409,12 @@ type FlowInvalidTriggerInputError implements SetFlowTriggerResult {
 	message: String!
 }
 
-type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
+type FlowInvalidTriggerStopPolicyInputError implements SetFlowTriggerResult {
+	reason: String!
+	message: String!
+}
+
+type FlowNotFound implements GetFlowResult & CancelFlowRunResult {
 	flowId: FlowID!
 	message: String!
 }
@@ -2278,17 +2445,18 @@ input FlowRetryPolicyInput {
 	backoffType: FlowRetryBackoffType!
 }
 
-union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
+union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionReactive | FlowStartConditionExecutor
 
-type FlowStartConditionBatching {
+type FlowStartConditionExecutor {
+	taskId: TaskID!
+}
+
+type FlowStartConditionReactive {
 	activeBatchingRule: FlowTriggerBatchingRule!
 	batchingDeadline: DateTime!
 	accumulatedRecordsCount: Int!
 	watermarkModified: Boolean!
-}
-
-type FlowStartConditionExecutor {
-	taskId: TaskID!
+	forBreakingChange: FlowTriggerBreakingChangeRule!
 }
 
 type FlowStartConditionSchedule {
@@ -2318,7 +2486,11 @@ type FlowTimingRecords {
 	"""
 	initiatedAt: DateTime!
 	"""
-	Planned scheduling time
+	First scheduling time
+	"""
+	firstAttemptScheduledAt: DateTime
+	"""
+	Planned scheduling time (different than first in case of retries)
 	"""
 	scheduledAt: DateTime
 	"""
@@ -2339,40 +2511,87 @@ type FlowTimingRecords {
 type FlowTrigger {
 	paused: Boolean!
 	schedule: FlowTriggerScheduleRule
-	batching: FlowTriggerBatchingRule
+	reactive: FlowTriggerReactiveRule
+	stopPolicy: FlowTriggerStopPolicy!
 }
 
-type FlowTriggerAutoPolling {
-	dummy: Boolean!
-}
+union FlowTriggerBatchingRule = FlowTriggerBatchingRuleImmediate | FlowTriggerBatchingRuleBuffering
 
-type FlowTriggerBatchingRule {
+type FlowTriggerBatchingRuleBuffering {
 	minRecordsToAwait: Int!
 	maxBatchingInterval: TimeDelta!
 }
 
-input FlowTriggerInput @oneOf {
-	schedule: ScheduleInput
-	batching: BatchingInput
+input FlowTriggerBatchingRuleBufferingInput {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDeltaInput!
 }
 
-type FlowTriggerInputDatasetFlow {
-	dataset: Dataset!
-	flowType: DatasetFlowType!
-	flowId: FlowID!
-}
-
-union FlowTriggerInstance = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
-
-type FlowTriggerManual {
-	initiator: Account!
-}
-
-type FlowTriggerPush {
+type FlowTriggerBatchingRuleImmediate {
 	dummy: Boolean!
 }
 
+input FlowTriggerBatchingRuleImmediateInput {
+	dummy: Boolean!
+}
+
+input FlowTriggerBatchingRuleInput @oneOf {
+	immediate: FlowTriggerBatchingRuleImmediateInput
+	buffering: FlowTriggerBatchingRuleBufferingInput
+}
+
+enum FlowTriggerBreakingChangeRule {
+	NO_ACTION
+	RECOVER
+}
+
+type FlowTriggerReactiveRule {
+	forNewData: FlowTriggerBatchingRule!
+	forBreakingChange: FlowTriggerBreakingChangeRule!
+}
+
+input FlowTriggerRuleInput @oneOf {
+	schedule: FlowTriggerRuleScheduleInput
+	reactive: FlowTriggerRuleReactiveInput
+}
+
+input FlowTriggerRuleReactiveInput {
+	forNewData: FlowTriggerBatchingRuleInput!
+	forBreakingChange: FlowTriggerBreakingChangeRule!
+}
+
+input FlowTriggerRuleScheduleInput @oneOf {
+	timeDelta: TimeDeltaInput
+	"""
+	Supported CRON syntax: min hour dayOfMonth month dayOfWeek
+	"""
+	cron5ComponentExpression: String
+}
+
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
+
+union FlowTriggerStopPolicy = FlowTriggerStopPolicyNever | FlowTriggerStopPolicyAfterConsecutiveFailures
+
+type FlowTriggerStopPolicyAfterConsecutiveFailures {
+	maxFailures: Int!
+}
+
+input FlowTriggerStopPolicyAfterConsecutiveFailuresInput {
+	maxFailures: Int!
+}
+
+input FlowTriggerStopPolicyInput @oneOf {
+	never: FlowTriggerStopPolicyNeverInput
+	afterConsecutiveFailures: FlowTriggerStopPolicyAfterConsecutiveFailuresInput
+}
+
+type FlowTriggerStopPolicyNever {
+	dummy: Boolean!
+}
+
+input FlowTriggerStopPolicyNeverInput {
+	dummy: Boolean!
+}
 
 type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 	message: String!
@@ -2891,6 +3110,7 @@ type NameLookupResultEdge {
 
 type NoChanges implements CommitResult & UpdateReadmeResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 type OdataProtocolDesc {
@@ -3061,6 +3281,20 @@ enum QueryDialect {
 	SQL_FLINK
 	SQL_DATA_FUSION
 	SQL_RISING_WAVE
+}
+
+interface ReactivateWebhookSubscriptionResult {
+	message: String!
+}
+
+type ReactivateWebhookSubscriptionResultSuccess implements ReactivateWebhookSubscriptionResult {
+	reactivated: Boolean!
+	message: String!
+}
+
+type ReactivateWebhookSubscriptionResultUnexpected implements ReactivateWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
+	message: String!
 }
 
 """
@@ -3375,14 +3609,6 @@ type RevokeResultAlreadyRevoked implements RevokeResult {
 type RevokeResultSuccess implements RevokeResult {
 	tokenId: AccessTokenID!
 	message: String!
-}
-
-input ScheduleInput @oneOf {
-	timeDelta: TimeDeltaInput
-	"""
-	Supported CRON syntax: min hour dayOfMonth month dayOfWeek
-	"""
-	cron5ComponentExpression: String
 }
 
 type Search {
@@ -3774,14 +4000,20 @@ type Task {
 	finishedAt: DateTime
 }
 
-union TaskFailureReason = TaskFailureReasonGeneral | TaskFailureReasonInputDatasetCompacted
+union TaskFailureReason = TaskFailureReasonGeneral | TaskFailureReasonInputDatasetCompacted | TaskFailureReasonWebhookDeliveryProblem
 
 type TaskFailureReasonGeneral {
 	message: String!
+	recoverable: Boolean!
 }
 
 type TaskFailureReasonInputDatasetCompacted {
 	inputDataset: Dataset!
+	message: String!
+}
+
+type TaskFailureReasonWebhookDeliveryProblem {
+	targetUrl: Url!
 	message: String!
 }
 
@@ -3998,6 +4230,11 @@ type UpsertDatasetEnvVarResultUpdated implements UpsertDatasetEnvVarResult {
 type UpsertDatasetEnvVarUpToDate implements UpsertDatasetEnvVarResult {
 	message: String!
 }
+
+"""
+URL is a String implementing the [URL Standard](http://url.spec.whatwg.org/)
+"""
+scalar Url
 
 type VersionedFile {
 	"""
@@ -4286,6 +4523,7 @@ type WebhookSubscriptionMut {
 	update(input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
 	pause: PauseWebhookSubscriptionResult!
 	resume: ResumeWebhookSubscriptionResult!
+	reactivate: ReactivateWebhookSubscriptionResult!
 	remove: RemoveWebhookSubscriptionResult!
 }
 

@@ -13,6 +13,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use kamu_webhooks_services::WebhookSubscriptionQueryServiceImpl;
+use messaging_outbox::MockOutbox;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,12 +42,15 @@ impl WebhookSubscriptionUseCaseHarness {
         &self.catalog
     }
 
-    pub(crate) async fn create_subscription(&self) -> WebhookSubscription {
-        self.create_subscription_in_dataset(odf::DatasetID::new_seeded_ed25519(b"foo"), None)
+    pub(crate) async fn create_subscription_in_dataset(
+        &self,
+        dataset_id: odf::DatasetID,
+    ) -> WebhookSubscription {
+        self.create_subscription_in_dataset_with_label(dataset_id, None)
             .await
     }
 
-    pub(crate) async fn create_subscription_in_dataset(
+    pub(crate) async fn create_subscription_in_dataset_with_label(
         &self,
         dataset_id: odf::DatasetID,
         label: Option<WebhookSubscriptionLabel>,
@@ -67,11 +71,136 @@ impl WebhookSubscriptionUseCaseHarness {
     pub(crate) async fn find_subscription(
         &self,
         subscription_id: WebhookSubscriptionID,
+        query_mode: WebhookSubscriptionQueryMode,
     ) -> Option<WebhookSubscription> {
         self.query_service
-            .find_webhook_subscription(subscription_id)
+            .find_webhook_subscription(subscription_id, query_mode)
             .await
             .unwrap()
+    }
+
+    pub(crate) fn expect_webhook_event_enabled_message(
+        mock_outbox: &mut MockOutbox,
+        event_type: &WebhookEventType,
+        dataset_id: Option<&odf::DatasetID>,
+        times: usize,
+    ) {
+        use mockall::predicate::{eq, function};
+
+        let dataset_id = dataset_id.cloned();
+        let event_type = event_type.clone();
+
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(times)
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE),
+                function(move |message_as_json: &serde_json::Value| {
+                    let message: WebhookSubscriptionEventChangesMessage =
+                        serde_json::from_value(message_as_json.clone()).unwrap();
+
+                    if let WebhookSubscriptionEventChangesMessage::EventEnabled(e) = &message {
+                        e.dataset_id == dataset_id && e.event_type == event_type
+                    } else {
+                        false
+                    }
+                }),
+                eq(1),
+            )
+            .returning(|_, _, _| Ok(()));
+    }
+
+    pub(crate) fn expect_webhook_event_disabled_message(
+        mock_outbox: &mut MockOutbox,
+        event_type: &WebhookEventType,
+        dataset_id: Option<&odf::DatasetID>,
+        times: usize,
+    ) {
+        use mockall::predicate::{eq, function};
+
+        let dataset_id = dataset_id.cloned();
+        let event_type = event_type.clone();
+
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(times)
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE),
+                function(move |message_as_json: &serde_json::Value| {
+                    let message: WebhookSubscriptionEventChangesMessage =
+                        serde_json::from_value(message_as_json.clone()).unwrap();
+
+                    if let WebhookSubscriptionEventChangesMessage::EventDisabled(e) = &message {
+                        e.dataset_id == dataset_id && e.event_type == event_type
+                    } else {
+                        false
+                    }
+                }),
+                eq(1),
+            )
+            .returning(|_, _, _| Ok(()));
+    }
+
+    pub(crate) fn expect_webhook_subscription_deleted_message(
+        mock_outbox: &mut MockOutbox,
+        event_type: &WebhookEventType,
+        dataset_id: Option<&odf::DatasetID>,
+        times: usize,
+    ) {
+        use mockall::predicate::{eq, function};
+
+        let dataset_id = dataset_id.cloned();
+        let event_types = vec![event_type.clone()];
+
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(times)
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE),
+                function(move |message_as_json: &serde_json::Value| {
+                    let message: WebhookSubscriptionLifecycleMessage =
+                        serde_json::from_value(message_as_json.clone()).unwrap();
+
+                    if let WebhookSubscriptionLifecycleMessage::Deleted(e) = &message {
+                        e.dataset_id == dataset_id && e.event_types == event_types
+                    } else {
+                        false
+                    }
+                }),
+                eq(1),
+            )
+            .returning(|_, _, _| Ok(()));
+    }
+
+    pub(crate) fn expect_webhook_subscription_marked_unreachable_message(
+        mock_outbox: &mut MockOutbox,
+        event_type: &WebhookEventType,
+        dataset_id: Option<&odf::DatasetID>,
+        times: usize,
+    ) {
+        use mockall::predicate::{eq, function};
+
+        let dataset_id = dataset_id.cloned();
+        let event_types = vec![event_type.clone()];
+
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(times)
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE),
+                function(move |message_as_json: &serde_json::Value| {
+                    let message: WebhookSubscriptionLifecycleMessage =
+                        serde_json::from_value(message_as_json.clone()).unwrap();
+
+                    if let WebhookSubscriptionLifecycleMessage::MarkedUnreachable(e) = &message {
+                        e.dataset_id == dataset_id && e.event_types == event_types
+                    } else {
+                        false
+                    }
+                }),
+                eq(1),
+            )
+            .returning(|_, _, _| Ok(()));
     }
 }
 

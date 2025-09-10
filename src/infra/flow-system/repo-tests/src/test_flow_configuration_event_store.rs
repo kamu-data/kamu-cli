@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
-use kamu_adapter_flow_dataset as afs;
-use kamu_adapter_flow_dataset::FlowConfigRuleCompact;
+use kamu_adapter_flow_dataset::{FlowConfigRuleCompact, ingest_dataset_binding};
 use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +26,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let flow_binding = FlowBinding::for_dataset(dataset_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let flow_binding = ingest_dataset_binding(&dataset_id);
 
     let events: Vec<_> = event_store
         .get_events(&flow_binding, GetEventsOpts::default())
@@ -37,17 +35,8 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
         .unwrap();
     assert_eq!(events, []);
 
-    let dataset_ids: Vec<_> = event_store
-        .list_dataset_ids(&PaginationOpts {
-            limit: 10,
-            offset: 0,
-        })
-        .await
-        .unwrap();
-    assert_eq!(dataset_ids, []);
-
     let dataset_bindings = event_store
-        .all_bindings_for_dataset_flows(&dataset_id)
+        .all_bindings_for_scope(&flow_binding.scope)
         .await
         .unwrap();
     assert!(
@@ -74,19 +63,22 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .unwrap();
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_binding_1 =
-        FlowBinding::for_dataset(dataset_id_1.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let flow_binding_1 = ingest_dataset_binding(&dataset_id_1);
 
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config(),
         retry_policy: None,
     };
     let event_1_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        rule: FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config(),
         retry_policy: Some(RetryPolicy {
             max_attempts: 3,
             min_delay_seconds: 10,
@@ -108,13 +100,14 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(2, num_events);
 
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
-    let flow_binding_2 =
-        FlowBinding::for_dataset(dataset_id_2.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let flow_binding_2 = ingest_dataset_binding(&dataset_id_2);
 
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_2.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config(),
         retry_policy: None,
     };
 
@@ -127,11 +120,13 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(3, num_events);
 
-    let flow_binding_3 = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        rule: FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config(),
         retry_policy: Some(RetryPolicy {
             max_attempts: 5,
             min_delay_seconds: 3600,
@@ -175,22 +170,8 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(&events[..], [event_3.into()]);
 
-    let mut dataset_ids: Vec<_> = event_store
-        .list_dataset_ids(&PaginationOpts {
-            limit: 10,
-            offset: 0,
-        })
-        .await
-        .unwrap();
-    dataset_ids.sort();
-
-    let mut expected_dataset_ids = vec![dataset_id_1.clone(), dataset_id_2.clone()];
-    expected_dataset_ids.sort();
-
-    assert_eq!(expected_dataset_ids, dataset_ids);
-
     let dataset_bindings = event_store
-        .all_bindings_for_dataset_flows(&dataset_id_1)
+        .all_bindings_for_scope(&flow_binding_1.scope)
         .await
         .unwrap();
     assert_eq!(
@@ -200,7 +181,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     );
 
     let dataset_bindings = event_store
-        .all_bindings_for_dataset_flows(&dataset_id_2)
+        .all_bindings_for_scope(&flow_binding_2.scope)
         .await
         .unwrap();
     assert_eq!(
@@ -227,27 +208,30 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         .get_one::<dyn FlowConfigurationEventStore>()
         .unwrap();
 
-    let flow_binding = FlowBinding::for_dataset(
-        odf::DatasetID::new_seeded_ed25519(b"foo"),
-        afs::FLOW_TYPE_DATASET_INGEST,
-    );
+    let flow_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
 
     let event_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config(),
         retry_policy: None,
     };
     let event_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        rule: FlowConfigRuleCompact::try_new(200_000, 2000)
+            .unwrap()
+            .into_flow_config(),
         retry_policy: None,
     };
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
-        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        rule: FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config(),
         retry_policy: None,
     };
 

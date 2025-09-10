@@ -7,24 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use file_utils::MediaType;
 use kamu::domain;
 use odf::metadata::OperationType as Op;
 
 use crate::prelude::*;
-use crate::queries::CollectionEntry;
+use crate::queries::{CollectionEntry, DatasetRequestState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct CollectionMut<'a> {
-    dataset: &'a domain::ResolvedDataset,
+    state: &'a DatasetRequestState,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'a> CollectionMut<'a> {
-    pub fn new(dataset: &'a domain::ResolvedDataset) -> Self {
-        Self { dataset }
+    pub fn new(state: &'a DatasetRequestState) -> Self {
+        Self { state }
     }
 
     // Push ingest the new record
@@ -38,6 +39,8 @@ impl<'a> CollectionMut<'a> {
     ) -> Result<CollectionUpdateResult> {
         use std::io::Write;
 
+        let dataset = self.state.resolved_dataset(ctx).await?;
+
         let push_ingest_use_case = from_catalog_n!(ctx, dyn domain::PushIngestDataUseCase);
 
         let mut ndjson = Vec::<u8>::new();
@@ -49,13 +52,13 @@ impl<'a> CollectionMut<'a> {
 
         let ingest_result = match push_ingest_use_case
             .execute(
-                self.dataset,
+                dataset,
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(ndjson)),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
-                    media_type: Some(kamu_core::MediaType::NDJSON.to_owned()),
+                    media_type: Some(MediaType::NDJSON.to_owned()),
                     expected_head,
                 },
                 None,
@@ -63,6 +66,16 @@ impl<'a> CollectionMut<'a> {
             .await
         {
             Ok(res) => res,
+            Err(domain::PushIngestDataError::Planning(
+                domain::PushIngestPlanningError::HeadNotFound(e),
+            )) => {
+                return Ok(CollectionUpdateResult::CasFailed(
+                    CollectionUpdateErrorCasFailed {
+                        expected_head: e.hash.into(),
+                        actual_head: None,
+                    },
+                ));
+            }
             Err(domain::PushIngestDataError::Execution(domain::PushIngestError::CommitError(
                 odf::dataset::CommitError::MetadataAppendError(
                     odf::dataset::AppendError::RefCASFailed(e),
@@ -71,7 +84,7 @@ impl<'a> CollectionMut<'a> {
                 return Ok(CollectionUpdateResult::CasFailed(
                     CollectionUpdateErrorCasFailed {
                         expected_head: e.expected.unwrap().into(),
-                        actual_head: e.actual.unwrap().into(),
+                        actual_head: Some(e.actual.unwrap().into()),
                     },
                 ));
             }
@@ -109,7 +122,7 @@ impl<'a> CollectionMut<'a> {
         // TODO: PERF: Filter paths that are relevant to operations
         let query_res = query_svc
             .get_data(
-                &self.dataset.get_handle().as_local_ref(),
+                &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
@@ -407,7 +420,7 @@ impl CollectionUpdateUpToDate {
 #[graphql(complex)]
 pub struct CollectionUpdateErrorCasFailed {
     expected_head: Multihash<'static>,
-    actual_head: Multihash<'static>,
+    actual_head: Option<Multihash<'static>>,
 }
 #[ComplexObject]
 impl CollectionUpdateErrorCasFailed {

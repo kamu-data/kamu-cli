@@ -586,8 +586,8 @@ Show physical schema of the underlying Parquet files:
 "#)]
 pub struct InspectSchema {
     /// Format of the output
-    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
-    pub output_format: Option<SchemaOutputFormat>,
+    #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = SchemaOutputFormat::OdfYaml)]
+    pub output_format: SchemaOutputFormat,
 
     /// Extract schema from the last data slice file instead of metadata
     #[arg(long, short = 'b', hide = true)]

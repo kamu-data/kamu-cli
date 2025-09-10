@@ -13,6 +13,7 @@ use dill::{Catalog, component, interface, meta};
 use internal_error::*;
 use kamu_datasets::{
     DatasetReferenceMessage,
+    DatasetReferenceMessageUpdated,
     DatasetReferenceRepository,
     DatasetReferenceService,
     GetDatasetReferenceError,
@@ -52,6 +53,34 @@ pub struct DatasetReferenceServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl DatasetReferenceServiceImpl {
+    async fn handle_dataset_reference_updated_message(
+        &self,
+        message: &DatasetReferenceMessageUpdated,
+    ) -> Result<(), InternalError> {
+        // Update reference at storage level
+        self.dataset_storage_unit_writer
+            .write_dataset_reference(
+                &message.dataset_id,
+                &message.block_ref,
+                &message.new_block_hash,
+            )
+            .await
+            .int_err()?;
+
+        tracing::debug!(
+            dataset_id = %message.dataset_id,
+            block_ref = %message.block_ref,
+            new_block_hash = %message.new_block_hash,
+            "Storage-level dataset references updated"
+        );
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl DatasetReferenceService for DatasetReferenceServiceImpl {
     async fn get_reference(
@@ -79,12 +108,12 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
             "Setting dataset reference in persistent storage"
         );
 
-        // Try repository operation
+        // Try to set the reference in the repository
         self.dataset_reference_repo
             .set_dataset_reference(dataset_id, block_ref, maybe_prev_block_hash, new_block_hash)
             .await?;
 
-        // Send outbox message
+        // Send an outbox message
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
@@ -120,27 +149,10 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
-            DatasetReferenceMessage::Updated(updated_message) => {
-                // Update reference at storage level
-                self.dataset_storage_unit_writer
-                    .write_dataset_reference(
-                        &updated_message.dataset_id,
-                        &updated_message.block_ref,
-                        &updated_message.new_block_hash,
-                    )
-                    .await
-                    .int_err()?;
-
-                tracing::debug!(
-                    dataset_id = %updated_message.dataset_id,
-                    block_ref = %updated_message.block_ref,
-                    new_block_hash = %updated_message.new_block_hash,
-                    "Storage-level dataset references updated"
-                );
+            DatasetReferenceMessage::Updated(message) => {
+                self.handle_dataset_reference_updated_message(message).await
             }
         }
-
-        Ok(())
     }
 }
 

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_webhooks::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +19,7 @@ use kamu_webhooks::*;
 #[interface(dyn ResumeWebhookSubscriptionUseCase)]
 pub struct ResumeWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +37,8 @@ impl ResumeWebhookSubscriptionUseCase for ResumeWebhookSubscriptionUseCaseImpl {
         &self,
         subscription: &mut WebhookSubscription,
     ) -> Result<(), ResumeWebhookSubscriptionError> {
+        let old_status = subscription.status();
+
         subscription
             .resume()
             .map_err(|e: ProjectionError<WebhookSubscriptionState>| {
@@ -50,6 +54,23 @@ impl ResumeWebhookSubscriptionUseCase for ResumeWebhookSubscriptionUseCaseImpl {
             .save(self.subscription_event_store.as_ref())
             .await
             .map_err(|e| ResumeWebhookSubscriptionError::Internal(e.int_err()))?;
+
+        let latest_status = subscription.status();
+
+        if old_status != latest_status {
+            for event_type in subscription.event_types() {
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+                        WebhookSubscriptionEventChangesMessage::event_enabled(
+                            subscription.id(),
+                            subscription.dataset_id(),
+                            event_type.clone(),
+                        ),
+                    )
+                    .await?;
+            }
+        }
 
         Ok(())
     }

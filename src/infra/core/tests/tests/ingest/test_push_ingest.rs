@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use datafusion::prelude::*;
+use file_utils::MediaType;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -18,6 +19,7 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
+use serde_json::json;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use tokio::io::AsyncRead;
@@ -409,10 +411,142 @@ async fn test_ingest_push_schema_stability() {
         )
         .await;
 
-    let set_data_schema = data_helper.get_last_set_data_schema_block().await.event;
+    // This should be a lossless conversion of ODF schema in metadata chain to arrow
+    let schema_in_metadata_as_arrow = Arc::new(
+        data_helper
+            .get_last_set_data_schema_block()
+            .await
+            .event
+            .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
+            .unwrap(),
+    );
 
-    // This schema is written automatically by the writer
-    let schema_current = set_data_schema.schema_as_arrow().unwrap();
+    // This is schema that datafusion interprets when reading the output parquet
+    // file. It may differ from the schema in metadata due to view encoding
+    // optimization auto-applied by datafusion
+    let schema_on_parquet_read = data_helper.get_last_data().await.schema().inner().clone();
+
+    odf::utils::testing::assert_arrow_schema_eq(
+        &schema_in_metadata_as_arrow,
+        json!({
+            "fields": [{
+                "name": "offset",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "op",
+                "data_type": "Int32",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "system_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "event_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "city",
+                // NOTE: We strip the encoding details in SetDataSchema, leaving only logical types
+                "data_type": "Utf8",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "population",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }],
+            "metadata": {},
+        }),
+    );
+
+    odf::utils::testing::assert_arrow_schema_eq(
+        &schema_on_parquet_read,
+        json!({
+            "fields": [{
+                "name": "offset",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "op",
+                "data_type": "Int32",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "system_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "event_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "city",
+                // NOTE: Since Datafusion 49 view encoding is used by default on Parquet read and is retained here
+                "data_type": "Utf8View",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "population",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }],
+            "metadata": {},
+        }),
+    );
 
     // This schema is captured earlier with:
     // - kamu-cli = 'branch/breaking-changes'
@@ -422,7 +556,7 @@ async fn test_ingest_push_schema_stability() {
     // println!("{}", hex::encode(set_data_schema.schema.as_slice()));
 
     let schema_prev = odf::metadata::SetDataSchema {
-        schema: hex::decode(
+        raw_arrow_schema: Some(hex::decode(
             "0c00000008000800000004000800000004000000060000004401000004010000ac0000006c0000\
             003c00000004000000e4feffff10000000180000000000010214000000d4feffff4000000000000\
             001000000000a000000706f70756c6174696f6e000018ffffff180000000c000000000001051000\
@@ -433,11 +567,23 @@ async fn test_ingest_push_schema_stability() {
             100000000f000400000008001000000010000000180000000000000214000000c4ffffff2000000\
             00000000100000000020000006f7000001000140010000e000f0004000000080010000000180000\
             0020000000000001021c00000008000c0004000b000800000040000000000000010000000006000\
-            0006f66667365740000").unwrap(),
-    }.schema_as_arrow().unwrap();
+            0006f66667365740000").unwrap()),
+        schema: None,
+    }.schema_as_arrow(&odf::metadata::ToArrowSettings::default()).map(Arc::new).unwrap();
 
     kamu_ingest_datafusion::DataWriterDataFusion::validate_output_schema_equivalence(
-        &schema_current,
+        &schema_in_metadata_as_arrow,
+        &schema_prev,
+    )
+    .expect(
+        "Schema drift detected! Schema produced by the current kamu/datafusion version is not \
+         equivalent to the schema produced previously. This will result in writer errors on \
+         existing datasets. You'll need to investigate how exactly the schema representation \
+         changed and whether equivalence test needs to be relaxed.",
+    );
+
+    kamu_ingest_datafusion::DataWriterDataFusion::validate_output_schema_equivalence(
+        &schema_on_parquet_read,
         &schema_prev,
     )
     .expect(
@@ -772,6 +918,79 @@ async fn test_ingest_sql_case_sensitivity() {
                 "#
             ),
         )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_push_with_predefined_data_schema() {
+    use odf::metadata::*;
+
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(odf::DatasetKind::Root)
+        .push_event(
+            MetadataFactory::add_push_source()
+                .read(ReadStepNdJson {
+                    ..Default::default()
+                })
+                .merge(MergeStrategyLedger {
+                    primary_key: vec!["date".to_string(), "city".to_string()],
+                })
+                .build(),
+        )
+        .push_event(SetVocab {
+            event_time_column: Some("date".to_string()),
+            ..Default::default()
+        })
+        .push_event(SetDataSchema::new(DataSchema {
+            fields: vec![
+                DataField::i64("offset"),
+                DataField::i32("op"),
+                DataField::timestamp_millis_utc("system_time"),
+                DataField::timestamp_millis_utc("date"),
+                DataField::string("city"),
+                DataField::i64("population"),
+            ],
+            extra: None,
+        }))
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    // Push from Stream
+    let data = std::io::Cursor::new(indoc!(
+        r#"
+        { "date": "2020-01-01", "city": "A", "population": 1000 }
+        { "date": "2020-01-02", "city": "B", "population": 2000 }
+        { "date": "2020-01-03", "city": "C", "population": 3000 }
+        "#
+    ));
+
+    harness
+        .ingest_from_stream(target, None, Box::new(data), PushIngestOpts::default())
+        .await;
+
+    data_helper
+        .assert_last_data_records_eq(indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | date                 | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-02T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ))
         .await;
 }
 

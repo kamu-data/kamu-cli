@@ -133,6 +133,7 @@ impl DatasetTestHelper {
                     prev_checkpoint,
                     prev_offset,
                     new_offset_interval: Some(new_offset_interval),
+                    new_linked_objects: None,
                     new_watermark: None,
                     new_source_state: None,
                 },

@@ -11,7 +11,7 @@ pub(crate) use async_graphql::*;
 pub(crate) use internal_error::*;
 
 pub(crate) use crate::guards::*;
-pub(crate) use crate::scalars::*;
+pub(crate) use crate::scalars::{TimeUnit, *};
 pub(crate) use crate::utils::{GqlError, from_catalog_n};
 
 pub(crate) type Result<T, E = GqlError> = ::core::result::Result<T, E>;

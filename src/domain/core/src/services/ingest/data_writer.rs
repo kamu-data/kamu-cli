@@ -98,7 +98,7 @@ pub struct WriteDataResult {
 pub struct StageDataResult {
     pub system_time: DateTime<Utc>,
     /// Set when `SetDataSchema` event needs to be committed
-    pub new_schema: Option<SchemaRef>,
+    pub new_schema: Option<odf::schema::DataSchema>,
     /// Set when `AddData` event needs to be committed
     pub add_data: Option<odf::dataset::AddDataParams>,
     /// Set when commmit will contains some data
@@ -133,6 +133,9 @@ pub enum WriteDataError {
     MergeError(#[from] MergeError),
 
     #[error(transparent)]
+    DataValidation(#[from] DataValidationError),
+
+    #[error(transparent)]
     EmptyCommit(#[from] EmptyCommitError),
 
     #[error(transparent)]
@@ -148,6 +151,7 @@ impl From<StageDataError> for WriteDataError {
             StageDataError::BadInputSchema(v) => WriteDataError::BadInputSchema(v),
             StageDataError::IncompatibleSchema(v) => WriteDataError::IncompatibleSchema(v),
             StageDataError::MergeError(v) => WriteDataError::MergeError(v),
+            StageDataError::DataValidation(v) => WriteDataError::DataValidation(v),
             StageDataError::EmptyCommit(v) => WriteDataError::EmptyCommit(v),
             StageDataError::Internal(v) => WriteDataError::Internal(v),
         }
@@ -166,6 +170,9 @@ pub enum StageDataError {
 
     #[error(transparent)]
     MergeError(#[from] MergeError),
+
+    #[error(transparent)]
+    DataValidation(#[from] DataValidationError),
 
     #[error(transparent)]
     EmptyCommit(#[from] EmptyCommitError),
@@ -202,6 +209,49 @@ impl std::fmt::Display for BadInputSchemaError {
             FmtSchema(&self.schema)
         )?;
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub enum DataValidationError {
+    #[error(transparent)]
+    InvalidValue(#[from] InvalidValueError),
+
+    #[error(transparent)]
+    DanglingReference(#[from] DanglingReferenceError),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct InvalidValueError {
+    message: String,
+    backtrace: Backtrace,
+}
+
+impl InvalidValueError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("ObjectLink column references a non-existing object {hash}")]
+pub struct DanglingReferenceError {
+    pub hash: odf::Multihash,
+    backtrace: Backtrace,
+}
+
+impl DanglingReferenceError {
+    pub fn new(hash: odf::Multihash) -> Self {
+        Self {
+            hash,
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
@@ -26,16 +26,12 @@ use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system::{
-    FlowConfigurationUpdatedMessage,
-    FlowProgressMessage,
-    FlowTriggerUpdatedMessage,
-};
-use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
-use kamu_task_system_inmem::domain::{MESSAGE_PRODUCER_KAMU_TASK_AGENT, TaskProgressMessage};
+use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
+use kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE;
 use merge::Merge as _;
 use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
@@ -577,6 +573,11 @@ pub fn configure_base_catalog(
         kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     );
 
+    register_message_dispatcher::<kamu_datasets::DatasetKeyBlocksMessage>(
+        &mut b,
+        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
+    );
+
     register_message_dispatcher::<kamu_datasets::DatasetExternallyChangedMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
@@ -633,7 +634,8 @@ pub fn configure_server_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
-    kamu_adapter_flow_dataset::register_dependencies(&mut b);
+    kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
+    kamu_adapter_flow_webhook::register_dependencies(&mut b);
     kamu_adapter_task_dataset::register_dependencies(&mut b);
     kamu_adapter_task_webhook::register_dependencies(&mut b);
 
@@ -650,23 +652,35 @@ pub fn configure_server_catalog(
 
     b.add::<UploadServiceLocal>();
 
-    register_message_dispatcher::<FlowProgressMessage>(
+    register_message_dispatcher::<kamu_flow_system::FlowProgressMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     );
-    register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
+    register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     );
-    register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+    register_message_dispatcher::<kamu_flow_system::FlowTriggerUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     );
-    register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_AGENT);
+    register_message_dispatcher::<kamu_task_system::TaskProgressMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+    );
 
     register_message_dispatcher::<AccessTokenLifecycleMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
+    );
+    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionEventChangesMessage>(
+        &mut b,
+        kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
     );
 
     b
@@ -716,6 +730,9 @@ pub fn register_config_in_catalog(
     password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,
 ) -> Result<(), CLIError> {
+    // Extra
+    catalog_builder.add_value(config.extra.as_ref().unwrap().graphql.clone());
+
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
     // Register JupyterConfig used by some commands
@@ -941,13 +958,53 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(kamu_flow_system::FlowAgentConfig::new(
         Duration::seconds(flow_agent_config.awaiting_step_secs.unwrap()),
         Duration::seconds(flow_agent_config.mandatory_throttling_period_secs.unwrap()),
+        if let Some(retry_configs) = flow_agent_config.default_retry_policies.as_ref() {
+            retry_configs
+                .iter()
+                .map(|(flow_type, retry_policy_config)| {
+                    (
+                        flow_type.clone(),
+                        kamu_flow_system::RetryPolicy::new(
+                            retry_policy_config.max_attempts.unwrap_or(0),
+                            retry_policy_config.min_delay_secs.unwrap_or(0),
+                            match retry_policy_config.backoff_type {
+                                Some(config::RetryPolicyConfigBackoffType::Exponential) => {
+                                    kamu_flow_system::RetryBackoffType::Exponential
+                                }
+                                Some(config::RetryPolicyConfigBackoffType::Linear) => {
+                                    kamu_flow_system::RetryBackoffType::Linear
+                                }
+                                Some(
+                                    config::RetryPolicyConfigBackoffType::ExponentialWithJitter,
+                                ) => kamu_flow_system::RetryBackoffType::ExponentialWithJitter,
+                                Some(config::RetryPolicyConfigBackoffType::Fixed) | None => {
+                                    kamu_flow_system::RetryBackoffType::Fixed
+                                }
+                            },
+                        ),
+                    )
+                })
+                .collect()
+        } else {
+            HashMap::new()
+        },
     ));
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
         Duration::seconds(i64::from(task_agent_config.checking_interval_secs.unwrap())),
     ));
-    //
+
+    // Webhooks configuration
+    let webhooks_config = config.webhooks.clone().unwrap();
+    {
+        let max_consecutive_failures = webhooks_config.max_consecutive_failures.unwrap();
+        assert!(
+            max_consecutive_failures > 0,
+            "Webhooks max_consecutive_failures must be > 0"
+        );
+        catalog_builder.add_value(kamu_webhooks::WebhooksConfig::new(max_consecutive_failures));
+    }
 
     // Search configuration
     let config::SearchConfig {

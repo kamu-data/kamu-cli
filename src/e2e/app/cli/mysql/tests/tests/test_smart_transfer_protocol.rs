@@ -419,7 +419,7 @@ kamu_cli_run_api_server_e2e_test!(
                   checkingIntervalSecs: 1
             "#
         )),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion, flaky"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -442,7 +442,7 @@ kamu_cli_run_api_server_e2e_test!(
                   checkingIntervalSecs: 1
             "#
         )),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion, flaky"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -485,6 +485,28 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_smart_push_smart_pull_force_overwrite_seed_block_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_derived_with_unaccessible_inputs_resolved_via_gql_mt,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),

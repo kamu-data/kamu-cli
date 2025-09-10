@@ -1077,6 +1077,139 @@ async fn test_pause_resume_subscription() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_reactivate_unreachable_subscription() {
+    let harness = WebhookSubscriptionsHarness::new().await;
+    let create_result = harness.create_root_dataset("foo").await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let subscription_id = harness
+        .create_webhook_subscription(
+            &schema,
+            &create_result.dataset_handle.id,
+            "https://example.com/webhook".to_string(),
+            vec![kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+            "My Webhook Subscription".to_string(),
+        )
+        .await;
+
+    // We need an unreachable subscription, but this cannot be done via API
+    harness
+        .mark_subscription_unreachable(&subscription_id)
+        .await;
+
+    // Confirm the subscription is visible and is in UNREACHABLE state
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::dataset_subscriptions_query())
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "subscriptions": [
+                            {
+                                "__typename": "WebhookSubscription",
+                                "id": subscription_id,
+                                "datasetId": create_result.dataset_handle.id.to_string(),
+                                "targetUrl": "https://example.com/webhook",
+                                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                                "label": "My Webhook Subscription",
+                                "status": "UNREACHABLE",
+                            }
+                        ]
+                    }
+                }
+
+            }
+        })
+    );
+
+    // Reactivation action goes here
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptionsHarness::reactivate_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "subscriptionId": subscription_id.clone(),
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "subscription": {
+                            "reactivate": {
+                                "__typename": "ReactivateWebhookSubscriptionResultSuccess",
+                                "message": "Success",
+                            }
+                        }
+                    }
+                }
+
+            }
+        })
+    );
+
+    // Observe the status of subscription was re-enabled
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::dataset_subscriptions_query())
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "subscriptions": [
+                            {
+                                "__typename": "WebhookSubscription",
+                                "id": subscription_id,
+                                "datasetId": create_result.dataset_handle.id.to_string(),
+                                "targetUrl": "https://example.com/webhook",
+                                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                                "label": "My Webhook Subscription",
+                                "status": "ENABLED",
+                            }
+                        ]
+                    }
+                }
+
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_remove_subscription() {
     let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
@@ -1174,8 +1307,10 @@ impl WebhookSubscriptionsHarness {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
             b.add::<CreateWebhookSubscriptionUseCaseImpl>();
             b.add::<UpdateWebhookSubscriptionUseCaseImpl>();
-            b.add::<PauseWebhookSubscriptionUseCaseImpl>();
+            b.add::<MarkWebhookSubscriptionUnreachableUseCaseImpl>();
+            b.add::<ReactivateWebhookSubscriptionUseCaseImpl>();
             b.add::<ResumeWebhookSubscriptionUseCaseImpl>();
+            b.add::<PauseWebhookSubscriptionUseCaseImpl>();
             b.add::<RemoveWebhookSubscriptionUseCaseImpl>();
             b.add::<WebhookSubscriptionQueryServiceImpl>();
             b.add_value(mock_secret_generator);
@@ -1255,6 +1390,27 @@ impl WebhookSubscriptionsHarness {
             .as_str()
             .unwrap()
             .to_string()
+    }
+
+    async fn mark_subscription_unreachable(&self, subscription_id: &str) {
+        let event_store = self
+            .catalog_authorized
+            .get_one::<dyn WebhookSubscriptionEventStore>()
+            .unwrap();
+
+        let use_case = self
+            .catalog_authorized
+            .get_one::<dyn MarkWebhookSubscriptionUnreachableUseCase>()
+            .unwrap();
+
+        let mut subscription = WebhookSubscription::load(
+            WebhookSubscriptionID::new(uuid::Uuid::parse_str(subscription_id).unwrap()),
+            event_store.as_ref(),
+        )
+        .await
+        .unwrap();
+
+        use_case.execute(&mut subscription).await.unwrap();
     }
 
     fn event_types_query() -> &'static str {
@@ -1367,6 +1523,30 @@ impl WebhookSubscriptionsHarness {
                         webhooks {
                             subscription(id: $subscriptionId) {
                                 resume {
+                                    __typename
+                                    message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+          "#
+        )
+    }
+
+    fn reactivate_subscription_mutation() -> &'static str {
+        indoc!(
+            r#"
+            mutation (
+                $datasetId: DatasetID!,
+                $subscriptionId: WebhookSubscriptionID!
+            ) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        webhooks {
+                            subscription(id: $subscriptionId) {
+                                reactivate {
                                     __typename
                                     message
                                 }

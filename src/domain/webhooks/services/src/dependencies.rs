@@ -14,8 +14,6 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<WebhookDeliveryScheduler>();
-    catalog_builder.add::<WebhookEventBuilderImpl>();
     catalog_builder.add::<WebhookDeliveryWorkerImpl>();
     catalog_builder.add::<WebhookSignerImpl>();
     catalog_builder.add::<WebhookSenderImpl>();
@@ -24,7 +22,9 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<WebhookSubscriptionQueryServiceImpl>();
 
     catalog_builder.add::<CreateWebhookSubscriptionUseCaseImpl>();
+    catalog_builder.add::<MarkWebhookSubscriptionUnreachableUseCaseImpl>();
     catalog_builder.add::<PauseWebhookSubscriptionUseCaseImpl>();
+    catalog_builder.add::<ReactivateWebhookSubscriptionUseCaseImpl>();
     catalog_builder.add::<RemoveWebhookSubscriptionUseCaseImpl>();
     catalog_builder.add::<ResumeWebhookSubscriptionUseCaseImpl>();
     catalog_builder.add::<UpdateWebhookSubscriptionUseCaseImpl>();

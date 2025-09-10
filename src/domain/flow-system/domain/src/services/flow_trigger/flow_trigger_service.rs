@@ -16,103 +16,92 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowTriggerService: Sync + Send {
     /// Find current trigger of a certain type
     async fn find_trigger(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<FlowTriggerState>, FindFlowTriggerError>;
+    ) -> Result<Option<FlowTriggerState>, InternalError>;
 
-    /// Set or modify flow configuration
+    /// Set or modify flow trigger
     async fn set_trigger(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: FlowBinding,
-        paused: bool,
         rule: FlowTriggerRule,
+        stop_policy: FlowTriggerStopPolicy,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
-    /// Lists all flow configurations, which are currently enabled
-    fn list_enabled_triggers(&self) -> FlowTriggerStateStream;
+    /// Lists all flow triggers, which are currently enabled
+    #[allow(clippy::elidable_lifetime_names)] // due to mock
+    fn list_enabled_triggers<'a>(&'a self) -> FlowTriggerStateStream<'a>;
 
-    /// Pauses particular flow configuration
+    /// Pauses particular flow trigger (user initiative)
     async fn pause_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError>;
 
-    /// Resumes particular flow configuration
+    /// Resumes particular flow trigger
     async fn resume_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        fflow_binding: &FlowBinding,
+        flow_binding: &FlowBinding,
     ) -> Result<(), InternalError>;
 
-    /// Pauses dataset flows of given type for given dataset.
-    /// If type is omitted, all possible dataset flow types are paused
-    async fn pause_dataset_flows(
+    /// Pauses flow triggers for given list of scopes
+    async fn pause_flow_triggers_for_scopes(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<&str>,
+        scopes: &[FlowScope],
     ) -> Result<(), InternalError>;
 
-    /// Pauses system flows of given type.
-    /// If type is omitted, all possible system flow types are paused
-    async fn pause_system_flows(
+    /// Resumes flow triggers for given list of scopes
+    async fn resume_flow_triggers_for_scopes(
         &self,
         request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<&str>,
+        scopes: &[FlowScope],
     ) -> Result<(), InternalError>;
 
-    /// Resumes dataset flows of given type for given dataset.
-    /// If type is omitted, all possible types are resumed (where configured)
-    async fn resume_dataset_flows(
+    /// Checks if there are any active triggers for the given list of scopes
+    async fn has_active_triggers_for_scopes(
         &self,
-        request_time: DateTime<Utc>,
-        dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<&str>,
-    ) -> Result<(), InternalError>;
-
-    /// Resumes system flows of given type.
-    /// If type is omitted, all possible system flow types are resumed (where
-    /// configured)
-    async fn resume_system_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<&str>,
-    ) -> Result<(), InternalError>;
-
-    /// Checks if there are any active triggers for the given list of datasets
-    async fn has_active_triggers_for_datasets(
-        &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError>;
+
+    /// Evaluates trigger stop policy after a failure
+    async fn evaluate_trigger_on_failure(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+        unrecoverable: bool,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FlowTriggerServiceExt {
-    async fn try_get_flow_schedule_rule(
+    async fn try_get_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<Schedule>, FindFlowTriggerError>;
+    ) -> Result<Option<Schedule>, InternalError>;
 
-    async fn try_get_flow_batching_rule(
+    async fn try_get_flow_active_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<BatchingRule>, FindFlowTriggerError>;
+    ) -> Result<Option<ReactiveRule>, InternalError>;
 }
 
 #[async_trait::async_trait]
 impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
-    async fn try_get_flow_schedule_rule(
+    async fn try_get_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<Schedule>, FindFlowTriggerError> {
+    ) -> Result<Option<Schedule>, InternalError> {
         let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
@@ -125,16 +114,16 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
         )
     }
 
-    async fn try_get_flow_batching_rule(
+    async fn try_get_flow_active_reactive_rule(
         &self,
         flow_binding: &FlowBinding,
-    ) -> Result<Option<BatchingRule>, FindFlowTriggerError> {
+    ) -> Result<Option<ReactiveRule>, InternalError> {
         let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
                 && trigger.is_active()
             {
-                trigger.try_get_batching_rule()
+                trigger.try_get_reactive_rule()
             } else {
                 None
             },
@@ -150,27 +139,12 @@ pub enum SetFlowTriggerError {
     Internal(#[from] InternalError),
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum FindFlowTriggerError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type FlowTriggerStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowTriggerState, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<TryLoadError<FlowTriggerState>> for FindFlowTriggerError {
-    fn from(value: TryLoadError<FlowTriggerState>) -> Self {
-        match value {
-            TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
-            TryLoadError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
 
 impl From<TryLoadError<FlowTriggerState>> for SetFlowTriggerError {
     fn from(value: TryLoadError<FlowTriggerState>) -> Self {

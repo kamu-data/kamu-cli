@@ -9,20 +9,22 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
-use kamu_task_system as ts;
+use kamu_task_system::{self as ts};
 
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct FlowState {
     /// Unique flow identifier
     pub flow_id: FlowID,
     /// Flow binding
     pub flow_binding: FlowBinding,
-    /// Triggers
-    pub triggers: Vec<FlowTriggerInstance>,
+    /// Activation causes
+    pub activation_causes: Vec<FlowActivationCause>,
+    /// Activation causes that arrived after the task was formed
+    pub late_activation_causes: Vec<FlowActivationCause>,
     /// Start condition (if defined)
     pub start_condition: Option<FlowStartCondition>,
     /// Timing records
@@ -39,7 +41,10 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
+    /// Flow scheduled for the first time
+    pub first_scheduled_at: Option<DateTime<Utc>>,
     /// Flow scheduled and will be activated at time
+    /// (different than first in case of retries)
     pub scheduled_for_activation_at: Option<DateTime<Utc>>,
     /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
@@ -50,10 +55,10 @@ pub struct FlowTimingRecords {
 }
 
 impl FlowState {
-    /// Extract primary trigger
-    pub fn primary_trigger(&self) -> &FlowTriggerInstance {
-        // At least 1 trigger is initially defined for sure
-        self.triggers.first().unwrap()
+    /// Extract primary activation cause
+    pub fn primary_activation_cause(&self) -> &FlowActivationCause {
+        // At least 1 cause is initially defined for sure
+        self.activation_causes.first().unwrap()
     }
 
     /// Computes status
@@ -78,6 +83,31 @@ impl FlowState {
     pub fn can_schedule(&self) -> bool {
         matches!(self.status(), FlowStatus::Waiting | FlowStatus::Retrying)
     }
+
+    pub fn get_reactive_data_increment(
+        &self,
+        last_activation_cause_index: usize,
+    ) -> ResourceDataChanges {
+        // Start from zero increment
+        let mut total_increment = ResourceDataChanges::default();
+
+        // For each dataset activation cause, add accumulated changes since the initial
+        let last_activation_cause_index =
+            last_activation_cause_index.min(self.activation_causes.len().saturating_sub(1));
+        for activation_cause in &self.activation_causes[0..=last_activation_cause_index] {
+            if let FlowActivationCause::ResourceUpdate(update_cause) = activation_cause
+                && let ResourceChanges::NewData(changes) = update_cause.changes
+            {
+                total_increment += ResourceDataChanges {
+                    blocks_added: changes.blocks_added,
+                    records_added: changes.records_added,
+                    new_watermark: changes.new_watermark,
+                };
+            }
+        }
+
+        total_increment
+    }
 }
 
 impl Projection for FlowState {
@@ -93,15 +123,17 @@ impl Projection for FlowState {
                     event_time: _,
                     flow_id,
                     flow_binding,
-                    trigger,
+                    activation_cause,
                     config_snapshot,
                     retry_policy,
                 }) => Ok(Self {
                     flow_id,
                     flow_binding,
-                    triggers: vec![trigger],
+                    activation_causes: vec![activation_cause],
+                    late_activation_causes: vec![],
                     start_condition: None,
                     timing: FlowTimingRecords {
+                        first_scheduled_at: None,
                         scheduled_for_activation_at: None,
                         awaiting_executor_since: None,
                         running_since: None,
@@ -143,13 +175,26 @@ impl Projection for FlowState {
                         ..s
                     }),
 
-                    E::TriggerAdded(FlowEventTriggerAdded { ref trigger, .. }) => {
+                    E::ActivationCauseAdded(FlowEventActivationCauseAdded {
+                        ref activation_cause,
+                        ..
+                    }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
+                        } else if !s.task_ids.is_empty() {
+                            let mut late_activation_causes = s.late_activation_causes;
+                            late_activation_causes.push(activation_cause.clone());
+                            Ok(FlowState {
+                                late_activation_causes,
+                                ..s
+                            })
                         } else {
-                            let mut triggers = s.triggers;
-                            triggers.push(trigger.clone());
-                            Ok(FlowState { triggers, ..s })
+                            let mut activation_causes = s.activation_causes;
+                            activation_causes.push(activation_cause.clone());
+                            Ok(FlowState {
+                                activation_causes,
+                                ..s
+                            })
                         }
                     }
 
@@ -162,6 +207,13 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
+                                    // First time: pick the time of scheduling
+                                    // After that, keep the previous value
+                                    first_scheduled_at: s
+                                        .timing
+                                        .first_scheduled_at
+                                        .or(Some(scheduled_for_activation_at)),
+
                                     scheduled_for_activation_at: Some(scheduled_for_activation_at),
                                     awaiting_executor_since: None,
                                     running_since: None,
@@ -252,6 +304,7 @@ impl Projection for FlowState {
                                     if let Some(next_attempt_at) = next_attempt_at {
                                         Ok(FlowState {
                                             timing: FlowTimingRecords {
+                                                first_scheduled_at: s.timing.first_scheduled_at,
                                                 // Next task will have to be scheduled
                                                 awaiting_executor_since: None,
                                                 // No longer running

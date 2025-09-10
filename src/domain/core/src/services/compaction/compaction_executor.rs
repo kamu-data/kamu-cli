@@ -47,13 +47,6 @@ pub enum CompactionResult {
 #[derive(Debug, Error)]
 pub enum CompactionExecutionError {
     #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
-
-    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 

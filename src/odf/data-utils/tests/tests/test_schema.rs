@@ -11,11 +11,54 @@ use std::assert_matches::assert_matches;
 
 use datafusion::error::DataFusionError;
 use datafusion::sql::sqlparser::parser::ParserError;
+use indoc::indoc;
+use odf_metadata::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_parse_ddl() {
+async fn test_parse_ddl_to_odf_schema() {
+    let schema = opendatafabric_data_utils::schema::parse::parse_ddl_to_odf_schema(indoc!(
+        r#"
+        b bool not null,
+        b_opt bool,
+        i32 int not null,
+        u32 int unsigned not null,
+        i64 bigint not null,
+        u64 bigint unsigned not null,
+        f32 float not null,
+        f64 double not null,
+        d date not null,
+        ts timestamp not null,
+        s1 string not null,
+        s2 varchar not null
+        "#
+    ))
+    .unwrap();
+
+    opendatafabric_data_utils::testing::assert_odf_schema_eq(
+        &schema,
+        &DataSchema::new(vec![
+            DataField::bool("b"),
+            DataField::bool("b_opt").optional(),
+            DataField::i32("i32"),
+            DataField::u32("u32"),
+            DataField::i64("i64"),
+            DataField::u64("u64"),
+            DataField::f32("f32"),
+            DataField::f64("f64"),
+            DataField::date("d"),
+            DataField::timestamp_millis_utc("ts"),
+            DataField::string("s1"),
+            DataField::string("s2"),
+        ]),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_parse_ddl_datafusion() {
     let ctx = datafusion::prelude::SessionContext::new();
     let schema = opendatafabric_data_utils::schema::parse::parse_ddl_to_datafusion_schema(
         &ctx,
@@ -26,18 +69,20 @@ async fn test_parse_ddl() {
     .unwrap();
     opendatafabric_data_utils::testing::assert_schema_eq(
         &schema,
-        r#"
-message arrow_schema {
-  REQUIRED INT64 ts (TIMESTAMP(NANOS,false));
-}
-        "#,
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 ts (TIMESTAMP(NANOS,false));
+            }
+            "#
+        ),
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_parse_ddl_with_force_utc() {
+async fn test_parse_ddl_datafusion_with_force_utc() {
     let ctx = datafusion::prelude::SessionContext::new();
     let schema = opendatafabric_data_utils::schema::parse::parse_ddl_to_datafusion_schema(
         &ctx,
@@ -48,18 +93,20 @@ async fn test_parse_ddl_with_force_utc() {
     .unwrap();
     opendatafabric_data_utils::testing::assert_schema_eq(
         &schema,
-        r#"
-message arrow_schema {
-  REQUIRED INT64 ts (TIMESTAMP(NANOS,true));
-}
-        "#,
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 ts (TIMESTAMP(NANOS,true));
+            }
+            "#
+        ),
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_parse_ddl_with_reserved_keyword() {
+async fn test_parse_ddl_datafusion_with_reserved_keyword() {
     let ctx = datafusion::prelude::SessionContext::new();
     let result = opendatafabric_data_utils::schema::parse::parse_ddl_to_datafusion_schema(
         &ctx,

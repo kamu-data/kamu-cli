@@ -11,12 +11,14 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use kamu::testing::BaseRepoHarness;
 use kamu_accounts::{DidEntity, DidSecretEncryptionConfig, DidSecretKeyRepository};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceStub;
 
 use super::dataset_base_use_case_harness::{
@@ -35,6 +37,16 @@ async fn test_create_root_dataset_from_snapshot() {
         MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id.clone()]);
     let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
+    let hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+        system_time: harness.system_time_source().now(),
+        prev_block_hash: None,
+        sequence_number: 0,
+        event: odf::MetadataEvent::Seed(
+            MetadataFactory::seed(odf::DatasetKind::Root)
+                .id(predefined_foo_id.clone())
+                .build(),
+        ),
+    });
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
         .kind(odf::DatasetKind::Root)
@@ -48,7 +60,7 @@ async fn test_create_root_dataset_from_snapshot() {
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -57,7 +69,7 @@ async fn test_create_root_dataset_from_snapshot() {
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Lifecycle Messages: 1
@@ -74,10 +86,20 @@ async fn test_create_root_dataset_from_snapshot() {
                 Prev Head: None
                 New Head: Multihash<Sha3_256>(<foo_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Appended {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
             "#
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
-        .replace("<foo_head>", foo_created.head.to_string().as_str()),
+        .replace("<foo_head>", foo_created.head.to_string().as_str())
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<foo_key_tail>", hash_seed_block.to_string().as_str())
+        .replace("<foo_key_head>", foo_created.head.to_string().as_str()),
         harness.collected_outbox_messages(),
     );
 }
@@ -97,12 +119,32 @@ async fn test_create_derived_dataset_from_snapshot() {
     ]);
     let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
+    let foo_hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+        system_time: harness.system_time_source().now(),
+        prev_block_hash: None,
+        sequence_number: 0,
+        event: odf::MetadataEvent::Seed(
+            MetadataFactory::seed(odf::DatasetKind::Root)
+                .id(predefined_foo_id.clone())
+                .build(),
+        ),
+    });
     let snapshot_root = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
         .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
+    let bar_hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+        system_time: harness.system_time_source().now(),
+        prev_block_hash: None,
+        sequence_number: 0,
+        event: odf::MetadataEvent::Seed(
+            MetadataFactory::seed(odf::DatasetKind::Derivative)
+                .id(predefined_bar_id.clone())
+                .build(),
+        ),
+    });
     let snapshot_derived = MetadataFactory::dataset_snapshot()
         .name(alias_bar.clone())
         .kind(odf::DatasetKind::Derivative)
@@ -129,13 +171,13 @@ async fn test_create_derived_dataset_from_snapshot() {
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
         foo_created.head,
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&bar_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -144,7 +186,7 @@ async fn test_create_derived_dataset_from_snapshot() {
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Lifecycle Messages: 2
@@ -179,12 +221,31 @@ async fn test_create_derived_dataset_from_snapshot() {
                 Added: [<foo_id>]
                 Removed: []
               }
+            Dataset Key Block Messages: 2
+              Key Blocks Appended {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
+              Key Blocks Appended {
+                Dataset ID: <bar_id>
+                Ref: head
+                Key Block Tail: <bar_key_tail>
+                Key Block Head: <bar_key_head>
+              }
             "#
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
         .replace("<bar_id>", predefined_bar_id.to_string().as_str())
         .replace("<foo_head>", foo_created.head.to_string().as_str())
-        .replace("<bar_head>", bar_created.head.to_string().as_str()),
+        .replace("<bar_head>", bar_created.head.to_string().as_str())
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<foo_key_tail>", foo_hash_seed_block.to_string().as_str())
+        .replace("<foo_key_head>", foo_created.head.to_string().as_str())
+        .replace("<bar_id>", predefined_bar_id.to_string().as_str())
+        .replace("<bar_key_tail>", bar_hash_seed_block.to_string().as_str())
+        .replace("<bar_key_head>", bar_created.head.to_string().as_str()),
         harness.collected_outbox_messages(),
     );
 }
@@ -210,7 +271,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -236,7 +297,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
 
     // Compare original account_id from db and id generated from a stored private
     // key
-    pretty_assertions::assert_eq!(foo_created.dataset_handle.id.as_did(), &did_odf);
+    assert_eq!(foo_created.dataset_handle.id.as_did(), &did_odf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -25,13 +25,14 @@ doctest = false
 default = ["lfs"]
 lfs = []
 s3 = []
-testing = ["dep:mockall", "dep:serde_json"]
+testing = ["dep:mockall"]
 
 
 [dependencies]
 common-macros = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
+file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -47,14 +48,15 @@ time-source = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
+datafusion = { version = "49", default-features = false }
 dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false }
 nutype = { version = "0.6", default-features = false }
-petgraph = { version = "0.7", default-features = false, features = [
+petgraph = { version = "0.8", default-features = false, features = [
     "stable_graph",
 ] }
 secrecy = "0.10"
-serde_json = { optional = true, version = "1" }
+serde_json = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }

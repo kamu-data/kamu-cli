@@ -301,6 +301,9 @@ where
             new_checkpoint,
             new_watermark: params.new_watermark,
             new_source_state: params.new_source_state,
+            extra: params
+                .new_linked_objects
+                .map(|v| ExtraAttributes::new().with(v)),
         };
 
         self.commit_event(

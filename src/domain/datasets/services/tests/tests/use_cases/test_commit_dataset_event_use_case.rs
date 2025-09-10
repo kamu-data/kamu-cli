@@ -16,6 +16,7 @@ use kamu_core::MockDidGenerator;
 use kamu_datasets::CommitDatasetEventUseCase;
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceStub;
 
 use super::dataset_base_use_case_harness::{
@@ -52,7 +53,8 @@ async fn test_commit_dataset_event() {
         .await;
     assert_matches!(res, Ok(_));
 
-    pretty_assertions::assert_eq!(
+    let foo_new_head = res.unwrap().new_head.to_string();
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Reference Messages: 1
@@ -62,11 +64,21 @@ async fn test_commit_dataset_event() {
                 Prev Head: Some(Multihash<Sha3_256>(<old_head>))
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Appended {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <foo_key_tail>
+                Key Block Head: <foo_key_head>
+              }
             "#
         )
         .replace("<foo_id>", dataset_id_foo.to_string().as_str())
         .replace("<old_head>", foo_old_head.to_string().as_str())
-        .replace("<new_head>", res.unwrap().new_head.to_string().as_str()),
+        .replace("<new_head>", foo_new_head.as_str())
+        .replace("<foo_id>", dataset_id_foo.to_string().as_str())
+        .replace("<foo_key_tail>", foo_new_head.as_str())
+        .replace("<foo_key_head>", foo_new_head.as_str()),
         harness.collected_outbox_messages(),
     );
 }
@@ -98,7 +110,7 @@ async fn test_commit_event_unauthorized() {
         .await;
     assert_matches!(res, Err(odf::dataset::CommitError::Access(_)));
 
-    pretty_assertions::assert_eq!("", harness.collected_outbox_messages(),);
+    assert_eq!("", harness.collected_outbox_messages(),);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,7 +157,8 @@ async fn test_commit_event_with_same_dependencies() {
     assert_matches!(res, Ok(_));
 
     // No dependency updates happened
-    pretty_assertions::assert_eq!(
+    let bar_new_head = res.unwrap().new_head.to_string();
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Reference Messages: 1
@@ -155,11 +168,20 @@ async fn test_commit_event_with_same_dependencies() {
                 Prev Head: Some(Multihash<Sha3_256>(<old_head>))
                 New Head: Multihash<Sha3_256>(<new_head>)
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Appended {
+                Dataset ID: <bar_id>
+                Ref: head
+                Key Block Tail: <bar_key_tail>
+                Key Block Head: <bar_key_head>
+              }
             "#
         )
         .replace("<bar_id>", dataset_id_bar.to_string().as_str())
         .replace("<old_head>", bar_old_head.to_string().as_str())
-        .replace("<new_head>", res.unwrap().new_head.to_string().as_str()),
+        .replace("<new_head>", bar_new_head.as_str())
+        .replace("<bar_key_tail>", bar_new_head.as_str())
+        .replace("<bar_key_head>", bar_new_head.as_str()),
         harness.collected_outbox_messages(),
     );
 }
@@ -213,7 +235,8 @@ async fn test_commit_event_with_new_dependencies() {
     assert_matches!(res, Ok(_));
 
     // No dependency updates happened
-    pretty_assertions::assert_eq!(
+    let baz_new_head = res.unwrap().new_head.to_string();
+    assert_eq!(
         indoc::indoc!(
             r#"
             Dataset Reference Messages: 1
@@ -229,13 +252,23 @@ async fn test_commit_event_with_new_dependencies() {
                 Added: [<bar_id>]
                 Removed: [<foo_id>]
               }
+            Dataset Key Block Messages: 1
+              Key Blocks Appended {
+                Dataset ID: <baz_id>
+                Ref: head
+                Key Block Tail: <baz_key_tail>
+                Key Block Head: <baz_key_head>
+              }
             "#
         )
         .replace("<foo_id>", dataset_id_foo.to_string().as_str())
         .replace("<bar_id>", dataset_id_bar.to_string().as_str())
         .replace("<baz_id>", dataset_id_baz.to_string().as_str())
         .replace("<old_head>", baz_old_head.to_string().as_str())
-        .replace("<new_head>", res.unwrap().new_head.to_string().as_str()),
+        .replace("<new_head>", baz_new_head.as_str())
+        .replace("<baz_id>", dataset_id_baz.to_string().as_str())
+        .replace("<baz_key_tail>", baz_new_head.as_str())
+        .replace("<baz_key_head>", baz_new_head.as_str()),
         harness.collected_outbox_messages(),
     );
 }

@@ -12,9 +12,10 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use dill::*;
+use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::services::upload_service::*;
-use kamu_core::{CacheDir, MediaType, ServerUrlConfig};
+use kamu_core::{CacheDir, ServerUrlConfig};
 use thiserror::Error;
 use tokio::io::AsyncRead;
 use uuid::Uuid;

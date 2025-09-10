@@ -95,7 +95,9 @@ impl<'a> DatasetMetadataMut<'a> {
         };
 
         let Some(new_attachments) = new_attachments else {
-            return Ok(UpdateReadmeResult::NoChanges(NoChanges));
+            return Ok(UpdateReadmeResult::NoChanges(NoChanges {
+                message: "Attachmets were not modified".to_string(),
+            }));
         };
 
         let event = odf::metadata::SetAttachments {

@@ -64,7 +64,7 @@ impl Projection for FlowConfigurationState {
                     E::Modified(FlowConfigurationEventModified {
                         rule, retry_policy, ..
                     }) => {
-                        // Note: when deleted dataset is re-added with the same id, we have to
+                        // Note: when deleted scope is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowConfigurationState {
                             rule: rule.clone(),
@@ -73,18 +73,14 @@ impl Projection for FlowConfigurationState {
                         })
                     }
 
-                    E::DatasetRemoved(_) => {
-                        if let FlowScope::Dataset { .. } = &s.flow_binding.scope {
-                            if s.status == FlowConfigurationStatus::Deleted {
-                                Ok(s) // idempotent DELETE
-                            } else {
-                                Ok(FlowConfigurationState {
-                                    status: FlowConfigurationStatus::Deleted,
-                                    ..s
-                                })
-                            }
+                    E::ScopeRemoved(_) => {
+                        if s.status == FlowConfigurationStatus::Deleted {
+                            Ok(s) // idempotent DELETE
                         } else {
-                            Err(ProjectionError::new(Some(s), event))
+                            Ok(FlowConfigurationState {
+                                status: FlowConfigurationStatus::Deleted,
+                                ..s
+                            })
                         }
                     }
                 }

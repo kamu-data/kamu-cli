@@ -86,6 +86,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
                     DatasetExternallyChangedMessage::ingest_http(
                         target_dataset.get_id(),
+                        options.source_name,
                         Some(old_head),
                         new_head,
                     ),

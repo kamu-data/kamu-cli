@@ -1,6 +1,6 @@
 [package]
 name = "kamu-flow-system-services"
-description = "Service model of the flows management for scheduled dataset and system activities"
+description = "Service model of the flows management for scheduled & reactive computation activities"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -27,7 +27,6 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-kamu-accounts = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
@@ -47,9 +46,11 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu-accounts = { workspace = true }
-kamu-adapter-flow-dataset = { workspace = true }
+kamu-adapter-flow-dataset = { workspace = true, features = ["testing"] }
+kamu-adapter-flow-webhook = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
 kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }

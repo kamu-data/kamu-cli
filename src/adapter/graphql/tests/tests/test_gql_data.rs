@@ -117,7 +117,7 @@ async fn create_test_dataset(
     dataset
         .commit_event(
             MetadataFactory::set_data_schema()
-                .schema(&schema)
+                .schema_from_arrow(&schema)
                 .build()
                 .into(),
             odf::dataset::CommitOpts::default(),
@@ -140,6 +140,7 @@ async fn create_test_dataset(
                 prev_checkpoint: None,
                 prev_offset: None,
                 new_offset_interval: Some(odf::metadata::OffsetInterval { start: 0, end: 3 }),
+                new_linked_objects: None,
                 new_watermark: None,
                 new_source_state: None,
             },

@@ -71,6 +71,13 @@ impl<'a> MetadataChainMut<'a> {
                 old_head: result.old_head.map(Into::into),
                 new_head: result.new_head.into(),
             }),
+            Err(odf::dataset::CommitError::MetadataAppendError(
+                odf::dataset::AppendError::InvalidBlock(
+                    odf::dataset::AppendValidationError::NoOpEvent(e),
+                ),
+            )) => CommitResult::NoChanges(NoChanges {
+                message: e.to_string(),
+            }),
             Err(odf::dataset::CommitError::ObjectNotFound(e)) => {
                 CommitResult::AppendError(CommitResultAppendError {
                     message: format!("Event is referencing a non-existent object {}", e.hash),
@@ -94,7 +101,10 @@ impl<'a> MetadataChainMut<'a> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
 pub enum CommitResult<'a> {
     Success(CommitResultSuccess<'a>),
     NoChanges(NoChanges),
@@ -114,6 +124,9 @@ pub struct CommitResultSuccess<'a> {
 
 #[ComplexObject]
 impl CommitResultSuccess<'_> {
+    pub async fn is_success(&self) -> bool {
+        true
+    }
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -121,21 +134,30 @@ impl CommitResultSuccess<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct NoChanges;
-
-#[Object]
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct NoChanges {
+    pub message: String,
+}
+#[ComplexObject]
 impl NoChanges {
-    pub async fn message(&self) -> String {
-        "No changes".to_string()
+    pub async fn is_success(&self) -> bool {
+        true
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
+#[graphql(complex)]
 pub struct CommitResultAppendError {
     pub message: String,
+}
+#[ComplexObject]
+impl CommitResultAppendError {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

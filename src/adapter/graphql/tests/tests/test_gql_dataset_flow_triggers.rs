@@ -12,7 +12,11 @@ use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
-use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowTriggerEventStore};
+use kamu_flow_system_inmem::{
+    InMemoryFlowConfigurationEventStore,
+    InMemoryFlowEventStore,
+    InMemoryFlowTriggerEventStore,
+};
 use kamu_flow_system_services::FlowTriggerServiceImpl;
 use odf::metadata::testing::MetadataFactory;
 
@@ -45,8 +49,8 @@ async fn test_crud_time_delta_root_dataset() {
                                         every
                                         unit
                                     }
-                            }
-                                batching {
+                                }
+                                reactive {
                                     __typename
                                 }
                             }
@@ -86,7 +90,6 @@ async fn test_crud_time_delta_root_dataset() {
     let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
-        false,
         1,
         "DAYS",
     );
@@ -117,7 +120,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         "every": 1,
                                         "unit": "DAYS"
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -130,7 +133,6 @@ async fn test_crud_time_delta_root_dataset() {
     let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
-        true,
         2,
         "HOURS",
     );
@@ -155,13 +157,13 @@ async fn test_crud_time_delta_root_dataset() {
                                 "message": "Success",
                                 "trigger": {
                                     "__typename": "FlowTrigger",
-                                    "paused": true,
+                                    "paused": false,
                                     "schedule": {
                                         "__typename": "TimeDelta",
                                         "every": 2,
                                         "unit": "HOURS"
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -193,7 +195,6 @@ async fn test_time_delta_validation() {
         let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
             &create_result.dataset_handle.id,
             "INGEST",
-            true,
             test_case.0,
             test_case.1,
         );
@@ -222,7 +223,6 @@ async fn test_time_delta_validation() {
         let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
             &create_result.dataset_handle.id,
             "INGEST",
-            true,
             test_case.0,
             test_case.1,
         );
@@ -267,7 +267,7 @@ async fn test_crud_cron_root_dataset() {
                                         cron5ComponentExpression
                                     }
                                 }
-                                batching {
+                                reactive {
                                     __typename
                                 }
                             }
@@ -307,7 +307,6 @@ async fn test_crud_cron_root_dataset() {
     let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
-        false,
         "*/2 * * * *",
     );
 
@@ -336,7 +335,7 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "Cron5ComponentExpression",
                                         "cron5ComponentExpression": "*/2 * * * *",
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -349,7 +348,6 @@ async fn test_crud_cron_root_dataset() {
     let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
-        true,
         "0 */1 * * *",
     );
 
@@ -373,12 +371,12 @@ async fn test_crud_cron_root_dataset() {
                                 "message": "Success",
                                 "trigger": {
                                     "__typename": "FlowTrigger",
-                                    "paused": true,
+                                    "paused": false,
                                     "schedule": {
                                         "__typename": "Cron5ComponentExpression",
                                         "cron5ComponentExpression": "0 */1 * * *",
                                     },
-                                    "batching": null,
+                                    "reactive": null,
                                 }
                             }
                         }
@@ -393,7 +391,6 @@ async fn test_crud_cron_root_dataset() {
     let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
-        true,
         invalid_cron_expression,
     );
 
@@ -427,7 +424,6 @@ async fn test_crud_cron_root_dataset() {
     let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
-        true,
         past_cron_expression,
     );
 
@@ -460,7 +456,7 @@ async fn test_crud_cron_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_crud_batching_derived_dataset() {
+async fn test_crud_reactive_buffering_derived_dataset() {
     let harness = FlowTriggerHarness::make().await;
 
     harness.create_root_dataset().await;
@@ -479,13 +475,19 @@ async fn test_crud_batching_derived_dataset() {
                                 schedule {
                                     __typename
                                 }
-                                batching {
+                                reactive {
                                     __typename
-                                    minRecordsToAwait
-                                    maxBatchingInterval {
-                                        every
-                                        unit
+                                    forNewData {
+                                        __typename
+                                        ... on FlowTriggerBatchingRuleBuffering {
+                                            minRecordsToAwait
+                                            maxBatchingInterval {
+                                                every
+                                                unit
+                                            }
+                                        }
                                     }
+                                    forBreakingChange
                                 }
                             }
                         }
@@ -521,12 +523,12 @@ async fn test_crud_batching_derived_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_trigger_batching_mutation(
+    let mutation_code = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
-        false,
         1,
         (30, "MINUTES"),
+        "NO_ACTION",
     );
 
     let res = schema
@@ -551,13 +553,17 @@ async fn test_crud_batching_derived_dataset() {
                                     "__typename": "FlowTrigger",
                                     "paused": false,
                                     "schedule": null,
-                                    "batching": {
-                                        "__typename": "FlowTriggerBatchingRule",
-                                        "minRecordsToAwait": 1,
-                                        "maxBatchingInterval": {
-                                            "every": 30,
-                                            "unit": "MINUTES"
-                                        }
+                                    "reactive": {
+                                        "__typename": "FlowTriggerReactiveRule",
+                                        "forNewData": {
+                                            "__typename": "FlowTriggerBatchingRuleBuffering",
+                                            "minRecordsToAwait": 1,
+                                            "maxBatchingInterval": {
+                                                "every": 30,
+                                                "unit": "MINUTES"
+                                            }
+                                        },
+                                        "forBreakingChange": "NO_ACTION",
                                     },
                                 }
                             }
@@ -572,7 +578,115 @@ async fn test_crud_batching_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_batching_trigger_validation() {
+async fn test_crud_reactive_immediate_derived_dataset() {
+    let harness = FlowTriggerHarness::make().await;
+
+    harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        triggers {
+                            byType (datasetFlowType: "EXECUTE_TRANSFORM") {
+                                __typename
+                                paused
+                                schedule {
+                                    __typename
+                                }
+                                reactive {
+                                    __typename
+                                    forNewData {
+                                        __typename
+                                    }
+                                    forBreakingChange
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_derived_result.dataset_handle.id.to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "byType": null
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_code = FlowTriggerHarness::set_trigger_reactive_immediate_mutation(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
+        "NO_ACTION",
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "SetFlowTriggerSuccess",
+                                "message": "Success",
+                                "trigger": {
+                                    "__typename": "FlowTrigger",
+                                    "paused": false,
+                                    "schedule": null,
+                                    "reactive": {
+                                        "__typename": "FlowTriggerReactiveRule",
+                                        "forNewData": {
+                                            "__typename": "FlowTriggerBatchingRuleImmediate",
+                                        },
+                                        "forBreakingChange": "NO_ACTION",
+                                    },
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_reactive_buffering_trigger_validation() {
     let harness = FlowTriggerHarness::make().await;
 
     harness.create_root_dataset().await;
@@ -580,18 +694,32 @@ async fn test_batching_trigger_validation() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    for test_case in [(
-        1,
-        25,
-        "HOURS",
-        "Maximum interval to await should not exceed 24 hours",
-    )] {
-        let mutation_code = FlowTriggerHarness::set_trigger_batching_mutation(
+    for test_case in [
+        (
+            1,
+            25,
+            "HOURS",
+            "Maximum interval to await should not exceed 24 hours",
+        ),
+        (
+            1,
+            0,
+            "MINUTES",
+            "Minimum interval to await should be positive",
+        ),
+        (
+            0,
+            30,
+            "MINUTES",
+            "Minimum records to await should be positive",
+        ),
+    ] {
+        let mutation_code = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
-            true,
             test_case.0,
             (test_case.1, test_case.2),
+            "NO_ACTION",
         );
 
         let response = schema
@@ -697,7 +825,6 @@ async fn test_pause_resume_dataset_flows() {
     let mutation_set_ingest = FlowTriggerHarness::set_time_delta_trigger_mutation(
         &create_root_result.dataset_handle.id,
         "INGEST",
-        false,
         1,
         "DAYS",
     );
@@ -710,12 +837,12 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let mutation_set_transform = FlowTriggerHarness::set_trigger_batching_mutation(
+    let mutation_set_transform = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
-        false,
         1,
         (30, "MINUTES"),
+        "RECOVER",
     );
 
     let res = schema
@@ -756,7 +883,7 @@ async fn test_pause_resume_dataset_flows() {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
-    let mutation_pause_root_compaction = FlowTriggerHarness::pause_flows_of_type_mutation(
+    let mutation_pause_root_compaction = FlowTriggerHarness::pause_flow_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
     );
@@ -815,10 +942,8 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Resume ingestion
-    let mutation_resume_ingest = FlowTriggerHarness::resume_flows_of_type_mutation(
-        &create_root_result.dataset_handle.id,
-        "INGEST",
-    );
+    let mutation_resume_ingest =
+        FlowTriggerHarness::resume_flow_mutation(&create_root_result.dataset_handle.id, "INGEST");
 
     let res = schema
         .execute(
@@ -845,7 +970,7 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Pause derived transform
-    let mutation_pause_derived_transform = FlowTriggerHarness::pause_flows_of_type_mutation(
+    let mutation_pause_derived_transform = FlowTriggerHarness::pause_flow_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
     );
@@ -915,12 +1040,12 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowTriggerHarness::set_trigger_batching_mutation(
+    let mutation_code = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
-        false,
         1,
         (30, "MINUTES"),
+        "RECOVER",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -956,7 +1081,6 @@ async fn test_conditions_not_met_for_flows() {
     let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
         &create_root_result.dataset_handle.id,
         "INGEST",
-        false,
         "0 */2 * * *",
     );
 
@@ -992,6 +1116,233 @@ async fn test_conditions_not_met_for_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_stop_policies() {
+    let harness = FlowTriggerHarness::make().await;
+
+    let create_root_result = harness.create_root_dataset().await;
+
+    //// Set ingest trigger stop policy with non-default consecutive failures
+
+    let mutation_code = indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            triggers {
+                                setTrigger (
+                                    datasetFlowType: "INGEST",
+                                    triggerRuleInput: {
+                                        schedule: {
+                                            timeDelta: { every: 1, unit: "DAYS" }
+                                        }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        afterConsecutiveFailures: { maxFailures: 3 }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowTriggerSuccess {
+                                        trigger {
+                                            __typename
+                                            stopPolicy {
+                                                __typename
+                                                ... on FlowTriggerStopPolicyAfterConsecutiveFailures {
+                                                    maxFailures
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &create_root_result.dataset_handle.id.to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "SetFlowTriggerSuccess",
+                                "message": "Success",
+                                "trigger": {
+                                    "__typename": "FlowTrigger",
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                        "maxFailures": 3
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Set another stop policy - never
+    let mutation_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        triggers {
+                            setTrigger (
+                                datasetFlowType: "INGEST",
+                                triggerRuleInput: {
+                                    schedule: {
+                                        timeDelta: { every: 1, unit: "DAYS" }
+                                    }
+                                }
+                                triggerStopPolicyInput: {
+                                    never: { dummy: false }
+                                }
+                            ) {
+                                __typename,
+                                message
+                                ... on SetFlowTriggerSuccess {
+                                    trigger {
+                                        __typename
+                                        stopPolicy {
+                                            __typename
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_root_result.dataset_handle.id.to_string());
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "SetFlowTriggerSuccess",
+                                "message": "Success",
+                                "trigger": {
+                                    "__typename": "FlowTrigger",
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyNever",
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_stop_policies_validation() {
+    let harness = FlowTriggerHarness::make().await;
+
+    let create_root_result = harness.create_root_dataset().await;
+
+    //// Set ingest trigger stop policy with incorrect consecutive failures
+
+    let mutation_code = indoc!(
+        r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            triggers {
+                                setTrigger (
+                                    datasetFlowType: "INGEST",
+                                    triggerRuleInput: {
+                                        schedule: {
+                                            timeDelta: { every: 1, unit: "DAYS" }
+                                        }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        afterConsecutiveFailures: { maxFailures: 0 }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+    )
+    .replace("<id>", &create_root_result.dataset_handle.id.to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "triggers": {
+                            "setTrigger": {
+                                "__typename": "FlowInvalidTriggerStopPolicyInputError",
+                                "message": "ConsecutiveFailuresCount is too small. The value must be greater or equal to 1.",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_setters_fail() {
     let harness = FlowTriggerHarness::make().await;
 
@@ -1000,7 +1351,6 @@ async fn test_anonymous_setters_fail() {
     let mutation_codes = [FlowTriggerHarness::set_time_delta_trigger_mutation(
         &create_root_result.dataset_handle.id,
         "INGEST",
-        false,
         5,
         "MINUTES",
     )];
@@ -1038,6 +1388,7 @@ impl FlowTriggerHarness {
 
             b.add::<MetadataQueryServiceImpl>()
                 .add::<FlowTriggerServiceImpl>()
+                .add::<InMemoryFlowEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowConfigurationEventStore>();
 
@@ -1146,7 +1497,6 @@ impl FlowTriggerHarness {
     fn set_time_delta_trigger_mutation(
         id: &odf::DatasetID,
         dataset_flow_type: &str,
-        paused: bool,
         every: u64,
         unit: &str,
     ) -> String {
@@ -1159,11 +1509,13 @@ impl FlowTriggerHarness {
                             triggers {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
-                                    paused: <paused>,
-                                    triggerInput: {
+                                    triggerRuleInput: {
                                         schedule: {
                                             timeDelta: { every: <every>, unit: "<unit>" }
                                         }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,
@@ -1179,7 +1531,7 @@ impl FlowTriggerHarness {
                                                     unit
                                                 }
                                             }
-                                            batching {
+                                            reactive {
                                                 __typename
                                             }
                                         }
@@ -1194,7 +1546,6 @@ impl FlowTriggerHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<paused>", if paused { "true" } else { "false" })
         .replace("<every>", every.to_string().as_str())
         .replace("<unit>", unit)
     }
@@ -1202,7 +1553,6 @@ impl FlowTriggerHarness {
     fn set_cron_trigger_mutation(
         id: &odf::DatasetID,
         dataset_flow_type: &str,
-        paused: bool,
         cron_expression: &str,
     ) -> String {
         indoc!(
@@ -1214,11 +1564,13 @@ impl FlowTriggerHarness {
                             triggers {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
-                                    paused: <paused>,
-                                    triggerInput: {
+                                    triggerRuleInput: {
                                         schedule: {
                                             cron5ComponentExpression: "<cron_expression>"
                                         }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,
@@ -1233,7 +1585,7 @@ impl FlowTriggerHarness {
                                                     cron5ComponentExpression
                                                 }
                                             }
-                                            batching {
+                                            reactive {
                                                 __typename
                                             }
                                         }
@@ -1248,16 +1600,15 @@ impl FlowTriggerHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<paused>", if paused { "true" } else { "false" })
         .replace("<cron_expression>", cron_expression)
     }
 
-    fn set_trigger_batching_mutation(
+    fn set_trigger_reactive_buffering_mutation(
         id: &odf::DatasetID,
         dataset_flow_type: &str,
-        paused: bool,
         min_records_to_await: u64,
         max_batching_interval: (u32, &str),
+        for_breaking_change: &str,
     ) -> String {
         indoc!(
             r#"
@@ -1268,12 +1619,19 @@ impl FlowTriggerHarness {
                             triggers {
                                 setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
-                                    paused: <paused>,
-                                    triggerInput: {
-                                        batching: {
-                                            minRecordsToAwait: <minRecordsToAwait>,
-                                            maxBatchingInterval: { every: <every>, unit: "<unit>" }
+                                    triggerRuleInput: {
+                                        reactive: {
+                                            forNewData: {
+                                                buffering: {
+                                                    minRecordsToAwait: <minRecordsToAwait>,
+                                                    maxBatchingInterval: { every: <every>, unit: "<unit>" }
+                                                }
+                                            },
+                                            forBreakingChange: "<forBreakingChange>"
                                         }
+                                    }
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
                                     }
                                 ) {
                                     __typename,
@@ -1288,13 +1646,19 @@ impl FlowTriggerHarness {
                                                 schedule {
                                                     __typename
                                                 }
-                                                batching {
+                                                reactive {
                                                     __typename
-                                                    minRecordsToAwait
-                                                    maxBatchingInterval {
-                                                        every
-                                                        unit
+                                                    forNewData {
+                                                        __typename
+                                                        ... on FlowTriggerBatchingRuleBuffering {
+                                                            minRecordsToAwait
+                                                            maxBatchingInterval {
+                                                                every
+                                                                unit
+                                                            }
+                                                        }
                                                     }
+                                                    forBreakingChange
                                                 }
                                             }
                                         }
@@ -1309,10 +1673,73 @@ impl FlowTriggerHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<paused>", if paused { "true" } else { "false" })
         .replace("<every>", &max_batching_interval.0.to_string())
         .replace("<unit>", max_batching_interval.1)
         .replace("<minRecordsToAwait>", &min_records_to_await.to_string())
+        .replace("<forBreakingChange>", for_breaking_change)
+    }
+
+    fn set_trigger_reactive_immediate_mutation(
+        id: &odf::DatasetID,
+        dataset_flow_type: &str,
+        for_breaking_change: &str,
+    ) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            triggers {
+                                setTrigger (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                    triggerRuleInput: {
+                                        reactive: {
+                                            forNewData: {
+                                                immediate: {
+                                                    dummy: false
+                                                }
+                                            },
+                                            forBreakingChange: "<forBreakingChange>"
+                                        }
+                                    },
+                                    triggerStopPolicyInput: {
+                                        never: { dummy: true }
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowTriggerSuccess {
+                                        __typename,
+                                        message
+                                        ... on SetFlowTriggerSuccess {
+                                            trigger {
+                                                __typename
+                                                paused
+                                                schedule {
+                                                    __typename
+                                                }
+                                                reactive {
+                                                    __typename
+                                                    forNewData {
+                                                        __typename
+                                                    }
+                                                    forBreakingChange
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<dataset_flow_type>", dataset_flow_type)
+        .replace("<forBreakingChange>", for_breaking_change)
     }
 
     fn quick_flow_trigger_query(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
@@ -1357,7 +1784,7 @@ impl FlowTriggerHarness {
         .replace("<id>", &id.to_string())
     }
 
-    fn pause_flows_of_type_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
+    fn pause_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -1365,7 +1792,7 @@ impl FlowTriggerHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             triggers {
-                                pauseFlows (
+                                pauseFlow (
                                     datasetFlowType: "<dataset_flow_type>",
                                 )
                             }
@@ -1379,7 +1806,7 @@ impl FlowTriggerHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn resume_flows_of_type_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
+    fn resume_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -1387,7 +1814,7 @@ impl FlowTriggerHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             triggers {
-                                resumeFlows (
+                                resumeFlow (
                                     datasetFlowType: "<dataset_flow_type>",
                                 )
                             }

@@ -64,13 +64,12 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
-        let flow_binding = fs::FlowBinding::for_dataset(
-            self.dataset_request_state.dataset_id().clone(),
-            afs::FLOW_TYPE_DATASET_INGEST,
-        );
-
         let res = flow_config_service
-            .set_configuration(flow_binding, configuration_rule, retry_policy)
+            .set_configuration(
+                afs::ingest_dataset_binding(self.dataset_request_state.dataset_id()),
+                configuration_rule,
+                retry_policy,
+            )
             .await
             .int_err()?;
 
@@ -87,11 +86,8 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         compaction_config_input: FlowConfigCompactionInput,
     ) -> Result<SetFlowConfigResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        if matches!(compaction_config_input, FlowConfigCompactionInput::Full(_))
-            && let Err(e) = ensure_flow_applied_to_expected_dataset_kind(
-                resolved_dataset,
-                odf::DatasetKind::Root,
-            )
+        if let Err(e) =
+            ensure_flow_applied_to_expected_dataset_kind(resolved_dataset, odf::DatasetKind::Root)
         {
             return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
         }
@@ -120,10 +116,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
-        let flow_binding = fs::FlowBinding::for_dataset(
-            self.dataset_request_state.dataset_id().clone(),
-            afs::FLOW_TYPE_DATASET_COMPACT,
-        );
+        let flow_binding = afs::compaction_dataset_binding(self.dataset_request_state.dataset_id());
 
         let res = flow_config_service
             .set_configuration(
