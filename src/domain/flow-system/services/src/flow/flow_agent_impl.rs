@@ -21,15 +21,7 @@ use internal_error::InternalError;
 use kamu_datasets::JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER;
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use messaging_outbox::{
-    InitialConsumerBoundary,
-    MessageConsumer,
-    MessageConsumerMeta,
-    MessageConsumerT,
-    MessageDeliveryMechanism,
-    Outbox,
-    OutboxExt,
-};
+use messaging_outbox::*;
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
@@ -477,7 +469,11 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         outbox
                             .post_message(
                                 MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                FlowProgressMessage::running(message.event_time, flow_id),
+                                FlowProgressMessage::running(
+                                    message.event_time,
+                                    flow_id,
+                                    flow.flow_binding.clone(),
+                                ),
                             )
                             .await?;
                     } else {
@@ -585,6 +581,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     FlowProgressMessage::finished(
                                         message.event_time,
                                         flow_id,
+                                        flow.flow_binding.clone(),
                                         flow_outcome.clone(),
                                     ),
                                 )
@@ -597,6 +594,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     FlowProgressMessage::retry_scheduled(
                                         message.event_time,
                                         flow_id,
+                                        flow.flow_binding.clone(),
                                         flow.timing
                                             .scheduled_for_activation_at
                                             .expect("Flow must have scheduled activation time"),
