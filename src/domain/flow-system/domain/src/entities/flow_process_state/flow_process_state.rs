@@ -193,18 +193,14 @@ impl FlowProcessState {
     pub fn update_trigger_state(
         &mut self,
         current_time: DateTime<Utc>,
-        paused_manual: Option<bool>,
-        stop_policy: Option<FlowTriggerStopPolicy>,
+        paused_manual: bool,
+        stop_policy: FlowTriggerStopPolicy,
         trigger_event_id: EventID,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_trigger_event_order(trigger_event_id)?;
 
-        if let Some(paused_manual) = paused_manual {
-            self.paused_manual = paused_manual;
-        }
-        if let Some(stop_policy) = stop_policy {
-            self.stop_policy = stop_policy;
-        }
+        self.paused_manual = paused_manual;
+        self.stop_policy = stop_policy;
 
         self.actualize_effective_state();
 
@@ -502,8 +498,8 @@ mod tests {
         state
             .update_trigger_state(
                 update_time,
-                Some(true),            // pause manually
-                Some(new_stop_policy), // change stop policy
+                true,            // pause manually
+                new_stop_policy, // change stop policy
                 EventID::new(2),
             )
             .unwrap();
@@ -517,12 +513,12 @@ mod tests {
         assert_eq!(state.updated_at, update_time);
         assert_eq!(state.last_applied_trigger_event_id, EventID::new(2));
 
-        // Test updating only pause state
+        // Test updating to unpause state
         state
             .update_trigger_state(
                 update_time + Duration::minutes(1),
-                Some(false), // unpause
-                None,        // keep same stop policy
+                false,           // unpause
+                new_stop_policy, // keep same stop policy
                 EventID::new(3),
             )
             .unwrap();
@@ -633,8 +629,8 @@ mod tests {
         state
             .update_trigger_state(
                 Utc::now() + Duration::minutes(1),
-                Some(true), // pause manually
-                None,
+                true, // pause manually
+                make_test_stop_policy_with_failures(2),
                 EventID::new(2),
             )
             .unwrap();
@@ -649,8 +645,8 @@ mod tests {
         state
             .update_trigger_state(
                 Utc::now() + Duration::minutes(2),
-                Some(false), // unpause
-                None,
+                false, // unpause
+                make_test_stop_policy_with_failures(2),
                 EventID::new(3),
             )
             .unwrap();
@@ -675,21 +671,36 @@ mod tests {
         let update_time = Utc::now() + Duration::minutes(1);
 
         // Test duplicate trigger event error
-        let result = state.update_trigger_state(update_time, Some(true), None, EventID::new(100));
+        let result = state.update_trigger_state(
+            update_time,
+            true,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(100),
+        );
         assert!(matches!(
             result.unwrap_err(),
             FlowProcessStateError::DuplicateTriggerEvent { .. }
         ));
 
         // Test out-of-order trigger event error
-        let result = state.update_trigger_state(update_time, Some(true), None, EventID::new(50));
+        let result = state.update_trigger_state(
+            update_time,
+            true,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(50),
+        );
         assert!(matches!(
             result.unwrap_err(),
             FlowProcessStateError::OutOfOrderTriggerEvent { .. }
         ));
 
         // Test valid trigger event sequence
-        let result = state.update_trigger_state(update_time, Some(true), None, EventID::new(150));
+        let result = state.update_trigger_state(
+            update_time,
+            true,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(150),
+        );
         assert!(result.is_ok());
         assert_eq!(state.last_applied_trigger_event_id, EventID::new(150));
 
@@ -772,8 +783,8 @@ mod tests {
         state
             .update_trigger_state(
                 base_time + Duration::minutes(10),
-                Some(true), // pause
-                None,
+                true, // pause
+                FlowTriggerStopPolicy::Never,
                 EventID::new(2),
             )
             .unwrap();
@@ -807,8 +818,8 @@ mod tests {
         state
             .update_trigger_state(
                 base_time + Duration::minutes(2),
-                Some(true),
-                None,
+                true,
+                make_test_stop_policy_with_failures(3),
                 EventID::new(2),
             )
             .unwrap();
@@ -835,8 +846,8 @@ mod tests {
         state
             .update_trigger_state(
                 base_time + Duration::minutes(4),
-                Some(false),
-                None,
+                false,
+                make_test_stop_policy_with_failures(3),
                 EventID::new(3),
             )
             .unwrap();
@@ -846,8 +857,8 @@ mod tests {
         state
             .update_trigger_state(
                 base_time + Duration::minutes(5),
-                None,
-                Some(FlowTriggerStopPolicy::Never),
+                false,
+                FlowTriggerStopPolicy::Never,
                 EventID::new(4),
             )
             .unwrap();
