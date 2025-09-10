@@ -48,9 +48,17 @@ pub(crate) async fn extract_modified_dependencies_in_interval(
     // With hints available, we can immediately assess the necessity of iteration.
     // If there are no necessary events in the interval, exit immediately.
     if let Some(hint_flags) = maybe_hint_flags
-        && !hint_flags.contains(Flag::SEED | Flag::SET_TRANSFORM)
+        && !hint_flags.contains(Flag::SET_TRANSFORM)
     {
-        return Ok(DependencyChange::Unchanged);
+        let has_seed = hint_flags.contains(Flag::SEED);
+        // 2 cases:
+        //  - no SetTransform but Seed is present, need to reset dependencies (dropped)
+        //  - no SetTransform w/o Seed means no dependency changes (unchanged)
+        return if has_seed {
+            Ok(DependencyChange::Dropped)
+        } else {
+            Ok(DependencyChange::Unchanged)
+        };
     }
 
     let mut new_upstream_ids: HashSet<odf::DatasetID> = HashSet::new();
