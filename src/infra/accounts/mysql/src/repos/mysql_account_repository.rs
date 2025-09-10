@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{
+    BatchLookup,
+    BatchLookupCreateOptions,
     PaginationOpts,
     TransactionRef,
     TransactionRefT,
@@ -15,7 +17,7 @@ use database_common::{
 };
 use dill::{component, interface};
 use email_utils::Email;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::mysql::MySqlRow;
@@ -252,10 +254,13 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<BatchLookup<Account, odf::AccountID, GetAccountByIdError>, InternalError> {
         if account_ids.is_empty() {
-            return Ok(Vec::new());
+            return Ok(BatchLookup {
+                found: Vec::new(),
+                not_found: Vec::new(),
+            });
         }
 
         let mut tr = self.transaction.lock().await;
@@ -289,7 +294,21 @@ impl AccountRepository for MySqlAccountRepository {
 
         let account_rows = query.fetch_all(connection_mut).await.int_err()?;
 
-        Ok(account_rows.iter().map(Self::map_account_row).collect())
+        let accounts: Vec<Account> = account_rows.iter().map(Self::map_account_row).collect();
+
+        Ok(BatchLookup::from_found_items(
+            accounts,
+            account_ids,
+            BatchLookupCreateOptions {
+                found_ids_fn: |accounts| accounts.iter().map(|a| a.id.clone()).collect(),
+                not_found_err_fn: |account_id| {
+                    GetAccountByIdError::NotFound(AccountNotFoundByIdError {
+                        account_id: (*account_id).clone(),
+                    })
+                },
+                _phantom: Default::default(),
+            },
+        ))
     }
 
     async fn get_account_by_name(

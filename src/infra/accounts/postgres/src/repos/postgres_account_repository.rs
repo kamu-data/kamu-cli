@@ -7,10 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{
+    BatchLookup,
+    BatchLookupCreateOptions,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::{component, interface};
 use email_utils::Email;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use sqlx::error::DatabaseError;
 
 use crate::domain::*;
@@ -232,20 +238,20 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<BatchLookup<Account, odf::AccountID, GetAccountByIdError>, InternalError> {
         if account_ids.is_empty() {
-            return Ok(Vec::new());
+            return Ok(BatchLookup {
+                found: Vec::new(),
+                not_found: Vec::new(),
+            });
         }
 
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let accounts_search: Vec<_> = account_ids
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect();
+        let accounts_search: Vec<_> = account_ids.iter().map(ToString::to_string).collect();
 
         let account_rows = sqlx::query_as!(
             AccountRowModel,
@@ -269,7 +275,21 @@ impl AccountRepository for PostgresAccountRepository {
         .await
         .int_err()?;
 
-        Ok(account_rows.into_iter().map(Into::into).collect())
+        let accounts = account_rows.into_iter().map(Into::into).collect::<Vec<_>>();
+
+        Ok(BatchLookup::from_found_items(
+            accounts,
+            account_ids,
+            BatchLookupCreateOptions {
+                found_ids_fn: |accounts| accounts.iter().map(|a| a.id.clone()).collect(),
+                not_found_err_fn: |account_id| {
+                    GetAccountByIdError::NotFound(AccountNotFoundByIdError {
+                        account_id: (*account_id).clone(),
+                    })
+                },
+                _phantom: Default::default(),
+            },
+        ))
     }
 
     async fn get_account_by_name(

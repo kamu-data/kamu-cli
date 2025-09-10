@@ -247,16 +247,27 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<BatchLookup<Account, odf::AccountID, GetAccountByIdError>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        let accounts: Vec<Account> = account_ids
-            .iter()
-            .filter_map(|account_id| guard.accounts_by_id.get(account_id).cloned())
-            .collect();
+        let mut found = Vec::with_capacity(account_ids.len());
+        let mut not_found = Vec::new();
 
-        Ok(accounts)
+        for account_id in account_ids {
+            if let Some(account) = guard.accounts_by_id.get(account_id).cloned() {
+                found.push(account);
+            } else {
+                not_found.push((
+                    (*account_id).clone(),
+                    GetAccountByIdError::NotFound(AccountNotFoundByIdError {
+                        account_id: (*account_id).clone(),
+                    }),
+                ));
+            }
+        }
+
+        Ok(BatchLookup { found, not_found })
     }
 
     async fn get_account_by_name(
