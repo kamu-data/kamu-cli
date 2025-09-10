@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::future::Future;
+use std::hash::Hash;
+use std::marker::PhantomData;
 use std::pin::Pin;
 
 use futures::Stream;
@@ -168,3 +171,51 @@ pub struct EventModel {
 pub struct ReturningEventModel {
     pub event_id: i64,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct BatchLookup<T, Id, Err> {
+    pub found: Vec<T>,
+    pub not_found: Vec<(Id, Err)>,
+}
+
+pub struct BatchLookupCreateOptions<T, Id, Err, FoundByFn, NotFoundErrFn>
+where
+    Id: Clone + Hash + Eq,
+    FoundByFn: FnOnce(&Vec<T>) -> HashSet<Id>,
+    NotFoundErrFn: Fn(&Id) -> Err,
+{
+    pub found_ids_fn: FoundByFn,
+    pub not_found_err_fn: NotFoundErrFn,
+    pub _phantom: PhantomData<T>,
+}
+
+impl<T, Id, Err> BatchLookup<T, Id, Err> {
+    pub fn from_found_items<FoundByFn, NotFoundErrFn>(
+        found: Vec<T>,
+        ids: &[&Id],
+        options: BatchLookupCreateOptions<T, Id, Err, FoundByFn, NotFoundErrFn>,
+    ) -> BatchLookup<T, Id, Err>
+    where
+        Id: Clone + Hash + Eq,
+        FoundByFn: FnOnce(&Vec<T>) -> HashSet<Id>,
+        NotFoundErrFn: Fn(&Id) -> Err,
+    {
+        let found_ids = (options.found_ids_fn)(&found);
+        let mut not_found = Vec::with_capacity(ids.len() - found.len());
+
+        for id in ids {
+            if !found_ids.contains(*id) {
+                let cloned_id = (*id).clone();
+                let not_found_err = (options.not_found_err_fn)(*id);
+
+                not_found.push((cloned_id, not_found_err));
+            }
+        }
+
+        BatchLookup { found, not_found }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
