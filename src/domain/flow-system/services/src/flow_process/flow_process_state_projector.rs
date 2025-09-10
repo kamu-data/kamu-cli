@@ -105,7 +105,6 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
                         message.flow_binding().clone(),
                         is_success,
                         message.event_time(),
-                        None,            // TODO: pass next_planned_at somehow
                         EventID::new(0), // TODO: pass event_id somehow
                     )
                     .await
