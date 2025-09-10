@@ -68,7 +68,7 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
         tracing::debug!(received_message = ?message, "Received flow progress message");
 
         match message {
-            /*FlowProgressMessage::Scheduled(scheduled_message) => {
+            FlowProgressMessage::Scheduled(scheduled_message) => {
                 let flow_process_state_repository = target_catalog
                     .get_one::<dyn FlowProcessStateRepository>()
                     .int_err()?;
@@ -88,7 +88,7 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
                         );
                         e.int_err()
                     })?;
-            }*/
+            }
             FlowProgressMessage::Finished(finished_message) => {
                 let is_success = match finished_message.outcome {
                     FlowOutcome::Success(_) => true,
@@ -119,7 +119,6 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
             }
 
             FlowProgressMessage::RetryScheduled(_)
-            | FlowProgressMessage::Scheduled(_)
             | FlowProgressMessage::Running(_)
             | FlowProgressMessage::Cancelled(_) => {
                 // Ignore for now
