@@ -90,8 +90,8 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
             self.flow_process_state_repository
                 .update_trigger_state(
                     &message.flow_binding,
-                    Some(message.trigger_status == FlowTriggerStatus::PausedByUser),
-                    Some(message.stop_policy),
+                    message.trigger_status == FlowTriggerStatus::PausedByUser,
+                    message.stop_policy,
                     EventID::new(0), // TODO: pass event_id somehow
                 )
                 .await
