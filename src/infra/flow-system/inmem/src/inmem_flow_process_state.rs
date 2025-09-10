@@ -453,13 +453,13 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         event_time: DateTime<Utc>,
         next_planned_at: Option<DateTime<Utc>>,
         flow_event_id: EventID,
-    ) -> Result<(), FlowProcessApplyResultError> {
+    ) -> Result<(), FlowProcessUpdateError> {
         let mut state = self.state.write().unwrap();
         let process_state = state
             .process_state_by_binding
             .get_mut(&flow_binding)
             .ok_or_else(|| {
-                FlowProcessApplyResultError::NotFound(FlowProcessNotFoundError {
+                FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
                     flow_binding: flow_binding.clone(),
                 })
             })?;

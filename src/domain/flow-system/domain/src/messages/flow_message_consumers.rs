@@ -11,4 +11,7 @@
 
 pub const MESSAGE_CONSUMER_KAMU_FLOW_AGENT: &str = "dev.kamu.domain.flow-system.FlowAgent";
 
+pub const MESSAGE_CONSUMER_KAMU_FLOW_PROCESS_STATE_PROJECTOR: &str =
+    "dev.kamu.domain.flow-system.FlowProcessStateProjector";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
