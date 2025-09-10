@@ -71,11 +71,11 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
 
             self.flow_process_state_repository
                 .insert_process_state(
+                    message.event_id,
                     message.flow_binding.clone(),
                     sort_key,
                     message.trigger_status == FlowTriggerStatus::PausedByUser,
                     message.stop_policy,
-                    EventID::new(0), // TODO: pass event_id somehow
                 )
                 .await
                 .map_err(|e| {
@@ -90,9 +90,9 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
             self.flow_process_state_repository
                 .update_trigger_state(
                     &message.flow_binding,
+                    message.event_id,
                     message.trigger_status == FlowTriggerStatus::PausedByUser,
                     message.stop_policy,
-                    EventID::new(0), // TODO: pass event_id somehow
                 )
                 .await
                 .map_err(|e| {
@@ -129,9 +129,9 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
             FlowProgressMessage::Scheduled(scheduled_message) => {
                 self.flow_process_state_repository
                     .on_flow_scheduled(
+                        EventID::new(0), // TODO: pass event_id somehow
                         message.flow_binding(),
                         scheduled_message.scheduled_for_activation_at,
-                        EventID::new(0), // TODO: pass event_id somehow
                     )
                     .await
                     .map_err(|e| {
@@ -152,10 +152,10 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
 
                 self.flow_process_state_repository
                     .apply_flow_result(
+                        EventID::new(0), // TODO: pass event_id somehow
                         message.flow_binding(),
                         is_success,
                         message.event_time(),
-                        EventID::new(0), // TODO: pass event_id somehow
                     )
                     .await
                     .map_err(|e| {

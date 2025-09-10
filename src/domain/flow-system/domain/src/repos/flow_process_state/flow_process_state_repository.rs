@@ -21,37 +21,37 @@ pub trait FlowProcessStateRepository: Send + Sync {
     /// Insert a new row when a trigger is created.
     async fn insert_process_state(
         &self,
+        trigger_event_id: EventID,
         flow_binding: FlowBinding,
         sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-        trigger_event_id: EventID,
     ) -> Result<(), FlowProcessInsertError>;
 
     /// Update trigger-related fields
     async fn update_trigger_state(
         &self,
         flow_binding: &FlowBinding,
+        trigger_event_id: EventID,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-        trigger_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError>;
 
     /// Apply a flow result (success or failure).
     async fn apply_flow_result(
         &self,
+        flow_event_id: EventID,
         flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-        flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError>;
 
     /// React to flow being scheduled.
     async fn on_flow_scheduled(
         &self,
+        flow_event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-        flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError>;
 
     /// Remove row when trigger is deleted.

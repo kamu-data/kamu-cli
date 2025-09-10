@@ -41,12 +41,12 @@ pub struct FlowProcessState {
 
 impl FlowProcessState {
     pub fn new(
+        trigger_event_id: EventID,
         current_time: DateTime<Utc>,
         flow_binding: FlowBinding,
         sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-        trigger_event_id: EventID,
     ) -> Self {
         // Ensure sort_key is lowercase for efficient filtering
         debug_assert_eq!(
@@ -192,10 +192,10 @@ impl FlowProcessState {
 
     pub fn update_trigger_state(
         &mut self,
+        trigger_event_id: EventID,
         current_time: DateTime<Utc>,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-        trigger_event_id: EventID,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_trigger_event_order(trigger_event_id)?;
 
@@ -212,9 +212,9 @@ impl FlowProcessState {
 
     pub fn on_success(
         &mut self,
+        flow_event_id: EventID,
         current_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
-        flow_event_id: EventID,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_flow_event_order(flow_event_id)?;
 
@@ -233,9 +233,9 @@ impl FlowProcessState {
 
     pub fn on_failure(
         &mut self,
+        flow_event_id: EventID,
         current_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
-        flow_event_id: EventID,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_flow_event_order(flow_event_id)?;
 
@@ -254,9 +254,9 @@ impl FlowProcessState {
 
     pub fn on_scheduled(
         &mut self,
+        flow_event_id: EventID,
         current_time: DateTime<Utc>,
         next_planned_at: DateTime<Utc>,
-        flow_event_id: EventID,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_flow_event_order(flow_event_id)?;
 
@@ -441,12 +441,12 @@ mod tests {
 
         // Test creating a new state without manual pause
         let state = FlowProcessState::new(
+            trigger_event_id,
             current_time,
             flow_binding.clone(),
             sort_key.clone(),
             false, // not paused manually
             stop_policy,
-            trigger_event_id,
         );
 
         assert_eq!(state.flow_binding(), &flow_binding);
@@ -465,12 +465,13 @@ mod tests {
 
         // Test with manual pause
         let paused_state = FlowProcessState::new(
+            EventID::new(456),
             current_time,
             flow_binding,
             sort_key,
-            true, // paused manually
+            true,
+            // paused manually
             stop_policy,
-            EventID::new(456),
         );
 
         assert!(paused_state.paused_manual());
@@ -483,12 +484,12 @@ mod tests {
     #[test]
     fn test_update_trigger_state() {
         let mut state = FlowProcessState::new(
+            EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
             make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
-            EventID::new(1),
         );
 
         let update_time = Utc::now() + Duration::minutes(1);
@@ -497,10 +498,10 @@ mod tests {
         // Test updating both pause and stop policy
         state
             .update_trigger_state(
+                EventID::new(2),
                 update_time,
                 true,            // pause manually
                 new_stop_policy, // change stop policy
-                EventID::new(2),
             )
             .unwrap();
 
@@ -516,10 +517,10 @@ mod tests {
         // Test updating to unpause state
         state
             .update_trigger_state(
+                EventID::new(3),
                 update_time + Duration::minutes(1),
                 false,           // unpause
                 new_stop_policy, // keep same stop policy
-                EventID::new(3),
             )
             .unwrap();
 
@@ -530,12 +531,12 @@ mod tests {
     #[test]
     fn test_flow_execution_events() {
         let mut state = FlowProcessState::new(
+            EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
             make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
-            EventID::new(1),
         );
 
         let current_time = Utc::now() + Duration::minutes(10);
@@ -543,7 +544,7 @@ mod tests {
 
         // Test failure increments failures count
         state
-            .on_failure(current_time, event_time, EventID::new(100))
+            .on_failure(EventID::new(100), current_time, event_time)
             .unwrap();
 
         assert_eq!(state.consecutive_failures, 1);
@@ -554,9 +555,9 @@ mod tests {
         // Test success resets failures count
         state
             .on_success(
+                EventID::new(101),
                 current_time + Duration::minutes(1),
                 event_time + Duration::minutes(1),
-                EventID::new(101),
             )
             .unwrap();
 
@@ -573,9 +574,9 @@ mod tests {
 
         state
             .on_failure(
+                EventID::new(102),
                 current_time + Duration::minutes(2),
                 event_time + Duration::minutes(2),
-                EventID::new(102),
             )
             .unwrap();
 
@@ -589,12 +590,12 @@ mod tests {
     #[test]
     fn test_stop_policy_behavior() {
         let mut state = FlowProcessState::new(
+            EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
             make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
-            EventID::new(1),
         );
 
         let current_time = Utc::now() + Duration::minutes(10);
@@ -603,7 +604,7 @@ mod tests {
         // With Never policy, failures should keep state as Failing
         for i in 1u32..=5u32 {
             state
-                .on_failure(current_time, event_time, EventID::new(100 + i64::from(i)))
+                .on_failure(EventID::new(100 + i64::from(i)), current_time, event_time)
                 .unwrap();
             assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
             assert_eq!(state.consecutive_failures, i);
@@ -613,12 +614,12 @@ mod tests {
     #[test]
     fn test_pause_interactions() {
         let mut state = FlowProcessState::new(
+            EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
             make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(2),
-            EventID::new(1),
         );
 
         // Simulate enough failures to trigger auto-stop
@@ -628,10 +629,10 @@ mod tests {
         // Manual pause should override auto-stop
         state
             .update_trigger_state(
+                EventID::new(2),
                 Utc::now() + Duration::minutes(1),
                 true, // pause manually
                 make_test_stop_policy_with_failures(2),
-                EventID::new(2),
             )
             .unwrap();
 
@@ -644,10 +645,10 @@ mod tests {
         // Unpause should transition back to StoppedAuto due to existing failures
         state
             .update_trigger_state(
+                EventID::new(3),
                 Utc::now() + Duration::minutes(2),
                 false, // unpause
                 make_test_stop_policy_with_failures(2),
-                EventID::new(3),
             )
             .unwrap();
 
@@ -660,22 +661,22 @@ mod tests {
     #[test]
     fn test_event_ordering_validation() {
         let mut state = FlowProcessState::new(
+            EventID::new(100),
             Utc::now(),
             make_test_flow_binding(),
             make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
-            EventID::new(100),
         );
 
         let update_time = Utc::now() + Duration::minutes(1);
 
         // Test duplicate trigger event error
         let result = state.update_trigger_state(
+            EventID::new(100),
             update_time,
             true,
             FlowTriggerStopPolicy::Never,
-            EventID::new(100),
         );
         assert!(matches!(
             result.unwrap_err(),
@@ -684,10 +685,10 @@ mod tests {
 
         // Test out-of-order trigger event error
         let result = state.update_trigger_state(
+            EventID::new(50),
             update_time,
             true,
             FlowTriggerStopPolicy::Never,
-            EventID::new(50),
         );
         assert!(matches!(
             result.unwrap_err(),
@@ -696,10 +697,10 @@ mod tests {
 
         // Test valid trigger event sequence
         let result = state.update_trigger_state(
+            EventID::new(150),
             update_time,
             true,
             FlowTriggerStopPolicy::Never,
-            EventID::new(150),
         );
         assert!(result.is_ok());
         assert_eq!(state.last_applied_trigger_event_id, EventID::new(150));
@@ -709,18 +710,18 @@ mod tests {
         let event_time = Utc::now();
 
         // Valid flow event
-        let result = state.on_success(current_time, event_time, EventID::new(200));
+        let result = state.on_success(EventID::new(200), current_time, event_time);
         assert!(result.is_ok());
 
         // Duplicate flow event error
-        let result = state.on_success(current_time, event_time, EventID::new(200));
+        let result = state.on_success(EventID::new(200), current_time, event_time);
         assert!(matches!(
             result.unwrap_err(),
             FlowProcessStateError::DuplicateFlowEvent { .. }
         ));
 
         // Out-of-order flow event error
-        let result = state.on_failure(current_time, event_time, EventID::new(100));
+        let result = state.on_failure(EventID::new(100), current_time, event_time);
         assert!(matches!(
             result.unwrap_err(),
             FlowProcessStateError::OutOfOrderFlowEvent { .. }
@@ -734,12 +735,12 @@ mod tests {
     #[test]
     fn test_flow_scheduling() {
         let mut state = FlowProcessState::new(
+            EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
             make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
-            EventID::new(1),
         );
 
         let base_time = Utc::now();
@@ -747,7 +748,7 @@ mod tests {
 
         // Test basic scheduling
         state
-            .on_scheduled(base_time, scheduled_time, EventID::new(100))
+            .on_scheduled(EventID::new(100), base_time, scheduled_time)
             .unwrap();
 
         assert_eq!(state.next_planned_at, Some(scheduled_time));
@@ -757,9 +758,9 @@ mod tests {
         state.next_planned_at = Some(base_time + Duration::minutes(30));
         state
             .on_success(
-                base_time + Duration::hours(2),
-                base_time + Duration::hours(2),
                 EventID::new(101),
+                base_time + Duration::hours(2),
+                base_time + Duration::hours(2),
             )
             .unwrap();
         assert_eq!(state.next_planned_at, None); // Cleared because it was in the past
@@ -769,23 +770,23 @@ mod tests {
         state.next_planned_at = Some(future_time);
         state
             .on_success(
-                base_time + Duration::hours(1),
-                base_time + Duration::hours(1),
                 EventID::new(102),
+                base_time + Duration::hours(1),
+                base_time + Duration::hours(1),
             )
             .unwrap();
         assert_eq!(state.next_planned_at, Some(future_time)); // Preserved because it's in the future
 
         // Test that non-running states clear planned time
         state
-            .on_scheduled(base_time, base_time + Duration::hours(2), EventID::new(103))
+            .on_scheduled(EventID::new(103), base_time, base_time + Duration::hours(2))
             .unwrap();
         state
             .update_trigger_state(
+                EventID::new(2),
                 base_time + Duration::minutes(10),
                 true, // pause
                 FlowTriggerStopPolicy::Never,
-                EventID::new(2),
             )
             .unwrap();
         assert_eq!(state.next_planned_at, None); // Cleared because state is paused
@@ -794,12 +795,12 @@ mod tests {
     #[test]
     fn test_comprehensive_state_transitions() {
         let mut state = FlowProcessState::new(
+            EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
             make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
-            EventID::new(1),
         );
 
         let base_time = Utc::now();
@@ -807,9 +808,9 @@ mod tests {
         // 1. Success -> Active state
         state
             .on_success(
-                base_time + Duration::minutes(1),
-                base_time + Duration::minutes(1),
                 EventID::new(10),
+                base_time + Duration::minutes(1),
+                base_time + Duration::minutes(1),
             )
             .unwrap();
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
@@ -817,10 +818,10 @@ mod tests {
         // 2. Manual pause -> PausedManual (overrides everything)
         state
             .update_trigger_state(
+                EventID::new(2),
                 base_time + Duration::minutes(2),
                 true,
                 make_test_stop_policy_with_failures(3),
-                EventID::new(2),
             )
             .unwrap();
         assert_eq!(
@@ -831,9 +832,9 @@ mod tests {
         // 3. Failure while paused -> stays PausedManual
         state
             .on_failure(
-                base_time + Duration::minutes(3),
-                base_time + Duration::minutes(3),
                 EventID::new(11),
+                base_time + Duration::minutes(3),
+                base_time + Duration::minutes(3),
             )
             .unwrap();
         assert_eq!(
@@ -845,10 +846,10 @@ mod tests {
         // 4. Unpause -> transitions to Failing due to existing failures
         state
             .update_trigger_state(
+                EventID::new(3),
                 base_time + Duration::minutes(4),
                 false,
                 make_test_stop_policy_with_failures(3),
-                EventID::new(3),
             )
             .unwrap();
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
@@ -856,10 +857,10 @@ mod tests {
         // 5. Change policy to Never -> stays Failing
         state
             .update_trigger_state(
+                EventID::new(4),
                 base_time + Duration::minutes(5),
                 false,
                 FlowTriggerStopPolicy::Never,
-                EventID::new(4),
             )
             .unwrap();
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
@@ -867,16 +868,16 @@ mod tests {
         // 6. Add more failures -> stays Failing with Never policy
         state
             .on_failure(
-                base_time + Duration::minutes(6),
-                base_time + Duration::minutes(6),
                 EventID::new(12),
+                base_time + Duration::minutes(6),
+                base_time + Duration::minutes(6),
             )
             .unwrap();
         state
             .on_failure(
-                base_time + Duration::minutes(7),
-                base_time + Duration::minutes(7),
                 EventID::new(13),
+                base_time + Duration::minutes(7),
+                base_time + Duration::minutes(7),
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 3);
@@ -885,9 +886,9 @@ mod tests {
         // 7. Success resets everything -> Active
         state
             .on_success(
-                base_time + Duration::minutes(8),
-                base_time + Duration::minutes(8),
                 EventID::new(14),
+                base_time + Duration::minutes(8),
+                base_time + Duration::minutes(8),
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 0);
