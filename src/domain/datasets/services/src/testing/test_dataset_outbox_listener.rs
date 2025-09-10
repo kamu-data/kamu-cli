@@ -13,6 +13,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
     DatasetDependenciesMessage,
+    DatasetKeyBlocksMessage,
     DatasetLifecycleMessage,
     DatasetReferenceMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
@@ -34,6 +35,7 @@ struct State {
     dataset_lifecycle_messages: Vec<DatasetLifecycleMessage>,
     dataset_reference_messages: Vec<DatasetReferenceMessage>,
     dataset_dependency_messages: Vec<DatasetDependenciesMessage>,
+    dataset_key_blocks_messages: Vec<DatasetKeyBlocksMessage>,
 }
 
 #[component(pub)]
@@ -42,6 +44,7 @@ struct State {
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[interface(dyn MessageConsumerT<DatasetReferenceMessage>)]
 #[interface(dyn MessageConsumerT<DatasetDependenciesMessage>)]
+#[interface(dyn MessageConsumerT<DatasetKeyBlocksMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: "TestOutboxDispatcher",
     feeding_producers: &[
@@ -64,6 +67,7 @@ impl TestDatasetOutboxListener {
         guard.dataset_lifecycle_messages.clear();
         guard.dataset_reference_messages.clear();
         guard.dataset_dependency_messages.clear();
+        guard.dataset_key_blocks_messages.clear();
     }
 }
 
@@ -104,6 +108,19 @@ impl MessageConsumerT<DatasetDependenciesMessage> for TestDatasetOutboxListener 
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
         guard.dataset_dependency_messages.push(message.clone());
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetKeyBlocksMessage> for TestDatasetOutboxListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &DatasetKeyBlocksMessage,
+    ) -> Result<(), InternalError> {
+        let mut guard = self.state.lock().unwrap();
+        guard.dataset_key_blocks_messages.push(message.clone());
         Ok(())
     }
 }
@@ -195,6 +212,27 @@ impl std::fmt::Display for TestDatasetOutboxListener {
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         )?;
+                        writeln!(f, "  }}")?;
+                    }
+                }
+            }
+        }
+
+        if !guard.dataset_key_blocks_messages.is_empty() {
+            writeln!(
+                f,
+                "Dataset Key Block Messages: {}",
+                guard.dataset_key_blocks_messages.len()
+            )?;
+
+            for msg in &guard.dataset_key_blocks_messages {
+                match msg {
+                    DatasetKeyBlocksMessage::Appended(msg) => {
+                        writeln!(f, "  Key Blocks Appended {{",)?;
+                        writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
+                        writeln!(f, "    Ref: {}", msg.block_ref)?;
+                        writeln!(f, "    Key Block Tail: {}", msg.tail_key_block_hash)?;
+                        writeln!(f, "    Key Block Head: {}", msg.head_key_block_hash)?;
                         writeln!(f, "  }}")?;
                     }
                 }

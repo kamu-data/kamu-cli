@@ -105,6 +105,11 @@ impl BaseGQLDatasetHarness {
                 MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
             );
 
+            register_message_dispatcher::<DatasetKeyBlocksMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
+            );
+
             b.build()
         };
 

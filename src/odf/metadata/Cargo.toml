@@ -44,7 +44,7 @@ multiformats = { workspace = true }
 chrono = { version = "0.4", features = ["serde"] }
 digest = "0.10"
 thiserror = { version = "2", default-features = false, features = ["std"] }
-bitflags = { version = "2", default-features = false }
+bitflags = { version = "2", default-features = false, features = ["serde"] }
 
 like = { version = "0.3", default-features = false }
 sha3 = "0.10"

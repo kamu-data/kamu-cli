@@ -64,20 +64,4 @@ pub struct DatasetReferenceMessageUpdated {
     pub new_block_hash: odf::Multihash,
 }
 
-impl DatasetReferenceMessageUpdated {
-    pub fn new(
-        dataset_id: odf::DatasetID,
-        block_ref: odf::BlockRef,
-        maybe_prev_block_hash: Option<odf::Multihash>,
-        new_block_hash: odf::Multihash,
-    ) -> Self {
-        Self {
-            dataset_id,
-            block_ref,
-            maybe_prev_block_hash,
-            new_block_hash,
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

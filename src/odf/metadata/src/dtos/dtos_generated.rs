@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use bitflags::bitflags;
 use chrono::{DateTime, Utc};
 use enum_variants::*;
+use serde::{Deserialize, Serialize};
 
 use crate::formats::Multihash;
 use crate::identity::*;
@@ -997,7 +998,7 @@ impl_enum_variant!(MetadataEvent::DisablePushSource(DisablePushSource));
 impl_enum_variant!(MetadataEvent::DisablePollingSource(DisablePollingSource));
 
 bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub struct MetadataEventTypeFlags: u32 {
         const ADD_DATA = 1 << 0;
         const EXECUTE_TRANSFORM = 1 << 1;

@@ -40,10 +40,10 @@ pub trait MetadataChain: Send + Sync {
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
     /// Returns the previous block relatively to the specified block,
-    /// attempting to use the hint flags as a quick skipping guideance.
-    /// In worst case, returns the nearest previous block.
+    /// attempting to use the hint flags as a quick skipping guidance.
+    /// In the worst case, returns the nearest previous block.
     /// Tail sequence number represents the minimal allowed block that can be
-    /// returned. When ommitted, the method will be iterating until the Seed
+    /// returned. When omitted, the method will be iterating until the Seed
     async fn get_preceding_block_with_hint(
         &self,
         head_block: &MetadataBlock,
@@ -275,6 +275,31 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + Send,
     {
+        self.accept_by_interval_ext(
+            visitors,
+            head_hash,
+            tail_hash,
+            AcceptByIntervalOptions {
+                inclusive_tail: false,
+                ignore_missing_tail: true,
+            },
+        )
+        .await
+    }
+
+    /// Extended version of [`MetadataChainExt::accept_by_interval()`] method,
+    /// allowing more flexible configuration.
+    #[tracing::instrument(level = "debug", skip_all, fields(?head_hash, ?tail_hash))]
+    async fn accept_by_interval_ext<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head_hash: Option<&Multihash>,
+        tail_hash: Option<&Multihash>,
+        options: AcceptByIntervalOptions,
+    ) -> Result<(), AcceptVisitorError<E>>
+    where
+        E: Error + Send,
+    {
         // Collect initial decisions of visitors
         let mut decisions: Vec<_> = visitors
             .iter()
@@ -318,10 +343,13 @@ pub trait MetadataChainExt: MetadataChain {
         };
 
         // Iterate over blocks until we satisfy all visitors or reach the tail
-        while let Some((hash, block)) = current_hashed_block
+        while let Some((hash, block)) = &current_hashed_block
             && merged_decision != MetadataVisitorDecision::Stop
-            && tail_hash != Some(&hash)
         {
+            if !options.inclusive_tail && tail_hash == Some(hash) {
+                break;
+            }
+
             // Trace the progress
             tracing::trace!(
                 current_block_hash=%hash,
@@ -333,7 +361,7 @@ pub trait MetadataChainExt: MetadataChain {
             );
 
             // Feed each visitor with the currently loaded block
-            let hashed_block_ref = (&hash, &block);
+            let hashed_block_ref = (hash, block);
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
                 match decision {
                     MetadataVisitorDecision::Stop => {}
@@ -373,7 +401,7 @@ pub trait MetadataChainExt: MetadataChain {
 
             // Try to jump to the previous block with satisfaction hints taken into account
             current_hashed_block = self
-                .get_preceding_block_with_hint(&block, tail_sequence_number, merged_decision)
+                .get_preceding_block_with_hint(block, tail_sequence_number, merged_decision)
                 .await
                 .map_err(IterBlocksError::from)?;
         }
@@ -381,6 +409,17 @@ pub trait MetadataChainExt: MetadataChain {
         // Finish all visitors
         for visitor in visitors {
             visitor.finish().map_err(AcceptVisitorError::Visitor)?;
+        }
+
+        if !options.ignore_missing_tail
+            && let Some((current_hash, _current_block)) = current_hashed_block
+            && let Some(tail_hash) = tail_hash
+            && current_hash != *tail_hash
+        {
+            Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
+                head: current_hash,
+                tail: tail_hash.clone(),
+            }))?;
         }
 
         Ok(())
@@ -528,6 +567,14 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Copy, Clone)]
+pub struct AcceptByIntervalOptions {
+    pub inclusive_tail: bool,
+    pub ignore_missing_tail: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone, Debug)]
 pub struct SetRefOpts<'a> {
     /// Ensure new value points to a valid block
@@ -653,16 +700,10 @@ impl From<GetBlockError> for IterBlocksError {
 #[derive(Error, Debug)]
 pub enum AcceptVisitorError<E> {
     #[error(transparent)]
-    Traversal(IterBlocksError),
+    Traversal(#[from] IterBlocksError),
 
     #[error(transparent)]
     Visitor(E),
-}
-
-impl<E> From<IterBlocksError> for AcceptVisitorError<E> {
-    fn from(value: IterBlocksError) -> Self {
-        Self::Traversal(value)
-    }
 }
 
 impl From<AcceptVisitorError<Infallible>> for IterBlocksError {

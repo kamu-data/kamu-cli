@@ -11,6 +11,7 @@ mod test_account_id;
 mod test_dataset_id;
 mod test_dataset_identity;
 mod test_dataset_refs;
+mod test_dto_extra;
 mod test_grammar;
 mod test_serde_buffer;
 mod test_serde_flatbuffers;

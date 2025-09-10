@@ -11,12 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::InternalError;
-use kamu_core::auth::{
-    ClassifyByAllowanceResponse,
-    DatasetAction,
-    DatasetActionAuthorizer,
-    DatasetActionUnauthorizedError,
-};
+use kamu_core::auth::{ClassifyByAllowanceResponse, DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     PushDatasetUseCase,
     PushError,
@@ -67,9 +62,14 @@ impl PushDatasetUseCaseImpl {
             .map(|(hdl, error)| PushResponse {
                 local_handle: Some(hdl),
                 target: push_target.cloned(),
-                result: Err(PushError::SyncError(match error {
-                    DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
-                    DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
+                result: Err(PushError::SyncError({
+                    use kamu_core::auth::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+
+                    match error {
+                        E::NotFound(e) => SyncError::DatasetNotFound(e.into()),
+                        E::Access(e) => SyncError::Access(e),
+                        E::Internal(e) => SyncError::Internal(e),
+                    }
                 })),
             })
             .collect();

@@ -36,7 +36,12 @@ use odf_metadata::{
     VariantOf,
 };
 
-use crate::{HashedMetadataBlockRef, MetadataChainVisitor, MetadataVisitorDecision as Decision};
+use crate::{
+    HashedMetadataBlock,
+    HashedMetadataBlockRef,
+    MetadataChainVisitor,
+    MetadataVisitorDecision as Decision,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -406,6 +411,40 @@ where
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         (self.fallible_visit_callback)(&mut self.state, hash, block)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchKeyBlocksVisitor {
+    key_blocks: Vec<HashedMetadataBlock>,
+}
+
+impl SearchKeyBlocksVisitor {
+    pub fn new() -> Self {
+        Self { key_blocks: vec![] }
+    }
+
+    pub fn into_hashed_key_blocks(self) -> Vec<HashedMetadataBlock> {
+        self.key_blocks
+    }
+}
+
+impl MetadataChainVisitor for SearchKeyBlocksVisitor {
+    type Error = Infallible;
+
+    fn initial_decision(&self) -> Decision {
+        Decision::NextOfType(Flag::KEY_BLOCK)
+    }
+
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let flag = Flag::from(&block.event);
+
+        if Flag::KEY_BLOCK.contains(flag) {
+            self.key_blocks.push((hash.clone(), block.clone()));
+        }
+
+        Ok(Decision::NextOfType(Flag::KEY_BLOCK))
     }
 }
 

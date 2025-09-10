@@ -16,11 +16,12 @@ use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetDependencyRepository,
-    DatasetReferenceMessage,
-    DatasetReferenceMessageUpdated,
+    DatasetKeyBlocksMessage,
+    DatasetKeyBlocksMessageAppended,
     DependencyGraphService,
     MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
 };
 use messaging_outbox::*;
@@ -31,10 +32,11 @@ use crate::{DependencyChange, extract_modified_dependencies_in_interval};
 
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<DatasetReferenceMessage>)]
+#[interface(dyn MessageConsumerT<DatasetKeyBlocksMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER,
     feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
@@ -47,17 +49,48 @@ pub struct DependencyGraphImmediateListener {
     outbox: Arc<dyn Outbox>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl DependencyGraphImmediateListener {
+    async fn handle_dataset_key_blocks_appended_message(
+        &self,
+        message: &DatasetKeyBlocksMessageAppended,
+    ) -> Result<(), InternalError> {
+        // For now, react only on Head updates
+        if message.block_ref != odf::dataset::BlockRef::Head {
+            return Ok(());
+        }
+
+        // Resolve dataset
+        let target = self
+            .dataset_registry
+            .get_dataset_by_id(&message.dataset_id)
+            .await
+            .int_err()?;
+
+        // Skip non-derived datasets
+        if target.get_kind() != odf::DatasetKind::Derivative {
+            return Ok(());
+        }
+
+        // Deal with potential upstream changes
+        self.handle_derived_dependency_updates(target, message)
+            .await?;
+
+        Ok(())
+    }
+
     async fn handle_derived_dependency_updates(
         &self,
         target: ResolvedDataset,
-        message: &DatasetReferenceMessageUpdated,
+        message: &DatasetKeyBlocksMessageAppended,
     ) -> Result<(), InternalError> {
         // Compute if there are modified dependencies
         let dependency_change = extract_modified_dependencies_in_interval(
             target.as_metadata_chain(),
-            &message.new_block_hash,
-            message.maybe_prev_block_hash.as_ref(),
+            &message.head_key_block_hash,
+            Some(&message.tail_key_block_hash),
+            Some(message.key_blocks_event_flags),
         )
         .await?;
 
@@ -130,45 +163,25 @@ impl MessageConsumer for DependencyGraphImmediateListener {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListener {
+impl MessageConsumerT<DatasetKeyBlocksMessage> for DependencyGraphImmediateListener {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "DependencyGraphImmediateListener[DatasetReferenceMessage]"
+        name = "DependencyGraphImmediateListener[DatasetKeyBlocksMessage]"
     )]
     async fn consume_message(
         &self,
         _: &Catalog,
-        message: &DatasetReferenceMessage,
+        message: &DatasetKeyBlocksMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
-            DatasetReferenceMessage::Updated(updated_message) => {
-                // For now, react only on Head updates
-                if updated_message.block_ref != odf::dataset::BlockRef::Head {
-                    return Ok(());
-                }
-
-                // Resolve dataset
-                let target = self
-                    .dataset_registry
-                    .get_dataset_by_id(&updated_message.dataset_id)
+            DatasetKeyBlocksMessage::Appended(message) => {
+                self.handle_dataset_key_blocks_appended_message(message)
                     .await
-                    .int_err()?;
-
-                // Skip non-derived datasets
-                if target.get_kind() != odf::DatasetKind::Derivative {
-                    return Ok(());
-                }
-
-                // Deal with potential upstream changes
-                self.handle_derived_dependency_updates(target, updated_message)
-                    .await?;
             }
         }
-
-        Ok(())
     }
 }
 

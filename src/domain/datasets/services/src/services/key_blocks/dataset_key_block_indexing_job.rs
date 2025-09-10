@@ -163,8 +163,12 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
     use futures::stream::TryStreamExt;
     use odf::dataset::MetadataChainExt;
 
-    // Resulting blocks
+    // Resulting blocks and event flags
     let mut key_blocks = Vec::new();
+    let mut key_event_flags = odf::metadata::MetadataEventTypeFlags::empty();
+
+    // TODO: PERF: iterate only over key blocks (using visitors) from (!) storage
+    //             not all blocks.
 
     // Iterate over blocks in the dataset in the specified range.
     // Note: don't ignore missing tail, we want to detect InvalidInterval error
@@ -182,6 +186,7 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
             Err(odf::dataset::IterBlocksError::InvalidInterval(_)) => {
                 return Ok(CollectKeyBlockResponse {
                     key_blocks,
+                    key_event_flags,
                     divergence_detected: true,
                 });
             }
@@ -201,11 +206,13 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
         if !event_flags.has_data_flags() {
             // Create a key block entity
             key_blocks.push(make_key_block(block_hash, &block));
+            key_event_flags |= event_flags;
         }
     }
 
     Ok(CollectKeyBlockResponse {
         key_blocks,
+        key_event_flags,
         divergence_detected: false,
     })
 }
@@ -236,6 +243,7 @@ pub(crate) fn make_key_block(
 #[derive(Debug)]
 pub(crate) struct CollectKeyBlockResponse {
     pub(crate) key_blocks: Vec<DatasetKeyBlock>,
+    pub(crate) key_event_flags: odf::metadata::MetadataEventTypeFlags,
     pub(crate) divergence_detected: bool,
 }
 

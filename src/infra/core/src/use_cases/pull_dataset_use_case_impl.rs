@@ -13,10 +13,10 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::{
+    ClassifyByAllowanceDatasetActionUnauthorizedError,
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
-    DatasetActionUnauthorizedError,
 };
 use kamu_core::*;
 
@@ -193,9 +193,14 @@ impl PullDatasetUseCaseImpl {
                     maybe_local_ref: Some(hdl.as_local_ref()),
                     maybe_remote_ref: None,
                     maybe_original_request: job.into_original_pull_request(),
-                    result: Err(match auth_error {
-                        DatasetActionUnauthorizedError::Access(e) => PullError::Access(e),
-                        DatasetActionUnauthorizedError::Internal(e) => PullError::Internal(e),
+                    result: Err({
+                        use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+
+                        match auth_error {
+                            E::NotFound(e) => PullError::NotFound(e),
+                            E::Access(e) => PullError::Access(e),
+                            E::Internal(e) => PullError::Internal(e),
+                        }
                     }),
                 }
             })
@@ -262,7 +267,7 @@ impl PullDatasetUseCaseImpl {
 
         let mut unauthorized_handles_to_errors: HashMap<
             odf::DatasetHandle,
-            DatasetActionUnauthorizedError,
+            ClassifyByAllowanceDatasetActionUnauthorizedError,
         > = unauthorized_handles_with_errors.into_iter().collect();
 
         let mut unauthorized_responses = Vec::new();
@@ -275,9 +280,14 @@ impl PullDatasetUseCaseImpl {
             let mut maybe_error = None;
             for read_hdl in read_handles {
                 if let Some(auth_error) = unauthorized_handles_to_errors.remove(read_hdl) {
-                    maybe_error = Some(match auth_error {
-                        DatasetActionUnauthorizedError::Access(e) => PullError::Access(e),
-                        DatasetActionUnauthorizedError::Internal(e) => PullError::Internal(e),
+                    maybe_error = Some({
+                        use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+
+                        match auth_error {
+                            E::NotFound(e) => PullError::NotFound(e),
+                            E::Access(e) => PullError::Access(e),
+                            E::Internal(e) => PullError::Internal(e),
+                        }
                     });
                     break;
                 }

@@ -573,6 +573,11 @@ pub fn configure_base_catalog(
         kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     );
 
+    register_message_dispatcher::<kamu_datasets::DatasetKeyBlocksMessage>(
+        &mut b,
+        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
+    );
+
     register_message_dispatcher::<kamu_datasets::DatasetExternallyChangedMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,

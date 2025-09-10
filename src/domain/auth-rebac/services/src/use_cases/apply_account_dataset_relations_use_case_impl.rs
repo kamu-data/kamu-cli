@@ -15,6 +15,7 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{
     AccountDatasetRelationOperation,
     ApplyAccountDatasetRelationsUseCase,
+    ApplyRelationMatrixBatchError,
     ApplyRelationMatrixError,
     DatasetRoleOperation,
     RebacService,
@@ -22,7 +23,7 @@ use kamu_auth_rebac::{
     UnsetAccountDatasetRelationsOperation,
 };
 use kamu_core::auth;
-use kamu_core::auth::{DatasetAction, DatasetActionUnauthorizedError};
+use kamu_core::auth::DatasetAction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,22 +51,30 @@ impl ApplyAccountDatasetRelationsUseCaseImpl {
             return Ok(());
         }
 
+        let mut not_found_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         let mut unauthorized_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         for (dataset_id, e) in unauthorized_ids_with_errors {
+            use kamu_core::auth::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+
             match e {
-                DatasetActionUnauthorizedError::Access(_) => {
+                E::NotFound(_) => {
+                    not_found_dataset_refs.push(dataset_id.as_local_ref());
+                }
+                E::Access(_) => {
                     unauthorized_dataset_refs.push(dataset_id.as_local_ref());
                 }
-                e @ DatasetActionUnauthorizedError::Internal(_) => {
+                e @ E::Internal(_) => {
                     return Err(ApplyRelationMatrixError::Internal(e.int_err()));
                 }
             }
         }
 
-        Err(ApplyRelationMatrixError::not_enough_permissions(
+        Err(ApplyRelationMatrixBatchError {
+            action: EXPECTED_ACCESS,
             unauthorized_dataset_refs,
-            EXPECTED_ACCESS,
-        ))
+            not_found_dataset_refs,
+        }
+        .into())
     }
 }
 

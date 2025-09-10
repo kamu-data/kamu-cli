@@ -98,14 +98,16 @@ impl DependencyGraphServiceImpl {
         tracing::debug!("Restoring dataset nodes in dependency graph");
 
         let mut datasets_stream = dataset_registry.all_dataset_handles();
-        while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
+        while let Some(next_res) = datasets_stream.next().await {
+            let dataset_handle = next_res?;
             state.get_or_create_dataset_node(&dataset_handle.id);
         }
 
         tracing::debug!("Restoring dependency graph edges");
 
         let mut dependencies_stream = dependency_repository.list_all_dependencies();
-        while let Some(Ok(dataset_dependencies)) = dependencies_stream.next().await {
+        while let Some(next_res) = dependencies_stream.next().await {
+            let dataset_dependencies = next_res?;
             let DatasetDependencies {
                 downstream_dataset_id,
                 upstream_dataset_ids,
