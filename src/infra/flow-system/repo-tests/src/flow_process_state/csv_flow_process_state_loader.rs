@@ -145,7 +145,7 @@ impl CsvFlowProcessStateLoader {
 
         // Insert the process
         self.flow_process_repository
-            .insert_process(
+            .insert_process_state(
                 flow_binding.clone(),
                 record.sort_key.clone(),
                 record.paused_manual,
@@ -251,7 +251,7 @@ impl CsvFlowProcessStateLoader {
 
             // First apply the flow result
             self.flow_process_repository
-                .apply_flow_result(flow_binding.clone(), success, event_time, flow_event_id)
+                .apply_flow_result(flow_binding, success, event_time, flow_event_id)
                 .await
                 .expect("Failed to apply flow result");
 
@@ -259,7 +259,7 @@ impl CsvFlowProcessStateLoader {
             if let Some(planned_at) = next_planned {
                 let schedule_event_id = self.next_event_id();
                 self.flow_process_repository
-                    .on_flow_scheduled(flow_binding.clone(), planned_at, schedule_event_id)
+                    .on_flow_scheduled(flow_binding, planned_at, schedule_event_id)
                     .await
                     .expect("Failed to schedule flow");
             }

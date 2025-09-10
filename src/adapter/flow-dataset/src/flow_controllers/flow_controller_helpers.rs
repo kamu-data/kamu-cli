@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_datasets::DatasetEntryService;
 use kamu_flow_system::{self as fs};
 
 use crate::{
@@ -66,6 +68,20 @@ pub fn reset_to_metadata_dataset_binding(dataset_id: &odf::DatasetID) -> fs::Flo
         FLOW_TYPE_DATASET_RESET_TO_METADATA,
         FlowScopeDataset::make_scope(dataset_id),
     )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn make_dataset_flow_sort_key(
+    dataset_entry_service: &dyn DatasetEntryService,
+    dataset_id: &odf::DatasetID,
+) -> Result<String, InternalError> {
+    let dataset_entry = dataset_entry_service
+        .get_entry(dataset_id)
+        .await
+        .int_err()?;
+
+    Ok(dataset_entry.alias().to_string())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

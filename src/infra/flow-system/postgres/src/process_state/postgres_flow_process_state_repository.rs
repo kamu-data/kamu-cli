@@ -115,7 +115,7 @@ impl PostgresFlowProcessStateRepository {
 
 #[async_trait::async_trait]
 impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
-    async fn insert_process(
+    async fn insert_process_state(
         &self,
         flow_binding: FlowBinding,
         sort_key: String,
@@ -187,17 +187,17 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
     async fn update_trigger_state(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         paused_manual: Option<bool>,
         stop_policy: Option<FlowTriggerStopPolicy>,
         trigger_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
-        let mut process_state = match self.load_process_state(&flow_binding).await {
+        let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
                 return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                 }));
             }
             Err(FlowProcessLoadError::Internal(e)) => {
@@ -238,17 +238,17 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
     async fn apply_flow_result(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
-        let mut process_state = match self.load_process_state(&flow_binding).await {
+        let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
                 return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                 }));
             }
             Err(FlowProcessLoadError::Internal(e)) => {
@@ -290,16 +290,16 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
     async fn on_flow_scheduled(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
-        let mut process_state = match self.load_process_state(&flow_binding).await {
+        let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
                 return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                 }));
             }
             Err(FlowProcessLoadError::Internal(e)) => {
@@ -313,7 +313,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
         // Apply flow scheduling
         process_state
-            .on_flow_scheduled(self.time_source.now(), planned_at, flow_event_id)
+            .on_scheduled(self.time_source.now(), planned_at, flow_event_id)
             .int_err()?;
 
         // Try saving back
@@ -333,9 +333,9 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         }
     }
 
-    async fn delete_process(
+    async fn delete_process_state(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
     ) -> Result<(), FlowProcessDeleteError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -357,7 +357,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         // Check if any rows were affected
         if result.rows_affected() == 0 {
             return Err(FlowProcessDeleteError::NotFound(FlowProcessNotFoundError {
-                flow_binding,
+                flow_binding: flow_binding.clone(),
             }));
         }
 

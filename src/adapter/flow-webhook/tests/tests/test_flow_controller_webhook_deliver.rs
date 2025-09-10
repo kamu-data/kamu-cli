@@ -20,6 +20,8 @@ use kamu_flow_system::*;
 use kamu_flow_system_inmem::InMemoryFlowEventStore;
 use kamu_task_system::{LogicalPlan, TaskResult};
 use kamu_webhooks::{WebhookEventType, WebhookEventTypeCatalog, WebhookSubscriptionID};
+use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_services::WebhookSubscriptionQueryServiceImpl;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -246,7 +248,9 @@ impl FlowControllerWebhookDeliverHarness {
             .add::<InMemoryFlowEventStore>()
             .add::<FakeDatasetEntryService>()
             .add_value(mock_flow_sensor_dispatcher)
-            .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>();
+            .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
+            .add::<WebhookSubscriptionQueryServiceImpl>()
+            .add::<InMemoryWebhookSubscriptionEventStore>();
 
         let catalog = b.build();
         Self {
