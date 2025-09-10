@@ -279,17 +279,17 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         event_time: DateTime<Utc>,
         next_planned_at: Option<DateTime<Utc>>,
         flow_event_id: EventID,
-    ) -> Result<(), FlowProcessApplyResultError> {
+    ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
         let mut process_state = match self.load_process_state(&flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
-                return Err(FlowProcessApplyResultError::NotFound(
-                    FlowProcessNotFoundError { flow_binding },
-                ));
+                return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
+                    flow_binding,
+                }));
             }
             Err(FlowProcessLoadError::Internal(e)) => {
-                return Err(FlowProcessApplyResultError::Internal(e));
+                return Err(FlowProcessUpdateError::Internal(e));
             }
         };
 
@@ -329,9 +329,9 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         {
             Ok(()) => Ok(()),
             Err(FlowProcessSaveError::ConcurrentModification(e)) => {
-                Err(FlowProcessApplyResultError::ConcurrentModification(e))
+                Err(FlowProcessUpdateError::ConcurrentModification(e))
             }
-            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessApplyResultError::Internal(e)),
+            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessUpdateError::Internal(e)),
         }
     }
 
