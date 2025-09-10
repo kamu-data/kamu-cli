@@ -218,7 +218,6 @@ impl FlowProcessState {
         &mut self,
         current_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
-        next_planned_at: Option<DateTime<Utc>>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_flow_event_order(flow_event_id)?;
@@ -226,8 +225,8 @@ impl FlowProcessState {
         self.consecutive_failures = 0;
         self.last_success_at = Some(event_time);
         self.last_attempt_at = Some(event_time);
-        self.next_planned_at = next_planned_at;
 
+        self.handle_next_planned_at_update(event_time);
         self.actualize_effective_state();
 
         self.last_applied_flow_event_id = flow_event_id;
@@ -240,7 +239,6 @@ impl FlowProcessState {
         &mut self,
         current_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
-        next_planned_at: Option<DateTime<Utc>>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_flow_event_order(flow_event_id)?;
@@ -248,9 +246,25 @@ impl FlowProcessState {
         self.consecutive_failures += 1;
         self.last_failure_at = Some(event_time);
         self.last_attempt_at = Some(event_time);
-        self.next_planned_at = next_planned_at;
 
+        self.handle_next_planned_at_update(event_time);
         self.actualize_effective_state();
+
+        self.last_applied_flow_event_id = flow_event_id;
+        self.updated_at = current_time;
+
+        Ok(())
+    }
+
+    pub fn on_flow_scheduled(
+        &mut self,
+        current_time: DateTime<Utc>,
+        next_planned_at: DateTime<Utc>,
+        flow_event_id: EventID,
+    ) -> Result<(), FlowProcessStateError> {
+        self.validate_flow_event_order(flow_event_id)?;
+
+        self.next_planned_at = Some(next_planned_at);
 
         self.last_applied_flow_event_id = flow_event_id;
         self.updated_at = current_time;
@@ -264,6 +278,21 @@ impl FlowProcessState {
             self.consecutive_failures,
             self.stop_policy,
         );
+
+        // Clear next_planned_at when flow process is not running (stopped or paused)
+        if !self.effective_state.is_running() {
+            self.next_planned_at = None;
+        }
+    }
+
+    fn handle_next_planned_at_update(&mut self, event_time: DateTime<Utc>) {
+        // Clear next_planned_at only if the old value is in the past relative to the
+        // event time
+        if let Some(existing_planned_at) = self.next_planned_at {
+            if existing_planned_at <= event_time {
+                self.next_planned_at = None;
+            }
+        }
     }
 
     fn validate_trigger_event_order(
@@ -585,7 +614,12 @@ mod tests {
         let flow_event_id = EventID::new(100);
 
         state
-            .on_success(current_time, event_time, next_planned, flow_event_id)
+            .on_success(current_time, event_time, flow_event_id)
+            .unwrap();
+
+        // Schedule the next flow separately to test the new pattern
+        state
+            .on_flow_scheduled(current_time, next_planned.unwrap(), EventID::new(101))
             .unwrap();
 
         assert_eq!(state.consecutive_failures, 0);
@@ -593,7 +627,7 @@ mod tests {
         assert_eq!(state.last_attempt_at, Some(event_time));
         assert_eq!(state.next_planned_at, next_planned);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
-        assert_eq!(state.last_applied_flow_event_id, flow_event_id);
+        assert_eq!(state.last_applied_flow_event_id, EventID::new(101)); // Latest event ID
         assert_eq!(state.updated_at, current_time);
     }
 
@@ -614,7 +648,12 @@ mod tests {
         let flow_event_id = EventID::new(200);
 
         state
-            .on_failure(current_time, event_time, next_planned, flow_event_id)
+            .on_failure(current_time, event_time, flow_event_id)
+            .unwrap();
+
+        // Schedule the next flow separately to test the new pattern
+        state
+            .on_flow_scheduled(current_time, next_planned.unwrap(), EventID::new(201))
             .unwrap();
 
         assert_eq!(state.consecutive_failures, 1);
@@ -622,7 +661,7 @@ mod tests {
         assert_eq!(state.last_attempt_at, Some(event_time));
         assert_eq!(state.next_planned_at, next_planned);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
-        assert_eq!(state.last_applied_flow_event_id, flow_event_id);
+        assert_eq!(state.last_applied_flow_event_id, EventID::new(201)); // Latest event ID
         assert_eq!(state.updated_at, current_time);
     }
 
@@ -647,7 +686,7 @@ mod tests {
 
         // This third failure should trigger auto-stop
         state
-            .on_failure(current_time, event_time, None, flow_event_id)
+            .on_failure(current_time, event_time, flow_event_id)
             .unwrap();
 
         assert_eq!(state.consecutive_failures, 3);
@@ -674,12 +713,7 @@ mod tests {
         // Even with many failures, should stay in Failing state with Never policy
         for i in 1u32..=10u32 {
             state
-                .on_failure(
-                    current_time,
-                    event_time,
-                    None,
-                    EventID::new(400 + i64::from(i)),
-                )
+                .on_failure(current_time, event_time, EventID::new(400 + i64::from(i)))
                 .unwrap();
             assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
             assert_eq!(state.consecutive_failures, i);
@@ -799,7 +833,6 @@ mod tests {
             .on_failure(
                 base_time + Duration::minutes(1),
                 base_time + Duration::minutes(1),
-                None,
                 EventID::new(10),
             )
             .unwrap();
@@ -811,7 +844,6 @@ mod tests {
             .on_failure(
                 base_time + Duration::minutes(2),
                 base_time + Duration::minutes(2),
-                None,
                 EventID::new(11),
             )
             .unwrap();
@@ -823,8 +855,16 @@ mod tests {
             .on_success(
                 base_time + Duration::minutes(3),
                 base_time + Duration::minutes(3),
-                Some(base_time + Duration::hours(1)),
                 EventID::new(12),
+            )
+            .unwrap();
+
+        // Schedule the next flow separately
+        state
+            .on_flow_scheduled(
+                base_time + Duration::minutes(3),
+                base_time + Duration::hours(1),
+                EventID::new(13),
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 0);
@@ -859,10 +899,19 @@ mod tests {
             .on_success(
                 base_time + Duration::minutes(1),
                 base_time + Duration::minutes(1),
-                Some(base_time + Duration::hours(1)),
                 EventID::new(10),
             )
             .unwrap();
+
+        // Schedule the next flow
+        state
+            .on_flow_scheduled(
+                base_time + Duration::minutes(1),
+                base_time + Duration::hours(1),
+                EventID::new(11),
+            )
+            .unwrap();
+
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
 
         // 2. Manual pause
@@ -884,8 +933,7 @@ mod tests {
             .on_failure(
                 base_time + Duration::minutes(3),
                 base_time + Duration::minutes(3),
-                None,
-                EventID::new(11),
+                EventID::new(12),
             )
             .unwrap();
         assert_eq!(
@@ -921,16 +969,14 @@ mod tests {
             .on_failure(
                 base_time + Duration::minutes(6),
                 base_time + Duration::minutes(6),
-                None,
-                EventID::new(12),
+                EventID::new(13),
             )
             .unwrap();
         state
             .on_failure(
                 base_time + Duration::minutes(7),
                 base_time + Duration::minutes(7),
-                None,
-                EventID::new(13),
+                EventID::new(14),
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 3);
@@ -941,8 +987,16 @@ mod tests {
             .on_success(
                 base_time + Duration::minutes(8),
                 base_time + Duration::minutes(8),
-                Some(base_time + Duration::hours(2)),
-                EventID::new(14),
+                EventID::new(15),
+            )
+            .unwrap();
+
+        // Schedule the next flow
+        state
+            .on_flow_scheduled(
+                base_time + Duration::minutes(8),
+                base_time + Duration::hours(2),
+                EventID::new(16),
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 0);
@@ -1049,14 +1103,13 @@ mod tests {
         let flow_event_id = EventID::new(500);
 
         // First success should work
-        let result1 = state.on_success(current_time, event_time, None, flow_event_id);
+        let result1 = state.on_success(current_time, event_time, flow_event_id);
         assert!(result1.is_ok());
 
         // Attempting to process the same flow event ID should fail
         let result2 = state.on_success(
             current_time + Duration::minutes(1),
             event_time + Duration::minutes(1),
-            None,
             flow_event_id, // Same event ID
         );
 
@@ -1089,7 +1142,7 @@ mod tests {
         let flow_event_id = EventID::new(500);
 
         // First success should work
-        let result1 = state.on_success(current_time, event_time, None, flow_event_id);
+        let result1 = state.on_success(current_time, event_time, flow_event_id);
         assert!(result1.is_ok());
 
         // Attempting to process an older flow event should fail
@@ -1097,7 +1150,6 @@ mod tests {
         let result2 = state.on_failure(
             current_time + Duration::minutes(1),
             event_time + Duration::minutes(1),
-            None,
             older_flow_event_id,
         );
 
@@ -1129,14 +1181,13 @@ mod tests {
         let event_time = Utc::now();
 
         // Valid sequence: 0 (initial) -> 100 -> 200 -> 350
-        let result1 = state.on_success(current_time, event_time, None, EventID::new(100));
+        let result1 = state.on_success(current_time, event_time, EventID::new(100));
         assert!(result1.is_ok());
         assert_eq!(state.last_applied_flow_event_id, EventID::new(100));
 
         let result2 = state.on_failure(
             current_time + Duration::minutes(1),
             event_time + Duration::minutes(1),
-            None,
             EventID::new(200),
         );
         assert!(result2.is_ok());
@@ -1145,7 +1196,6 @@ mod tests {
         let result3 = state.on_success(
             current_time + Duration::minutes(2),
             event_time + Duration::minutes(2),
-            None,
             EventID::new(350),
         );
         assert!(result3.is_ok());
@@ -1170,7 +1220,6 @@ mod tests {
         let result1 = state.on_success(
             current_time,
             event_time,
-            None,
             EventID::new(50), // flow event
         );
         assert!(result1.is_ok());
@@ -1188,7 +1237,6 @@ mod tests {
         let result3 = state.on_failure(
             current_time + Duration::minutes(2),
             event_time + Duration::minutes(2),
-            None,
             EventID::new(30), // Lower than last flow event (50)
         );
         assert!(result3.is_err());
@@ -1258,7 +1306,6 @@ mod tests {
         let result2 = state.on_failure(
             current_time,
             current_time,
-            None,
             EventID::new(-5), // Negative, definitely lower than initial 0
         );
         assert!(result2.is_err());
@@ -1272,6 +1319,370 @@ mod tests {
             initial_trigger_event_id
         );
         assert_eq!(state.last_applied_flow_event_id, initial_flow_event_id);
+    }
+
+    #[test]
+    fn test_on_flow_scheduled() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let current_time = Utc::now() + Duration::minutes(1);
+        let next_planned = Utc::now() + Duration::hours(1);
+        let flow_event_id = EventID::new(100);
+
+        // Test scheduling a flow
+        let result = state.on_flow_scheduled(current_time, next_planned, flow_event_id);
+        assert!(result.is_ok());
+
+        assert_eq!(state.next_planned_at, Some(next_planned));
+        assert_eq!(state.last_applied_flow_event_id, flow_event_id);
+        assert_eq!(state.updated_at, current_time);
+    }
+
+    #[test]
+    fn test_on_flow_scheduled_clears_past_planned_time() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+
+        // Set an existing planned time
+        state.next_planned_at = Some(base_time + Duration::hours(1));
+
+        // Simulate a success event that happens after the planned time
+        let success_time = base_time + Duration::hours(2);
+        state
+            .on_success(success_time, success_time, EventID::new(100))
+            .unwrap();
+
+        // The old planned time should be cleared since it was in the past relative to
+        // success
+        assert_eq!(state.next_planned_at, None);
+    }
+
+    #[test]
+    fn test_on_flow_scheduled_preserves_future_planned_time() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+
+        // Set an existing planned time in the future
+        let future_planned = base_time + Duration::hours(3);
+        state.next_planned_at = Some(future_planned);
+
+        // Simulate a success event that happens before the planned time
+        let success_time = base_time + Duration::hours(1);
+        state
+            .on_success(success_time, success_time, EventID::new(100))
+            .unwrap();
+
+        // The future planned time should be preserved
+        assert_eq!(state.next_planned_at, Some(future_planned));
+    }
+
+    #[test]
+    fn test_effective_state_clears_next_planned_at() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            make_test_stop_policy_with_failures(1),
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+
+        // Schedule a flow
+        state
+            .on_flow_scheduled(base_time, base_time + Duration::hours(1), EventID::new(100))
+            .unwrap();
+        assert_eq!(state.next_planned_at, Some(base_time + Duration::hours(1)));
+
+        // Trigger a failure that causes auto-stop
+        state
+            .on_failure(
+                base_time + Duration::minutes(1),
+                base_time + Duration::minutes(1),
+                EventID::new(101),
+            )
+            .unwrap();
+
+        // Should be stopped and planned time should be cleared
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(state.next_planned_at, None);
+    }
+
+    #[test]
+    fn test_scheduling_before_success() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+        let scheduled_time = base_time + Duration::hours(2);
+
+        // Schedule first, then have success
+        state
+            .on_flow_scheduled(base_time, scheduled_time, EventID::new(100))
+            .unwrap();
+
+        // Success happens later - should preserve the scheduled time since it's in the
+        // future
+        state
+            .on_success(
+                base_time + Duration::minutes(30),
+                base_time + Duration::minutes(30),
+                EventID::new(101),
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, Some(scheduled_time));
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
+    }
+
+    #[test]
+    fn test_scheduling_before_failure() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+        let scheduled_time = base_time + Duration::hours(3);
+
+        // Schedule first
+        state
+            .on_flow_scheduled(base_time, scheduled_time, EventID::new(100))
+            .unwrap();
+
+        // Failure happens later - should preserve the scheduled time since it's in the
+        // future
+        state
+            .on_failure(
+                base_time + Duration::minutes(15),
+                base_time + Duration::minutes(15),
+                EventID::new(101),
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, Some(scheduled_time));
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
+    }
+
+    #[test]
+    fn test_scheduling_interleaved_with_execution_events() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+
+        // Initial scheduling
+        state
+            .on_flow_scheduled(base_time, base_time + Duration::hours(1), EventID::new(100))
+            .unwrap();
+
+        // Failure happens - since scheduled time is in future, it should be preserved
+        state
+            .on_failure(
+                base_time + Duration::minutes(10),
+                base_time + Duration::minutes(10),
+                EventID::new(101),
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, Some(base_time + Duration::hours(1)));
+
+        // Reschedule for earlier time
+        state
+            .on_flow_scheduled(
+                base_time + Duration::minutes(20),
+                base_time + Duration::minutes(30),
+                EventID::new(102),
+            )
+            .unwrap();
+
+        // Success happens - should clear the scheduled time since it's now in the past
+        state
+            .on_success(
+                base_time + Duration::minutes(45),
+                base_time + Duration::minutes(45),
+                EventID::new(103),
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, None); // Cleared because scheduled time was in the past
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
+    }
+
+    #[test]
+    fn test_multiple_scheduling_events_between_executions() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+
+        // Initial success
+        state
+            .on_success(base_time, base_time, EventID::new(100))
+            .unwrap();
+
+        // Multiple scheduling events
+        state
+            .on_flow_scheduled(
+                base_time + Duration::minutes(5),
+                base_time + Duration::hours(1),
+                EventID::new(101),
+            )
+            .unwrap();
+
+        state
+            .on_flow_scheduled(
+                base_time + Duration::minutes(10),
+                base_time + Duration::hours(2),
+                EventID::new(102),
+            )
+            .unwrap();
+
+        state
+            .on_flow_scheduled(
+                base_time + Duration::minutes(15),
+                base_time + Duration::minutes(30),
+                EventID::new(103),
+            )
+            .unwrap();
+
+        // Final scheduling should be the last one
+        assert_eq!(
+            state.next_planned_at,
+            Some(base_time + Duration::minutes(30))
+        );
+
+        // Failure happens after all scheduled times - should clear it
+        state
+            .on_failure(
+                base_time + Duration::hours(3),
+                base_time + Duration::hours(3),
+                EventID::new(104),
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, None);
+    }
+
+    #[test]
+    fn test_scheduling_after_pause_clears_on_actualization() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            false,
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+
+        // Schedule a flow
+        state
+            .on_flow_scheduled(base_time, base_time + Duration::hours(1), EventID::new(100))
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, Some(base_time + Duration::hours(1)));
+
+        // Pause manually - this should clear the scheduled time
+        state
+            .update_trigger_state(
+                base_time + Duration::minutes(10),
+                Some(true), // pause
+                None,
+                EventID::new(2),
+            )
+            .unwrap();
+
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::PausedManual
+        );
+        assert_eq!(state.next_planned_at, None); // Should be cleared when paused
+    }
+
+    #[test]
+    fn test_scheduling_while_paused_gets_cleared() {
+        let mut state = FlowProcessState::new(
+            Utc::now(),
+            make_test_flow_binding(),
+            make_test_sort_key(),
+            true, // start paused
+            FlowTriggerStopPolicy::Never,
+            EventID::new(1),
+        );
+
+        let base_time = Utc::now();
+
+        // Try to schedule while paused
+        state
+            .on_flow_scheduled(base_time, base_time + Duration::hours(1), EventID::new(100))
+            .unwrap();
+
+        // The scheduling event itself doesn't trigger state actualization,
+        // so the scheduled time is set initially
+        assert_eq!(state.next_planned_at, Some(base_time + Duration::hours(1)));
+
+        // But any operation that triggers actualization should clear it
+        state
+            .update_trigger_state(
+                base_time + Duration::minutes(1),
+                None, // no change to pause state
+                None,
+                EventID::new(2),
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, None); // Should be cleared because state is paused
     }
 }
 

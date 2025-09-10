@@ -451,7 +451,6 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         flow_binding: FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-        next_planned_at: Option<DateTime<Utc>>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         let mut state = self.state.write().unwrap();
@@ -469,7 +468,6 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
                 .on_success(
                     self.time_source.now(),
                     event_time,
-                    next_planned_at,
                     flow_event_id,
                 )
                 .int_err()?;
@@ -478,11 +476,33 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
                 .on_failure(
                     self.time_source.now(),
                     event_time,
-                    next_planned_at,
                     flow_event_id,
                 )
                 .int_err()?;
         }
+
+        Ok(())
+    }
+
+    async fn schedule_flow(
+        &self,
+        flow_binding: FlowBinding,
+        planned_at: DateTime<Utc>,
+        flow_event_id: EventID,
+    ) -> Result<(), FlowProcessUpdateError> {
+        let mut state = self.state.write().unwrap();
+        let process_state = state
+            .process_state_by_binding
+            .get_mut(&flow_binding)
+            .ok_or_else(|| {
+                FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
+                    flow_binding: flow_binding.clone(),
+                })
+            })?;
+
+        process_state
+            .on_flow_scheduled(self.time_source.now(), planned_at, flow_event_id)
+            .int_err()?;
 
         Ok(())
     }

@@ -241,7 +241,6 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         flow_binding: FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-        next_planned_at: Option<DateTime<Utc>>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         // Load current state
@@ -264,23 +263,58 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         // Apply updates in memory
         if success {
             process_state
-                .on_success(
-                    self.time_source.now(),
-                    event_time,
-                    next_planned_at,
-                    flow_event_id,
-                )
+                .on_success(self.time_source.now(), event_time, flow_event_id)
                 .int_err()?;
         } else {
             process_state
-                .on_failure(
-                    self.time_source.now(),
-                    event_time,
-                    next_planned_at,
-                    flow_event_id,
-                )
+                .on_failure(self.time_source.now(), event_time, flow_event_id)
                 .int_err()?;
         }
+
+        // Try saving back
+        match self
+            .save_process_state(
+                &process_state,
+                current_trigger_event_id,
+                current_flow_event_id,
+            )
+            .await
+        {
+            Ok(()) => Ok(()),
+            Err(FlowProcessSaveError::ConcurrentModification(e)) => {
+                Err(FlowProcessUpdateError::ConcurrentModification(e))
+            }
+            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessUpdateError::Internal(e)),
+        }
+    }
+
+    async fn schedule_flow(
+        &self,
+        flow_binding: FlowBinding,
+        planned_at: DateTime<Utc>,
+        flow_event_id: EventID,
+    ) -> Result<(), FlowProcessUpdateError> {
+        // Load current state
+        let mut process_state = match self.load_process_state(&flow_binding).await {
+            Ok(state) => state,
+            Err(FlowProcessLoadError::NotFound(_)) => {
+                return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
+                    flow_binding,
+                }));
+            }
+            Err(FlowProcessLoadError::Internal(e)) => {
+                return Err(FlowProcessUpdateError::Internal(e));
+            }
+        };
+
+        // Backup current event IDs for concurrency check
+        let current_trigger_event_id = process_state.last_applied_trigger_event_id();
+        let current_flow_event_id = process_state.last_applied_flow_event_id();
+
+        // Apply flow scheduling
+        process_state
+            .on_flow_scheduled(self.time_source.now(), planned_at, flow_event_id)
+            .int_err()?;
 
         // Try saving back
         match self
