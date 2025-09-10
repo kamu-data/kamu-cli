@@ -376,6 +376,8 @@ async fn test_subscription_marked_unreachable_on_trigger_stop() {
                 rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
                     every: Duration::days(1),
                 })),
+                stop_policy: FlowTriggerStopPolicy::default(),
+                is_new_trigger: false,
             },
         )
         .await

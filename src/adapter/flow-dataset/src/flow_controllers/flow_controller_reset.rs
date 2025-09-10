@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_datasets::DatasetEntryService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
@@ -20,6 +21,7 @@ use crate::{
     FLOW_TYPE_DATASET_RESET,
     FlowConfigRuleReset,
     FlowScopeDataset,
+    make_dataset_flow_sort_key,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +34,7 @@ use crate::{
 pub struct FlowControllerReset {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 #[async_trait::async_trait]
@@ -115,6 +118,15 @@ impl fs::FlowController for FlowControllerReset {
             .int_err()?;
 
         Ok(())
+    }
+
+    async fn make_flow_sort_key(
+        &self,
+        flow_binding: &fs::FlowBinding,
+    ) -> Result<String, InternalError> {
+        let scope = FlowScopeDataset::new(&flow_binding.scope);
+        let dataset_id = scope.dataset_id();
+        make_dataset_flow_sort_key(self.dataset_entry_service.as_ref(), &dataset_id).await
     }
 }
 

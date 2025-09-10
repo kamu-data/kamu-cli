@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{FlowBinding, FlowTriggerRule, FlowTriggerStatus};
+use crate::{FlowBinding, FlowTriggerRule, FlowTriggerStatus, FlowTriggerStopPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,6 +33,12 @@ pub struct FlowTriggerUpdatedMessage {
 
     /// The updated trigger rule for the flow
     pub rule: FlowTriggerRule,
+
+    /// The stop policy for the flow
+    pub stop_policy: FlowTriggerStopPolicy,
+
+    /// New trigger indicator
+    pub is_new_trigger: bool,
 }
 
 impl Message for FlowTriggerUpdatedMessage {
