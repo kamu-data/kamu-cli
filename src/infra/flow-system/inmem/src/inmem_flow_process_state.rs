@@ -389,7 +389,7 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
 
 #[async_trait::async_trait]
 impl FlowProcessStateRepository for InMemoryFlowProcessState {
-    async fn insert_process(
+    async fn insert_process_state(
         &self,
         flow_binding: FlowBinding,
         sort_key: String,
@@ -419,7 +419,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
 
     async fn update_trigger_state(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         paused_manual: Option<bool>,
         stop_policy: Option<FlowTriggerStopPolicy>,
         trigger_event_id: EventID,
@@ -427,7 +427,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         let mut state = self.state.write().unwrap();
         let process_state = state
             .process_state_by_binding
-            .get_mut(&flow_binding)
+            .get_mut(flow_binding)
             .ok_or_else(|| {
                 FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
                     flow_binding: flow_binding.clone(),
@@ -448,7 +448,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
 
     async fn apply_flow_result(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
         flow_event_id: EventID,
@@ -456,7 +456,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         let mut state = self.state.write().unwrap();
         let process_state = state
             .process_state_by_binding
-            .get_mut(&flow_binding)
+            .get_mut(flow_binding)
             .ok_or_else(|| {
                 FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
                     flow_binding: flow_binding.clone(),
@@ -478,14 +478,14 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
 
     async fn on_flow_scheduled(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
         flow_event_id: EventID,
     ) -> Result<(), FlowProcessUpdateError> {
         let mut state = self.state.write().unwrap();
         let process_state = state
             .process_state_by_binding
-            .get_mut(&flow_binding)
+            .get_mut(flow_binding)
             .ok_or_else(|| {
                 FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
                     flow_binding: flow_binding.clone(),
@@ -493,24 +493,24 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             })?;
 
         process_state
-            .on_flow_scheduled(self.time_source.now(), planned_at, flow_event_id)
+            .on_scheduled(self.time_source.now(), planned_at, flow_event_id)
             .int_err()?;
 
         Ok(())
     }
 
-    async fn delete_process(
+    async fn delete_process_state(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
     ) -> Result<(), FlowProcessDeleteError> {
         let mut state = self.state.write().unwrap();
         if state
             .process_state_by_binding
-            .remove(&flow_binding)
+            .remove(flow_binding)
             .is_none()
         {
             return Err(FlowProcessDeleteError::NotFound(FlowProcessNotFoundError {
-                flow_binding,
+                flow_binding: flow_binding.clone(),
             }));
         }
         Ok(())

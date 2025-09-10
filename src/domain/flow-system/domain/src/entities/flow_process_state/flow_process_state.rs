@@ -256,7 +256,7 @@ impl FlowProcessState {
         Ok(())
     }
 
-    pub fn on_flow_scheduled(
+    pub fn on_scheduled(
         &mut self,
         current_time: DateTime<Utc>,
         next_planned_at: DateTime<Utc>,
@@ -736,7 +736,7 @@ mod tests {
 
         // Test basic scheduling
         state
-            .on_flow_scheduled(base_time, scheduled_time, EventID::new(100))
+            .on_scheduled(base_time, scheduled_time, EventID::new(100))
             .unwrap();
 
         assert_eq!(state.next_planned_at, Some(scheduled_time));
@@ -767,7 +767,7 @@ mod tests {
 
         // Test that non-running states clear planned time
         state
-            .on_flow_scheduled(base_time, base_time + Duration::hours(2), EventID::new(103))
+            .on_scheduled(base_time, base_time + Duration::hours(2), EventID::new(103))
             .unwrap();
         state
             .update_trigger_state(
