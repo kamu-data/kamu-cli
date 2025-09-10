@@ -367,6 +367,7 @@ async fn test_subscription_marked_unreachable_on_trigger_stop() {
             MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
             FlowTriggerUpdatedMessage {
                 event_time: Utc::now(),
+                event_id: EventID::new(175),
                 flow_binding: webhook_deliver_binding(
                     subscription_id,
                     &WebhookEventTypeCatalog::dataset_ref_updated(),

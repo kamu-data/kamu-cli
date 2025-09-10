@@ -63,11 +63,11 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
 
     flow_process_repository
         .insert_process_state(
+            EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
-            EventID::new(1),
         )
         .await
         .unwrap();
@@ -136,34 +136,34 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     flow_process_repository
         .insert_process_state(
+            EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
-            EventID::new(1),
         )
         .await
         .unwrap();
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(&flow_binding, true, success_time, EventID::new(1))
+        .apply_flow_result(EventID::new(1), &flow_binding, true, success_time)
         .await
         .unwrap();
 
     // Schedule flow after success
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(2),
             &flow_binding,
             success_time + Duration::hours(1),
-            EventID::new(2),
         )
         .await
         .unwrap();
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(&flow_binding, false, failure_time, EventID::new(3))
+        .apply_flow_result(EventID::new(3), &flow_binding, false, failure_time)
         .await
         .unwrap();
 
@@ -231,45 +231,45 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
 
     flow_process_repository
         .insert_process_state(
+            EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
             false,
             FlowTriggerStopPolicy::AfterConsecutiveFailures {
                 failures_count: ConsecutiveFailuresCount::try_new(3).unwrap(),
             },
-            EventID::new(1),
         )
         .await
         .unwrap();
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(&flow_binding, true, success_time, EventID::new(2))
+        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
         .await
         .unwrap();
 
     // Schedule after success
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(3),
             &flow_binding,
             success_time + Duration::hours(1),
-            EventID::new(3),
         )
         .await
         .unwrap();
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(&flow_binding, false, failure_time, EventID::new(4))
+        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
         .await
         .unwrap();
 
     // Schedule after failure
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(5),
             &flow_binding,
             failure_time + Duration::hours(1),
-            EventID::new(5),
         )
         .await
         .unwrap();
@@ -277,14 +277,14 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
     let second_failure_time = failure_time + Duration::hours(1);
     let next_run_time = Some(second_failure_time + Duration::hours(1));
     flow_process_repository
-        .apply_flow_result(&flow_binding, false, second_failure_time, EventID::new(6))
+        .apply_flow_result(EventID::new(6), &flow_binding, false, second_failure_time)
         .await
         .unwrap();
 
     // Schedule after second failure if needed
     if let Some(planned_at) = next_run_time {
         flow_process_repository
-            .on_flow_scheduled(&flow_binding, planned_at, EventID::new(7))
+            .on_flow_scheduled(EventID::new(7), &flow_binding, planned_at)
             .await
             .unwrap();
     }
@@ -353,77 +353,77 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     flow_process_repository
         .insert_process_state(
+            EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
             false,
             FlowTriggerStopPolicy::AfterConsecutiveFailures {
                 failures_count: ConsecutiveFailuresCount::try_new(3).unwrap(),
             },
-            EventID::new(1),
         )
         .await
         .unwrap();
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(&flow_binding, true, success_time, EventID::new(2))
+        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
         .await
         .unwrap();
 
     // Schedule after success
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(3),
             &flow_binding,
             success_time + Duration::hours(1),
-            EventID::new(3),
         )
         .await
         .unwrap();
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(&flow_binding, false, failure_time, EventID::new(4))
+        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
         .await
         .unwrap();
 
     // Schedule after failure
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(5),
             &flow_binding,
             failure_time + Duration::hours(1),
-            EventID::new(5),
         )
         .await
         .unwrap();
 
     let second_failure_time = failure_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(&flow_binding, false, second_failure_time, EventID::new(6))
+        .apply_flow_result(EventID::new(6), &flow_binding, false, second_failure_time)
         .await
         .unwrap();
 
     // Schedule after second failure
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(7),
             &flow_binding,
             second_failure_time + Duration::hours(1),
-            EventID::new(7),
         )
         .await
         .unwrap();
 
     let recovery_time = second_failure_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(&flow_binding, true, recovery_time, EventID::new(8))
+        .apply_flow_result(EventID::new(8), &flow_binding, true, recovery_time)
         .await
         .unwrap();
 
     // Schedule after recovery
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(9),
             &flow_binding,
             recovery_time + Duration::hours(1),
-            EventID::new(9),
         )
         .await
         .unwrap();
@@ -495,27 +495,27 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
 
     flow_process_repository
         .insert_process_state(
+            EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
-            EventID::new(1),
         )
         .await
         .unwrap();
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(&flow_binding, true, success_time, EventID::new(2))
+        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
         .await
         .unwrap();
 
     // Schedule after success
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(3),
             &flow_binding,
             success_time + Duration::hours(1),
-            EventID::new(3),
         )
         .await
         .unwrap();
@@ -523,9 +523,9 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
     flow_process_repository
         .update_trigger_state(
             &flow_binding,
+            EventID::new(4),
             true,
             FlowTriggerStopPolicy::default(),
-            EventID::new(4),
         )
         .await
         .unwrap();
@@ -595,11 +595,11 @@ pub async fn test_delete_process(catalog: &Catalog) {
     // Insert a process first
     flow_process_repository
         .insert_process_state(
+            EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
-            EventID::new(1),
         )
         .await
         .unwrap();
@@ -706,11 +706,11 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     // Insert a process
     flow_process_repository
         .insert_process_state(
+            EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
-            EventID::new(1),
         )
         .await
         .unwrap();
@@ -718,32 +718,32 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     // Apply some flow results to create history
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(&flow_binding, true, success_time, EventID::new(2))
+        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
         .await
         .unwrap();
 
     // Schedule after success
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(3),
             &flow_binding,
             success_time + Duration::hours(1),
-            EventID::new(3),
         )
         .await
         .unwrap();
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(&flow_binding, false, failure_time, EventID::new(4))
+        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
         .await
         .unwrap();
 
     // Schedule after failure
     flow_process_repository
         .on_flow_scheduled(
+            EventID::new(5),
             &flow_binding,
             failure_time + Duration::hours(1),
-            EventID::new(5),
         )
         .await
         .unwrap();
@@ -752,9 +752,9 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     flow_process_repository
         .update_trigger_state(
             &flow_binding,
+            EventID::new(3),
             true,
             FlowTriggerStopPolicy::default(),
-            EventID::new(3),
         )
         .await
         .unwrap();
