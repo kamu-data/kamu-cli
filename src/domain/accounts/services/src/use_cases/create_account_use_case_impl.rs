@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use database_common::BatchLookup;
 use email_utils::Email;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -197,29 +198,36 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
     async fn execute_multi_wallet_accounts(
         &self,
-        mut wallet_addresses: HashSet<DidPkh>,
+        wallet_addresses: HashSet<DidPkh>,
     ) -> Result<Vec<Account>, CreateMultiWalletAccountsError> {
         let account_ids = wallet_addresses
-            .iter()
-            .map(|wa| wa.clone().into())
+            .into_iter()
+            .map(Into::into)
             .collect::<Vec<odf::AccountID>>();
-        let existing_accounts = self
+        let account_ids_refs = account_ids.iter().collect::<Vec<_>>();
+
+        let BatchLookup { found, not_found } = self
             .account_service
-            .get_accounts_by_ids(&account_ids)
+            .get_accounts_by_ids(&account_ids_refs)
             .await?;
 
-        if existing_accounts.len() == wallet_addresses.len() {
-            return Ok(existing_accounts);
+        if not_found.is_empty() {
+            return Ok(found);
         }
 
-        for existing_account in &existing_accounts {
-            // SAFETY: input IDs are originally did:pkh
-            let did_pkh = existing_account.id.as_did_pkh().unwrap();
-            wallet_addresses.remove(did_pkh);
-        }
+        let not_found_wallet_addresses = not_found
+            .into_iter()
+            .map(|(account_id, _e)| {
+                // SAFETY: accounts IDs are originally did:pkh
+                let odf::AccountID::Pkh(did_pkh) = account_id else {
+                    unreachable!();
+                };
+                did_pkh
+            })
+            .collect::<Vec<_>>();
 
-        let mut created_accounts = Vec::new();
-        for wallet_address in wallet_addresses {
+        let mut created_accounts = Vec::with_capacity(not_found_wallet_addresses.len());
+        for wallet_address in not_found_wallet_addresses {
             let created_account = self
                 .account_service
                 .create_wallet_account(&wallet_address)
@@ -233,7 +241,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             self.notify_account_created(created_account).await?;
         }
 
-        created_accounts.extend(existing_accounts);
+        created_accounts.extend(found);
 
         Ok(created_accounts)
     }
