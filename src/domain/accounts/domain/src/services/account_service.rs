@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use database_common::PaginationOpts;
+use database_common::{BatchLookup, PaginationOpts};
 use internal_error::InternalError;
 use odf::metadata::DidPkh;
 
@@ -38,8 +38,8 @@ pub trait AccountService: Sync + Send {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, InternalError>;
+        account_ids: &[&odf::AccountID],
+    ) -> Result<BatchLookup<Account, odf::AccountID, GetAccountByIdError>, InternalError>;
 
     async fn get_account_by_name(
         &self,
