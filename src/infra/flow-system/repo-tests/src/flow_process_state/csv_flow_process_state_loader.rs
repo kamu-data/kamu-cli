@@ -34,7 +34,6 @@ pub(crate) struct CsvFlowProcessRecord {
     pub scope_type: String,
     pub dataset_alias: String,
     pub subscription_label: Option<String>,
-    pub sort_key: String,
     pub paused_manual: bool,
     pub stop_policy_kind: String,
     pub stop_policy_data: Option<String>,
@@ -148,7 +147,6 @@ impl CsvFlowProcessStateLoader {
             .upsert_process_state_on_trigger_event(
                 trigger_event_id,
                 flow_binding.clone(),
-                record.sort_key.clone(),
                 record.paused_manual,
                 stop_policy,
             )

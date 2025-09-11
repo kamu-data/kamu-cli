@@ -167,15 +167,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture =
-        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_name_alpha,
-    harness = SqliteFlowProcessStateHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture =
         kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_ordering_flow_type,
     harness = SqliteFlowProcessStateHarness
 );
@@ -288,15 +279,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture =
-        kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_name_contains,
-    harness = SqliteFlowProcessStateHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture =
         kamu_flow_system_repo_tests::test_flow_process_state::test_list_processes_filter_by_scope,
     harness = SqliteFlowProcessStateHarness
 );
@@ -358,14 +340,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_account_dashboard_upcoming_updates,
-    harness = SqliteFlowProcessStateHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_failing_webhooks_for_dataset_sorted_az,
     harness = SqliteFlowProcessStateHarness
 );
 

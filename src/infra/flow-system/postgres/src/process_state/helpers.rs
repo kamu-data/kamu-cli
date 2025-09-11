@@ -23,26 +23,25 @@ pub(crate) async fn load_process_state(
     let maybe_row = sqlx::query_as!(
         PostgresFlowProcessStateRowModel,
         r#"
-            SELECT
-                flow_type,
-                scope_data,
-                paused_manual,
-                stop_policy_kind as "stop_policy_kind: PostgresFlowStopPolicyKind",
-                stop_policy_data,
-                consecutive_failures,
-                last_success_at,
-                last_failure_at,
-                last_attempt_at,
-                next_planned_at,
-                effective_state as "effective_state: FlowProcessEffectiveState",
-                sort_key,
-                updated_at,
-                last_applied_trigger_event_id,
-                last_applied_flow_event_id
-            FROM flow_process_states
-            WHERE
-                flow_type = $1 AND scope_data = $2
-            "#,
+        SELECT
+            flow_type,
+            scope_data,
+            paused_manual,
+            stop_policy_kind as "stop_policy_kind: PostgresFlowStopPolicyKind",
+            stop_policy_data,
+            consecutive_failures,
+            last_success_at,
+            last_failure_at,
+            last_attempt_at,
+            next_planned_at,
+            effective_state as "effective_state: FlowProcessEffectiveState",
+            updated_at,
+            last_applied_trigger_event_id,
+            last_applied_flow_event_id
+        FROM flow_process_states
+        WHERE
+            flow_type = $1 AND scope_data = $2
+        "#,
         flow_binding.flow_type,
         scope_data_json,
     )

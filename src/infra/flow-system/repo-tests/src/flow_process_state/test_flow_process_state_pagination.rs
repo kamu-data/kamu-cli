@@ -225,7 +225,6 @@ pub async fn test_list_processes_pagination_different_orderings(catalog: &Catalo
     // Test pagination consistency across different ordering methods
     let orderings = vec![
         FlowProcessOrder::recent(),
-        FlowProcessOrder::name_alpha(),
         FlowProcessOrder {
             field: FlowProcessOrderField::ConsecutiveFailures,
             desc: true,

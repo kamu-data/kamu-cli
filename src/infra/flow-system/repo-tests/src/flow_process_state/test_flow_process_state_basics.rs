@@ -59,13 +59,11 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
     let flow_binding = ingest_dataset_binding(&dataset_id);
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -80,7 +78,6 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert_eq!(*single_state.sort_key(), sort_key);
     assert!(!single_state.paused_manual());
     assert_eq!(
         single_state.effective_state(),
@@ -132,13 +129,11 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
     let flow_binding = ingest_dataset_binding(&dataset_id);
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -175,7 +170,6 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert_eq!(*single_state.sort_key(), sort_key);
     assert!(!single_state.paused_manual());
     assert_eq!(
         single_state.effective_state(),
@@ -227,13 +221,11 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
     let flow_binding = ingest_dataset_binding(&dataset_id);
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::AfterConsecutiveFailures {
                 failures_count: ConsecutiveFailuresCount::try_new(3).unwrap(),
@@ -297,7 +289,6 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert_eq!(*single_state.sort_key(), sort_key);
     assert!(!single_state.paused_manual());
     assert_eq!(
         single_state.effective_state(),
@@ -349,13 +340,11 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
     let flow_binding = ingest_dataset_binding(&dataset_id);
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::AfterConsecutiveFailures {
                 failures_count: ConsecutiveFailuresCount::try_new(3).unwrap(),
@@ -436,7 +425,6 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert_eq!(*single_state.sort_key(), sort_key);
     assert!(!single_state.paused_manual());
     assert_eq!(
         single_state.effective_state(),
@@ -491,13 +479,11 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
     let flow_binding = ingest_dataset_binding(&dataset_id);
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -524,7 +510,6 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
         .upsert_process_state_on_trigger_event(
             EventID::new(4),
             flow_binding.clone(),
-            sort_key.clone(),
             true,
             FlowTriggerStopPolicy::default(),
         )
@@ -539,7 +524,6 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert_eq!(*single_state.sort_key(), sort_key);
     assert!(single_state.paused_manual());
     assert_eq!(
         single_state.effective_state(),
@@ -591,14 +575,12 @@ pub async fn test_delete_process(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
     let flow_binding = ingest_dataset_binding(&dataset_id);
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     // Insert a process first
     flow_process_repository
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -678,7 +660,6 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
     let flow_process_repository = catalog.get_one::<dyn FlowProcessStateRepository>().unwrap();
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     // Create multiple flow types for the same dataset scope
     use kamu_adapter_flow_dataset::{
@@ -703,7 +684,6 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             ingest_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -714,7 +694,6 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
         .upsert_process_state_on_trigger_event(
             EventID::new(2),
             transform_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -725,7 +704,6 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
         .upsert_process_state_on_trigger_event(
             EventID::new(3),
             compaction_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -861,14 +839,12 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
     let flow_binding = ingest_dataset_binding(&dataset_id);
-    let sort_key = "kamu/random-dataset-id".to_string();
 
     // Insert a process
     flow_process_repository
         .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
-            sort_key.clone(),
             false,
             FlowTriggerStopPolicy::default(),
         )
@@ -913,7 +889,6 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
         .upsert_process_state_on_trigger_event(
             EventID::new(3),
             flow_binding.clone(),
-            sort_key,
             true,
             FlowTriggerStopPolicy::default(),
         )

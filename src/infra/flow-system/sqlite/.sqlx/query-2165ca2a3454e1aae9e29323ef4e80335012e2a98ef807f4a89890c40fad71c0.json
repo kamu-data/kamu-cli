@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                paused_manual,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                effective_state,\n                sort_key,\n                updated_at as \"updated_at: _\",\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                paused_manual,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                effective_state,\n                updated_at as \"updated_at: _\",\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -59,23 +59,18 @@
         "type_info": "Text"
       },
       {
-        "name": "sort_key",
-        "ordinal": 11,
-        "type_info": "Text"
-      },
-      {
         "name": "updated_at: _",
-        "ordinal": 12,
+        "ordinal": 11,
         "type_info": "Null"
       },
       {
         "name": "last_applied_trigger_event_id",
-        "ordinal": 13,
+        "ordinal": 12,
         "type_info": "Integer"
       },
       {
         "name": "last_applied_flow_event_id",
-        "ordinal": 14,
+        "ordinal": 13,
         "type_info": "Integer"
       }
     ],
@@ -96,9 +91,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "930b2c84f37f12a734cbdd92138081eed4ad6170f1342fd2a930dd0c36f27488"
+  "hash": "2165ca2a3454e1aae9e29323ef4e80335012e2a98ef807f4a89890c40fad71c0"
 }

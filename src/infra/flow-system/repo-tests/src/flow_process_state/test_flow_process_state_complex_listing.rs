@@ -13,7 +13,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowScopeDataset,
 };
-use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
+use kamu_adapter_flow_webhook::FLOW_TYPE_WEBHOOK_DELIVER;
 use kamu_flow_system::*;
 
 use super::csv_flow_process_state_loader::CsvFlowProcessStateLoader;
@@ -60,21 +60,18 @@ pub async fn test_dataset_page_recent_activity(catalog: &Catalog) {
         first_process.flow_binding().flow_type,
         FLOW_TYPE_WEBHOOK_DELIVER
     );
-    assert_eq!(first_process.sort_key(), "acme/orders/slack_alerts");
 
     let second_process = &first_page.processes[1];
     assert_eq!(
         second_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_INGEST
     );
-    assert_eq!(second_process.sort_key(), "acme/orders");
 
     let third_process = &first_page.processes[2];
     assert_eq!(
         third_process.flow_binding().flow_type,
         FLOW_TYPE_WEBHOOK_DELIVER
     );
-    assert_eq!(third_process.sort_key(), "acme/orders/ops_webhook");
 
     // Verify timestamps are in descending order
     let first_attempt = first_process.last_attempt_at().unwrap();
@@ -104,21 +101,6 @@ pub async fn test_dataset_page_recent_activity(catalog: &Catalog) {
         fourth_process.flow_binding().flow_type,
         FLOW_TYPE_WEBHOOK_DELIVER
     );
-    assert_eq!(fourth_process.sort_key(), "acme/orders/archive_sink");
-
-    // Verify no overlap between pages
-    let all_first_page_keys: std::collections::HashSet<_> = first_page
-        .processes
-        .iter()
-        .map(FlowProcessState::sort_key)
-        .collect();
-    let all_second_page_keys: std::collections::HashSet<_> = second_page
-        .processes
-        .iter()
-        .map(FlowProcessState::sort_key)
-        .collect();
-
-    assert!(all_first_page_keys.is_disjoint(&all_second_page_keys));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,7 +145,6 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
         first_process.flow_binding().flow_type,
         FLOW_TYPE_WEBHOOK_DELIVER
     );
-    assert_eq!(first_process.sort_key(), "beta/catalog/legacy_partner");
     assert_eq!(first_process.consecutive_failures(), 10);
     assert_eq!(
         first_process.effective_state(),
@@ -175,7 +156,6 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
         second_process.flow_binding().flow_type,
         FLOW_TYPE_WEBHOOK_DELIVER
     );
-    assert_eq!(second_process.sort_key(), "zeta/metrics/ops_webhook");
     assert_eq!(second_process.consecutive_failures(), 5);
     assert_eq!(
         second_process.effective_state(),
@@ -187,7 +167,6 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
         third_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_INGEST
     );
-    assert_eq!(third_process.sort_key(), "gamma/audit");
     assert_eq!(third_process.consecutive_failures(), 4);
     assert_eq!(
         third_process.effective_state(),
@@ -199,7 +178,6 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
         fourth_process.flow_binding().flow_type,
         FLOW_TYPE_WEBHOOK_DELIVER
     );
-    assert_eq!(fourth_process.sort_key(), "acme/logs/security_monitor");
     assert_eq!(fourth_process.consecutive_failures(), 3);
     assert_eq!(
         fourth_process.effective_state(),
@@ -211,7 +189,6 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
         fifth_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_TRANSFORM
     );
-    assert_eq!(fifth_process.sort_key(), "beta/catalog.daily");
     assert_eq!(fifth_process.consecutive_failures(), 2);
     assert_eq!(
         fifth_process.effective_state(),
@@ -238,8 +215,8 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
         assert!(
             state == FlowProcessEffectiveState::StoppedAuto
                 || state == FlowProcessEffectiveState::Failing,
-            "Process {} has state {:?}, but should be StoppedAuto or Failing",
-            process.sort_key(),
+            "Process {:?} has state {:?}, but should be StoppedAuto or Failing",
+            process.flow_binding(),
             state
         );
     }
@@ -286,10 +263,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         FLOW_TYPE_DATASET_TRANSFORM
     );
     assert_eq!(
-        first_process.sort_key(),
-        "acme/logs.processed/transform:pii_scrub"
-    );
-    assert_eq!(
         first_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-07T19:00:00+00:00"
     );
@@ -299,7 +272,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         second_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_INGEST
     );
-    assert_eq!(second_process.sort_key(), "acme/logs");
     assert_eq!(
         second_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-07T21:00:00+00:00"
@@ -310,7 +282,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         third_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_INGEST
     );
-    assert_eq!(third_process.sort_key(), "zeta/metrics");
     assert_eq!(
         third_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T08:30:00+00:00"
@@ -321,7 +292,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         fourth_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_INGEST
     );
-    assert_eq!(fourth_process.sort_key(), "acme/orders");
     assert_eq!(
         fourth_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T09:00:00+00:00"
@@ -332,7 +302,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         fifth_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_INGEST
     );
-    assert_eq!(fifth_process.sort_key(), "beta/catalog");
     assert_eq!(
         fifth_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T09:30:00+00:00"
@@ -379,7 +348,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         sixth_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_TRANSFORM
     );
-    assert_eq!(sixth_process.sort_key(), "acme/users.daily");
     assert_eq!(
         sixth_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T10:00:00+00:00"
@@ -390,7 +358,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         seventh_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_TRANSFORM
     );
-    assert_eq!(seventh_process.sort_key(), "beta/catalog.daily");
     assert_eq!(
         seventh_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T10:15:00+00:00"
@@ -402,10 +369,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         FLOW_TYPE_DATASET_TRANSFORM
     );
     assert_eq!(
-        eighth_process.sort_key(),
-        "acme/orders.daily/transform:enrichment"
-    );
-    assert_eq!(
         eighth_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T10:30:00+00:00"
     );
@@ -415,7 +378,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         ninth_process.flow_binding().flow_type,
         FLOW_TYPE_DATASET_INGEST
     );
-    assert_eq!(ninth_process.sort_key(), "acme/users");
     assert_eq!(
         ninth_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T11:00:00+00:00"
@@ -427,27 +389,9 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         FLOW_TYPE_DATASET_TRANSFORM
     );
     assert_eq!(
-        tenth_process.sort_key(),
-        "zeta/metrics.daily/transform:daily_rollup"
-    );
-    assert_eq!(
         tenth_process.next_planned_at().unwrap().to_rfc3339(),
         "2025-09-08T12:00:00+00:00"
     );
-
-    // Verify no overlap between pages
-    let all_first_page_keys: std::collections::HashSet<_> = first_page
-        .processes
-        .iter()
-        .map(FlowProcessState::sort_key)
-        .collect();
-    let all_second_page_keys: std::collections::HashSet<_> = second_page
-        .processes
-        .iter()
-        .map(FlowProcessState::sort_key)
-        .collect();
-
-    assert!(all_first_page_keys.is_disjoint(&all_second_page_keys));
 
     // Verify only INGEST and EXECUTE_TRANSFORM types
     for process in first_page
@@ -458,8 +402,8 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         let flow_type = &process.flow_binding().flow_type;
         assert!(
             flow_type == FLOW_TYPE_DATASET_INGEST || flow_type == FLOW_TYPE_DATASET_TRANSFORM,
-            "Process {} has flow type {}, but should be INGEST or EXECUTE_TRANSFORM",
-            process.sort_key(),
+            "Process {:?} has flow type {}, but should be INGEST or EXECUTE_TRANSFORM",
+            process.flow_binding(),
             flow_type
         );
     }
@@ -487,75 +431,6 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
             curr_planned
         );
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_failing_webhooks_for_dataset_sorted_az(catalog: &Catalog) {
-    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
-    csv_loader.populate_from_csv().await;
-
-    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
-
-    // Create dataset scope for "acme/users"
-    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"acme/users");
-    let scope_query = FlowScopeSubscription::query_for_subscriptions_of_dataset(&dataset_id);
-
-    // Setup ordering: SortKey ASC (A–Z)
-    let ordering = FlowProcessOrder {
-        field: FlowProcessOrderField::NameAlpha,
-        desc: false, // ASC (A–Z)
-    };
-
-    // Filter: specific dataset (acme/users), only WEBHOOK_DELIVER type, only
-    // failing state
-    let filter = FlowProcessListFilter::for_scope(scope_query)
-        .for_flow_types(&[FLOW_TYPE_WEBHOOK_DELIVER])
-        .with_effective_states(&[FlowProcessEffectiveState::Failing]);
-
-    // Test single page (expecting only 1 failing webhook for acme/users)
-    let result = flow_process_state_query
-        .list_processes(filter, ordering, 10, 0)
-        .await
-        .unwrap();
-
-    // Verify results
-    assert_eq!(result.processes.len(), 1);
-
-    // From CSV data, only failing webhook for acme/users:
-    // Row 8: WEBHOOK_DELIVER acme/users/slack_alerts (failing state)
-
-    let webhook_process = &result.processes[0];
-    assert_eq!(
-        webhook_process.flow_binding().flow_type,
-        FLOW_TYPE_WEBHOOK_DELIVER
-    );
-    assert_eq!(webhook_process.sort_key(), "acme/users/slack_alerts");
-    assert_eq!(
-        webhook_process.effective_state(),
-        FlowProcessEffectiveState::Failing
-    );
-    assert_eq!(webhook_process.consecutive_failures(), 2);
-    assert_eq!(
-        webhook_process.last_failure_at().unwrap().to_rfc3339(),
-        "2025-09-08T07:42:00+00:00"
-    );
-
-    // Verify only WEBHOOK_DELIVER and failing state
-    for process in &result.processes {
-        assert_eq!(process.flow_binding().flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
-        assert_eq!(
-            process.effective_state(),
-            FlowProcessEffectiveState::Failing
-        );
-    }
-
-    // Additional verification: ensure it's webhook subscription for acme/users
-    let flow_scope = &webhook_process.flow_binding().scope;
-    let webhook_scope = FlowScopeSubscription::new(flow_scope);
-    assert_eq!(webhook_scope.maybe_dataset_id(), Some(dataset_id));
-    // Note: subscription_id is a UUID that we can't predict, just verify the
-    // scope type
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

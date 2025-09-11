@@ -20,8 +20,6 @@ CREATE TABLE flow_process_states (
     effective_state  TEXT NOT NULL
         CHECK (effective_state IN ('failing', 'stopped_auto', 'paused_manual', 'active')),
 
-    sort_key        TEXT NOT NULL,
-
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT (CURRENT_TIMESTAMP),
     last_applied_trigger_event_id INTEGER NOT NULL DEFAULT 0,
     last_applied_flow_event_id    INTEGER NOT NULL DEFAULT 0,
@@ -30,10 +28,6 @@ CREATE TABLE flow_process_states (
 );
 
 /* ------------------------------ */
-
--- Alphabetical ordering / prefix searches on sort_key
-CREATE INDEX idx_fps_sort_key_btree
-  ON flow_process_states (sort_key);
 
 -- Filter by dataset_id across scopes
 CREATE INDEX idx_fps_dataset_id
