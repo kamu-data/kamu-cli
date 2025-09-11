@@ -97,6 +97,18 @@ impl CurrentAccountSubject {
             CurrentAccountSubject::Anonymous(_) => &DEFAULT_ACCOUNT_NAME,
         }
     }
+
+    pub fn resolve_account_name_by_dataset_alias(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> odf::AccountName {
+        if dataset_alias.is_multi_tenant() {
+            // Safety: In multi-tenant, we have a name.
+            dataset_alias.account_name.as_ref().unwrap().clone()
+        } else {
+            self.account_name_or_default().clone()
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

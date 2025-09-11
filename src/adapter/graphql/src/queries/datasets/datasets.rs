@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use std::collections::HashMap;
+
 use kamu_core::auth::{self, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 
 use crate::prelude::*;
@@ -27,7 +28,8 @@ impl Datasets {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Dataset>> {
-        let rebac_dataset_registry_facade = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
+        let rebac_dataset_registry_facade =
+            from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacDatasetRegistryFacade);
 
         let resolve_res = rebac_dataset_registry_facade
             .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Read)
@@ -35,7 +37,7 @@ impl Datasets {
         let handle = match resolve_res {
             Ok(handle) => Ok(handle),
             Err(e) => {
-                use RebacDatasetRefUnresolvedError as E;
+                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
 
                 match e {
                     E::NotFound(_) | E::Access(_) => return Ok(None),
@@ -56,40 +58,65 @@ impl Datasets {
         dataset_refs: Vec<odf::DatasetRef>,
         skip_missing: bool,
     ) -> Result<Vec<Dataset>> {
-        let rebac_dataset_registry_facade = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
+        let (rebac_dataset_registry_facade, account_service, current_account_subject) = from_catalog_n!(
+            ctx,
+            dyn kamu_auth_rebac::RebacDatasetRegistryFacade,
+            dyn kamu_accounts::AccountService,
+            kamu_accounts::CurrentAccountSubject
+        );
 
-        let mut res = Vec::new();
-        for r in &dataset_refs {
-            // TODO: PERF: Vectorize resolution
-            let handle = match rebac_dataset_registry_facade
-                .resolve_dataset_handle_by_ref(r, auth::DatasetAction::Read)
-                .await
-            {
-                Ok(handle) => handle,
-                Err(e) => match e {
-                    RebacDatasetRefUnresolvedError::NotFound(_)
-                    | RebacDatasetRefUnresolvedError::Access(_) => {
-                        if skip_missing {
-                            continue;
-                        }
-                        return Err(GqlError::gql(format!(
-                            "Dataset {r} not found or not accessible"
-                        )));
-                    }
-                    e @ RebacDatasetRefUnresolvedError::Internal(_) => {
-                        return Err(e.int_err().into());
-                    }
-                },
-            };
+        let resolution = rebac_dataset_registry_facade
+            .classify_dataset_refs_by_allowance(dataset_refs, auth::DatasetAction::Read)
+            .await?;
 
-            let account = Account::from_dataset_alias(ctx, &handle.alias)
-                .await?
-                .expect("Account must exist");
-
-            res.push(Dataset::new_access_checked(account, handle));
+        if !skip_missing && !resolution.inaccessible_refs.is_empty() {
+            return Err(GqlError::gql(format!(
+                "Inaccessible datasets: {}",
+                itertools::join(resolution.inaccessible_refs.iter().map(|(r, _)| r), ",")
+            )));
         }
 
-        Ok(res)
+        let owner_names = resolution
+            .accessible_resolved_refs
+            .iter()
+            .map(|(_, h)| current_account_subject.resolve_account_name_by_dataset_alias(&h.alias))
+            .collect::<Vec<_>>();
+        let owner_names_refs = owner_names.iter().collect::<Vec<_>>();
+        let owner_lookup = account_service
+            .get_accounts_by_names(&owner_names_refs)
+            .await?;
+
+        if !owner_lookup.not_found.is_empty() {
+            return Err(GqlError::gql(format!(
+                "Unresolved accounts: {}",
+                itertools::join(owner_lookup.not_found.iter().map(|(n, _)| n), ",")
+            )));
+        }
+
+        let owners_map = owner_lookup
+            .found
+            .into_iter()
+            .fold(HashMap::new(), |mut acc, account| {
+                acc.insert(account.account_name.clone(), account);
+                acc
+            });
+
+        let datasets = resolution
+            .accessible_resolved_refs
+            .into_iter()
+            .map(|(_, dataset_handle)| {
+                let owner_name = current_account_subject
+                    .resolve_account_name_by_dataset_alias(&dataset_handle.alias);
+                let owner = owners_map
+                    .get(&owner_name)
+                    .unwrap_or_else(|| unreachable!("{owner_name} not found in {owners_map:?}"))
+                    .clone();
+
+                Dataset::new_access_checked(Account::from_account(owner), dataset_handle)
+            })
+            .collect();
+
+        Ok(datasets)
     }
 }
 
