@@ -36,7 +36,6 @@ pub(crate) async fn load_process_state(
                 last_attempt_at as "last_attempt_at: _",
                 next_planned_at as "next_planned_at: _",
                 effective_state,
-                sort_key,
                 updated_at as "updated_at: _",
                 last_applied_trigger_event_id,
                 last_applied_flow_event_id

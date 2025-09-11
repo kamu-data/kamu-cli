@@ -34,8 +34,6 @@ CREATE TABLE flow_process_states (
 
     effective_state  flow_process_effective_state NOT NULL,
 
-    sort_key         TEXT NOT NULL,
-
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_applied_trigger_event_id BIGINT NOT NULL DEFAULT 0,
     last_applied_flow_event_id    BIGINT NOT NULL DEFAULT 0,
@@ -44,10 +42,6 @@ CREATE TABLE flow_process_states (
 );
 
 /* ------------------------------ */
-
--- Fast alphabetical ordering / prefix ranges
-CREATE INDEX idx_fps_sort_key_like
-  ON flow_process_states (sort_key COLLATE "C" text_pattern_ops);
 
 -- By dataset_id across all scopes (dataset + webhooks)
 CREATE INDEX idx_fps_dataset_id ON flow_process_states ((scope_data->>'dataset_id'));

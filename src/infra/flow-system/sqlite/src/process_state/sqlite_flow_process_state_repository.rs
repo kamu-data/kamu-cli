@@ -65,7 +65,6 @@ impl SqliteFlowProcessStateRepository {
         let last_failure_at = state.last_failure_at();
         let last_attempt_at = state.last_attempt_at();
         let next_planned_at = state.next_planned_at();
-        let sort_key = state.sort_key();
         let updated_at = state.updated_at();
         let last_applied_trigger_event_id = state.last_applied_trigger_event_id().into_inner();
         let last_applied_flow_event_id = state.last_applied_flow_event_id().into_inner();
@@ -88,14 +87,13 @@ impl SqliteFlowProcessStateRepository {
                     last_attempt_at = $7,
                     next_planned_at = $8,
                     effective_state = $9,
-                    sort_key = $10,
-                    updated_at = $11,
-                    last_applied_trigger_event_id = $12,
-                    last_applied_flow_event_id = $13
+                    updated_at = $10,
+                    last_applied_trigger_event_id = $11,
+                    last_applied_flow_event_id = $12
                 WHERE
-                    flow_type = $14 AND scope_data = $15 AND
-                    last_applied_trigger_event_id = $16 AND
-                    last_applied_flow_event_id = $17
+                    flow_type = $13 AND scope_data = $14 AND
+                    last_applied_trigger_event_id = $15 AND
+                    last_applied_flow_event_id = $16
             "#,
             paused_manual,
             stop_policy_kind,
@@ -106,7 +104,6 @@ impl SqliteFlowProcessStateRepository {
             last_attempt_at,
             next_planned_at,
             effective_state_str,
-            sort_key,
             updated_at,
             last_applied_trigger_event_id,
             last_applied_flow_event_id,
@@ -139,7 +136,6 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         &self,
         trigger_event_id: EventID,
         flow_binding: FlowBinding,
-        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), FlowProcessUpsertError> {
@@ -186,7 +182,6 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                     trigger_event_id,
                     self.time_source.now(),
                     flow_binding,
-                    sort_key,
                     paused_manual,
                     stop_policy,
                 );
@@ -207,7 +202,6 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                 let last_failure_at = state.last_failure_at();
                 let last_attempt_at = state.last_attempt_at();
                 let next_planned_at = state.next_planned_at();
-                let sort_key_ref = state.sort_key();
                 let updated_at = state.updated_at();
                 let last_applied_trigger_event_id =
                     state.last_applied_trigger_event_id().into_inner();
@@ -230,12 +224,11 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                         last_attempt_at,
                         next_planned_at,
                         effective_state,
-                        sort_key,
                         updated_at,
                         last_applied_trigger_event_id,
                         last_applied_flow_event_id
                     )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                     ON CONFLICT (flow_type, scope_data) DO NOTHING
                     "#,
                     scope_data_json,
@@ -249,7 +242,6 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                     last_attempt_at,
                     next_planned_at,
                     effective_state_str,
-                    sort_key_ref,
                     updated_at,
                     last_applied_trigger_event_id,
                     last_applied_flow_event_id,

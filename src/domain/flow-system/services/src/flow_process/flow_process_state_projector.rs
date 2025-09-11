@@ -32,19 +32,6 @@ pub struct FlowProcessStateProjector {
     flow_process_state_repository: Arc<dyn FlowProcessStateRepository>,
 }
 
-impl FlowProcessStateProjector {
-    async fn make_sort_key(
-        &self,
-        target_catalog: &dill::Catalog,
-        flow_binding: &FlowBinding,
-    ) -> Result<String, InternalError> {
-        let flow_controller =
-            get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)
-                .expect("FlowController must be present in the catalog");
-        flow_controller.make_flow_sort_key(flow_binding).await
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MessageConsumer for FlowProcessStateProjector {}
@@ -60,20 +47,15 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
     )]
     async fn consume_message(
         &self,
-        target_catalog: &dill::Catalog,
+        _: &dill::Catalog,
         message: &FlowTriggerUpdatedMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow trigger message");
-
-        let sort_key = self
-            .make_sort_key(target_catalog, &message.flow_binding)
-            .await?;
 
         self.flow_process_state_repository
             .upsert_process_state_on_trigger_event(
                 message.event_id,
                 message.flow_binding.clone(),
-                sort_key,
                 message.trigger_status == FlowTriggerStatus::PausedByUser,
                 message.stop_policy,
             )

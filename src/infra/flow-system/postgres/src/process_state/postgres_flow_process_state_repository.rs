@@ -68,14 +68,13 @@ impl PostgresFlowProcessStateRepository {
                     last_attempt_at = $7,
                     next_planned_at = $8,
                     effective_state = $9,
-                    sort_key = $10,
-                    updated_at = $11,
-                    last_applied_trigger_event_id = $12,
-                    last_applied_flow_event_id = $13
+                    updated_at = $10,
+                    last_applied_trigger_event_id = $11,
+                    last_applied_flow_event_id = $12
                 WHERE
-                    flow_type = $14 AND scope_data = $15 AND
-                    last_applied_trigger_event_id = $16 AND
-                    last_applied_flow_event_id = $17
+                    flow_type = $13 AND scope_data = $14 AND
+                    last_applied_trigger_event_id = $15 AND
+                    last_applied_flow_event_id = $16
             "#,
             state.paused_manual(),
             state.stop_policy().kind_to_string() as &str,
@@ -86,7 +85,6 @@ impl PostgresFlowProcessStateRepository {
             state.last_attempt_at(),
             state.next_planned_at(),
             state.effective_state() as FlowProcessEffectiveState,
-            state.sort_key(),
             state.updated_at(),
             state.last_applied_trigger_event_id().into_inner(),
             state.last_applied_flow_event_id().into_inner(),
@@ -119,7 +117,6 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         &self,
         trigger_event_id: EventID,
         flow_binding: FlowBinding,
-        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), FlowProcessUpsertError> {
@@ -166,7 +163,6 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                     trigger_event_id,
                     self.time_source.now(),
                     flow_binding,
-                    sort_key,
                     paused_manual,
                     stop_policy,
                 );
@@ -194,12 +190,11 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                         last_attempt_at,
                         next_planned_at,
                         effective_state,
-                        sort_key,
                         updated_at,
                         last_applied_trigger_event_id,
                         last_applied_flow_event_id
                     )
-                    VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                    VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                     ON CONFLICT (flow_type, scope_data) DO NOTHING
                     "#,
                     scope_data_json,
@@ -213,7 +208,6 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                     state.last_attempt_at(),
                     state.next_planned_at(),
                     state.effective_state() as FlowProcessEffectiveState,
-                    state.sort_key(),
                     state.updated_at(),
                     state.last_applied_trigger_event_id().into_inner(),
                     state.last_applied_flow_event_id().into_inner(),
