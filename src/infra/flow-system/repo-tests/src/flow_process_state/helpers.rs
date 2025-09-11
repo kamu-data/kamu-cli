@@ -308,38 +308,6 @@ pub(crate) fn assert_effective_state_ordering(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn assert_name_alpha_ordering(
-    processes: &[FlowProcessState],
-    desc: bool,
-    context: &str,
-) {
-    let sort_keys: Vec<_> = processes.iter().map(FlowProcessState::sort_key).collect();
-
-    for i in 1..sort_keys.len() {
-        if desc {
-            // DESC: Z-A alphabetical order
-            assert!(
-                sort_keys[i - 1] >= sort_keys[i],
-                "Sort keys not in descending alphabetical order in {}: '{}' should be >= '{}'",
-                context,
-                sort_keys[i - 1],
-                sort_keys[i]
-            );
-        } else {
-            // ASC: A-Z alphabetical order
-            assert!(
-                sort_keys[i - 1] <= sort_keys[i],
-                "Sort keys not in ascending alphabetical order in {}: '{}' should be <= '{}'",
-                context,
-                sort_keys[i - 1],
-                sort_keys[i]
-            );
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn assert_flow_type_ordering(processes: &[FlowProcessState], desc: bool, context: &str) {
     let flow_types: Vec<_> = processes
         .iter()

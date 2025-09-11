@@ -40,9 +40,6 @@ impl InMemoryFlowProcessState {
         state: &'a State,
         filter: &'a FlowProcessListFilter<'_>,
     ) -> Vec<&'a FlowProcessState> {
-        // Pre-lowercase the name query once outside the loop for efficiency
-        let name_query_lowercase = filter.name_contains.map(str::to_lowercase);
-
         state
             .list_matching_process_states(&filter.scope)
             .filter(|ps| {
@@ -115,13 +112,6 @@ impl InMemoryFlowProcessState {
                 // Minimum consecutive failures filter
                 if let Some(min_failures) = filter.min_consecutive_failures {
                     if ps.consecutive_failures() < min_failures {
-                        return false;
-                    }
-                }
-
-                // Name contains filter (case-insensitive, prefix matching)
-                if let Some(ref name_query_lower) = name_query_lowercase {
-                    if !ps.sort_key().starts_with(name_query_lower) {
                         return false;
                     }
                 }
@@ -202,13 +192,6 @@ impl InMemoryFlowProcessState {
                         a.effective_state().cmp(&b.effective_state())
                     }
                 }
-                FlowProcessOrderField::NameAlpha => {
-                    if order.desc {
-                        b.sort_key().cmp(a.sort_key())
-                    } else {
-                        a.sort_key().cmp(b.sort_key())
-                    }
-                }
                 FlowProcessOrderField::FlowType => {
                     if order.desc {
                         b.flow_binding().flow_type.cmp(&a.flow_binding().flow_type)
@@ -250,8 +233,7 @@ impl InMemoryFlowProcessState {
                         }
                     }
 
-                    // Final tie-breaker: Sort key for stable pagination
-                    a.sort_key().cmp(b.sort_key())
+                    Ordering::Equal
                 }
                 primary_order => primary_order,
             }
@@ -393,7 +375,6 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         &self,
         trigger_event_id: EventID,
         flow_binding: FlowBinding,
-        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), FlowProcessUpsertError> {
@@ -415,7 +396,6 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
                     trigger_event_id,
                     self.time_source.now(),
                     flow_binding,
-                    sort_key,
                     paused_manual,
                     stop_policy,
                 ),

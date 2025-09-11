@@ -23,7 +23,6 @@ pub trait FlowProcessStateRepository: Send + Sync {
         &self,
         trigger_event_id: EventID,
         flow_binding: FlowBinding,
-        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), FlowProcessUpsertError>;
