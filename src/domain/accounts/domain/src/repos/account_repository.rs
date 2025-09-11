@@ -9,13 +9,7 @@
 
 use std::fmt::Display;
 
-use database_common::{
-    BatchLookup,
-    EntityPageListing,
-    EntityPageStream,
-    EntityPageStreamer,
-    PaginationOpts,
-};
+use database_common::{EntityPageListing, EntityPageStream, EntityPageStreamer, PaginationOpts};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use thiserror::Error;
@@ -35,8 +29,8 @@ pub trait AccountRepository: Send + Sync {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[&odf::AccountID],
-    ) -> Result<BatchLookup<Account, odf::AccountID, GetAccountByIdError>, InternalError>;
+        account_ids: &[odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountByIdError>;
 
     async fn get_account_by_name(
         &self,
