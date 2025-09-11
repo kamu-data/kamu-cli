@@ -90,26 +90,21 @@ impl AccountService for AccountServiceImpl {
 
     async fn get_account_map(
         &self,
-        account_ids: &[odf::AccountID],
+        account_ids: &[&odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError> {
-        let account_map = match self.account_repo.get_accounts_by_ids(account_ids).await {
-            Ok(accounts) => {
-                let map = accounts
-                    .into_iter()
-                    .fold(HashMap::new(), |mut acc, account| {
-                        acc.insert(account.id.clone(), account);
-                        acc
-                    });
-                Ok(map)
-            }
-            Err(err) => match err {
-                GetAccountByIdError::NotFound(_) => Ok(HashMap::new()),
-                e => Err(e),
-            },
-        }
-        .int_err()?;
+        let accounts = self
+            .account_repo
+            .get_accounts_by_ids(account_ids)
+            .await
+            .int_err()?;
 
-        Ok(account_map)
+        let map = accounts
+            .into_iter()
+            .fold(HashMap::new(), |mut acc, account| {
+                acc.insert(account.id.clone(), account);
+                acc
+            });
+        Ok(map)
     }
 
     async fn account_by_name(

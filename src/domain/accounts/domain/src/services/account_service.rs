@@ -48,7 +48,7 @@ pub trait AccountService: Sync + Send {
 
     async fn get_account_map(
         &self,
-        account_ids: &[odf::AccountID],
+        account_ids: &[&odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError>;
 
     async fn account_by_name(
