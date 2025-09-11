@@ -53,13 +53,6 @@ impl FlowController for FlowControllerSystemGC {
         // No propagation needed for system GC dispatcher
         Ok(())
     }
-
-    async fn make_flow_sort_key(
-        &self,
-        _flow_binding: &FlowBinding,
-    ) -> Result<String, InternalError> {
-        Ok("<system>".to_string())
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -36,11 +36,11 @@ impl SqliteFlowProcessStateQuery {
 
     fn generate_ordering_predicate(order: FlowProcessOrder) -> String {
         let direction = if order.desc { "DESC" } else { "ASC" };
-        let default_tiebreaker = "last_attempt_at DESC NULLS LAST, sort_key ASC, flow_type ASC";
+        let default_tiebreaker = "last_attempt_at DESC NULLS LAST, flow_type ASC";
 
         match order.field {
             FlowProcessOrderField::LastAttemptAt => {
-                format!("last_attempt_at {direction} NULLS LAST, sort_key ASC, flow_type ASC",)
+                format!("last_attempt_at {direction} NULLS LAST, flow_type ASC",)
             }
             FlowProcessOrderField::NextPlannedAt => {
                 format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}",)
@@ -64,11 +64,8 @@ impl SqliteFlowProcessStateQuery {
                 .to_string();
                 format!("{main_ordering} {direction}, {default_tiebreaker}",)
             }
-            FlowProcessOrderField::NameAlpha => {
-                format!("sort_key {direction}, last_attempt_at DESC NULLS LAST, flow_type ASC",)
-            }
             FlowProcessOrderField::FlowType => {
-                format!("flow_type {direction}, last_attempt_at DESC NULLS LAST, sort_key ASC",)
+                format!("flow_type {direction}, last_attempt_at DESC NULLS LAST",)
             }
         }
     }
@@ -104,7 +101,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         let connection_mut = tr.connection_mut().await?;
 
         let (scope_conditions, flow_types_parameter_index) =
-            generate_scope_query_condition_clauses(&filter.scope, 10 /* 9 params + 1 */);
+            generate_scope_query_condition_clauses(&filter.scope, 9 /* 8 params + 1 */);
 
         let scope_values = form_scope_query_condition_values(filter.scope.clone());
 
@@ -124,8 +121,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                     ($5 IS NULL OR last_failure_at >= $5) AND
                     ($6 IS NULL OR next_planned_at < $6) AND
                     ($7 IS NULL OR next_planned_at > $7) AND
-                    ($8 IS NULL OR consecutive_failures >= $8) AND
-                    ($9 IS NULL OR (sort_key LIKE $9 || '%'))
+                    ($8 IS NULL OR consecutive_failures >= $8)
             "#,
             filter
                 .for_flow_types
@@ -157,8 +153,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             .bind(filter.last_failure_since)
             .bind(filter.next_planned_before)
             .bind(filter.next_planned_after)
-            .bind(filter.min_consecutive_failures.map(i64::from))
-            .bind(filter.name_contains.map(str::to_ascii_lowercase));
+            .bind(filter.min_consecutive_failures.map(i64::from));
 
         for scope_value in &scope_values {
             count_query = count_query.bind(scope_value);
@@ -186,7 +181,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
 
         // For the list query, adjust parameter indices for limit/offset
         let (list_scope_conditions, list_flow_types_parameter_index) =
-            generate_scope_query_condition_clauses(&filter.scope, 12 /* 11 params + 1 */);
+            generate_scope_query_condition_clauses(&filter.scope, 11 /* 10 params + 1 */);
 
         let list_effective_state_parameter_index =
             list_flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
@@ -205,7 +200,6 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 last_attempt_at,
                 next_planned_at,
                 effective_state,
-                sort_key,
                 updated_at,
                 last_applied_trigger_event_id,
                 last_applied_flow_event_id
@@ -218,8 +212,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                     ($7 IS NULL OR last_failure_at >= $7) AND
                     ($8 IS NULL OR next_planned_at < $8) AND
                     ($9 IS NULL OR next_planned_at > $9) AND
-                    ($10 IS NULL OR consecutive_failures >= $10) AND
-                    ($11 IS NULL OR (sort_key LIKE $11 || '%'))
+                    ($10 IS NULL OR consecutive_failures >= $10)
                 ORDER BY {ordering_predicate}
                 LIMIT $1 OFFSET $2
             "#,
@@ -256,8 +249,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .bind(filter.last_failure_since)
                 .bind(filter.next_planned_before)
                 .bind(filter.next_planned_after)
-                .bind(filter.min_consecutive_failures.map(i64::from))
-                .bind(filter.name_contains.map(str::to_ascii_lowercase));
+                .bind(filter.min_consecutive_failures.map(i64::from));
 
         for scope_value in &scope_values {
             list_query = list_query.bind(scope_value);

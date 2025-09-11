@@ -20,18 +20,9 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use kamu_adapter_flow_dataset::{
-    DATASET_RESOURCE_TYPE,
-    DatasetResourceUpdateDetails,
-    make_dataset_flow_sort_key,
-};
+use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, DatasetResourceUpdateDetails};
 use kamu_datasets::DatasetEntryService;
-use kamu_webhooks::{
-    ResultIntoInternal,
-    WebhookEventType,
-    WebhookEventTypeCatalog,
-    WebhookSubscriptionQueryMode,
-};
+use kamu_webhooks::{ResultIntoInternal, WebhookEventType, WebhookEventTypeCatalog};
 use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
@@ -53,7 +44,6 @@ pub struct FlowControllerWebhookDeliver {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
-    webhook_subscription_query_service: Arc<dyn kamu_webhooks::WebhookSubscriptionQueryService>,
 }
 
 impl FlowControllerWebhookDeliver {
@@ -229,41 +219,6 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
     ) -> Result<(), InternalError> {
         // No further actions triggered with a webhook delivery
         Ok(())
-    }
-
-    async fn make_flow_sort_key(
-        &self,
-        flow_binding: &fs::FlowBinding,
-    ) -> Result<String, InternalError> {
-        let scope = FlowScopeSubscription::new(&flow_binding.scope);
-
-        // Load webhook subscription
-        let subscription_id = scope.subscription_id();
-        let Some(webhook_subscription) = self
-            .webhook_subscription_query_service
-            .find_webhook_subscription(subscription_id, WebhookSubscriptionQueryMode::Active)
-            .await
-            .int_err()?
-        else {
-            return InternalError::bail(format!(
-                "Failed to find webhook subscription with ID: {subscription_id}"
-            ));
-        };
-
-        // Find out it's sort key suffix
-        let webhook_sort_key_suffix = webhook_subscription.sort_key();
-
-        // If dataset is involved, prepend it's sort key
-        match scope.maybe_dataset_id() {
-            None => Ok(webhook_sort_key_suffix),
-            Some(dataset_id) => {
-                let dataset_sort_key =
-                    make_dataset_flow_sort_key(self.dataset_entry_service.as_ref(), &dataset_id)
-                        .await?;
-
-                Ok(format!("{dataset_sort_key}/{webhook_sort_key_suffix}"))
-            }
-        }
     }
 }
 

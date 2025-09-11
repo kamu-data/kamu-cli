@@ -19,7 +19,6 @@ use crate::{FlowBinding, FlowProcessEffectiveState, FlowTriggerStopPolicy};
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FlowProcessState {
     flow_binding: FlowBinding,
-    sort_key: String,
 
     paused_manual: bool,
     stop_policy: FlowTriggerStopPolicy,
@@ -44,20 +43,11 @@ impl FlowProcessState {
         trigger_event_id: EventID,
         current_time: DateTime<Utc>,
         flow_binding: FlowBinding,
-        sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Self {
-        // Ensure sort_key is lowercase for efficient filtering
-        debug_assert_eq!(
-            sort_key.to_lowercase(),
-            sort_key,
-            "sort_key must be lowercase for efficient filtering"
-        );
-
         Self {
             flow_binding,
-            sort_key,
             paused_manual,
             stop_policy,
             consecutive_failures: 0,
@@ -82,18 +72,10 @@ impl FlowProcessState {
         last_attempt_at: Option<DateTime<Utc>>,
         next_planned_at: Option<DateTime<Utc>>,
         effective_state: FlowProcessEffectiveState,
-        sort_key: String,
         updated_at: DateTime<Utc>,
         last_applied_trigger_event_id: EventID,
         last_applied_flow_event_id: EventID,
     ) -> Result<Self, InternalError> {
-        // Ensure sort_key is lowercase for efficient filtering
-        debug_assert_eq!(
-            sort_key.to_lowercase(),
-            sort_key,
-            "sort_key must be lowercase for efficient filtering"
-        );
-
         debug_assert_eq!(
             effective_state,
             FlowProcessEffectiveState::calculate(paused_manual, consecutive_failures, stop_policy,),
@@ -109,7 +91,6 @@ impl FlowProcessState {
 
         Ok(Self {
             flow_binding,
-            sort_key,
             paused_manual,
             stop_policy,
             consecutive_failures,
@@ -128,11 +109,6 @@ impl FlowProcessState {
     #[inline]
     pub fn flow_binding(&self) -> &FlowBinding {
         &self.flow_binding
-    }
-
-    #[inline]
-    pub fn sort_key(&self) -> &str {
-        &self.sort_key
     }
 
     #[inline]
@@ -421,10 +397,6 @@ mod tests {
         FlowBinding::new("test.flow.type", FlowScope::make_system_scope())
     }
 
-    fn make_test_sort_key() -> String {
-        "test_sort_key".to_string()
-    }
-
     fn make_test_stop_policy_with_failures(count: u32) -> FlowTriggerStopPolicy {
         FlowTriggerStopPolicy::AfterConsecutiveFailures {
             failures_count: ConsecutiveFailuresCount::try_new(count).unwrap(),
@@ -435,7 +407,6 @@ mod tests {
     fn test_new_flow_process_state() {
         let current_time = Utc::now();
         let flow_binding = make_test_flow_binding();
-        let sort_key = make_test_sort_key();
         let stop_policy = FlowTriggerStopPolicy::Never;
         let trigger_event_id = EventID::new(123);
 
@@ -444,13 +415,11 @@ mod tests {
             trigger_event_id,
             current_time,
             flow_binding.clone(),
-            sort_key.clone(),
             false, // not paused manually
             stop_policy,
         );
 
         assert_eq!(state.flow_binding(), &flow_binding);
-        assert_eq!(state.sort_key, sort_key);
         assert!(!state.paused_manual());
         assert_eq!(state.stop_policy(), stop_policy);
         assert_eq!(state.consecutive_failures(), 0);
@@ -468,7 +437,6 @@ mod tests {
             EventID::new(456),
             current_time,
             flow_binding,
-            sort_key,
             true,
             // paused manually
             stop_policy,
@@ -487,7 +455,6 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
         );
@@ -534,7 +501,6 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
         );
@@ -593,7 +559,6 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
         );
@@ -617,7 +582,6 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(2),
         );
@@ -664,7 +628,6 @@ mod tests {
             EventID::new(100),
             Utc::now(),
             make_test_flow_binding(),
-            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
         );
@@ -738,7 +701,6 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            make_test_sort_key(),
             false,
             FlowTriggerStopPolicy::Never,
         );
@@ -798,7 +760,6 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            make_test_sort_key(),
             false,
             make_test_stop_policy_with_failures(3),
         );

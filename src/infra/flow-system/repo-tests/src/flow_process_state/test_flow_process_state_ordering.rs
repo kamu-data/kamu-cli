@@ -17,7 +17,6 @@ use crate::flow_process_state::helpers::{
     assert_flow_type_ordering,
     assert_last_attempt_at_ordering,
     assert_last_failure_at_ordering,
-    assert_name_alpha_ordering,
     assert_next_planned_at_ordering,
 };
 
@@ -239,49 +238,6 @@ pub async fn test_list_processes_ordering_effective_state(catalog: &Catalog) {
 
     // Verify DESC ordering
     assert_effective_state_ordering(&listing_desc.processes, true, "DESC ordering test");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_list_processes_ordering_name_alpha(catalog: &Catalog) {
-    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
-    csv_loader.populate_from_csv().await;
-
-    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
-
-    // ordering by name ASC - should have A-Z alphabetical order
-    let listing_asc = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all(),
-            FlowProcessOrder {
-                field: FlowProcessOrderField::NameAlpha,
-                desc: false,
-            },
-            50, // Large limit to get all
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Verify ASC ordering
-    assert_name_alpha_ordering(&listing_asc.processes, false, "ASC ordering test");
-
-    // ordering by name DESC - should have Z-A alphabetical order
-    let listing_desc = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all(),
-            FlowProcessOrder {
-                field: FlowProcessOrderField::NameAlpha,
-                desc: true,
-            },
-            50, // Large limit to get all
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Verify DESC ordering
-    assert_name_alpha_ordering(&listing_desc.processes, true, "DESC ordering test");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

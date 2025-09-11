@@ -76,9 +76,6 @@ pub struct FlowProcessListFilter<'a> {
 
     /// Severity cut.
     pub min_consecutive_failures: Option<u32>,
-
-    /// Name search on hierarchical sort key (case-insensitive).
-    pub name_contains: Option<&'a str>,
 }
 
 impl<'a> FlowProcessListFilter<'a> {
@@ -98,7 +95,6 @@ impl<'a> FlowProcessListFilter<'a> {
             next_planned_before: None,
             next_planned_after: None,
             min_consecutive_failures: None,
-            name_contains: None,
         }
     }
 
@@ -192,14 +188,6 @@ impl<'a> FlowProcessListFilter<'a> {
             ..self
         }
     }
-
-    /// Adding name contains filter.
-    pub fn with_name_contains(self, name_contains: &'a str) -> Self {
-        Self {
-            name_contains: Some(name_contains),
-            ..self
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -216,14 +204,6 @@ impl FlowProcessOrder {
         Self {
             field: FlowProcessOrderField::LastAttemptAt,
             desc: true,
-        }
-    }
-
-    /// Alphabetical by hierarchical key (owner/dataset[/kind:label]).
-    pub fn name_alpha() -> Self {
-        Self {
-            field: FlowProcessOrderField::NameAlpha,
-            desc: false,
         }
     }
 }
@@ -244,9 +224,6 @@ pub enum FlowProcessOrderField {
 
     /// Severity bucketing
     EffectiveState,
-
-    /// A–Z over sort key
-    NameAlpha,
 
     /// By flow type
     FlowType,
