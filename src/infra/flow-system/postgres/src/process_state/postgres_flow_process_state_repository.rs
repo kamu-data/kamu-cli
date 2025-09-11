@@ -115,124 +115,126 @@ impl PostgresFlowProcessStateRepository {
 
 #[async_trait::async_trait]
 impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
-    async fn insert_process_state(
+    async fn upsert_process_state_on_trigger_event(
         &self,
         trigger_event_id: EventID,
         flow_binding: FlowBinding,
         sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessInsertError> {
-        let state = FlowProcessState::new(
-            trigger_event_id,
-            self.time_source.now(),
-            flow_binding,
-            sort_key,
-            paused_manual,
-            stop_policy,
-        );
-
-        let scope_data_json = serde_json::to_value(&state.flow_binding().scope).int_err()?;
-
-        let stop_policy_kind = state.stop_policy().kind_to_string();
-        let stop_policy_data = serde_json::to_value(state.stop_policy()).int_err()?;
-
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        sqlx::query!(
-            r#"
-            INSERT INTO flow_process_states (
-                scope_data,
-                flow_type,
-                paused_manual,
-                stop_policy_kind,
-                stop_policy_data,
-                consecutive_failures,
-                last_success_at,
-                last_failure_at,
-                last_attempt_at,
-                next_planned_at,
-                effective_state,
-                sort_key,
-                updated_at,
-                last_applied_trigger_event_id,
-                last_applied_flow_event_id
-            )
-                VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-            ON CONFLICT (flow_type, scope_data) DO NOTHING
-            "#,
-            scope_data_json,
-            state.flow_binding().flow_type,
-            state.paused_manual(),
-            stop_policy_kind as &str,
-            stop_policy_data,
-            i32::try_from(state.consecutive_failures()).unwrap(),
-            state.last_success_at(),
-            state.last_failure_at(),
-            state.last_attempt_at(),
-            state.next_planned_at(),
-            state.effective_state() as FlowProcessEffectiveState,
-            state.sort_key(),
-            state.updated_at(),
-            state.last_applied_trigger_event_id().into_inner(),
-            state.last_applied_flow_event_id().into_inner(),
-        )
-        .execute(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(())
-    }
-
-    async fn update_trigger_state(
-        &self,
-        flow_binding: &FlowBinding,
-        trigger_event_id: EventID,
-        paused_manual: bool,
-        stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessUpdateError> {
+    ) -> Result<(), FlowProcessUpsertError> {
         // Load current state
-        let mut process_state = match self.load_process_state(flow_binding).await {
-            Ok(state) => state,
+        match self.load_process_state(&flow_binding).await {
+            // Got existing row => update it
+            Ok(mut process_state) => {
+                // Backup current event IDs for concurrency check
+                let current_trigger_event_id = process_state.last_applied_trigger_event_id();
+                let current_flow_event_id = process_state.last_applied_flow_event_id();
+
+                // Apply updates in memory
+                process_state
+                    .update_trigger_state(
+                        trigger_event_id,
+                        self.time_source.now(),
+                        paused_manual,
+                        stop_policy,
+                    )
+                    .int_err()?;
+
+                // Try saving back
+                match self
+                    .save_process_state(
+                        &process_state,
+                        current_trigger_event_id,
+                        current_flow_event_id,
+                    )
+                    .await
+                {
+                    Ok(()) => Ok(()),
+                    Err(FlowProcessSaveError::ConcurrentModification(e)) => {
+                        Err(FlowProcessUpsertError::ConcurrentModification(e))
+                    }
+                    Err(FlowProcessSaveError::Internal(e)) => {
+                        Err(FlowProcessUpsertError::Internal(e))
+                    }
+                }
+            }
+
+            // No existing row, create new
             Err(FlowProcessLoadError::NotFound(_)) => {
-                return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding: flow_binding.clone(),
-                }));
-            }
-            Err(FlowProcessLoadError::Internal(e)) => {
-                return Err(FlowProcessUpdateError::Internal(e));
-            }
-        };
+                let state = FlowProcessState::new(
+                    trigger_event_id,
+                    self.time_source.now(),
+                    flow_binding,
+                    sort_key,
+                    paused_manual,
+                    stop_policy,
+                );
 
-        // Backup current event IDs for concurrency check
-        let current_trigger_event_id = process_state.last_applied_trigger_event_id();
-        let current_flow_event_id = process_state.last_applied_flow_event_id();
+                let scope_data_json =
+                    serde_json::to_value(&state.flow_binding().scope).int_err()?;
 
-        // Apply updates in memory
-        process_state
-            .update_trigger_state(
-                trigger_event_id,
-                self.time_source.now(),
-                paused_manual,
-                stop_policy,
-            )
-            .int_err()?;
+                let stop_policy_kind = state.stop_policy().kind_to_string();
+                let stop_policy_data = serde_json::to_value(state.stop_policy()).int_err()?;
 
-        // Try saving back
-        match self
-            .save_process_state(
-                &process_state,
-                current_trigger_event_id,
-                current_flow_event_id,
-            )
-            .await
-        {
-            Ok(()) => Ok(()),
-            Err(FlowProcessSaveError::ConcurrentModification(e)) => {
-                Err(FlowProcessUpdateError::ConcurrentModification(e))
+                let mut tr = self.transaction.lock().await;
+                let connection_mut = tr.connection_mut().await?;
+
+                let result = sqlx::query!(
+                    r#"
+                    INSERT INTO flow_process_states (
+                        scope_data,
+                        flow_type,
+                        paused_manual,
+                        stop_policy_kind,
+                        stop_policy_data,
+                        consecutive_failures,
+                        last_success_at,
+                        last_failure_at,
+                        last_attempt_at,
+                        next_planned_at,
+                        effective_state,
+                        sort_key,
+                        updated_at,
+                        last_applied_trigger_event_id,
+                        last_applied_flow_event_id
+                    )
+                    VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                    ON CONFLICT (flow_type, scope_data) DO NOTHING
+                    "#,
+                    scope_data_json,
+                    state.flow_binding().flow_type,
+                    state.paused_manual(),
+                    stop_policy_kind as &str,
+                    stop_policy_data,
+                    i32::try_from(state.consecutive_failures()).unwrap(),
+                    state.last_success_at(),
+                    state.last_failure_at(),
+                    state.last_attempt_at(),
+                    state.next_planned_at(),
+                    state.effective_state() as FlowProcessEffectiveState,
+                    state.sort_key(),
+                    state.updated_at(),
+                    state.last_applied_trigger_event_id().into_inner(),
+                    state.last_applied_flow_event_id().into_inner(),
+                )
+                .execute(connection_mut)
+                .await
+                .int_err()?;
+
+                if result.rows_affected() == 0 {
+                    return Err(FlowProcessUpsertError::ConcurrentModification(
+                        FlowProcessConcurrentModificationError {
+                            flow_binding: state.flow_binding().clone(),
+                        },
+                    ));
+                }
+
+                Ok(())
             }
-            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessUpdateError::Internal(e)),
+
+            // Bad error
+            Err(FlowProcessLoadError::Internal(e)) => Err(FlowProcessUpsertError::Internal(e)),
         }
     }
 

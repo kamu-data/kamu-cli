@@ -374,7 +374,6 @@ async fn test_subscription_marked_unreachable_on_trigger_stop() {
                     Some(&dataset_id),
                 ),
                 trigger_status: FlowTriggerStatus::StoppedAutomatically,
-                previous_trigger_status: Some(FlowTriggerStatus::Active),
                 rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
                     every: Duration::days(1),
                 })),

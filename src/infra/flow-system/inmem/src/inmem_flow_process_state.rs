@@ -389,59 +389,38 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
 
 #[async_trait::async_trait]
 impl FlowProcessStateRepository for InMemoryFlowProcessState {
-    async fn insert_process_state(
+    async fn upsert_process_state_on_trigger_event(
         &self,
         trigger_event_id: EventID,
         flow_binding: FlowBinding,
         sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessInsertError> {
+    ) -> Result<(), FlowProcessUpsertError> {
         let mut state = self.state.write().unwrap();
-        if state.process_state_by_binding.contains_key(&flow_binding) {
-            return Err(FlowProcessInsertError::AlreadyExists { flow_binding });
+        if let Some(existing) = state.process_state_by_binding.get_mut(&flow_binding) {
+            existing
+                .update_trigger_state(
+                    trigger_event_id,
+                    self.time_source.now(),
+                    paused_manual,
+                    stop_policy,
+                )
+                .int_err()
+                .map_err(FlowProcessUpsertError::Internal)?;
+        } else {
+            state.process_state_by_binding.insert(
+                flow_binding.clone(),
+                FlowProcessState::new(
+                    trigger_event_id,
+                    self.time_source.now(),
+                    flow_binding,
+                    sort_key,
+                    paused_manual,
+                    stop_policy,
+                ),
+            );
         }
-
-        state.process_state_by_binding.insert(
-            flow_binding.clone(),
-            FlowProcessState::new(
-                trigger_event_id,
-                self.time_source.now(),
-                flow_binding,
-                sort_key,
-                paused_manual,
-                stop_policy,
-            ),
-        );
-
-        Ok(())
-    }
-
-    async fn update_trigger_state(
-        &self,
-        flow_binding: &FlowBinding,
-        trigger_event_id: EventID,
-        paused_manual: bool,
-        stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessUpdateError> {
-        let mut state = self.state.write().unwrap();
-        let process_state = state
-            .process_state_by_binding
-            .get_mut(flow_binding)
-            .ok_or_else(|| {
-                FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding: flow_binding.clone(),
-                })
-            })?;
-
-        process_state
-            .update_trigger_state(
-                trigger_event_id,
-                self.time_source.now(),
-                paused_manual,
-                stop_policy,
-            )
-            .int_err()?;
 
         Ok(())
     }

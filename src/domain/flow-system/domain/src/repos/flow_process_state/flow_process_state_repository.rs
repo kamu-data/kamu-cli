@@ -18,24 +18,15 @@ use crate::{FlowBinding, FlowTriggerStopPolicy};
 
 #[async_trait::async_trait]
 pub trait FlowProcessStateRepository: Send + Sync {
-    /// Insert a new row when a trigger is created.
-    async fn insert_process_state(
+    /// Upsert a row when a trigger is created or updated.
+    async fn upsert_process_state_on_trigger_event(
         &self,
         trigger_event_id: EventID,
         flow_binding: FlowBinding,
         sort_key: String,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessInsertError>;
-
-    /// Update trigger-related fields
-    async fn update_trigger_state(
-        &self,
-        flow_binding: &FlowBinding,
-        trigger_event_id: EventID,
-        paused_manual: bool,
-        stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessUpdateError>;
+    ) -> Result<(), FlowProcessUpsertError>;
 
     /// Apply a flow result (success or failure).
     async fn apply_flow_result(
@@ -59,6 +50,17 @@ pub trait FlowProcessStateRepository: Send + Sync {
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<(), FlowProcessDeleteError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum FlowProcessUpsertError {
+    #[error(transparent)]
+    ConcurrentModification(FlowProcessConcurrentModificationError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

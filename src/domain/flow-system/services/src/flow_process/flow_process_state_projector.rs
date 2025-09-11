@@ -64,48 +64,27 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow trigger message");
 
-        // New trigger?
-        if message.previous_trigger_status.is_none() {
-            let sort_key = self
-                .make_sort_key(target_catalog, &message.flow_binding)
-                .await?;
+        let sort_key = self
+            .make_sort_key(target_catalog, &message.flow_binding)
+            .await?;
 
-            self.flow_process_state_repository
-                .insert_process_state(
-                    message.event_id,
-                    message.flow_binding.clone(),
-                    sort_key,
-                    message.trigger_status == FlowTriggerStatus::PausedByUser,
-                    message.stop_policy,
-                )
-                .await
-                .map_err(|e| {
-                    tracing::error!(
-                        error = ?e,
-                        error_msg = %e,
-                        "Failed to insert new flow process"
-                    );
-                    e.int_err()
-                })?;
-        } else {
-            // Existing trigger
-            self.flow_process_state_repository
-                .update_trigger_state(
-                    &message.flow_binding,
-                    message.event_id,
-                    message.trigger_status == FlowTriggerStatus::PausedByUser,
-                    message.stop_policy,
-                )
-                .await
-                .map_err(|e| {
-                    tracing::error!(
-                        error = ?e,
-                        error_msg = %e,
-                        "Failed to update flow process trigger state"
-                    );
-                    e.int_err()
-                })?;
-        }
+        self.flow_process_state_repository
+            .upsert_process_state_on_trigger_event(
+                message.event_id,
+                message.flow_binding.clone(),
+                sort_key,
+                message.trigger_status == FlowTriggerStatus::PausedByUser,
+                message.stop_policy,
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Failed to insert new flow process"
+                );
+                e.int_err()
+            })?;
 
         Ok(())
     }
