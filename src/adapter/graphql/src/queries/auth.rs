@@ -69,7 +69,7 @@ impl Auth {
             .await
             .int_err()?;
         let authorized_datasets_map = rebac_service
-            .get_authorized_datasets_by_account_ids(&account_ids[..])
+            .get_authorized_datasets_by_account_ids(&account_ids)
             .await
             .int_err()?;
         let dataset_entries_map = {
