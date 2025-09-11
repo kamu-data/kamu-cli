@@ -32,17 +32,17 @@ pub struct FlowTriggerUpdatedMessage {
     /// The unique binding identifying the flow
     pub flow_binding: FlowBinding,
 
-    /// Status of the trigger
+    /// Current status of the trigger
     pub trigger_status: FlowTriggerStatus,
+
+    /// Previous status of the trigger
+    pub previous_trigger_status: Option<FlowTriggerStatus>,
 
     /// The updated trigger rule for the flow
     pub rule: FlowTriggerRule,
 
     /// The stop policy for the flow
     pub stop_policy: FlowTriggerStopPolicy,
-
-    /// New trigger indicator
-    pub is_new_trigger: bool,
 }
 
 impl Message for FlowTriggerUpdatedMessage {

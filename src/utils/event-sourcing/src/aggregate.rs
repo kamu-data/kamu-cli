@@ -90,8 +90,8 @@ where
 
     /// Returns the last event ID in an event store to which this aggregate was
     /// synchronized
-    pub fn last_stored_event_id(&self) -> Option<&EventID> {
-        self.last_stored_event_id.as_ref()
+    pub fn last_stored_event_id(&self) -> Option<EventID> {
+        self.last_stored_event_id
     }
 
     /// Initializes an aggregate from event history
