@@ -469,184 +469,6 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_list_processes_filter_by_name_contains(catalog: &Catalog) {
-    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
-    csv_loader.populate_from_csv().await;
-
-    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
-
-    // Test filtering by name containing "acme"
-    let acme_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("acme"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Should find processes with sort keys starting with "acme" (prefix matching)
-    assert!(!acme_processes.processes.is_empty());
-    assert_eq!(acme_processes.processes.len(), 13);
-    assert_eq!(acme_processes.total_count, 13);
-    assert_flow_type_distribution(&acme_processes.processes, 3, 4, 6);
-    assert_effective_state_distribution(&acme_processes.processes, 5, 5, 3, 0);
-
-    for process in &acme_processes.processes {
-        assert!(process.sort_key().to_lowercase().starts_with("acme"));
-    }
-
-    // Test filtering by name starting with "beta"
-    let beta_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("beta"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Should find processes with sort keys starting with "beta" (prefix matching)
-    assert!(!beta_processes.processes.is_empty());
-    assert_eq!(beta_processes.processes.len(), 5);
-    assert_eq!(beta_processes.total_count, 5);
-    assert_flow_type_distribution(&beta_processes.processes, 1, 1, 3);
-    assert_effective_state_distribution(&beta_processes.processes, 0, 3, 0, 2);
-
-    for process in &beta_processes.processes {
-        assert!(process.sort_key().to_lowercase().starts_with("beta"));
-    }
-
-    // Test 1: Unmatched prefix - should return no results
-    let unmatched_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("nonexistent"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    assert!(unmatched_processes.processes.is_empty());
-    assert_eq!(unmatched_processes.processes.len(), 0);
-    assert_eq!(unmatched_processes.total_count, 0);
-
-    // Test 2: Hierarchical identifier prefix - match specific acme dataset types
-    let acme_orders_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("acme/orders"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Should find acme/orders and acme/orders.* processes (prefix matching)
-    assert!(!acme_orders_processes.processes.is_empty());
-    assert_eq!(acme_orders_processes.processes.len(), 6); // acme/orders + variants + webhooks
-    assert_eq!(acme_orders_processes.total_count, 6);
-    assert_flow_type_distribution(&acme_orders_processes.processes, 1, 2, 3);
-    assert_effective_state_distribution(&acme_orders_processes.processes, 4, 1, 1, 0);
-
-    for process in &acme_orders_processes.processes {
-        assert!(process.sort_key().to_lowercase().starts_with("acme/orders"));
-    }
-
-    // Test 3: Webhook prefix with nested path - test hierarchical webhook
-    // identifiers
-    let webhook_prefix_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("acme/logs/"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Should find webhook processes with acme/logs/* sort keys
-    assert!(!webhook_prefix_processes.processes.is_empty());
-    assert_eq!(webhook_prefix_processes.processes.len(), 1); // acme/logs/security_monitor
-    assert_eq!(webhook_prefix_processes.total_count, 1);
-    assert_flow_type_distribution(&webhook_prefix_processes.processes, 0, 0, 1);
-    assert_effective_state_distribution(&webhook_prefix_processes.processes, 0, 1, 0, 0);
-
-    for process in &webhook_prefix_processes.processes {
-        assert!(process.sort_key().to_lowercase().starts_with("acme/logs/"));
-    }
-
-    // Test 4: Case insensitive matching - uppercase input should match lowercase
-    // data
-    let uppercase_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("ACME"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Should find same results as lowercase "acme" (case insensitive)
-    assert!(!uppercase_processes.processes.is_empty());
-    assert_eq!(uppercase_processes.processes.len(), 13);
-    assert_eq!(uppercase_processes.total_count, 13);
-    assert_flow_type_distribution(&uppercase_processes.processes, 3, 4, 6);
-    assert_effective_state_distribution(&uppercase_processes.processes, 5, 5, 3, 0);
-
-    for process in &uppercase_processes.processes {
-        assert!(process.sort_key().to_lowercase().starts_with("acme"));
-    }
-
-    // Test 5: Substring matching should fail (prefix search only)
-    let substring_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("catalog"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Should return no results since "catalog" is not a prefix
-    // (only appears in beta/catalog.*, gamma/audit, etc.)
-    assert!(substring_processes.processes.is_empty());
-    assert_eq!(substring_processes.processes.len(), 0);
-    assert_eq!(substring_processes.total_count, 0);
-
-    // Verify by testing a valid prefix that contains "catalog"
-    let beta_catalog_processes = flow_process_state_query
-        .list_processes(
-            FlowProcessListFilter::all().with_name_contains("beta/catalog"),
-            FlowProcessOrder::recent(),
-            100,
-            0,
-        )
-        .await
-        .unwrap();
-
-    // Should find beta/catalog.* processes (prefix matching works)
-    assert!(!beta_catalog_processes.processes.is_empty());
-    assert_eq!(beta_catalog_processes.processes.len(), 5);
-    assert_eq!(beta_catalog_processes.total_count, 5);
-
-    for process in &beta_catalog_processes.processes {
-        assert!(
-            process
-                .sort_key()
-                .to_lowercase()
-                .starts_with("beta/catalog")
-        );
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
     let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
     csv_loader.populate_from_csv().await;
@@ -895,8 +717,7 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
                 .with_effective_states(&[
                     FlowProcessEffectiveState::Active,
                     FlowProcessEffectiveState::Failing,
-                ])
-                .with_name_contains("acme"),
+                ]),
             FlowProcessOrder::recent(),
             100,
             0,
@@ -917,9 +738,6 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
             state == FlowProcessEffectiveState::Active
                 || state == FlowProcessEffectiveState::Failing
         );
-
-        // Check name contains
-        assert!(process.sort_key().to_lowercase().contains("acme"));
     }
 }
 
