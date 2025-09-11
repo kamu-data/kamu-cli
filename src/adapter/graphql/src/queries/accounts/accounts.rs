@@ -73,11 +73,13 @@ impl Accounts {
             )));
         }
 
-        Ok(lookup
+        let accounts = lookup
             .found
             .into_iter()
             .map(Account::from_account)
-            .collect())
+            .collect();
+
+        Ok(accounts)
     }
 
     /// Returns an account by its name, if found
@@ -117,7 +119,13 @@ impl Accounts {
             )));
         }
 
-        Ok(lookup.found.into_iter().map(Account::new).collect())
+        let accounts = lookup
+            .found
+            .into_iter()
+            .map(Account::from_account)
+            .collect();
+
+        Ok(accounts)
     }
 }
 

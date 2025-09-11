@@ -92,7 +92,9 @@ impl AccountsMut {
             )));
         }
 
-        Ok(lookup.found.into_iter().map(AccountMut::new).collect())
+        let account_muts = lookup.found.into_iter().map(AccountMut::new).collect();
+
+        Ok(account_muts)
     }
 
     /// Returns a mutable account by its name
@@ -136,7 +138,9 @@ impl AccountsMut {
             )));
         }
 
-        Ok(lookup.found.into_iter().map(AccountMut::new).collect())
+        let account_muts = lookup.found.into_iter().map(AccountMut::new).collect();
+
+        Ok(account_muts)
     }
 
     /// Create a new account
