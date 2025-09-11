@@ -676,7 +676,7 @@ impl DataWriterDataFusion {
 
         let mut link_columns = Vec::new();
         for f in &schema.fields {
-            Self::collect_link_columns(f, &mut link_columns)?;
+            Self::collect_link_columns(f, &Vec::new(), &mut link_columns)?;
         }
 
         if link_columns.is_empty() {
@@ -768,9 +768,9 @@ impl DataWriterDataFusion {
 
     fn collect_link_columns(
         field: &odf::schema::DataField,
+        path: &Vec<&odf::schema::DataField>,
         cols: &mut Vec<Expr>,
     ) -> Result<(), InternalError> {
-        use odf::schema::ext::*;
         use odf::schema::*;
 
         match &field.r#type {
@@ -781,23 +781,18 @@ impl DataWriterDataFusion {
                     name: field.name.clone(),
                     extra: field.extra.clone(),
                 };
-                Self::collect_link_columns(&f, cols)
+                Self::collect_link_columns(&f, path, cols)
             }
-            DataType::String(_) => match field.get_extra::<AttrType>().int_err()? {
-                Some(AttrType {
-                    r#type:
-                        odf::schema::ext::DataTypeExt::ObjectLink(DataTypeExtObjectLink { link_type }),
-                }) => match link_type.as_ref() {
-                    DataTypeExt::Multihash(_) => {
-                        cols.push(col(Column::from_name(&field.name)));
-                        Ok(())
+            DataType::String(_) => {
+                if Self::is_object_link(field)? {
+                    if !path.is_empty() {
+                        return Err("Nested ObjectLink columns are not yet supported".int_err());
                     }
-                    DataTypeExt::Did(_) | DataTypeExt::ObjectLink(_) | DataTypeExt::Core(_) => {
-                        Err(format!("Unsupported link type: {link_type:?}").int_err())
-                    }
-                },
-                _ => Ok(()),
-            },
+
+                    cols.push(col(Column::from_name(&field.name)));
+                }
+                Ok(())
+            }
             DataType::Binary(_)
             | DataType::Bool(_)
             | DataType::Date(_)
@@ -816,8 +811,49 @@ impl DataWriterDataFusion {
             | DataType::UInt64(_)
             | DataType::Null(_)
             | DataType::Time(_)
-            | DataType::Timestamp(_) => Ok(()),
-            DataType::List(_) | DataType::Map(_) | DataType::Struct(_) => unimplemented!(),
+            | DataType::Timestamp(_)
+            | DataType::Map(_) => {
+                if Self::is_object_link(field)? {
+                    return Err("ObjectLink is only expected on String core type".int_err());
+                }
+                Ok(())
+            }
+            DataType::List(_) => {
+                if Self::is_object_link(field)? {
+                    return Err("Nested ObjectLink columns are not yet supported".int_err());
+                }
+                Ok(())
+            }
+            DataType::Struct(t) => {
+                if Self::is_object_link(field)? {
+                    return Err("ObjectLink is only expected on String core type".int_err());
+                }
+
+                let mut subpath = path.clone();
+                for sf in &t.fields {
+                    subpath.push(sf);
+                    Self::collect_link_columns(sf, &subpath, cols)?;
+                    subpath.pop();
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn is_object_link(field: &odf::schema::DataField) -> Result<bool, InternalError> {
+        use odf::schema::ext::*;
+
+        match field.get_extra::<AttrType>().int_err()? {
+            Some(AttrType {
+                r#type:
+                    odf::schema::ext::DataTypeExt::ObjectLink(DataTypeExtObjectLink { link_type }),
+            }) => match link_type.as_ref() {
+                DataTypeExt::Multihash(_) => Ok(true),
+                DataTypeExt::Did(_) | DataTypeExt::ObjectLink(_) | DataTypeExt::Core(_) => {
+                    Err(format!("Unsupported link type: {link_type:?}").int_err())
+                }
+            },
+            _ => Ok(false),
         }
     }
 
