@@ -271,7 +271,10 @@ impl KamuTable {
                 .to_arrow(&odf::metadata::ToArrowSettings {
                     // NOTE: Using more efficient View encodings as default
                     // TODO: Make configurable
-                    default_buffer_encoding: Some(odf::metadata::ArrowBufferEncoding::View {
+                    default_binary_encoding: Some(odf::metadata::ArrowBufferEncoding::View {
+                        offset_bit_width: Some(32),
+                    }),
+                    default_string_encoding: Some(odf::metadata::ArrowBufferEncoding::View {
                         offset_bit_width: Some(32),
                     }),
                     ..Default::default()

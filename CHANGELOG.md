@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Crash on writing datasets with `List` field type
+
 ## [0.248.0] - 2025-09-09
 ### Added
 - Introducing ODF Schema per [ODF RFC-016](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/016-odf-schema.md)

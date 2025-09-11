@@ -62,8 +62,14 @@ impl DataSchema {
 
 #[derive(Debug, Clone, Default)]
 pub struct ToArrowSettings {
-    // Which buffer encoding to use if not explicitly specified
-    pub default_buffer_encoding: Option<ArrowBufferEncoding>,
+    // Which encoding to use for Binary type if not explicitly specified
+    pub default_binary_encoding: Option<ArrowBufferEncoding>,
+
+    // Which encoding to use for String type if not explicitly specified
+    pub default_string_encoding: Option<ArrowBufferEncoding>,
+
+    // Which encoding to use for List type if not explicitly specified
+    pub default_list_encoding: Option<ArrowBufferEncoding>,
 
     // How to represent Date if not explicitly specified
     pub default_date_encoding: Option<ArrowDateEncoding>,
@@ -265,7 +271,12 @@ impl DataType {
                         item_type: Box::new(item_type),
                         fixed_length: None,
                     }),
-                    None,
+                    Some(
+                        ArrowBufferEncoding::Contiguous {
+                            offset_bit_width: Some(32),
+                        }
+                        .into(),
+                    ),
                 )
             }
             ArrowDataType::ListView(field) => {
@@ -478,16 +489,24 @@ impl DataType {
             encoding.cloned()
         } else {
             match self {
-                DataType::Binary(_) | DataType::String(_) | DataType::List(_) => {
-                    Some(ArrowEncoding {
-                        buffer: settings.default_buffer_encoding.clone(),
-                        date: None,
-                        decimal: None,
-                    })
-                }
+                DataType::Binary(_) => Some(ArrowEncoding {
+                    buffer: settings.default_binary_encoding.clone(),
+                    date: None,
+                    decimal: None,
+                }),
+                DataType::String(_) => Some(ArrowEncoding {
+                    buffer: settings.default_string_encoding.clone(),
+                    date: None,
+                    decimal: None,
+                }),
                 DataType::Date(_) => Some(ArrowEncoding {
                     buffer: None,
                     date: settings.default_date_encoding.clone(),
+                    decimal: None,
+                }),
+                DataType::List(_) => Some(ArrowEncoding {
+                    buffer: settings.default_list_encoding.clone(),
+                    date: None,
                     decimal: None,
                 }),
                 DataType::Bool(_)
@@ -1081,6 +1100,11 @@ mod test {
         let arrow_schema = ArrowSchema::new(vec![
             ArrowField::new("utf8", ArrowDataType::Utf8, false),
             ArrowField::new("binary", ArrowDataType::Binary, false),
+            ArrowField::new(
+                "list",
+                ArrowDataType::List(ArrowField::new("item", ArrowDataType::Utf8, false).into()),
+                false,
+            ),
         ]);
 
         let odf_schema = DataSchema::new_from_arrow(&arrow_schema).unwrap();
@@ -1091,7 +1115,12 @@ mod test {
                 }),
                 DataField::binary("binary").encoding(ArrowBufferEncoding::Contiguous {
                     offset_bit_width: Some(32)
-                })
+                }),
+                DataField::list("list", DataType::string()).encoding(
+                    ArrowBufferEncoding::Contiguous {
+                        offset_bit_width: Some(32)
+                    }
+                )
             ]),
             odf_schema,
         );
@@ -1107,8 +1136,14 @@ mod test {
             odf_schema
                 .strip_encoding()
                 .to_arrow(&ToArrowSettings {
-                    default_buffer_encoding: Some(ArrowBufferEncoding::View {
+                    default_binary_encoding: Some(ArrowBufferEncoding::View {
                         offset_bit_width: Some(32)
+                    }),
+                    default_string_encoding: Some(ArrowBufferEncoding::View {
+                        offset_bit_width: Some(32)
+                    }),
+                    default_list_encoding: Some(ArrowBufferEncoding::View {
+                        offset_bit_width: Some(64)
                     }),
                     default_date_encoding: None,
                 })
@@ -1116,6 +1151,14 @@ mod test {
             ArrowSchema::new(vec![
                 ArrowField::new("utf8", ArrowDataType::Utf8View, false),
                 ArrowField::new("binary", ArrowDataType::BinaryView, false),
+                // TODO: Validate that this is correct and that view types can stack up like that
+                ArrowField::new(
+                    "list",
+                    ArrowDataType::LargeListView(
+                        ArrowField::new("item", ArrowDataType::Utf8View, false).into()
+                    ),
+                    false
+                ),
             ])
         );
     }
