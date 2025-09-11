@@ -35,9 +35,6 @@ pub struct FlowTriggerUpdatedMessage {
     /// Current status of the trigger
     pub trigger_status: FlowTriggerStatus,
 
-    /// Previous status of the trigger
-    pub previous_trigger_status: Option<FlowTriggerStatus>,
-
     /// The updated trigger rule for the flow
     pub rule: FlowTriggerRule,
 

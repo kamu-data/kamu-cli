@@ -34,40 +34,33 @@ impl FlowTriggerServiceImpl {
         &self,
         request_time: DateTime<Utc>,
         mut flow_trigger: FlowTrigger,
-        previous_status: Option<FlowTriggerStatus>,
     ) -> Result<FlowTriggerState, InternalError> {
         flow_trigger.pause(request_time).int_err()?;
-        self.save_trigger(request_time, flow_trigger, previous_status)
-            .await
+        self.save_trigger(request_time, flow_trigger).await
     }
 
     async fn stop_given_trigger(
         &self,
         request_time: DateTime<Utc>,
         mut flow_trigger: FlowTrigger,
-        previous_status: Option<FlowTriggerStatus>,
     ) -> Result<FlowTriggerState, InternalError> {
         flow_trigger.stop(request_time).int_err()?;
-        self.save_trigger(request_time, flow_trigger, previous_status)
-            .await
+        self.save_trigger(request_time, flow_trigger).await
     }
 
     async fn resume_given_trigger(
         &self,
         request_time: DateTime<Utc>,
         mut flow_trigger: FlowTrigger,
-        previous_status: Option<FlowTriggerStatus>,
     ) -> Result<FlowTriggerState, InternalError> {
         flow_trigger.resume(request_time).int_err()?;
-        self.save_trigger(request_time, flow_trigger, previous_status)
-            .await
+        self.save_trigger(request_time, flow_trigger).await
     }
 
     async fn save_trigger(
         &self,
         request_time: DateTime<Utc>,
         mut flow_trigger: FlowTrigger,
-        previous_status: Option<FlowTriggerStatus>,
     ) -> Result<FlowTriggerState, InternalError> {
         // Skip saving and publishing events if nothing changed
         if flow_trigger.has_updates() {
@@ -76,7 +69,7 @@ impl FlowTriggerServiceImpl {
                 .await
                 .int_err()?;
 
-            self.publish_trigger_updated(&flow_trigger, previous_status, request_time)
+            self.publish_trigger_updated(&flow_trigger, request_time)
                 .await?;
         }
 
@@ -86,7 +79,6 @@ impl FlowTriggerServiceImpl {
     async fn publish_trigger_updated(
         &self,
         trigger: &FlowTrigger,
-        previous_status: Option<FlowTriggerStatus>,
         request_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         let message = FlowTriggerUpdatedMessage {
@@ -96,7 +88,6 @@ impl FlowTriggerServiceImpl {
             rule: trigger.rule.clone(),
             stop_policy: trigger.stop_policy,
             trigger_status: trigger.status,
-            previous_trigger_status: previous_status,
         };
 
         self.outbox
@@ -197,26 +188,21 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         let maybe_flow_trigger =
             FlowTrigger::try_load(&flow_binding, self.flow_trigger_event_store.as_ref()).await?;
 
-        let (flow_trigger, previous_status) = match maybe_flow_trigger {
+        let flow_trigger = match maybe_flow_trigger {
             // Modification
             Some(mut flow_trigger) => {
-                let previous_status = Some(flow_trigger.status);
-
                 flow_trigger
                     .modify_rule(self.time_source.now(), rule, stop_policy)
                     .int_err()?;
 
-                (flow_trigger, previous_status)
+                flow_trigger
             }
             // New trigger
-            None => (
-                FlowTrigger::new(self.time_source.now(), flow_binding, rule, stop_policy),
-                None,
-            ),
+            None => FlowTrigger::new(self.time_source.now(), flow_binding, rule, stop_policy),
         };
 
         // Save trigger
-        self.save_trigger(request_time, flow_trigger, previous_status)
+        self.save_trigger(request_time, flow_trigger)
             .await
             .map_err(Into::into)
     }
@@ -247,8 +233,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 .int_err()?;
 
         if let Some(flow_trigger) = maybe_flow_trigger {
-            let previous_status = Some(flow_trigger.status);
-            self.pause_given_trigger(request_time, flow_trigger, previous_status)
+            self.pause_given_trigger(request_time, flow_trigger)
                 .await
                 .int_err()?;
         }
@@ -267,8 +252,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 .int_err()?;
 
         if let Some(flow_trigger) = maybe_flow_trigger {
-            let previous_status = Some(flow_trigger.status);
-            self.resume_given_trigger(request_time, flow_trigger, previous_status)
+            self.resume_given_trigger(request_time, flow_trigger)
                 .await
                 .int_err()?;
         }
@@ -299,8 +283,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
 
             for flow_trigger in flow_triggers {
                 if flow_trigger.is_alive() {
-                    let previous_status = Some(flow_trigger.status);
-                    self.pause_given_trigger(request_time, flow_trigger, previous_status)
+                    self.pause_given_trigger(request_time, flow_trigger)
                         .await
                         .int_err()?;
                 }
@@ -333,8 +316,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
 
             for flow_trigger in flow_triggers {
                 if flow_trigger.is_alive() {
-                    let previous_status = Some(flow_trigger.status);
-                    self.resume_given_trigger(request_time, flow_trigger, previous_status)
+                    self.resume_given_trigger(request_time, flow_trigger)
                         .await
                         .int_err()?;
                 }
@@ -371,8 +353,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
 
         if let Some(active_trigger) = maybe_active_trigger {
             // We got the trigger.
-            let previous_status = Some(active_trigger.status);
-
             // The failure is either:
             //  - unrecoverable => no sense to continue attempts until user fixes the issue
             //  - recoverable   => evaluate stop policy
@@ -381,7 +361,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                     flow_binding = ?flow_binding,
                     "Auto-stopping flow trigger after unrecoverable failure",
                 );
-                self.stop_given_trigger(request_time, active_trigger, previous_status)
+                self.stop_given_trigger(request_time, active_trigger)
                     .await
                     .int_err()?;
             } else {
@@ -404,7 +384,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                                 %actual_failures_count,
                                 "Auto-stopping flow trigger after crossing consecutive failures threshold",
                             );
-                            self.stop_given_trigger(request_time, active_trigger, previous_status)
+                            self.stop_given_trigger(request_time, active_trigger)
                                 .await
                                 .int_err()?;
                         } else {
