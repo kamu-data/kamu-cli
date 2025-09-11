@@ -478,20 +478,14 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         Ok(())
     }
 
-    async fn delete_process_state(
+    async fn delete_process_states_by_scope(
         &self,
-        flow_binding: &FlowBinding,
+        scope: &FlowScope,
     ) -> Result<(), FlowProcessDeleteError> {
         let mut state = self.state.write().unwrap();
-        if state
+        state
             .process_state_by_binding
-            .remove(flow_binding)
-            .is_none()
-        {
-            return Err(FlowProcessDeleteError::NotFound(FlowProcessNotFoundError {
-                flow_binding: flow_binding.clone(),
-            }));
-        }
+            .retain(|binding, _| binding.scope != *scope);
         Ok(())
     }
 }

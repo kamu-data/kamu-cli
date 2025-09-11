@@ -632,9 +632,9 @@ pub async fn test_delete_process(catalog: &Catalog) {
         .unwrap();
     assert_eq!(rollup_before.total, 1);
 
-    // Delete the process
+    // Delete the parent scope
     flow_process_repository
-        .delete_process_state(&flow_binding)
+        .delete_process_states_by_scope(&flow_binding.scope)
         .await
         .unwrap();
 
@@ -673,25 +673,184 @@ pub async fn test_delete_process(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_delete_process_not_found(catalog: &Catalog) {
+pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
     let flow_process_repository = catalog.get_one::<dyn FlowProcessStateRepository>().unwrap();
 
-    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"nonexistent-dataset-id");
-    let flow_binding = ingest_dataset_binding(&dataset_id);
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"random-dataset-id");
+    let sort_key = "kamu/random-dataset-id".to_string();
 
-    // Try to delete a process that doesn't exist
-    let result = flow_process_repository
-        .delete_process_state(&flow_binding)
-        .await;
+    // Create multiple flow types for the same dataset scope
+    use kamu_adapter_flow_dataset::{
+        compaction_dataset_binding,
+        ingest_dataset_binding,
+        transform_dataset_binding,
+    };
 
-    // Should return NotFound error
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        FlowProcessDeleteError::NotFound(err) => {
-            assert_eq!(err.flow_binding, flow_binding);
-        }
-        other => panic!("Expected NotFound error, got: {other:?}",),
-    }
+    let ingest_binding = ingest_dataset_binding(&dataset_id);
+    let transform_binding = transform_dataset_binding(&dataset_id);
+    let compaction_binding = compaction_dataset_binding(&dataset_id);
+
+    // Verify all bindings have the same scope but different flow types
+    assert_eq!(ingest_binding.scope, transform_binding.scope);
+    assert_eq!(ingest_binding.scope, compaction_binding.scope);
+    assert_ne!(ingest_binding.flow_type, transform_binding.flow_type);
+    assert_ne!(ingest_binding.flow_type, compaction_binding.flow_type);
+    assert_ne!(transform_binding.flow_type, compaction_binding.flow_type);
+
+    // Insert process states for all three flow types
+    flow_process_repository
+        .upsert_process_state_on_trigger_event(
+            EventID::new(1),
+            ingest_binding.clone(),
+            sort_key.clone(),
+            false,
+            FlowTriggerStopPolicy::default(),
+        )
+        .await
+        .unwrap();
+
+    flow_process_repository
+        .upsert_process_state_on_trigger_event(
+            EventID::new(2),
+            transform_binding.clone(),
+            sort_key.clone(),
+            false,
+            FlowTriggerStopPolicy::default(),
+        )
+        .await
+        .unwrap();
+
+    flow_process_repository
+        .upsert_process_state_on_trigger_event(
+            EventID::new(3),
+            compaction_binding.clone(),
+            sort_key.clone(),
+            false,
+            FlowTriggerStopPolicy::default(),
+        )
+        .await
+        .unwrap();
+
+    // Add some history to the processes
+    let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+
+    // Ingest process: successful
+    flow_process_repository
+        .apply_flow_result(EventID::new(4), &ingest_binding, true, success_time)
+        .await
+        .unwrap();
+
+    // Transform process: failed
+    let failure_time = success_time + Duration::hours(1);
+    flow_process_repository
+        .apply_flow_result(EventID::new(5), &transform_binding, false, failure_time)
+        .await
+        .unwrap();
+
+    // Compaction process: scheduled
+    let scheduled_time = failure_time + Duration::hours(1);
+    flow_process_repository
+        .on_flow_scheduled(EventID::new(6), &compaction_binding, scheduled_time)
+        .await
+        .unwrap();
+
+    // Verify all three process states exist
+    let ingest_state = flow_process_state_query
+        .try_get_process_state(&ingest_binding)
+        .await
+        .unwrap();
+    assert!(ingest_state.is_some());
+
+    let transform_state = flow_process_state_query
+        .try_get_process_state(&transform_binding)
+        .await
+        .unwrap();
+    assert!(transform_state.is_some());
+
+    let compaction_state = flow_process_state_query
+        .try_get_process_state(&compaction_binding)
+        .await
+        .unwrap();
+    assert!(compaction_state.is_some());
+
+    // Verify listing shows all three processes
+    let listing_before = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all(),
+            FlowProcessOrder {
+                field: FlowProcessOrderField::LastAttemptAt,
+                desc: true,
+            },
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+    assert_eq!(listing_before.processes.len(), 3);
+
+    // Verify rollup counts all three processes
+    let rollup_before = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .await
+        .unwrap();
+    assert_eq!(rollup_before.total, 3);
+    assert_eq!(rollup_before.active, 2); // ingest success + compaction scheduled
+    assert_eq!(rollup_before.failing, 0); // transform failed but is stopped, not failing
+    assert_eq!(rollup_before.paused, 0);
+    assert_eq!(rollup_before.stopped, 1); // transform stopped after single failure
+
+    // Delete by scope - this should remove ALL flow types for this dataset
+    flow_process_repository
+        .delete_process_states_by_scope(&ingest_binding.scope)
+        .await
+        .unwrap();
+
+    // Verify all process states are gone
+    let ingest_state_after = flow_process_state_query
+        .try_get_process_state(&ingest_binding)
+        .await
+        .unwrap();
+    assert!(ingest_state_after.is_none());
+
+    let transform_state_after = flow_process_state_query
+        .try_get_process_state(&transform_binding)
+        .await
+        .unwrap();
+    assert!(transform_state_after.is_none());
+
+    let compaction_state_after = flow_process_state_query
+        .try_get_process_state(&compaction_binding)
+        .await
+        .unwrap();
+    assert!(compaction_state_after.is_none());
+
+    // Verify listing is empty
+    let listing_after = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all(),
+            FlowProcessOrder {
+                field: FlowProcessOrderField::LastAttemptAt,
+                desc: true,
+            },
+            100,
+            0,
+        )
+        .await
+        .unwrap();
+    assert!(listing_after.processes.is_empty());
+
+    // Verify rollup shows everything is gone
+    let rollup_after = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .await
+        .unwrap();
+    assert_eq!(rollup_after.total, 0);
+    assert_eq!(rollup_after.active, 0);
+    assert_eq!(rollup_after.failing, 0);
+    assert_eq!(rollup_after.paused, 0);
+    assert_eq!(rollup_after.stopped, 0);
+    assert_eq!(rollup_after.worst_consecutive_failures, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -773,9 +932,9 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     assert_eq!(state.last_failure_at(), Some(failure_time));
     assert!(state.paused_manual());
 
-    // Delete the process
+    // Delete the flow scope
     flow_process_repository
-        .delete_process_state(&flow_binding)
+        .delete_process_states_by_scope(&flow_binding.scope)
         .await
         .unwrap();
 
