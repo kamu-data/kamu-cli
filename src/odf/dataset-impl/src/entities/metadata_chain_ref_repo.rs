@@ -79,7 +79,7 @@ where
             }?;
             if prev_expected != prev_actual.as_ref() {
                 return Err(RefCASError {
-                    reference: r.clone(),
+                    reference: *r,
                     expected: prev_expected.cloned(),
                     actual: prev_actual,
                 }

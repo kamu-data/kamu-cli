@@ -98,7 +98,7 @@ impl DatasetReferenceCASError {
     ) -> Self {
         Self {
             dataset_id: dataset_id.clone(),
-            block_ref: block_ref.clone(),
+            block_ref: *block_ref,
             expected_prev_block_hash: expected_prev_block_hash.cloned(),
             actual_prev_block_hash: actual_prev_block_hash.cloned(),
         }
