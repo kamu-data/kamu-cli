@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use crypto_utils::{Argon2Hasher, PasswordHashingMode};
-use database_common::PaginationOpts;
+use database_common::{BatchLookup, BatchLookupCreateOptions, PaginationOpts};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
@@ -58,12 +58,27 @@ impl AccountService for AccountServiceImpl {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, InternalError> {
-        self.account_repo
+        account_ids: &[&odf::AccountID],
+    ) -> Result<BatchLookup<Account, odf::AccountID, GetAccountByIdError>, InternalError> {
+        let accounts = self
+            .account_repo
             .get_accounts_by_ids(account_ids)
             .await
-            .int_err()
+            .int_err()?;
+
+        Ok(BatchLookup::from_found_items(
+            accounts,
+            account_ids,
+            BatchLookupCreateOptions {
+                found_ids_fn: |accounts| accounts.iter().map(|a| a.id.clone()).collect(),
+                not_found_err_fn: |account_id| {
+                    GetAccountByIdError::NotFound(AccountNotFoundByIdError {
+                        account_id: (*account_id).clone(),
+                    })
+                },
+                _phantom: Default::default(),
+            },
+        ))
     }
 
     async fn get_account_by_name(
