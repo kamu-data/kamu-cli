@@ -12,7 +12,7 @@ use event_sourcing::EventID;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{FlowBinding, FlowTriggerStopPolicy};
+use crate::{FlowBinding, FlowScope, FlowTriggerStopPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,10 +45,10 @@ pub trait FlowProcessStateRepository: Send + Sync {
         planned_at: DateTime<Utc>,
     ) -> Result<(), FlowProcessUpdateError>;
 
-    /// Remove row when trigger is deleted.
-    async fn delete_process_state(
+    /// Remove all rows for the given scope.
+    async fn delete_process_states_by_scope(
         &self,
-        flow_binding: &FlowBinding,
+        scope: &FlowScope,
     ) -> Result<(), FlowProcessDeleteError>;
 }
 
@@ -114,9 +114,6 @@ pub enum FlowProcessSaveError {
 
 #[derive(Error, Debug)]
 pub enum FlowProcessDeleteError {
-    #[error(transparent)]
-    NotFound(FlowProcessNotFoundError),
-
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
