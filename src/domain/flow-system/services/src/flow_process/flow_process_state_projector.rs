@@ -64,7 +64,8 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow trigger message");
 
-        if message.is_new_trigger {
+        // New trigger?
+        if message.previous_trigger_status.is_none() {
             let sort_key = self
                 .make_sort_key(target_catalog, &message.flow_binding)
                 .await?;
@@ -87,6 +88,7 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
                     e.int_err()
                 })?;
         } else {
+            // Existing trigger
             self.flow_process_state_repository
                 .update_trigger_state(
                     &message.flow_binding,

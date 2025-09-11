@@ -60,7 +60,7 @@ async fn test_task_save_load_update() {
     task.cancel(Utc::now()).unwrap();
 
     task.save(&event_store).await.unwrap();
-    let cancel_event = *task.last_stored_event_id().unwrap();
+    let cancel_event = task.last_stored_event_id().unwrap();
     assert_eq!(event_store.len().await.unwrap(), 3);
 
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();

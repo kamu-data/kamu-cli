@@ -84,7 +84,7 @@ async fn test_aggregate_load() {
     let store = CalcEventStore::new(vec![CalcEvents::Add(10), CalcEvents::Sub(6)]);
     let c = Calc::load((), &store).await.unwrap();
     assert_eq!(c.as_ref().0, 4);
-    assert_eq!(c.last_stored_event_id(), Some(&EventID::new(1)));
+    assert_eq!(c.last_stored_event_id(), Some(EventID::new(1)));
 }
 
 #[tokio::test]
