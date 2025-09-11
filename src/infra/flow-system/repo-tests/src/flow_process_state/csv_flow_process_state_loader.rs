@@ -145,7 +145,7 @@ impl CsvFlowProcessStateLoader {
 
         // Insert the process
         self.flow_process_repository
-            .insert_process_state(
+            .upsert_process_state_on_trigger_event(
                 trigger_event_id,
                 flow_binding.clone(),
                 record.sort_key.clone(),
