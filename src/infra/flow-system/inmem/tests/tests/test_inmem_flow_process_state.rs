@@ -320,7 +320,8 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process_not_found,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process_with_history,
     harness = InMemoryFlowProcessStateHarness
 );
 
@@ -329,7 +330,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture =
-        kamu_flow_system_repo_tests::test_flow_process_state::test_delete_process_with_history,
+        kamu_flow_system_repo_tests::test_flow_process_state::test_delete_multiple_process_types_by_scope,
     harness = InMemoryFlowProcessStateHarness
 );
 
