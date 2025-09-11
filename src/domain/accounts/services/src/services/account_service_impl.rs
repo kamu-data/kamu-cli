@@ -88,6 +88,31 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.get_account_by_name(account_name).await
     }
 
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<BatchLookup<Account, odf::AccountName, GetAccountByNameError>, InternalError> {
+        let accounts = self
+            .account_repo
+            .get_accounts_by_names(account_names)
+            .await
+            .int_err()?;
+
+        Ok(BatchLookup::from_found_items(
+            accounts,
+            account_names,
+            BatchLookupCreateOptions {
+                found_ids_fn: |accounts| accounts.iter().map(|a| a.account_name.clone()).collect(),
+                not_found_err_fn: |account_name| {
+                    GetAccountByNameError::NotFound(AccountNotFoundByNameError {
+                        account_name: account_name.clone(),
+                    })
+                },
+                _phantom: Default::default(),
+            },
+        ))
+    }
+
     async fn get_account_map(
         &self,
         account_ids: &[&odf::AccountID],

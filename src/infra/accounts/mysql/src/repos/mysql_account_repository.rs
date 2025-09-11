@@ -333,6 +333,47 @@ impl AccountRepository for MySqlAccountRepository {
         }
     }
 
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError> {
+        if account_names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::MySql>::new(
+            r#"
+            SELECT id,
+                   account_name,
+                   email,
+                   display_name,
+                   account_type,
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE id IN (
+            "#,
+        );
+        query_builder.push_values(account_names, |mut b, account_name| {
+            b.push_bind(account_name.as_str());
+        });
+        query_builder.push(")");
+
+        let account_rows = query_builder
+            .build()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(account_rows.iter().map(Self::map_account_row).collect())
+    }
+
     async fn find_account_id_by_provider_identity_key(
         &self,
         provider_identity_key: &str,

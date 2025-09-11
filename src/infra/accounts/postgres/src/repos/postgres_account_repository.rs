@@ -466,6 +466,44 @@ impl AccountRepository for PostgresAccountRepository {
             ))
         }
     }
+
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError> {
+        if account_names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_names: Vec<_> = account_names.iter().map(ToString::to_string).collect();
+
+        let account_rows = sqlx::query_as!(
+            AccountRowModel,
+            r#"
+            SELECT id           AS "id: _",
+                   account_name,
+                   email,
+                   display_name,
+                   account_type AS "account_type: AccountType",
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE account_name = ANY($1)
+            "#,
+            &account_names
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(account_rows.into_iter().map(Into::into).collect())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
