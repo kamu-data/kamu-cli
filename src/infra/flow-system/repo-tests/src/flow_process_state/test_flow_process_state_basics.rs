@@ -62,7 +62,7 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
     let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
-        .insert_process_state(
+        .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
@@ -135,7 +135,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
     let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
-        .insert_process_state(
+        .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
@@ -230,7 +230,7 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
     let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
-        .insert_process_state(
+        .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
@@ -352,7 +352,7 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
     let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
-        .insert_process_state(
+        .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
@@ -494,7 +494,7 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
     let sort_key = "kamu/random-dataset-id".to_string();
 
     flow_process_repository
-        .insert_process_state(
+        .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
@@ -521,9 +521,10 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
         .unwrap();
 
     flow_process_repository
-        .update_trigger_state(
-            &flow_binding,
+        .upsert_process_state_on_trigger_event(
             EventID::new(4),
+            flow_binding.clone(),
+            sort_key.clone(),
             true,
             FlowTriggerStopPolicy::default(),
         )
@@ -594,7 +595,7 @@ pub async fn test_delete_process(catalog: &Catalog) {
 
     // Insert a process first
     flow_process_repository
-        .insert_process_state(
+        .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
@@ -705,7 +706,7 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
 
     // Insert a process
     flow_process_repository
-        .insert_process_state(
+        .upsert_process_state_on_trigger_event(
             EventID::new(1),
             flow_binding.clone(),
             sort_key.clone(),
@@ -750,9 +751,10 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
 
     // Update trigger state
     flow_process_repository
-        .update_trigger_state(
-            &flow_binding,
+        .upsert_process_state_on_trigger_event(
             EventID::new(3),
+            flow_binding.clone(),
+            sort_key,
             true,
             FlowTriggerStopPolicy::default(),
         )
