@@ -260,7 +260,7 @@ impl AccountRepository for PostgresAccountRepository {
             FROM accounts
             WHERE id = ANY($1)
             "#,
-            &accounts_search
+            &account_ids
         )
         .fetch_all(connection_mut)
         .await
