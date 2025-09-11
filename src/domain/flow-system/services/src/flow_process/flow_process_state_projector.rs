@@ -18,6 +18,7 @@ use messaging_outbox::*;
 #[dill::interface(dyn MessageConsumer)]
 #[dill::interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[dill::interface(dyn MessageConsumerT<FlowProgressMessage>)]
+#[dill::interface(dyn FlowScopeRemovalHandler)]
 #[dill::meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
     feeding_producers: &[
@@ -155,6 +156,34 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
                 // Ignore for now
             }
         }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FlowScopeRemovalHandler for FlowProcessStateProjector {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "FlowProcessStateProjector[FlowScopeRemovalHandler]"
+    )]
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        tracing::debug!(flow_scope = ?flow_scope, "Handling flow scope removal");
+
+        self.flow_process_state_repository
+            .delete_process_states_by_scope(flow_scope)
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Failed to delete flow processes by flow scope"
+                );
+                e.int_err()
+            })?;
 
         Ok(())
     }

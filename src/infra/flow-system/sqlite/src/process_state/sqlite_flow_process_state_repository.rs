@@ -371,34 +371,26 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         }
     }
 
-    async fn delete_process_state(
+    async fn delete_process_states_by_scope(
         &self,
-        flow_binding: &FlowBinding,
+        scope: &FlowScope,
     ) -> Result<(), FlowProcessDeleteError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_json = serde_json::to_value(scope).int_err()?;
         let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
 
-        let result = sqlx::query!(
+        sqlx::query!(
             r#"
             DELETE FROM flow_process_states
-                WHERE flow_type = $1 AND scope_data = $2
+                WHERE scope_data = $1
             "#,
-            flow_binding.flow_type,
             scope_data_json,
         )
         .execute(connection_mut)
         .await
         .int_err()?;
-
-        // Check if any rows were affected
-        if result.rows_affected() == 0 {
-            return Err(FlowProcessDeleteError::NotFound(FlowProcessNotFoundError {
-                flow_binding: flow_binding.clone(),
-            }));
-        }
 
         Ok(())
     }

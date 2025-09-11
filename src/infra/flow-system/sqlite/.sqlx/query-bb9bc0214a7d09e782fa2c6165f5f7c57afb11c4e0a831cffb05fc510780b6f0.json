@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM flow_process_states\n                WHERE scope_data = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "bb9bc0214a7d09e782fa2c6165f5f7c57afb11c4e0a831cffb05fc510780b6f0"
+}
