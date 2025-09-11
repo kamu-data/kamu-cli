@@ -10,8 +10,6 @@
 use std::num::NonZeroUsize;
 
 use database_common::{
-    BatchLookup,
-    BatchLookupCreateOptions,
     PaginationOpts,
     TransactionRef,
     TransactionRefT,
@@ -19,7 +17,7 @@ use database_common::{
 };
 use dill::{component, interface};
 use email_utils::Email;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::sqlite::SqliteRow;
@@ -269,13 +267,10 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[&odf::AccountID],
-    ) -> Result<BatchLookup<Account, odf::AccountID, GetAccountByIdError>, InternalError> {
+        account_ids: &[odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountByIdError> {
         if account_ids.is_empty() {
-            return Ok(BatchLookup {
-                found: Vec::new(),
-                not_found: Vec::new(),
-            });
+            return Ok(Vec::new());
         }
 
         let mut tr = self.transaction.lock().await;
@@ -309,24 +304,7 @@ impl AccountRepository for SqliteAccountRepository {
 
         let account_rows = query.fetch_all(connection_mut).await.int_err()?;
 
-        let accounts = account_rows
-            .iter()
-            .map(Self::map_account_row)
-            .collect::<Vec<_>>();
-
-        Ok(BatchLookup::from_found_items(
-            accounts,
-            account_ids,
-            BatchLookupCreateOptions {
-                found_ids_fn: |accounts| accounts.iter().map(|a| a.id.clone()).collect(),
-                not_found_err_fn: |account_id| {
-                    GetAccountByIdError::NotFound(AccountNotFoundByIdError {
-                        account_id: (*account_id).clone(),
-                    })
-                },
-                _phantom: Default::default(),
-            },
-        ))
+        Ok(account_rows.iter().map(Self::map_account_row).collect())
     }
 
     async fn get_account_by_name(
