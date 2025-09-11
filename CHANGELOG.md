@@ -11,6 +11,16 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- GQL: `BigInt` scalar
+### Changed
+- GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
+- Allow `molecule` and `molecule.dev` accounts separation
+- Collection datasets will ignore add and move operations that don't change the entry path, ref, or extra attributes and return `CollectionUpdateUpToDate`
+- GQL: `Search::query()`: case insensitive search.
+- GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
+
 ## [0.248.1] - 2025-09-11
 ### Fixed
 - Crash on writing datasets with `List` field type
