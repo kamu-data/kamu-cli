@@ -97,7 +97,7 @@ impl Molecule {
     }
 
     pub fn dataset_snapshot_data_room(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        super::Collection::dataset_shapshot(
+        super::Collection::dataset_snapshot(
             alias,
             vec![ColumnInput {
                 name: "molecule_change_by".into(),
@@ -107,6 +107,7 @@ impl Molecule {
             }],
             vec![],
         )
+        .expect("Schema is always valid as there are no user inputs")
     }
 
     pub fn dataset_snapshot_announcements(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {

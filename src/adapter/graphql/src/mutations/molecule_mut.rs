@@ -110,7 +110,7 @@ impl MoleculeMut {
 
         // Create a project account
         let molecule_account = account_svc
-            .account_by_id(subject.account_id())
+            .try_get_account_by_id(subject.account_id())
             .await?
             .unwrap();
 
@@ -136,13 +136,12 @@ impl MoleculeMut {
             // TODO: Set avatar and display name?
             // https://avatars.githubusercontent.com/u/37688345?s=200&amp;v=4
             create_account_use_case
-                .execute(
+                .execute_derived(
                     &molecule_account,
                     &project_account_name,
-                    CreateAccountUseCaseOptions {
-                        email: Some(project_email),
-                        password: None,
-                    },
+                    CreateAccountUseCaseOptions::builder()
+                        .maybe_email(Some(project_email))
+                        .build(),
                 )
                 .await
                 .int_err()?
@@ -221,7 +220,7 @@ impl MoleculeMut {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
-                    media_type: Some(kamu_core::MediaType::NDJSON.to_owned()),
+                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
                     expected_head: None,
                 },
                 None,
@@ -397,7 +396,7 @@ impl MoleculeProjectMut {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
-                    media_type: Some(kamu_core::MediaType::NDJSON.to_owned()),
+                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
                     expected_head: None,
                 },
                 None,
