@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
-
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::{
     AccountConfig,
@@ -34,8 +32,8 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
-use odf::AccountName;
 use odf::metadata::{DidKey, DidOdf};
+use pretty_assertions::{assert_eq, assert_matches};
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +50,7 @@ async fn test_can_find_account_by_all_means() {
 
     let wasya_account = {
         let maybe_wasya_account = account_svc
-            .account_by_name(&AccountName::new_unchecked(WASYA))
+            .account_by_name(&odf::AccountName::new_unchecked(WASYA))
             .await
             .unwrap();
         assert!(maybe_wasya_account.is_some());
@@ -86,40 +84,91 @@ async fn test_multi_find() {
     let account_svc = catalog.get_one::<dyn AccountService>().unwrap();
 
     let wasya_id = account_svc
-        .find_account_id_by_name(&AccountName::new_unchecked(WASYA))
+        .find_account_id_by_name(&odf::AccountName::new_unchecked(WASYA))
         .await
         .unwrap()
         .unwrap();
     let petya_id = account_svc
-        .find_account_id_by_name(&AccountName::new_unchecked(PETYA))
+        .find_account_id_by_name(&odf::AccountName::new_unchecked(PETYA))
         .await
         .unwrap()
         .unwrap();
+    let not_found_account_id = odf::AccountID::new_generated_ed25519().1;
+    let not_found_account_name = "I.cannot.be.found";
 
-    let mut accounts = account_svc
-        .get_accounts_by_ids(&[wasya_id.clone(), petya_id.clone()])
-        .await
-        .unwrap();
-    pretty_assertions::assert_eq!(2, accounts.len());
-    accounts.sort_by(|acc1, acc2| acc1.account_name.cmp(&acc2.account_name));
-    pretty_assertions::assert_eq!(PETYA, accounts[0].account_name.as_str());
-    pretty_assertions::assert_eq!(WASYA, accounts[1].account_name.as_str());
+    {
+        let lookup = account_svc
+            .get_accounts_by_ids(&[&wasya_id, &petya_id, &not_found_account_id])
+            .await
+            .unwrap();
+        let found_accounts = {
+            let mut v = lookup
+                .found
+                .iter()
+                .map(|a| (a.account_name.as_str(), &a.id))
+                .collect::<Vec<_>>();
+            v.sort_by(|(_, a), (_, b)| a.cmp(b));
+            v
+        };
+        assert_eq!([(PETYA, &petya_id), (WASYA, &wasya_id)], *found_accounts);
 
-    let accounts_map = account_svc
-        .get_account_map(&[wasya_id.clone(), petya_id.clone()])
-        .await
-        .unwrap();
-    pretty_assertions::assert_eq!(2, accounts.len());
-    assert!(
-        accounts_map
-            .get(&wasya_id)
-            .is_some_and(|a| a.account_name.as_str() == WASYA)
-    );
-    assert!(
-        accounts_map
-            .get(&petya_id)
-            .is_some_and(|a| a.account_name.as_str() == PETYA)
-    );
+        let not_found_account_ids = lookup
+            .not_found
+            .iter()
+            .map(|(id, _)| id)
+            .collect::<Vec<_>>();
+        assert_eq!([&not_found_account_id], *not_found_account_ids);
+    }
+    {
+        fn odf_name(s: &str) -> odf::AccountName {
+            odf::AccountName::new_unchecked(s)
+        }
+
+        let lookup = account_svc
+            .get_accounts_by_names(&[
+                &odf_name(WASYA),
+                &odf_name(PETYA),
+                &odf_name(not_found_account_name),
+            ])
+            .await
+            .unwrap();
+        let found_accounts = {
+            let mut v = lookup
+                .found
+                .iter()
+                .map(|a| (a.account_name.as_str(), &a.id))
+                .collect::<Vec<_>>();
+            v.sort_by(|(_, a), (_, b)| a.cmp(b));
+            v
+        };
+        assert_eq!([(PETYA, &petya_id), (WASYA, &wasya_id)], *found_accounts);
+
+        let not_found_account_names = lookup
+            .not_found
+            .iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            [&odf_name(not_found_account_name)],
+            *not_found_account_names
+        );
+    }
+    {
+        let map = account_svc
+            .get_account_map(&[&wasya_id, &petya_id, &not_found_account_id])
+            .await
+            .unwrap();
+        assert_eq!(2, map.len());
+        assert!(
+            map.get(&wasya_id)
+                .is_some_and(|a| a.account_name.as_str() == WASYA)
+        );
+        assert!(
+            map.get(&petya_id)
+                .is_some_and(|a| a.account_name.as_str() == PETYA)
+        );
+        assert!(!map.contains_key(&not_found_account_id));
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,7 +187,7 @@ async fn test_did_secret_key_generation() {
     let did_odf =
         DidOdf::from(DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap());
 
-    pretty_assertions::assert_eq!(account_did.1.as_did_odf(), Some(&did_odf));
+    assert_eq!(account_did.1.as_did_odf(), Some(&did_odf));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,7 +200,7 @@ async fn make_catalog() -> dill::Catalog {
         predefined_account_config
             .predefined
             .push(AccountConfig::test_config_from_name(
-                AccountName::new_unchecked(account_name),
+                odf::AccountName::new_unchecked(account_name),
             ));
     }
 
