@@ -63,13 +63,13 @@ impl Auth {
             dyn DatasetEntryService
         );
 
-        let account_ids = account_ids.into_iter().map(Into::into).collect::<Vec<_>>();
+        let account_ids = account_ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         let accounts_map = account_service
             .get_account_map(&account_ids)
             .await
             .int_err()?;
         let authorized_datasets_map = rebac_service
-            .get_authorized_datasets_by_account_ids(&account_ids)
+            .get_authorized_datasets_by_account_ids(&account_ids[..])
             .await
             .int_err()?;
         let dataset_entries_map = {
