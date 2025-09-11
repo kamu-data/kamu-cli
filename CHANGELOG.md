@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.248.1] - 2025-09-11
 ### Fixed
 - Crash on writing datasets with `List` field type
 
