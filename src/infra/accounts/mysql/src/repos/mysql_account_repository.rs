@@ -252,8 +252,8 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         if account_ids.is_empty() {
             return Ok(Vec::new());
         }

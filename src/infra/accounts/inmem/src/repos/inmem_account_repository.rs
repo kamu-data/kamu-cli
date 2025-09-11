@@ -247,8 +247,8 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         let guard = self.state.lock().unwrap();
 
         let accounts: Vec<Account> = account_ids
