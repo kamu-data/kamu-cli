@@ -232,8 +232,8 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         if account_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -242,10 +242,7 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let accounts_search: Vec<_> = account_ids
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect();
+        let account_ids: Vec<_> = account_ids.iter().map(ToString::to_string).collect();
 
         let account_rows = sqlx::query_as!(
             AccountRowModel,

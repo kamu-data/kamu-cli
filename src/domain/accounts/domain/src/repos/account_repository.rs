@@ -29,8 +29,8 @@ pub trait AccountRepository: Send + Sync {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError>;
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError>;
 
     async fn get_account_by_name(
         &self,
@@ -200,6 +200,14 @@ pub enum GetAccountByIdError {
 #[error("Account not found by ID: '{account_id}'")]
 pub struct AccountNotFoundByIdError {
     pub account_id: odf::AccountID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetAccountsByIdsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
