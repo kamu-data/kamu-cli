@@ -61,24 +61,23 @@ impl Accounts {
     ) -> Result<Vec<Account>> {
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
-        let mut res = Vec::new();
+        let domain_account_ids = account_ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+        let lookup = account_service
+            .get_accounts_by_ids(&domain_account_ids)
+            .await?;
 
-        for account_id in account_ids {
-            let account_id = account_id.into();
-
-            // TODO: PERF: Vectorize resolution
-            match account_service.find_account_name_by_id(&account_id).await? {
-                Some(account_name) => {
-                    res.push(Account::new(account_id.into(), account_name.into()));
-                }
-                None if skip_missing => (),
-                None => {
-                    return Err(GqlError::gql(format!("Unresolved account: {account_id}")));
-                }
-            }
+        if !skip_missing && !lookup.not_found.is_empty() {
+            return Err(GqlError::gql(format!(
+                "Unresolved accounts: {}",
+                itertools::join(lookup.not_found.iter().map(|(id, _)| id), ",")
+            )));
         }
 
-        Ok(res)
+        Ok(lookup
+            .found
+            .into_iter()
+            .map(Account::from_account)
+            .collect())
     }
 
     /// Returns an account by its name, if found
