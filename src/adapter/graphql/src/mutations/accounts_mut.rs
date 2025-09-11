@@ -80,22 +80,19 @@ impl AccountsMut {
     ) -> Result<Vec<AccountMut>> {
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
-        let mut res = Vec::new();
+        let domain_account_ids = account_ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+        let lookup = account_service
+            .get_accounts_by_ids(&domain_account_ids)
+            .await?;
 
-        for account_id in account_ids {
-            let account_id = account_id.into();
-
-            // TODO: PERF: Vectorize resolution
-            match account_service.try_get_account_by_id(&account_id).await? {
-                Some(account) => res.push(AccountMut::new(account)),
-                None if skip_missing => (),
-                None => {
-                    return Err(GqlError::gql(format!("Unresolved account: {account_id}")));
-                }
-            }
+        if !skip_missing && !lookup.not_found.is_empty() {
+            return Err(GqlError::gql(format!(
+                "Unresolved accounts: {}",
+                itertools::join(lookup.not_found.iter().map(|(id, _)| id), ",")
+            )));
         }
 
-        Ok(res)
+        Ok(lookup.found.into_iter().map(AccountMut::new).collect())
     }
 
     /// Returns a mutable account by its name
