@@ -46,6 +46,11 @@ pub trait AccountService: Sync + Send {
         account_name: &odf::AccountName,
     ) -> Result<Account, GetAccountByNameError>;
 
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<BatchLookup<Account, odf::AccountName, GetAccountByNameError>, InternalError>;
+
     async fn get_account_map(
         &self,
         account_ids: &[&odf::AccountID],
