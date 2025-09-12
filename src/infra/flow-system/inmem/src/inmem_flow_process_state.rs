@@ -411,16 +411,12 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-    ) -> Result<(), FlowProcessUpdateError> {
+    ) -> Result<(), FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
-        let process_state = state
-            .process_state_by_binding
-            .get_mut(flow_binding)
-            .ok_or_else(|| {
-                FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding: flow_binding.clone(),
-                })
-            })?;
+        let Some(process_state) = state.process_state_by_binding.get_mut(flow_binding) else {
+            // Skip this flow, must be a manual launch without any trigger existing
+            return Ok(());
+        };
 
         if success {
             process_state
@@ -440,16 +436,12 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         flow_event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-    ) -> Result<(), FlowProcessUpdateError> {
+    ) -> Result<(), FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
-        let process_state = state
-            .process_state_by_binding
-            .get_mut(flow_binding)
-            .ok_or_else(|| {
-                FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding: flow_binding.clone(),
-                })
-            })?;
+        let Some(process_state) = state.process_state_by_binding.get_mut(flow_binding) else {
+            // Skip this flow, must be a manual launch without any trigger existing
+            return Ok(());
+        };
 
         process_state
             .on_scheduled(flow_event_id, self.time_source.now(), planned_at)

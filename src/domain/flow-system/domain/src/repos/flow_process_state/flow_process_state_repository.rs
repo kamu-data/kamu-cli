@@ -34,7 +34,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
         flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-    ) -> Result<(), FlowProcessUpdateError>;
+    ) -> Result<(), FlowProcessFlowEventError>;
 
     /// React to flow being scheduled.
     async fn on_flow_scheduled(
@@ -42,7 +42,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
         flow_event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-    ) -> Result<(), FlowProcessUpdateError>;
+    ) -> Result<(), FlowProcessFlowEventError>;
 
     /// Remove all rows for the given scope.
     async fn delete_process_states_by_scope(
@@ -76,10 +76,7 @@ pub enum FlowProcessInsertError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum FlowProcessUpdateError {
-    #[error(transparent)]
-    NotFound(FlowProcessNotFoundError),
-
+pub enum FlowProcessFlowEventError {
     #[error(transparent)]
     ConcurrentModification(FlowProcessConcurrentModificationError),
 
