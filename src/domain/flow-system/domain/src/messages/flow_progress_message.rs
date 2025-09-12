@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use event_sourcing::EventID;
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
@@ -48,21 +49,29 @@ impl Message for FlowProgressMessage {
 impl FlowProgressMessage {
     pub fn scheduled(
         event_time: DateTime<Utc>,
+        event_id: EventID,
         flow_id: FlowID,
         flow_binding: FlowBinding,
         scheduled_for_activation_at: DateTime<Utc>,
     ) -> Self {
         Self::Scheduled(FlowProgressMessageScheduled {
             event_time,
+            event_id,
             flow_id,
             flow_binding,
             scheduled_for_activation_at,
         })
     }
 
-    pub fn running(event_time: DateTime<Utc>, flow_id: FlowID, flow_binding: FlowBinding) -> Self {
+    pub fn running(
+        event_time: DateTime<Utc>,
+        event_id: EventID,
+        flow_id: FlowID,
+        flow_binding: FlowBinding,
+    ) -> Self {
         Self::Running(FlowProgressMessageRunning {
             event_time,
+            event_id,
             flow_id,
             flow_binding,
         })
@@ -70,12 +79,14 @@ impl FlowProgressMessage {
 
     pub fn retry_scheduled(
         event_time: DateTime<Utc>,
+        event_id: EventID,
         flow_id: FlowID,
         flow_binding: FlowBinding,
         scheduled_for_activation_at: DateTime<Utc>,
     ) -> Self {
         Self::RetryScheduled(FlowProgressMessageRetryScheduled {
             event_time,
+            event_id,
             flow_id,
             flow_binding,
             scheduled_for_activation_at,
@@ -84,12 +95,14 @@ impl FlowProgressMessage {
 
     pub fn finished(
         event_time: DateTime<Utc>,
+        event_id: EventID,
         flow_id: FlowID,
         flow_binding: FlowBinding,
         outcome: FlowOutcome,
     ) -> Self {
         Self::Finished(FlowProgressMessageFinished {
             event_time,
+            event_id,
             flow_id,
             flow_binding,
             outcome,
@@ -98,11 +111,13 @@ impl FlowProgressMessage {
 
     pub fn cancelled(
         event_time: DateTime<Utc>,
+        event_id: EventID,
         flow_id: FlowID,
         flow_binding: FlowBinding,
     ) -> Self {
         Self::Cancelled(FlowProgressMessageCancelled {
             event_time,
+            event_id,
             flow_id,
             flow_binding,
         })
@@ -145,6 +160,9 @@ pub struct FlowProgressMessageScheduled {
     /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
 
+    /// The unique identifier for the event
+    pub event_id: EventID,
+
     /// The unique identifier of the flow
     pub flow_id: FlowID,
 
@@ -161,6 +179,9 @@ pub struct FlowProgressMessageRunning {
     /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
 
+    /// The unique identifier for the event
+    pub event_id: EventID,
+
     /// The unique identifier of the flow
     pub flow_id: FlowID,
 
@@ -173,6 +194,9 @@ pub struct FlowProgressMessageRunning {
 pub struct FlowProgressMessageRetryScheduled {
     /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
+
+    /// The unique identifier for the event
+    pub event_id: EventID,
 
     /// The unique identifier of the flow
     pub flow_id: FlowID,
@@ -190,6 +214,9 @@ pub struct FlowProgressMessageFinished {
     /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
 
+    /// The unique identifier for the event
+    pub event_id: EventID,
+
     /// The unique identifier of the flow
     pub flow_id: FlowID,
 
@@ -205,6 +232,9 @@ pub struct FlowProgressMessageFinished {
 pub struct FlowProgressMessageCancelled {
     /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
+
+    /// The unique identifier for the event
+    pub event_id: EventID,
 
     /// The unique identifier of the flow
     pub flow_id: FlowID,
