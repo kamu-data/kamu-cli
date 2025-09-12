@@ -163,7 +163,10 @@ impl FlowSchedulingHelper {
         };
 
         // Is a pending flow present for this config?
-        match self.find_pending_flow(flow_binding).await? {
+        let (mut flow, maybe_next_activation_time) = match self
+            .find_pending_flow(flow_binding)
+            .await?
+        {
             // Already pending flow
             Some(flow_id) => {
                 // Load, merge triggers, update activation time
@@ -177,7 +180,7 @@ impl FlowSchedulingHelper {
                         .int_err()?;
                 }
 
-                match trigger_context {
+                let maybe_next_activation_time = match trigger_context {
                     FlowTriggerContext::Reactive(reactive_rule) => {
                         // Is this rule still waited?
                         if matches!(flow.start_condition, Some(FlowStartCondition::Reactive(_))) {
@@ -186,10 +189,10 @@ impl FlowSchedulingHelper {
                                 &mut flow,
                                 &reactive_rule,
                                 throttling_boundary_time,
-                            )
-                            .await?;
+                            )?
                         } else {
                             // Skip, the flow waits for something else
+                            None
                         }
                     }
                     FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
@@ -217,61 +220,30 @@ impl FlowSchedulingHelper {
                             }
 
                             // Schedule the flow earlier than previously planned
-                            self.schedule_flow_for_activation(&mut flow, throttling_boundary_time)
-                                .await?;
+                            Some(throttling_boundary_time)
+                        } else {
+                            None
                         }
                     }
-                }
+                };
 
-                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-                Ok(flow.into())
+                (flow, maybe_next_activation_time)
             }
 
             // Otherwise, initiate a new flow and schedule it for activation
             None => {
-                // Do we have a defined configuration for this flow?
-                let maybe_flow_configuration = self
-                    .flow_configuration_service
-                    .find_configuration(flow_binding)
-                    .await
-                    .int_err()?;
-
-                // Decide on configuration rule snapshot:
-                //  - if forced, use it
-                //  - if not, use the latest configuration rule, if any
-                //  - if no configuration, use default rule
-                let maybe_flow_config_rule_snapshot =
-                    maybe_forced_flow_config_rule.map(Some).unwrap_or_else(|| {
-                        maybe_flow_configuration
-                            .as_ref()
-                            .map(|config| Some(config.rule.clone()))
-                            .unwrap_or_default()
-                    });
-
-                // Decide on retry policy:
-                // - if configuration defines it, use it
-                // - if not, use default retry policy for this flow type, if it's defined
-                let retry_policy = maybe_flow_configuration
-                    .and_then(|config| config.retry_policy)
-                    .or_else(|| {
-                        self.agent_config
-                            .default_retry_policy_by_flow_type
-                            .get(&flow_binding.flow_type)
-                            .copied()
-                    });
-
                 // Initiate new flow
                 let mut flow = self
                     .make_new_flow(
                         self.flow_event_store.as_ref(),
                         flow_binding.clone(),
                         activation_causes,
-                        maybe_flow_config_rule_snapshot,
-                        retry_policy,
+                        maybe_forced_flow_config_rule,
                     )
                     .await?;
 
-                match trigger_context {
+                // Decide when to activate it
+                let maybe_next_activation_time = match trigger_context {
                     FlowTriggerContext::Reactive(reactive_rule) => {
                         // Don't activate if reactive condition not satisfied
                         self.evaluate_flow_reactive_rule(
@@ -279,13 +251,13 @@ impl FlowSchedulingHelper {
                             &mut flow,
                             &reactive_rule,
                             throttling_boundary_time,
-                        )
-                        .await?;
+                        )?
                     }
+
                     FlowTriggerContext::Scheduled(schedule) => {
                         // Next activation time depends on:
                         //  - last success time, if ever launched
-                        //  - schedule, if defined
+                        //  - schedule
                         let naive_next_activation_time = schedule.next_activation_time(
                             activation_time,
                             flow_run_stats.last_success_time,
@@ -313,10 +285,9 @@ impl FlowSchedulingHelper {
                             .int_err()?;
                         }
 
-                        // Schedule flow for the decided moment
-                        self.schedule_flow_for_activation(&mut flow, next_activation_time)
-                            .await?;
+                        Some(next_activation_time)
                     }
+
                     FlowTriggerContext::Unconditional => {
                         // Apply throttling boundary
                         let next_activation_time =
@@ -331,26 +302,48 @@ impl FlowSchedulingHelper {
                             )?;
                         }
 
-                        // Schedule flow for the decided moment
-                        self.schedule_flow_for_activation(&mut flow, next_activation_time)
-                            .await?;
+                        Some(next_activation_time)
                     }
-                }
+                };
 
-                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-                Ok(flow.into())
+                (flow, maybe_next_activation_time)
             }
+        };
+
+        // Schedule for activation, if needed
+        if let Some(next_activation_time) = maybe_next_activation_time {
+            flow.schedule_for_activation(self.time_source.now(), next_activation_time)
+                .int_err()?;
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+
+            // Notify about scheduling
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                    FlowProgressMessage::scheduled(
+                        self.time_source.now(),
+                        flow.last_stored_event_id().expect("Must have event ID"),
+                        flow.flow_id,
+                        flow.flow_binding.clone(),
+                        next_activation_time,
+                    ),
+                )
+                .await?;
+        } else {
+            // Save flow state, even if not scheduled
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
         }
+
+        Ok(flow.into())
     }
 
-    #[allow(unused_mut)]
-    async fn evaluate_flow_reactive_rule(
+    fn evaluate_flow_reactive_rule(
         &self,
         evaluation_time: DateTime<Utc>,
         flow: &mut Flow,
         reactive_rule: &ReactiveRule,
         throttling_boundary_time: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
         let mut accumulated_records_count = 0;
@@ -435,12 +428,11 @@ impl FlowSchedulingHelper {
                 None => true,
             };
             if should_activate {
-                self.schedule_flow_for_activation(flow, corrected_finish_time)
-                    .await?;
+                return Ok(Some(corrected_finish_time));
             }
         }
 
-        Ok(())
+        Ok(None)
     }
 
     fn indicate_throttling_activity(
@@ -475,8 +467,7 @@ impl FlowSchedulingHelper {
         flow_event_store: &dyn FlowEventStore,
         flow_binding: FlowBinding,
         mut activation_causes: Vec<FlowActivationCause>,
-        maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
-        retry_policy: Option<RetryPolicy>,
+        maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(?flow_binding, ?activation_causes, "Creating new flow");
 
@@ -488,12 +479,44 @@ impl FlowSchedulingHelper {
         let other_causes = activation_causes.split_off(1);
         let first_cause = activation_causes.into_iter().next().unwrap();
 
+        // Do we have a defined configuration for this flow?
+        let maybe_flow_configuration = self
+            .flow_configuration_service
+            .find_configuration(&flow_binding)
+            .await
+            .int_err()?;
+
+        // Decide on configuration rule snapshot:
+        //  - if forced, use it
+        //  - if not, use the latest configuration rule, if any
+        //  - if no configuration, use default rule
+        let maybe_flow_config_rule_snapshot =
+            maybe_forced_flow_config_rule.map(Some).unwrap_or_else(|| {
+                maybe_flow_configuration
+                    .as_ref()
+                    .map(|config| Some(config.rule.clone()))
+                    .unwrap_or_default()
+            });
+
+        // Decide on retry policy:
+        // - if configuration defines it, use it
+        // - if not, use default retry policy for this flow type, if it's defined
+        let retry_policy = maybe_flow_configuration
+            .and_then(|config| config.retry_policy)
+            .or_else(|| {
+                self.agent_config
+                    .default_retry_policy_by_flow_type
+                    .get(&flow_binding.flow_type)
+                    .copied()
+            });
+
+        // Create the flow
         let mut flow = Flow::new(
             self.time_source.now(),
             flow_event_store.new_flow_id().await?,
             flow_binding,
             first_cause,
-            maybe_config_rule_snapshot,
+            maybe_flow_config_rule_snapshot,
             retry_policy,
         );
 
@@ -504,27 +527,6 @@ impl FlowSchedulingHelper {
         }
 
         Ok(flow)
-    }
-
-    async fn schedule_flow_for_activation(
-        &self,
-        flow: &mut Flow,
-        activate_at: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
-        flow.schedule_for_activation(self.time_source.now(), activate_at)
-            .int_err()?;
-
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                FlowProgressMessage::scheduled(
-                    self.time_source.now(),
-                    flow.flow_id,
-                    flow.flow_binding.clone(),
-                    activate_at,
-                ),
-            )
-            .await
     }
 }
 
