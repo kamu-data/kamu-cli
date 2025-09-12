@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
+use odf_metadata as odf;
 use thiserror::Error;
 
 use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
@@ -18,8 +19,20 @@ use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
 pub trait DatasetHandleResolver: Send + Sync {
     async fn resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &odf_metadata::DatasetRef,
-    ) -> Result<odf_metadata::DatasetHandle, DatasetRefUnresolvedError>;
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<odf::DatasetHandle, DatasetRefUnresolvedError>;
+
+    async fn resolve_dataset_handles_by_refs(
+        &self,
+        dataset_refs: &[&odf::DatasetRef],
+    ) -> Result<ResolveDatasetHandlesByRefsResponse, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ResolveDatasetHandlesByRefsResponse {
+    pub resolved_handles: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub unresolved_refs: Vec<(odf::DatasetRef, DatasetRefUnresolvedError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,11 +64,11 @@ impl From<GetStoredDatasetError> for DatasetRefUnresolvedError {
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset not found: {dataset_ref}")]
 pub struct DatasetNotFoundError {
-    pub dataset_ref: odf_metadata::DatasetRef,
+    pub dataset_ref: odf::DatasetRef,
 }
 
 impl DatasetNotFoundError {
-    pub fn new(dataset_ref: odf_metadata::DatasetRef) -> Self {
+    pub fn new(dataset_ref: odf::DatasetRef) -> Self {
         Self { dataset_ref }
     }
 }
