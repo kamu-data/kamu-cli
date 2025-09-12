@@ -159,6 +159,42 @@ impl DatasetEntryServiceImpl {
         }
     }
 
+    fn resolve_owner_account_names<'a>(
+        &'a self,
+        dataset_aliases: &'a [&'a odf::DatasetAlias],
+    ) -> Result<HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>>, InternalError> {
+        let mut res = HashMap::new();
+
+        let mut single_tenant_count = 0;
+        let mut multi_tenant_count = 0;
+
+        for dataset_alias in dataset_aliases {
+            let account_name = match &dataset_alias.account_name {
+                Some(account_name) => {
+                    multi_tenant_count += 1;
+                    account_name
+                }
+                None => {
+                    single_tenant_count += 1;
+                    self.current_account_subject.account_name_or_default()
+                }
+            };
+
+            let owner_dataset_aliases = res.entry(account_name).or_insert_with(Vec::new);
+            owner_dataset_aliases.push(*dataset_alias);
+        }
+
+        if single_tenant_count > 0 && multi_tenant_count > 0 {
+            return Err(format!(
+                "Simultaneous presence of single-tenant and multi-tenant account names: {}",
+                itertools::join(dataset_aliases, ",")
+            )
+            .int_err());
+        }
+
+        Ok(res)
+    }
+
     async fn resolve_account_ids_by_maybe_names(
         &self,
         maybe_account_names: &[Option<&odf::AccountName>],
@@ -200,7 +236,7 @@ impl DatasetEntryServiceImpl {
                 .iter()
                 .fold(HashMap::new(), |mut acc, account_name| {
                     if let Some(id) = readable_cache.accounts.names2ids.get(account_name) {
-                        acc.insert(account_name.clone(), id.clone());
+                        acc.insert(*account_name, id.clone());
                     }
                     acc
                 })
