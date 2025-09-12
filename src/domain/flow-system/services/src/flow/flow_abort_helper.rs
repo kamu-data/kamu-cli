@@ -51,6 +51,7 @@ impl FlowAbortHelper {
                         MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
                         FlowProgressMessage::cancelled(
                             self.time_source.now(),
+                            flow.last_stored_event_id().expect("Must have event ID"),
                             flow.flow_id,
                             flow.flow_binding.clone(),
                         ),

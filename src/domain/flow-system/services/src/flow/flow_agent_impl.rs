@@ -471,6 +471,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
                                 FlowProgressMessage::running(
                                     message.event_time,
+                                    flow.last_stored_event_id().expect("Must have event ID"),
                                     flow_id,
                                     flow.flow_binding.clone(),
                                 ),
@@ -580,6 +581,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
                                     FlowProgressMessage::finished(
                                         message.event_time,
+                                        flow.last_stored_event_id().expect("Must have event ID"),
                                         flow_id,
                                         flow.flow_binding.clone(),
                                         flow_outcome.clone(),
@@ -593,6 +595,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
                                     FlowProgressMessage::retry_scheduled(
                                         message.event_time,
+                                        flow.last_stored_event_id().expect("Must have event ID"),
                                         flow_id,
                                         flow.flow_binding.clone(),
                                         flow.timing

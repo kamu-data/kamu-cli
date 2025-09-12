@@ -93,7 +93,7 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
             FlowProgressMessage::Scheduled(scheduled_message) => {
                 self.flow_process_state_repository
                     .on_flow_scheduled(
-                        EventID::new(0), // TODO: pass event_id somehow
+                        scheduled_message.event_id,
                         message.flow_binding(),
                         scheduled_message.scheduled_for_activation_at,
                     )
@@ -116,7 +116,7 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
 
                 self.flow_process_state_repository
                     .apply_flow_result(
-                        EventID::new(0), // TODO: pass event_id somehow
+                        finished_message.event_id,
                         message.flow_binding(),
                         is_success,
                         message.event_time(),
