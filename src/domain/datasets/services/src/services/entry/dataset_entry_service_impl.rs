@@ -159,6 +159,107 @@ impl DatasetEntryServiceImpl {
         }
     }
 
+    async fn resolve_account_ids_by_maybe_names(
+        &self,
+        maybe_account_names: &[Option<&odf::AccountName>],
+    ) -> Result<ResolveAccountIdsByMaybeNamesResponse, InternalError> {
+        let mut single_tenant_count = 0;
+        let mut multi_tenant_count = 0;
+
+        let account_names = maybe_account_names
+            .iter()
+            .map(|maybe_account_name| match maybe_account_name {
+                Some(account_name) => {
+                    multi_tenant_count += 1;
+                    account_name
+                }
+                None => {
+                    single_tenant_count += 1;
+                    self.current_account_subject.account_name_or_default()
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if single_tenant_count > 0 && multi_tenant_count > 0 {
+            return Err(format!(
+                "Simultaneous presence of single-tenant and multi-tenant account names: {}",
+                itertools::join(
+                    maybe_account_names
+                        .iter()
+                        .map(|maybe_account_name| { format!("{maybe_account_name:?}") }),
+                    ","
+                )
+            )
+            .int_err());
+        }
+
+        // 1. Read all available data from the cache
+        let cached_name_id_pairs = {
+            let readable_cache = self.cache.read().unwrap();
+            account_names
+                .iter()
+                .fold(HashMap::new(), |mut acc, account_name| {
+                    if let Some(id) = readable_cache.accounts.names2ids.get(account_name) {
+                        acc.insert(account_name.clone(), id.clone());
+                    }
+                    acc
+                })
+        };
+
+        let mut resolved_account_ids = Vec::with_capacity(cached_name_id_pairs.len());
+        for (name, resolved_id) in &cached_name_id_pairs {
+            resolved_account_ids.push(((*name).clone(), resolved_id.clone()));
+        }
+
+        let mut unresolved_account_names = Vec::new();
+
+        // 2. Request unresolved account names from the service
+        if account_names.len() != resolved_account_ids.len() {
+            let mut account_names_to_request =
+                Vec::with_capacity(account_names.len() - resolved_account_ids.len());
+            for account_name in account_names {
+                if !cached_name_id_pairs.contains_key(account_name) {
+                    account_names_to_request.push(account_name);
+                }
+            }
+
+            let lookup = self
+                .account_svc
+                .get_accounts_by_names(&account_names_to_request)
+                .await?;
+            let resolved_account_ids_from_service = lookup
+                .found
+                .into_iter()
+                .map(|a| (a.account_name, a.id))
+                .collect::<Vec<_>>();
+
+            // Cache the resolved results
+            {
+                let mut writable_cache = self.cache.write().unwrap();
+                for (account_name, account_id) in &resolved_account_ids_from_service {
+                    writable_cache
+                        .accounts
+                        .names2ids
+                        .insert(account_name.clone(), account_id.clone());
+                }
+            }
+
+            // Add service-{un,}resolved ones to response
+            resolved_account_ids.extend(resolved_account_ids_from_service);
+
+            unresolved_account_names = lookup
+                .not_found
+                .into_iter()
+                .map(|(id, e)| (id, e.into()))
+                .collect::<Vec<_>>();
+        }
+
+        Ok(ResolveAccountIdsByMaybeNamesResponse {
+            resolved_account_ids,
+            unresolved_account_names,
+        })
+    }
+
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,
@@ -681,6 +782,13 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
 
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ResolveAccountIdsByMaybeNamesResponse {
+    resolved_account_ids: Vec<(odf::AccountName, odf::AccountID)>,
+    unresolved_account_names: Vec<(odf::AccountName, ResolveAccountIdByNameError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
