@@ -4278,6 +4278,7 @@ impl FlowRunsHarness {
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()
+                .add::<InMemoryFlowProcessState>()
                 .add_value(FlowAgentConfig::new(
                     Duration::seconds(1),
                     Duration::minutes(1),

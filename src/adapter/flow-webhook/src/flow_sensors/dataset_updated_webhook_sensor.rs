@@ -131,6 +131,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 fs::FlowBinding::new(FLOW_TYPE_WEBHOOK_DELIVER, self.webhook_flow_scope.clone());
             flow_run_service
                 .run_flow_automatically(
+                    activation_cause.activation_time(),
                     &target_flow_binding,
                     vec![activation_cause.clone()],
                     Some(fs::FlowTriggerRule::Reactive(reactive_rule)),
