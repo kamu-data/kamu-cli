@@ -7816,6 +7816,7 @@ dependencies = [
  "indoc 2.0.6",
  "init-on-startup",
  "internal-error",
+ "itertools 0.14.0",
  "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
