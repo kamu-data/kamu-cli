@@ -77,6 +77,8 @@ impl FlowSystemTestListener {
     }
 
     pub(crate) async fn make_a_snapshot(&self, update_time: DateTime<Utc>) {
+        println!("Making a snapshot at {update_time}");
+
         use futures::TryStreamExt;
         let flows: Vec<_> = self
             .flow_query_service
