@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use core::panic;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
@@ -45,11 +45,12 @@ pub(crate) struct FlowSystemTestListener {
     state: Arc<Mutex<FlowSystemTestListenerState>>,
 }
 
-type FlowSnapshot = (DateTime<Utc>, HashMap<FlowBinding, Vec<FlowState>>);
+type FlowSnapshot = HashMap<FlowBinding, Vec<FlowState>>;
 
 #[derive(Default)]
 struct FlowSystemTestListenerState {
-    snapshots: Vec<FlowSnapshot>,
+    loaded: bool,
+    snapshots: BTreeMap<DateTime<Utc>, Vec<FlowSnapshot>>,
     dataset_display_names: HashMap<odf::DatasetID, String>,
 }
 
@@ -77,8 +78,6 @@ impl FlowSystemTestListener {
     }
 
     pub(crate) async fn make_a_snapshot(&self, update_time: DateTime<Utc>) {
-        println!("Making a snapshot at {update_time}");
-
         use futures::TryStreamExt;
         let flows: Vec<_> = self
             .flow_query_service
@@ -102,7 +101,11 @@ impl FlowSystemTestListener {
         }
 
         let mut state = self.state.lock().unwrap();
-        state.snapshots.push((update_time, flow_states_map));
+        state
+            .snapshots
+            .entry(update_time)
+            .and_modify(|snapshots| snapshots.push(flow_states_map.clone()))
+            .or_insert(vec![flow_states_map]);
     }
 
     pub(crate) fn define_dataset_display_name(&self, id: odf::DatasetID, display_name: String) {
@@ -138,189 +141,197 @@ impl std::fmt::Display for FlowSystemTestListener {
         let initial_time = self.fake_time_source.initial_time;
 
         let state = self.state.lock().unwrap();
-        for i in 0..state.snapshots.len() {
-            let (snapshot_time, snapshots) = state.snapshots.get(i).unwrap();
-            writeln!(
-                f,
-                "#{i}: +{}ms:",
-                (*snapshot_time - initial_time).num_milliseconds(),
-            )?;
 
-            let mut flow_headings = snapshots
-                .keys()
-                .map(|flow_binding| {
-                    (
-                        flow_binding,
-                        match flow_binding.scope.scope_type() {
-                            FLOW_SCOPE_TYPE_DATASET => {
-                                let dataset_id =
-                                    FlowScopeDataset::new(&flow_binding.scope).dataset_id();
-                                format!(
-                                    "\"{}\" {}",
-                                    state
-                                        .dataset_display_names
-                                        .get(&dataset_id)
-                                        .cloned()
-                                        .unwrap_or_else(|| dataset_id.to_string()),
-                                    Self::display_flow_type(flow_binding.flow_type.as_str())
-                                )
-                            }
-                            FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
-                                let subscription_scope =
-                                    FlowScopeSubscription::new(&flow_binding.scope);
-                                let subscription_id = subscription_scope.subscription_id();
-                                let maybe_dataset_id = subscription_scope.maybe_dataset_id();
+        let mut snapshots_iter = state.snapshots.iter();
+        let mut index = 0;
 
-                                format!(
-                                    "\"{}\" Subscription: {} {}",
-                                    match maybe_dataset_id {
-                                        Some(dataset_id) => state
+        while let Some((snapshot_time, snapshots)) = snapshots_iter.next() {
+            for snapshot in snapshots {
+                writeln!(
+                    f,
+                    "#{index}: +{}ms:",
+                    (*snapshot_time - initial_time).num_milliseconds(),
+                )?;
+
+                let mut flow_headings = snapshot
+                    .keys()
+                    .map(|flow_binding| {
+                        (
+                            flow_binding,
+                            match flow_binding.scope.scope_type() {
+                                FLOW_SCOPE_TYPE_DATASET => {
+                                    let dataset_id =
+                                        FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+                                    format!(
+                                        "\"{}\" {}",
+                                        state
                                             .dataset_display_names
                                             .get(&dataset_id)
                                             .cloned()
                                             .unwrap_or_else(|| dataset_id.to_string()),
-                                        None => "<None>".to_string(),
-                                    },
-                                    subscription_id,
-                                    Self::display_flow_type(flow_binding.flow_type.as_str())
-                                )
-                            }
-                            FLOW_SCOPE_TYPE_SYSTEM => {
-                                format!(
-                                    "System {}",
-                                    Self::display_flow_type(flow_binding.flow_type.as_str())
-                                )
-                            }
-                            _ => panic!(
-                                "Unexpected flow scope type: {}",
-                                flow_binding.scope.scope_type()
-                            ),
-                        },
-                    )
-                })
-                .collect::<Vec<_>>();
-            flow_headings.sort_by_key(|(_, title)| title.clone());
+                                        Self::display_flow_type(flow_binding.flow_type.as_str())
+                                    )
+                                }
+                                FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
+                                    let subscription_scope =
+                                        FlowScopeSubscription::new(&flow_binding.scope);
+                                    let subscription_id = subscription_scope.subscription_id();
+                                    let maybe_dataset_id = subscription_scope.maybe_dataset_id();
 
-            for (flow_binding, heading) in flow_headings {
-                writeln!(f, "  {heading}:")?;
-                for flow_state in snapshots.get(flow_binding).unwrap() {
-                    write!(
-                        f,
-                        "    Flow ID = {} {}",
-                        flow_state.flow_id,
-                        match flow_state.status() {
-                            FlowStatus::Waiting => "Waiting".to_string(),
-                            FlowStatus::Running => format!(
-                                "{:?}(task={})",
-                                flow_state.status(),
-                                flow_state
-                                    .task_ids
-                                    .iter()
-                                    .map(|task_id| format!("{task_id}"))
-                                    .collect::<Vec<_>>()
-                                    .join(",")
-                            ),
-                            FlowStatus::Retrying => format!(
-                                "{:?}(scheduled_at={}ms)",
-                                flow_state.status(),
-                                (flow_state.timing.scheduled_for_activation_at.unwrap()
-                                    - initial_time)
-                                    .num_milliseconds()
-                            ),
-                            _ => format!("{:?}", flow_state.status()),
-                        }
-                    )?;
+                                    format!(
+                                        "\"{}\" Subscription: {} {}",
+                                        match maybe_dataset_id {
+                                            Some(dataset_id) => state
+                                                .dataset_display_names
+                                                .get(&dataset_id)
+                                                .cloned()
+                                                .unwrap_or_else(|| dataset_id.to_string()),
+                                            None => "<None>".to_string(),
+                                        },
+                                        subscription_id,
+                                        Self::display_flow_type(flow_binding.flow_type.as_str())
+                                    )
+                                }
+                                FLOW_SCOPE_TYPE_SYSTEM => {
+                                    format!(
+                                        "System {}",
+                                        Self::display_flow_type(flow_binding.flow_type.as_str())
+                                    )
+                                }
+                                _ => panic!(
+                                    "Unexpected flow scope type: {}",
+                                    flow_binding.scope.scope_type()
+                                ),
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                flow_headings.sort_by_key(|(_, title)| title.clone());
 
-                    if matches!(flow_state.status(), FlowStatus::Waiting) {
+                for (flow_binding, heading) in flow_headings {
+                    writeln!(f, "  {heading}:")?;
+                    for flow_state in snapshot.get(flow_binding).unwrap() {
                         write!(
                             f,
-                            " {}",
-                            match flow_state.primary_activation_cause() {
-                                FlowActivationCause::Manual(_) => String::from("Manual"),
-                                FlowActivationCause::AutoPolling(_) => String::from("AutoPolling"),
-                                FlowActivationCause::ResourceUpdate(update) => {
-                                    let update_details: DatasetResourceUpdateDetails =
-                                        serde_json::from_value(update.details.clone()).unwrap();
-                                    match &update_details.source {
-                                        DatasetUpdateSource::HttpIngest { .. } => {
-                                            String::from("HttpIngest")
-                                        }
-                                        DatasetUpdateSource::SmartProtocolPush { .. } => {
-                                            String::from("SmartProtocolPush")
-                                        }
-                                        DatasetUpdateSource::ExternallyDetectedChange => {
-                                            String::from("ExternallyDetectedChange")
-                                        }
-                                        DatasetUpdateSource::UpstreamFlow { .. } => format!(
-                                            "Input({})",
-                                            state
-                                                .dataset_display_names
-                                                .get(&update_details.dataset_id)
-                                                .cloned()
-                                                .unwrap_or_else(|| update_details
-                                                    .dataset_id
-                                                    .to_string())
-                                        ),
-                                    }
-                                }
-                            }
-                        )?;
-                    }
-
-                    if let Some(start_condition) = flow_state.start_condition {
-                        match start_condition {
-                            FlowStartCondition::Throttling(t) => {
-                                write!(
-                                    f,
-                                    " Throttling(for={}ms, wakeup={}ms, shifted={}ms)",
-                                    t.interval.num_milliseconds(),
-                                    (t.wake_up_at - initial_time).num_milliseconds(),
-                                    (t.shifted_from - initial_time).num_milliseconds()
-                                )?;
-                            }
-                            FlowStartCondition::Reactive(b) => write!(
-                                f,
-                                " Batching({}/{}, until={}ms)",
-                                self.get_accumulated_reactive_records(flow_state, &b),
-                                b.active_rule.for_new_data.min_records_to_await(),
-                                (b.batching_deadline - initial_time).num_milliseconds(),
-                            )?,
-                            FlowStartCondition::Executor(e) => {
-                                write!(
-                                    f,
-                                    " Executor(task={}, since={}ms)",
-                                    e.task_id,
-                                    (flow_state.timing.awaiting_executor_since.unwrap()
+                            "    Flow ID = {} {}",
+                            flow_state.flow_id,
+                            match flow_state.status() {
+                                FlowStatus::Waiting => "Waiting".to_string(),
+                                FlowStatus::Running => format!(
+                                    "{:?}(task={})",
+                                    flow_state.status(),
+                                    flow_state
+                                        .task_ids
+                                        .iter()
+                                        .map(|task_id| format!("{task_id}"))
+                                        .collect::<Vec<_>>()
+                                        .join(",")
+                                ),
+                                FlowStatus::Retrying => format!(
+                                    "{:?}(scheduled_at={}ms)",
+                                    flow_state.status(),
+                                    (flow_state.timing.scheduled_for_activation_at.unwrap()
                                         - initial_time)
                                         .num_milliseconds()
-                                )?;
-                            }
-                            FlowStartCondition::Schedule(s) => {
-                                write!(
-                                    f,
-                                    " Schedule(wakeup={}ms)",
-                                    (s.wake_up_at - initial_time).num_milliseconds(),
-                                )?;
-                            }
-                        }
-                    }
-
-                    if let Some(outcome) = &flow_state.outcome {
-                        writeln!(
-                            f,
-                            " {}",
-                            match outcome {
-                                FlowOutcome::Success(_) => "Success",
-                                FlowOutcome::Aborted => "Aborted",
-                                FlowOutcome::Failed => "Failed",
+                                ),
+                                _ => format!("{:?}", flow_state.status()),
                             }
                         )?;
-                    } else {
-                        writeln!(f)?;
+
+                        if matches!(flow_state.status(), FlowStatus::Waiting) {
+                            write!(
+                                f,
+                                " {}",
+                                match flow_state.primary_activation_cause() {
+                                    FlowActivationCause::Manual(_) => String::from("Manual"),
+                                    FlowActivationCause::AutoPolling(_) =>
+                                        String::from("AutoPolling"),
+                                    FlowActivationCause::ResourceUpdate(update) => {
+                                        let update_details: DatasetResourceUpdateDetails =
+                                            serde_json::from_value(update.details.clone()).unwrap();
+                                        match &update_details.source {
+                                            DatasetUpdateSource::HttpIngest { .. } => {
+                                                String::from("HttpIngest")
+                                            }
+                                            DatasetUpdateSource::SmartProtocolPush { .. } => {
+                                                String::from("SmartProtocolPush")
+                                            }
+                                            DatasetUpdateSource::ExternallyDetectedChange => {
+                                                String::from("ExternallyDetectedChange")
+                                            }
+                                            DatasetUpdateSource::UpstreamFlow { .. } => format!(
+                                                "Input({})",
+                                                state
+                                                    .dataset_display_names
+                                                    .get(&update_details.dataset_id)
+                                                    .cloned()
+                                                    .unwrap_or_else(|| update_details
+                                                        .dataset_id
+                                                        .to_string())
+                                            ),
+                                        }
+                                    }
+                                }
+                            )?;
+                        }
+
+                        if let Some(start_condition) = flow_state.start_condition {
+                            match start_condition {
+                                FlowStartCondition::Throttling(t) => {
+                                    write!(
+                                        f,
+                                        " Throttling(for={}ms, wakeup={}ms, shifted={}ms)",
+                                        t.interval.num_milliseconds(),
+                                        (t.wake_up_at - initial_time).num_milliseconds(),
+                                        (t.shifted_from - initial_time).num_milliseconds()
+                                    )?;
+                                }
+                                FlowStartCondition::Reactive(b) => write!(
+                                    f,
+                                    " Batching({}/{}, until={}ms)",
+                                    self.get_accumulated_reactive_records(flow_state, &b),
+                                    b.active_rule.for_new_data.min_records_to_await(),
+                                    (b.batching_deadline - initial_time).num_milliseconds(),
+                                )?,
+                                FlowStartCondition::Executor(e) => {
+                                    write!(
+                                        f,
+                                        " Executor(task={}, since={}ms)",
+                                        e.task_id,
+                                        (flow_state.timing.awaiting_executor_since.unwrap()
+                                            - initial_time)
+                                            .num_milliseconds()
+                                    )?;
+                                }
+                                FlowStartCondition::Schedule(s) => {
+                                    write!(
+                                        f,
+                                        " Schedule(wakeup={}ms)",
+                                        (s.wake_up_at - initial_time).num_milliseconds(),
+                                    )?;
+                                }
+                            }
+                        }
+
+                        if let Some(outcome) = &flow_state.outcome {
+                            writeln!(
+                                f,
+                                " {}",
+                                match outcome {
+                                    FlowOutcome::Success(_) => "Success",
+                                    FlowOutcome::Aborted => "Aborted",
+                                    FlowOutcome::Failed => "Failed",
+                                }
+                            )?;
+                        } else {
+                            writeln!(f)?;
+                        }
                     }
                 }
+                writeln!(f)?;
+
+                index += 1;
             }
-            writeln!(f)?;
         }
         Ok(())
     }
@@ -335,6 +346,14 @@ impl MessageConsumerT<FlowAgentUpdatedMessage> for FlowSystemTestListener {
         _: &Catalog,
         message: &FlowAgentUpdatedMessage,
     ) -> Result<(), InternalError> {
+        if message.update_details == FlowAgentUpdateDetails::Loaded {
+            let mut state = self.state.lock().unwrap();
+            if state.loaded {
+                panic!("FlowAgentUpdatedMessage::Loaded received more than once");
+            }
+            state.loaded = true;
+        }
+
         self.make_a_snapshot(message.update_time).await;
         Ok(())
     }
@@ -347,13 +366,14 @@ impl MessageConsumerT<FlowProgressMessage> for FlowSystemTestListener {
         _: &Catalog,
         message: &FlowProgressMessage,
     ) -> Result<(), InternalError> {
-        match message {
-            FlowProgressMessage::Running(e) => self.make_a_snapshot(e.event_time).await,
-            FlowProgressMessage::RetryScheduled(e) => self.make_a_snapshot(e.event_time).await,
-            FlowProgressMessage::Finished(e) => self.make_a_snapshot(e.event_time).await,
-            FlowProgressMessage::Cancelled(e) => self.make_a_snapshot(e.event_time).await,
-            FlowProgressMessage::Scheduled(_) => {}
+        {
+            let state = self.state.lock().unwrap();
+            if !state.loaded {
+                return Ok(()); // Ignore until loaded
+            }
         }
+
+        self.make_a_snapshot(message.event_time()).await;
         Ok(())
     }
 }

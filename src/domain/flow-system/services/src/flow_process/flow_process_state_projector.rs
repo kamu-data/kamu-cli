@@ -23,7 +23,7 @@ use messaging_outbox::*;
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-        MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
+        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,

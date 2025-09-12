@@ -238,17 +238,16 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
-    ) -> Result<(), FlowProcessUpdateError> {
+    ) -> Result<(), FlowProcessFlowEventError> {
         // Load current state
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
-                return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding: flow_binding.clone(),
-                }));
+                // Skip this flow, must be a manual launch without any trigger existing
+                return Ok(());
             }
             Err(FlowProcessLoadError::Internal(e)) => {
-                return Err(FlowProcessUpdateError::Internal(e));
+                return Err(FlowProcessFlowEventError::Internal(e));
             }
         };
 
@@ -278,9 +277,9 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         {
             Ok(()) => Ok(()),
             Err(FlowProcessSaveError::ConcurrentModification(e)) => {
-                Err(FlowProcessUpdateError::ConcurrentModification(e))
+                Err(FlowProcessFlowEventError::ConcurrentModification(e))
             }
-            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessUpdateError::Internal(e)),
+            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessFlowEventError::Internal(e)),
         }
     }
 
@@ -289,17 +288,16 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         flow_event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-    ) -> Result<(), FlowProcessUpdateError> {
+    ) -> Result<(), FlowProcessFlowEventError> {
         // Load current state
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
-                return Err(FlowProcessUpdateError::NotFound(FlowProcessNotFoundError {
-                    flow_binding: flow_binding.clone(),
-                }));
+                // Skip this flow, must be a manual launch without any trigger existing
+                return Ok(());
             }
             Err(FlowProcessLoadError::Internal(e)) => {
-                return Err(FlowProcessUpdateError::Internal(e));
+                return Err(FlowProcessFlowEventError::Internal(e));
             }
         };
 
@@ -323,9 +321,9 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         {
             Ok(()) => Ok(()),
             Err(FlowProcessSaveError::ConcurrentModification(e)) => {
-                Err(FlowProcessUpdateError::ConcurrentModification(e))
+                Err(FlowProcessFlowEventError::ConcurrentModification(e))
             }
-            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessUpdateError::Internal(e)),
+            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessFlowEventError::Internal(e)),
         }
     }
 

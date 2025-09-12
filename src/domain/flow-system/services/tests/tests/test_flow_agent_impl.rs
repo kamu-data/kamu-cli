@@ -148,20 +148,29 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
             #3: +20ms:
               "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Schedule(wakeup=80ms)
                 Flow ID = 0 Finished Success
 
-            #4: +80ms:
+            #5: +80ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=80ms)
                 Flow ID = 0 Finished Success
 
-            #5: +90ms:
+            #6: +90ms:
               "foo" Ingest:
                 Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
-            #6: +100ms:
+            #7: +100ms:
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #8: +100ms:
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Success
@@ -307,6 +316,10 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
 
             #3: +120ms:
               "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #4: +120ms:
+              "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Schedule(wakeup=180ms)
                 Flow ID = 0 Finished Success
 
@@ -406,20 +419,28 @@ async fn test_cron_config() {
               "foo" Ingest:
                 Flow ID = 0 Waiting AutoPolling Schedule(wakeup=5000ms)
 
-            #2: +5000ms:
+            #2: +2000ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=5000ms)
+
+            #3: +5000ms:
               "foo" Ingest:
                 Flow ID = 0 Waiting AutoPolling Executor(task=0, since=5000ms)
 
-            #3: +6000ms:
+            #4: +6000ms:
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
-            #4: +7000ms:
+            #5: +7000ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #6: +7000ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Schedule(wakeup=10000ms)
                 Flow ID = 0 Finished Success
 
-            #5: +10000ms:
+            #7: +10000ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=10000ms)
                 Flow ID = 0 Finished Success
@@ -564,26 +585,48 @@ async fn test_manual_trigger() {
 
             #3: +20ms:
               "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Schedule(wakeup=110ms)
                 Flow ID = 0 Finished Success
 
-            #4: +40ms:
+            #5: +40ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=110ms)
+                Flow ID = 0 Finished Success
+
+            #6: +40ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=40ms)
                 Flow ID = 0 Finished Success
 
-            #5: +60ms:
+            #7: +60ms:
               "foo" Ingest:
                 Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
-            #6: +70ms:
+            #8: +70ms:
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +70ms:
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #7: +80ms:
+            #10: +80ms:
+              "bar" Ingest:
+                Flow ID = 3 Waiting Manual
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #11: +80ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting Manual Executor(task=2, since=80ms)
               "foo" Ingest:
@@ -591,7 +634,7 @@ async fn test_manual_trigger() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #8: +100ms:
+            #12: +100ms:
               "bar" Ingest:
                 Flow ID = 3 Running(task=2)
               "foo" Ingest:
@@ -599,7 +642,7 @@ async fn test_manual_trigger() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #9: +110ms:
+            #13: +110ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
@@ -607,7 +650,7 @@ async fn test_manual_trigger() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #10: +160ms:
+            #14: +160ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
@@ -760,26 +803,48 @@ async fn test_ingest_trigger_with_ingest_config() {
 
             #3: +20ms:
               "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Schedule(wakeup=110ms)
                 Flow ID = 0 Finished Success
 
-            #4: +40ms:
+            #5: +40ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=110ms)
+                Flow ID = 0 Finished Success
+
+            #6: +40ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=40ms)
                 Flow ID = 0 Finished Success
 
-            #5: +60ms:
+            #7: +60ms:
               "foo" Ingest:
                 Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
-            #6: +70ms:
+            #8: +70ms:
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +70ms:
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #7: +80ms:
+            #10: +80ms:
+              "bar" Ingest:
+                Flow ID = 3 Waiting Manual
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #11: +80ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting Manual Executor(task=2, since=80ms)
               "foo" Ingest:
@@ -787,7 +852,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #8: +100ms:
+            #12: +100ms:
               "bar" Ingest:
                 Flow ID = 3 Running(task=2)
               "foo" Ingest:
@@ -795,7 +860,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #9: +110ms:
+            #13: +110ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
@@ -803,7 +868,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #10: +160ms:
+            #14: +160ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
@@ -917,31 +982,41 @@ async fn test_manual_trigger_compaction() {
 
             #1: +10ms:
               "foo" HardCompaction:
-                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+                Flow ID = 0 Waiting Manual
 
             #2: +10ms:
               "foo" HardCompaction:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+            #3: +10ms:
+              "foo" HardCompaction:
                 Flow ID = 0 Running(task=0)
 
-            #3: +30ms:
+            #4: +30ms:
               "bar" HardCompaction:
                 Flow ID = 1 Waiting Manual
               "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
-            #4: +50ms:
+            #5: +50ms:
+              "bar" HardCompaction:
+                Flow ID = 1 Waiting Manual
+              "foo" HardCompaction:
+                Flow ID = 0 Running(task=0)
+
+            #6: +50ms:
               "bar" HardCompaction:
                 Flow ID = 1 Waiting Manual Executor(task=1, since=50ms)
               "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
-            #5: +60ms:
+            #7: +60ms:
               "bar" HardCompaction:
                 Flow ID = 1 Running(task=1)
               "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
-            #6: +70ms:
+            #8: +70ms:
               "bar" HardCompaction:
                 Flow ID = 1 Finished Success
               "foo" HardCompaction:
@@ -1038,13 +1113,17 @@ async fn test_manual_trigger_reset() {
 
             #1: +10ms:
               "foo" Reset:
+                Flow ID = 0 Waiting Manual
+
+            #2: +10ms:
+              "foo" Reset:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
-            #2: +20ms:
+            #3: +20ms:
               "foo" Reset:
                 Flow ID = 0 Running(task=0)
 
-            #3: +110ms:
+            #4: +110ms:
               "foo" Reset:
                 Flow ID = 0 Finished Success
 
@@ -1129,13 +1208,17 @@ async fn test_manual_trigger_reset_to_metadata() {
 
             #1: +10ms:
               "foo" ResetToMetadata:
+                Flow ID = 0 Waiting Manual
+
+            #2: +10ms:
+              "foo" ResetToMetadata:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
-            #2: +20ms:
+            #3: +20ms:
               "foo" ResetToMetadata:
                 Flow ID = 0 Running(task=0)
 
-            #3: +110ms:
+            #4: +110ms:
               "foo" ResetToMetadata:
                 Flow ID = 0 Finished Success
 
@@ -1324,31 +1407,41 @@ async fn test_reset_trigger_derivatives_reactively() {
 
           #1: +50ms:
             "foo" Reset:
-              Flow ID = 0 Waiting Manual Executor(task=0, since=50ms)
+              Flow ID = 0 Waiting Manual
 
           #2: +50ms:
             "foo" Reset:
-              Flow ID = 0 Running(task=0)
+              Flow ID = 0 Waiting Manual Executor(task=0, since=50ms)
 
-          #3: +90ms:
+          #3: +50ms:
             "foo" Reset:
-              Flow ID = 0 Finished Success
-            "foo_bar" ResetToMetadata:
-              Flow ID = 1 Waiting Input(foo)
+              Flow ID = 0 Running(task=0)
 
           #4: +90ms:
             "foo" Reset:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
+              Flow ID = 1 Waiting Input(foo)
+
+          #5: +90ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" ResetToMetadata:
+              Flow ID = 1 Waiting Input(foo)
+
+          #6: +90ms:
+            "foo" Reset:
+              Flow ID = 0 Finished Success
+            "foo_bar" ResetToMetadata:
               Flow ID = 1 Waiting Input(foo) Executor(task=1, since=90ms)
 
-          #5: +110ms:
+          #7: +110ms:
             "foo" Reset:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
               Flow ID = 1 Running(task=1)
 
-          #6: +180ms:
+          #8: +180ms:
             "foo" Reset:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
@@ -1435,13 +1528,17 @@ async fn test_manual_trigger_compaction_with_config() {
 
             #1: +20ms:
               "foo" HardCompaction:
+                Flow ID = 0 Waiting Manual
+
+            #2: +20ms:
+              "foo" HardCompaction:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
 
-            #2: +30ms:
+            #3: +30ms:
               "foo" HardCompaction:
                 Flow ID = 0 Running(task=0)
 
-            #3: +40ms:
+            #4: +40ms:
               "foo" HardCompaction:
                 Flow ID = 0 Finished Success
 
@@ -1635,31 +1732,41 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
 
           #1: +50ms:
             "foo" HardCompaction:
-              Flow ID = 0 Waiting Manual Executor(task=0, since=50ms)
+              Flow ID = 0 Waiting Manual
 
           #2: +50ms:
             "foo" HardCompaction:
-              Flow ID = 0 Running(task=0)
+              Flow ID = 0 Waiting Manual Executor(task=0, since=50ms)
 
-          #3: +90ms:
+          #3: +50ms:
             "foo" HardCompaction:
-              Flow ID = 0 Finished Success
-            "foo_bar" ResetToMetadata:
-              Flow ID = 1 Waiting Input(foo)
+              Flow ID = 0 Running(task=0)
 
           #4: +90ms:
             "foo" HardCompaction:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
+              Flow ID = 1 Waiting Input(foo)
+
+          #5: +90ms:
+            "foo" HardCompaction:
+              Flow ID = 0 Finished Success
+            "foo_bar" ResetToMetadata:
+              Flow ID = 1 Waiting Input(foo)
+
+          #6: +90ms:
+            "foo" HardCompaction:
+              Flow ID = 0 Finished Success
+            "foo_bar" ResetToMetadata:
               Flow ID = 1 Waiting Input(foo) Executor(task=1, since=90ms)
 
-          #5: +110ms:
+          #7: +110ms:
             "foo" HardCompaction:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
               Flow ID = 1 Running(task=1)
 
-          #6: +150ms:
+          #8: +150ms:
             "foo" HardCompaction:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
@@ -1855,31 +1962,41 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
 
           #1: +50ms:
             "foo" ResetToMetadata:
-              Flow ID = 0 Waiting Manual Executor(task=0, since=50ms)
+              Flow ID = 0 Waiting Manual
 
           #2: +50ms:
             "foo" ResetToMetadata:
-              Flow ID = 0 Running(task=0)
+              Flow ID = 0 Waiting Manual Executor(task=0, since=50ms)
 
-          #3: +90ms:
+          #3: +50ms:
             "foo" ResetToMetadata:
-              Flow ID = 0 Finished Success
-            "foo_bar" ResetToMetadata:
-              Flow ID = 1 Waiting Input(foo)
+              Flow ID = 0 Running(task=0)
 
           #4: +90ms:
             "foo" ResetToMetadata:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
+              Flow ID = 1 Waiting Input(foo)
+
+          #5: +90ms:
+            "foo" ResetToMetadata:
+              Flow ID = 0 Finished Success
+            "foo_bar" ResetToMetadata:
+              Flow ID = 1 Waiting Input(foo)
+
+          #6: +90ms:
+            "foo" ResetToMetadata:
+              Flow ID = 0 Finished Success
+            "foo_bar" ResetToMetadata:
               Flow ID = 1 Waiting Input(foo) Executor(task=1, since=90ms)
 
-          #5: +110ms:
+          #7: +110ms:
             "foo" ResetToMetadata:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
               Flow ID = 1 Running(task=1)
 
-          #6: +180ms:
+          #8: +180ms:
             "foo" ResetToMetadata:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
@@ -1887,7 +2004,15 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
             "foo_bar_baz" ResetToMetadata:
               Flow ID = 2 Waiting Input(foo_bar)
 
-          #7: +180ms:
+          #9: +180ms:
+            "foo" ResetToMetadata:
+              Flow ID = 0 Finished Success
+            "foo_bar" ResetToMetadata:
+              Flow ID = 1 Finished Success
+            "foo_bar_baz" ResetToMetadata:
+              Flow ID = 2 Waiting Input(foo_bar)
+
+          #10: +180ms:
             "foo" ResetToMetadata:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
@@ -1895,7 +2020,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
             "foo_bar_baz" ResetToMetadata:
               Flow ID = 2 Waiting Input(foo_bar) Executor(task=2, since=180ms)
 
-          #8: +200ms:
+          #11: +200ms:
             "foo" ResetToMetadata:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
@@ -1903,7 +2028,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
             "foo_bar_baz" ResetToMetadata:
               Flow ID = 2 Running(task=2)
 
-          #9: +240ms:
+          #12: +240ms:
             "foo" ResetToMetadata:
               Flow ID = 0 Finished Success
             "foo_bar" ResetToMetadata:
@@ -2016,13 +2141,17 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
 
             #1: +10ms:
               "foo" ResetToMetadata:
+                Flow ID = 0 Waiting Manual
+
+            #2: +10ms:
+              "foo" ResetToMetadata:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
 
-            #2: +20ms:
+            #3: +20ms:
               "foo" ResetToMetadata:
                 Flow ID = 0 Running(task=0)
 
-            #3: +90ms:
+            #4: +90ms:
               "foo" ResetToMetadata:
                 Flow ID = 0 Finished Success
 
@@ -2171,17 +2300,30 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
               "bar" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
+                Flow ID = 0 Finished Success
+            
+            #4: +20ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
-            #4: +20ms:
+            #5: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Running(task=1)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
-            #5: +30ms:
+            #6: +30ms:
+              "bar" Ingest:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
+                Flow ID = 0 Finished Success
+
+            #7: +30ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=110ms)
                 Flow ID = 1 Finished Success
@@ -2189,7 +2331,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
-            #6: +50ms:
+            #8: +50ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=110ms)
                 Flow ID = 1 Finished Success
@@ -2197,7 +2339,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #7: +50ms:
+            #9: +50ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
@@ -2205,7 +2347,16 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #8: +80ms:
+            #10: +80ms:
+              "bar" Ingest:
+                Flow ID = 3 Finished Aborted
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Waiting AutoPolling
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #11: +80ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2215,7 +2366,17 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #9: +80ms:
+            #12: +80ms:
+              "bar" Ingest:
+                Flow ID = 5 Waiting AutoPolling Schedule(wakeup=100ms)
+                Flow ID = 3 Finished Aborted
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Waiting AutoPolling
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #13: +80ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2225,7 +2386,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #10: +100ms:
+            #14: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Executor(task=3, since=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2378,17 +2539,30 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               "bar" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 0 Finished Success
+
+            #5: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Running(task=1)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
                 Flow ID = 0 Finished Success
 
-            #5: +30ms:
+            #6: +30ms:
+              "bar" Ingest:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 0 Finished Success
+
+            #7: +30ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=90ms)
                 Flow ID = 1 Finished Success
@@ -2396,7 +2570,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
                 Flow ID = 0 Finished Success
 
-            #6: +50ms:
+            #8: +50ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=90ms)
                 Flow ID = 1 Finished Success
@@ -2404,7 +2578,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #7: +50ms:
+            #9: +50ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
@@ -2412,7 +2586,16 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #8: +100ms:
+            #10: +100ms:
+              "bar" Ingest:
+                Flow ID = 3 Finished Aborted
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+            
+            #11: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling
                 Flow ID = 3 Finished Aborted
@@ -2422,7 +2605,17 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #9: +100ms:
+            #12: +100ms:
+              "bar" Ingest:
+                Flow ID = 5 Waiting AutoPolling
+                Flow ID = 3 Finished Aborted
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #13: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2432,7 +2625,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #10: +120ms:
+            #14: +120ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 3 Finished Aborted
@@ -2569,17 +2762,30 @@ async fn test_dataset_deleted() {
               "bar" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
+                Flow ID = 0 Finished Success
+
+            #5: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Running(task=1)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
-            #5: +30ms:
+            #6: +30ms:
+              "bar" Ingest:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
+                Flow ID = 0 Finished Success
+
+            #7: +30ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 1 Finished Success
@@ -2587,7 +2793,7 @@ async fn test_dataset_deleted() {
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
-            #6: +50ms:
+            #8: +50ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 1 Finished Success
@@ -2595,7 +2801,7 @@ async fn test_dataset_deleted() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #7: +100ms:
+            #9: +100ms:
               "bar" Ingest:
                 Flow ID = 3 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 1 Finished Success
@@ -2603,7 +2809,7 @@ async fn test_dataset_deleted() {
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
-            #8: +120ms:
+            #10: +120ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
@@ -2765,21 +2971,20 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "baz" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "baz" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
 
-            #5: +30ms:
+            #5: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Finished Failed
+                Flow ID = 1 Running(task=1)
               "baz" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
@@ -2790,12 +2995,21 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
+              "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
+                Flow ID = 0 Finished Success
+
+            #7: +30ms:
+              "bar" Ingest:
+                Flow ID = 1 Finished Failed
+              "baz" Ingest:
                 Flow ID = 2 Running(task=2)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
 
-            #7: +40ms:
+            #8: +40ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
@@ -2804,7 +3018,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
 
-            #8: +60ms:
+            #9: +60ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
@@ -2977,20 +3191,38 @@ async fn test_derived_dataset_triggered_after_input_change() {
 
             #3: +20ms:
               "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 0 Finished Success
 
-            #4: +100ms:
+            #5: +100ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=100ms)
                 Flow ID = 0 Finished Success
 
-            #5: +110ms:
+            #6: +110ms:
               "foo" Ingest:
                 Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
-            #6: +120ms:
+            #7: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1120ms)
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #8: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1120ms)
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +120ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1120ms)
               "foo" Ingest:
@@ -2998,7 +3230,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #7: +120ms:
+            #10: +120ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Executor(task=2, since=120ms)
               "foo" Ingest:
@@ -3006,7 +3238,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #8: +130ms:
+            #11: +130ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Running(task=2)
               "foo" Ingest:
@@ -3014,7 +3246,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #9: +140ms:
+            #12: +140ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Finished Success
               "foo" Ingest:
@@ -3022,7 +3254,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
-            #10: +200ms:
+            #13: +200ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Finished Success
               "foo" Ingest:
@@ -3226,38 +3458,60 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
               "bar" ExecuteTransform:
                 Flow ID = 1 Waiting ExternallyDetectedChange Executor(task=1, since=0ms)
               "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting ExternallyDetectedChange Executor(task=1, since=0ms)
+              "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 0 Finished Success
 
-            #4: +30ms:
+            #5: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Running(task=1)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 0 Finished Success
 
-            #5: +40ms:
+            #6: +40ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 0 Finished Success
 
-            #6: +100ms:
+            #7: +100ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 0 Finished Success
 
-            #7: +110ms:
+            #8: +110ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Running(task=2)
                 Flow ID = 0 Finished Success
 
-            #8: +120ms:
+            #9: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Waiting Input(foo) Batching(3/1, until=1120ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #10: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Waiting Input(foo) Batching(3/1, until=1120ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #11: +120ms:
               "bar" ExecuteTransform:
                 Flow ID = 3 Waiting Input(foo) Batching(3/1, until=1120ms)
                 Flow ID = 1 Finished Success
@@ -3266,7 +3520,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
-            #9: +120ms:
+            #12: +120ms:
               "bar" ExecuteTransform:
                 Flow ID = 3 Waiting Input(foo) Executor(task=3, since=120ms)
                 Flow ID = 1 Finished Success
@@ -3275,7 +3529,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
-            #10: +130ms:
+            #13: +130ms:
               "bar" ExecuteTransform:
                 Flow ID = 3 Running(task=3)
                 Flow ID = 1 Finished Success
@@ -3284,7 +3538,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
-            #11: +140ms:
+            #14: +140ms:
               "bar" ExecuteTransform:
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
@@ -3293,7 +3547,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
-            #12: +200ms:
+            #15: +200ms:
               "bar" ExecuteTransform:
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
@@ -3409,22 +3663,31 @@ async fn test_throttling_manual_triggers() {
 
             #1: +20ms:
               "foo" Ingest:
+                Flow ID = 0 Waiting Manual
+
+            #2: +20ms:
+              "foo" Ingest:
                 Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
 
-            #2: +40ms:
+            #3: +40ms:
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
-            #3: +50ms:
+            #4: +50ms:
               "foo" Ingest:
                 Flow ID = 0 Finished Success
 
-            #4: +100ms:
+            #5: +70ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting Manual Throttling(for=100ms, wakeup=150ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
-            #5: +150ms:
+            #6: +100ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting Manual Throttling(for=100ms, wakeup=150ms, shifted=70ms)
+                Flow ID = 0 Finished Success
+
+            #7: +150ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting Manual Executor(task=1, since=150ms)
                 Flow ID = 0 Finished Success
@@ -3690,10 +3953,26 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               "baz" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Batching(7/1, until=86400020ms)
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "baz" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Batching(7/1, until=86400020ms)
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #5: +20ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "baz" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Batching(7/1, until=86400020ms)
+              "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
+                Flow ID = 0 Finished Success
+
+            #6: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "baz" ExecuteTransform:
@@ -3702,7 +3981,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
-            #5: +40ms:
+            #7: +40ms:
               "bar" Ingest:
                 Flow ID = 1 Running(task=1)
               "baz" ExecuteTransform:
@@ -3711,7 +3990,16 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
-            #6: +50ms:
+            #8: +50ms:
+              "bar" Ingest:
+                Flow ID = 1 Finished Success
+              "baz" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=20ms)
+              "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
+                Flow ID = 0 Finished Success
+
+            #9: +50ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3721,7 +4009,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
-            #7: +60ms:
+            #10: +60ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3731,7 +4019,17 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
-            #8: +80ms:
+            #11: +80ms:
+              "bar" Ingest:
+                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
+                Flow ID = 1 Finished Success
+              "baz" ExecuteTransform:
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
+                Flow ID = 0 Finished Success
+
+            #12: +80ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3742,7 +4040,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
-            #9: +120ms:
+            #13: +120ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3753,7 +4051,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Waiting AutoPolling Executor(task=3, since=120ms)
                 Flow ID = 0 Finished Success
 
-            #10: +130ms:
+            #14: +130ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3764,7 +4062,18 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Running(task=3)
                 Flow ID = 0 Finished Success
 
-            #11: +140ms:
+            #15: +140ms:
+              "bar" Ingest:
+                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
+                Flow ID = 1 Finished Success
+              "baz" ExecuteTransform:
+                Flow ID = 5 Waiting Input(bar) Throttling(for=100ms, wakeup=180ms, shifted=50ms)
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Finished Success
+                Flow ID = 0 Finished Success
+
+            #16: +140ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3776,7 +4085,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #12: +180ms:
+            #17: +180ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
@@ -3788,7 +4097,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #13: +200ms:
+            #18: +200ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Executor(task=5, since=200ms)
                 Flow ID = 1 Finished Success
@@ -3800,7 +4109,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #14: +220ms:
+            #19: +220ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Executor(task=5, since=200ms)
                 Flow ID = 1 Finished Success
@@ -3812,7 +4121,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #15: +230ms:
+            #20: +230ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Executor(task=5, since=200ms)
                 Flow ID = 1 Finished Success
@@ -3824,7 +4133,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #16: +240ms:
+            #21: +240ms:
               "bar" Ingest:
                 Flow ID = 4 Waiting AutoPolling Executor(task=5, since=200ms)
                 Flow ID = 1 Finished Success
@@ -3836,7 +4145,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #17: +250ms:
+            #22: +250ms:
               "bar" Ingest:
                 Flow ID = 4 Running(task=5)
                 Flow ID = 1 Finished Success
@@ -3848,7 +4157,33 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #18: +260ms:
+            #23: +260ms:
+              "bar" Ingest:
+                Flow ID = 4 Finished Success
+                Flow ID = 1 Finished Success
+              "baz" ExecuteTransform:
+                Flow ID = 7 Waiting Input(bar) Throttling(for=100ms, wakeup=330ms, shifted=260ms)
+                Flow ID = 5 Finished Success
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 6 Waiting AutoPolling Executor(task=6, since=240ms)
+                Flow ID = 3 Finished Success
+                Flow ID = 0 Finished Success
+
+            #24: +260ms:
+              "bar" Ingest:
+                Flow ID = 4 Finished Success
+                Flow ID = 1 Finished Success
+              "baz" ExecuteTransform:
+                Flow ID = 7 Waiting Input(bar) Throttling(for=100ms, wakeup=330ms, shifted=260ms)
+                Flow ID = 5 Finished Success
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 6 Waiting AutoPolling Executor(task=6, since=240ms)
+                Flow ID = 3 Finished Success
+                Flow ID = 0 Finished Success
+
+            #25: +260ms:
               "bar" Ingest:
                 Flow ID = 8 Waiting AutoPolling Schedule(wakeup=410ms)
                 Flow ID = 4 Finished Success
@@ -3862,7 +4197,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #19: +330ms:
+            #26: +330ms:
               "bar" Ingest:
                 Flow ID = 8 Waiting AutoPolling Schedule(wakeup=410ms)
                 Flow ID = 4 Finished Success
@@ -3876,7 +4211,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 Flow ID = 3 Finished Success
                 Flow ID = 0 Finished Success
 
-            #20: +410ms:
+            #27: +410ms:
               "bar" Ingest:
                 Flow ID = 8 Waiting AutoPolling Executor(task=8, since=410ms)
                 Flow ID = 4 Finished Success

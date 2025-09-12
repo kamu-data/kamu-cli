@@ -24,7 +24,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowAbortHelper>();
     catalog_builder.add::<FlowSchedulingHelper>();
 
-    // catalog_builder.add::<FlowProcessStateProjector>();
+    catalog_builder.add::<FlowProcessStateProjector>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
