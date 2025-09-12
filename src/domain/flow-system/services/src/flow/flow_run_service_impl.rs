@@ -49,6 +49,7 @@ impl FlowRunService for FlowRunServiceImpl {
 
         self.flow_scheduling_helper
             .trigger_flow_common(
+                activation_time,
                 flow_binding,
                 None,
                 vec![FlowActivationCause::Manual(FlowActivationCauseManual {
@@ -65,6 +66,7 @@ impl FlowRunService for FlowRunServiceImpl {
     /// unless it's already waiting
     async fn run_flow_automatically(
         &self,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         activation_causes: Vec<FlowActivationCause>,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
@@ -72,6 +74,7 @@ impl FlowRunService for FlowRunServiceImpl {
     ) -> Result<FlowState, RunFlowError> {
         self.flow_scheduling_helper
             .trigger_flow_common(
+                activation_time,
                 flow_binding,
                 maybe_flow_trigger_rule,
                 activation_causes,
