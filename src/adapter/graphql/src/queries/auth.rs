@@ -63,7 +63,7 @@ impl Auth {
             dyn DatasetEntryService
         );
 
-        let account_ids = account_ids.into_iter().map(Into::into).collect::<Vec<_>>();
+        let account_ids = account_ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         let accounts_map = account_service
             .get_account_map(&account_ids)
             .await

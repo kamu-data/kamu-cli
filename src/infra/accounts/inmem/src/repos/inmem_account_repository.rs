@@ -247,8 +247,8 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         let guard = self.state.lock().unwrap();
 
         let accounts: Vec<Account> = account_ids
@@ -384,6 +384,20 @@ impl AccountRepository for InMemoryAccountRepository {
                 },
             ))
         }
+    }
+
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError> {
+        let guard = self.state.lock().unwrap();
+
+        let accounts = account_names
+            .iter()
+            .filter_map(|name| guard.accounts_by_name.get(*name).cloned())
+            .collect();
+
+        Ok(accounts)
     }
 }
 

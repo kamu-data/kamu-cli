@@ -52,7 +52,7 @@ impl<'a> DatasetCollaboration<'a> {
         let authorized_accounts = self.dataset_request_state.authorized_accounts(ctx).await?;
         let authorized_account_ids = authorized_accounts
             .iter()
-            .map(|a| a.account_id.clone())
+            .map(|a| &a.account_id)
             .collect::<Vec<_>>();
         let mut authorized_account_map = account_service
             .get_account_map(&authorized_account_ids)
