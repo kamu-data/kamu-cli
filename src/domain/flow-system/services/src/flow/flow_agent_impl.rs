@@ -161,6 +161,7 @@ impl FlowAgentImpl {
                 if let Some(FlowStartCondition::Reactive(b)) = &flow.start_condition {
                     scheduling_helper
                         .trigger_flow_common(
+                            start_time,
                             &flow.flow_binding,
                             Some(FlowTriggerRule::Reactive(b.active_rule)),
                             vec![FlowActivationCause::AutoPolling(
@@ -525,14 +526,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .int_err()?;
                         }
 
-                        // In case of success:
-                        //  - schedule next flow, if we had any late activation cause
-                        if message.outcome.is_success() {
-                            scheduling_helper
-                                .try_schedule_late_flow_activations(&flow)
-                                .await?;
-                        }
-
                         let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
 
                         // The outcome might not be final in case of retrying flows.
@@ -565,16 +558,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     .await?;
                             }
 
-                            // Try to schedule auto-polling flow, if applicable.
-                            // We don't care whether we failed or succeeded,
-                            // that is determined with the stop policy in the trigger.
-                            scheduling_helper
-                                .try_schedule_auto_polling_flow_if_enabled(
-                                    finish_time,
-                                    &flow.flow_binding,
-                                )
-                                .await?;
-
                             // Notify about finished flow
                             outbox
                                 .post_message(
@@ -586,6 +569,24 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                         flow.flow_binding.clone(),
                                         flow_outcome.clone(),
                                     ),
+                                )
+                                .await?;
+
+                            // In case of success:
+                            //  - schedule next flow, if we had any late activation cause
+                            if message.outcome.is_success() {
+                                scheduling_helper
+                                    .try_schedule_late_flow_activations(finish_time, &flow)
+                                    .await?;
+                            }
+
+                            // Try to schedule auto-polling flow, if applicable.
+                            // We don't care whether we failed or succeeded,
+                            // that is determined with the stop policy in the trigger.
+                            scheduling_helper
+                                .try_schedule_auto_polling_flow_if_enabled(
+                                    finish_time,
+                                    &flow.flow_binding,
                                 )
                                 .await?;
                         } else {

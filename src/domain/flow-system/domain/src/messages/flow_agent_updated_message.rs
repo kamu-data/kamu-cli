@@ -36,7 +36,7 @@ impl Message for FlowAgentUpdatedMessage {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents different types of updates to a flow agent
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowAgentUpdateDetails {
     /// Indicates that the agent has been loaded
     Loaded,

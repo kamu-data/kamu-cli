@@ -59,6 +59,7 @@ impl DerivedDatasetFlowSensor {
 
     async fn run_transform_flow(
         &self,
+        activation_time: DateTime<Utc>,
         activation_causes: Vec<fs::FlowActivationCause>,
         flow_run_service: &dyn fs::FlowRunService,
     ) -> Result<(), InternalError> {
@@ -67,6 +68,7 @@ impl DerivedDatasetFlowSensor {
 
         flow_run_service
             .run_flow_automatically(
+                activation_time,
                 &flow_binding,
                 activation_causes,
                 Some(fs::FlowTriggerRule::Reactive(self.reactive_rule())),
@@ -80,6 +82,7 @@ impl DerivedDatasetFlowSensor {
 
     async fn run_reset_to_metadata_only(
         &self,
+        activation_time: DateTime<Utc>,
         activation_cause: &fs::FlowActivationCause,
         flow_run_service: &dyn fs::FlowRunService,
     ) -> Result<(), InternalError> {
@@ -87,6 +90,7 @@ impl DerivedDatasetFlowSensor {
             fs::FlowBinding::new(FLOW_TYPE_DATASET_RESET_TO_METADATA, self.flow_scope.clone());
         flow_run_service
             .run_flow_automatically(
+                activation_time,
                 &target_flow_binding,
                 vec![activation_cause.clone()],
                 None,
@@ -203,8 +207,12 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 }
 
                 // Trigger transform flow with all activation causes
-                self.run_transform_flow(all_activation_causes, flow_run_service.as_ref())
-                    .await?;
+                self.run_transform_flow(
+                    activation_time,
+                    all_activation_causes,
+                    flow_run_service.as_ref(),
+                )
+                .await?;
             }
         }
 
@@ -241,6 +249,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                     // Trigger transform flow for the target dataset
                     let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
                     self.run_transform_flow(
+                        activation_cause.activation_time(),
                         vec![activation_cause.clone()],
                         flow_run_service.as_ref(),
                     )
@@ -255,6 +264,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                             let flow_run_service =
                                 catalog.get_one::<dyn fs::FlowRunService>().unwrap();
                             self.run_reset_to_metadata_only(
+                                activation_cause.activation_time(),
                                 activation_cause,
                                 flow_run_service.as_ref(),
                             )
