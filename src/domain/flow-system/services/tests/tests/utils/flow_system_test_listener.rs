@@ -142,10 +142,10 @@ impl std::fmt::Display for FlowSystemTestListener {
 
         let state = self.state.lock().unwrap();
 
-        let mut snapshots_iter = state.snapshots.iter();
+        let snapshots_iter = state.snapshots.iter();
         let mut index = 0;
 
-        while let Some((snapshot_time, snapshots)) = snapshots_iter.next() {
+        for (snapshot_time, snapshots) in snapshots_iter {
             for snapshot in snapshots {
                 writeln!(
                     f,
@@ -348,9 +348,10 @@ impl MessageConsumerT<FlowAgentUpdatedMessage> for FlowSystemTestListener {
     ) -> Result<(), InternalError> {
         if message.update_details == FlowAgentUpdateDetails::Loaded {
             let mut state = self.state.lock().unwrap();
-            if state.loaded {
-                panic!("FlowAgentUpdatedMessage::Loaded received more than once");
-            }
+            debug_assert!(
+                !state.loaded,
+                "FlowAgentUpdatedMessage::Loaded received more than once"
+            );
             state.loaded = true;
         }
 
