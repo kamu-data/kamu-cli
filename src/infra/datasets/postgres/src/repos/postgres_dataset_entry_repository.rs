@@ -250,6 +250,14 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         }
     }
 
+    async fn get_dataset_entries_by_owner_and_name<'a>(
+        &self,
+        _owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
+        dbg!();
+        todo!()
+    }
+
     async fn get_dataset_entries_by_owner_id<'a>(
         &'a self,
         owner_id: &odf::AccountID,

@@ -55,6 +55,11 @@ pub trait DatasetEntryRepository: Send + Sync {
         name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError>;
 
+    async fn get_dataset_entries_by_owner_and_name<'a>(
+        &self,
+        owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError>;
+
     async fn save_dataset_entry(
         &self,
         dataset_entry: &DatasetEntry,
@@ -191,6 +196,14 @@ impl DatasetEntryByNameNotFoundError {
             dataset_name,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetEntriesByNameError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,13 +11,16 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use database_common::BatchLookup;
 use dill::{Singleton, component, interface, scope};
+use internal_error::InternalError;
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntry,
     DatasetEntryNotFoundError,
     DatasetEntryService,
     DatasetEntryStream,
+    GetDatasetEntryByNameError,
     GetDatasetEntryError,
     GetMultipleDatasetEntriesError,
 };
@@ -121,6 +124,17 @@ impl DatasetEntryService for FakeDatasetEntryService {
         );
 
         Ok(res)
+    }
+
+    async fn get_dataset_entries_by_owner_and_name(
+        &self,
+        _owner_id_dataset_name_pairs: &[&(odf::AccountID, odf::DatasetName)],
+    ) -> Result<
+        BatchLookup<DatasetEntry, (odf::AccountID, odf::DatasetName), GetDatasetEntryByNameError>,
+        InternalError,
+    > {
+        dbg!();
+        todo!()
     }
 }
 

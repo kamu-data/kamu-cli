@@ -191,6 +191,14 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Box::pin(futures::stream::iter(dataset_entries_page))
     }
 
+    async fn get_dataset_entries_by_owner_and_name<'a>(
+        &self,
+        _owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
+        dbg!();
+        todo!()
+    }
+
     async fn save_dataset_entry(
         &self,
         dataset_entry: &DatasetEntry,
