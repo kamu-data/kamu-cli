@@ -11,7 +11,13 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
+use database_common::{
+    BatchLookup,
+    BatchLookupCreateOptions,
+    EntityPageListing,
+    EntityPageStreamer,
+    PaginationOpts,
+};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -159,7 +165,7 @@ impl DatasetEntryServiceImpl {
         }
     }
 
-    fn resolve_owner_account_names<'a>(
+    fn group_aliases_by_resolved_owner_account_name<'a>(
         &'a self,
         dataset_aliases: &'a [&'a odf::DatasetAlias],
     ) -> Result<HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>>, InternalError> {
@@ -375,6 +381,132 @@ impl DatasetEntryServiceImpl {
             list: self.entries_as_handles(&dataset_entry_listing.list),
         })
     }
+
+    fn make_dataset_handle(&self, entry: DatasetEntry) -> odf::DatasetHandle {
+        odf::DatasetHandle::new(
+            entry.id,
+            self.tenancy_config.make_alias(entry.owner_name, entry.name),
+            entry.kind,
+        )
+    }
+
+    async fn resolve_dataset_handles_by_dataset_ids<'a>(
+        &'a self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<odf::dataset::ResolveDatasetHandlesByRefsResponse, InternalError> {
+        let entries_resolution_by_ids = self.get_multiple_entries(dataset_ids).await.int_err()?;
+
+        let mut resolved_handles =
+            Vec::with_capacity(entries_resolution_by_ids.resolved_entries.len());
+        let mut unresolved_refs =
+            Vec::with_capacity(entries_resolution_by_ids.unresolved_entries.len());
+
+        for entry in entries_resolution_by_ids.resolved_entries {
+            resolved_handles.push((entry.id.as_local_ref(), self.make_dataset_handle(entry)));
+        }
+
+        for unresolved_dataset_id in entries_resolution_by_ids.unresolved_entries {
+            let dataset_ref = unresolved_dataset_id.as_local_ref();
+            unresolved_refs.push((
+                dataset_ref.clone(),
+                odf::DatasetNotFoundError::new(dataset_ref).into(),
+            ));
+        }
+
+        Ok(odf::dataset::ResolveDatasetHandlesByRefsResponse {
+            resolved_handles,
+            unresolved_refs,
+        })
+    }
+
+    async fn resolve_dataset_handles_by_dataset_aliases(
+        &self,
+        dataset_aliases: &[&odf::DatasetAlias],
+    ) -> Result<odf::dataset::ResolveDatasetHandlesByRefsResponse, InternalError> {
+        let mut resolved_handles = Vec::with_capacity(dataset_aliases.len());
+        let mut unresolved_refs = Vec::with_capacity(dataset_aliases.len());
+
+        // First, we attempt to resolve accounts
+        let owner_name_dataset_aliases_mapping =
+            self.group_aliases_by_resolved_owner_account_name(dataset_aliases)?;
+        let maybe_owner_names = dataset_aliases
+            .iter()
+            .map(|alias| alias.account_name.as_ref())
+            .collect::<Vec<_>>();
+
+        let owner_ids_resolution_by_names = self
+            .resolve_account_ids_by_maybe_names(&maybe_owner_names)
+            .await?;
+
+        for (unresolved_owner_name, _) in owner_ids_resolution_by_names.unresolved_account_names {
+            // If a dataset owner account not found, then no datasets
+            let dataset_aliases_without_owner = owner_name_dataset_aliases_mapping
+                .get(&unresolved_owner_name)
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "{unresolved_owner_name} not found in \
+                         {owner_name_dataset_aliases_mapping:?}"
+                    );
+                });
+            for dataset_alias_without_owner in dataset_aliases_without_owner {
+                let dataset_ref = dataset_alias_without_owner.as_local_ref();
+                let e = odf::DatasetNotFoundError::new(dataset_ref.clone());
+                unresolved_refs.push((dataset_ref, e.into()));
+            }
+        }
+
+        // After that, try to resolve dataset entries
+        let owner_id_name_mapping = owner_ids_resolution_by_names
+            .resolved_account_ids
+            .into_iter()
+            .map(|(name, id)| (id, name))
+            .collect::<HashMap<_, _>>();
+        let mut owner_id_dataset_name_pairs =
+            Vec::with_capacity(dataset_aliases.len() - unresolved_refs.len());
+
+        for (owner_id, owner_name) in &owner_id_name_mapping {
+            let dataset_aliases = owner_name_dataset_aliases_mapping
+                .get(&owner_name)
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "{owner_name} not found in {owner_name_dataset_aliases_mapping:?}"
+                    );
+                });
+            for dataset_alias in dataset_aliases {
+                owner_id_dataset_name_pairs
+                    .push((owner_id.clone(), dataset_alias.dataset_name.clone()));
+            }
+        }
+
+        let owner_id_dataset_name_pairs_refs =
+            owner_id_dataset_name_pairs.iter().collect::<Vec<_>>();
+
+        let entries_lookup = self
+            .get_dataset_entries_by_owner_and_name(&owner_id_dataset_name_pairs_refs)
+            .await?;
+
+        for ((owner_id, dataset_name), _e) in entries_lookup.not_found {
+            let owner_name = owner_id_name_mapping.get(&owner_id).unwrap_or_else(|| {
+                unreachable!("{owner_id} not found in {owner_id_dataset_name_pairs:?}");
+            });
+            let alias = self
+                .tenancy_config
+                .make_alias(owner_name.clone(), dataset_name);
+            let dataset_ref = alias.as_local_ref();
+            let e = odf::DatasetNotFoundError::new(dataset_ref.clone());
+            unresolved_refs.push((dataset_ref, e.into()));
+        }
+
+        for entry in entries_lookup.found {
+            let dataset_handle = self.make_dataset_handle(entry);
+            resolved_handles.push((dataset_handle.alias.as_local_ref(), dataset_handle));
+        }
+
+        Ok(odf::dataset::ResolveDatasetHandlesByRefsResponse {
+            resolved_handles,
+            unresolved_refs,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -534,12 +666,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                 }
             }
             odf::DatasetRef::ID(id) => match self.get_entry(id).await {
-                Ok(entry) => Ok(odf::DatasetHandle::new(
-                    entry.id.clone(),
-                    self.tenancy_config
-                        .make_alias(entry.owner_name, entry.name.clone()),
-                    entry.kind,
-                )),
+                Ok(entry) => Ok(self.make_dataset_handle(entry)),
                 Err(GetDatasetEntryError::NotFound(_)) => Err(
                     odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
