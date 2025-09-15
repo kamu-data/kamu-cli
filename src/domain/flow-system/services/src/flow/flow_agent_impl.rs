@@ -510,22 +510,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
 
                         let finish_time = self.agent_config.round_time(message.event_time)?;
 
-                        // In case of success:
-                        //  - execute follow-up method
-                        if let Some(task_result) = flow.try_task_result_as_ref()
-                            && !task_result.is_empty()
-                        {
-                            let flow_controller = get_flow_controller_from_catalog(
-                                target_catalog,
-                                &flow.flow_binding.flow_type,
-                            )?;
-
-                            flow_controller
-                                .propagate_success(&flow, task_result, finish_time)
-                                .await
-                                .int_err()?;
-                        }
-
                         let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
 
                         // The outcome might not be final in case of retrying flows.
@@ -571,6 +555,21 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     ),
                                 )
                                 .await?;
+
+                            // In case of success: propagate success and dispatch sensitive events
+                            if let Some(task_result) = flow.try_task_result_as_ref()
+                                && !task_result.is_empty()
+                            {
+                                let flow_controller = get_flow_controller_from_catalog(
+                                    target_catalog,
+                                    &flow.flow_binding.flow_type,
+                                )?;
+
+                                flow_controller
+                                    .propagate_success(&flow, task_result, finish_time)
+                                    .await
+                                    .int_err()?;
+                            }
 
                             // In case of success:
                             //  - schedule next flow, if we had any late activation cause

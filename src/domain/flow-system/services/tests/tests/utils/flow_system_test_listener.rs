@@ -309,6 +309,16 @@ impl std::fmt::Display for FlowSystemTestListener {
                                         " Schedule(wakeup={}ms)",
                                         (s.wake_up_at - initial_time).num_milliseconds(),
                                     )?;
+                                    if let Some(activation_time) =
+                                        flow_state.timing.scheduled_for_activation_at
+                                        && s.wake_up_at != activation_time
+                                    {
+                                        write!(
+                                            f,
+                                            " Activating(at={}ms)",
+                                            (activation_time - initial_time).num_milliseconds()
+                                        )?;
+                                    }
                                 }
                             }
                         }
