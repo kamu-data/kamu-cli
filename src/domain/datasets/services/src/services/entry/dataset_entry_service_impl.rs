@@ -713,6 +713,62 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
             },
         }
     }
+
+    // TODO: tests
+    #[tracing::instrument(level = "debug", skip_all, fields(dataset_refs_count = dataset_refs.len()))]
+    async fn resolve_dataset_handles_by_refs(
+        &self,
+        dataset_refs: &[&odf::DatasetRef],
+    ) -> Result<odf::dataset::ResolveDatasetHandlesByRefsResponse, InternalError> {
+        let mut resolved_handles = Vec::with_capacity(dataset_refs.len());
+
+        let mut dataset_ids = Vec::new();
+        let mut dataset_aliases = Vec::new();
+
+        for dataset_ref in dataset_refs {
+            match dataset_ref {
+                odf::DatasetRef::Handle(h) => {
+                    // 1. We got lucky and nothing to do.
+                    resolved_handles.push(((*dataset_ref).clone(), h.clone()));
+                }
+                odf::DatasetRef::ID(id) => {
+                    // Store for later resolving.
+                    dataset_ids.push(Cow::Borrowed(id));
+                }
+                odf::DatasetRef::Alias(alias) => {
+                    // Store for later resolving.
+                    dataset_aliases.push(alias);
+                }
+            }
+        }
+
+        // 2. Resolve IDs.
+        let resolution_by_ids = self
+            .resolve_dataset_handles_by_dataset_ids(&dataset_ids)
+            .await?;
+        resolved_handles.extend(resolution_by_ids.resolved_handles);
+
+        // 3. Resolve aliases.
+        let resolution_by_aliases = self
+            .resolve_dataset_handles_by_dataset_aliases(&dataset_aliases)
+            .await?;
+        resolved_handles.extend(resolution_by_aliases.resolved_handles);
+
+        let unresolved_refs = {
+            let mut v = Vec::with_capacity(
+                resolution_by_ids.unresolved_refs.len()
+                    + resolution_by_aliases.unresolved_refs.len(),
+            );
+            v.extend(resolution_by_ids.unresolved_refs);
+            v.extend(resolution_by_aliases.unresolved_refs);
+            v
+        };
+
+        Ok(odf::dataset::ResolveDatasetHandlesByRefsResponse {
+            resolved_handles,
+            unresolved_refs,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
