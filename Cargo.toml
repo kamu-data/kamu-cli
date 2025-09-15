@@ -325,6 +325,12 @@ multiple_crate_versions = { level = "allow", priority = 1 }
 debug = 2
 
 
+# Based on:
+# https://github.com/launchbadge/sqlx/tree/c52e129e8341c46b2ea5c9b912e1af665be1ef83?tab=readme-ov-file#compile-time-verification
+[profile.dev.package.sqlx-macros]
+opt-level = 3
+
+
 # Emit the line info tables for our crates to produce useful crash reports and backtraces.
 # We don't emit info for dependencies as this significantly increases binary size.
 # See: https://doc.rust-lang.org/cargo/reference/profiles.html#debug
