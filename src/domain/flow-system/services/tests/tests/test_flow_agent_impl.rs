@@ -2301,7 +2301,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Finished Success
-            
+
             #4: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
@@ -2594,7 +2594,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=120ms)
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #11: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Waiting AutoPolling
