@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::Any;
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder, component};
 use internal_error::{InternalError, ResultIntoInternal};
-use tokio::sync::Mutex;
+
+use crate::TransactionRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -168,121 +167,6 @@ impl DatabaseTransactionRunner {
             callback(catalog_item1, catalog_item2, catalog_item3).await
         })
         .await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents a shared reference to [`sqlx::Transaction`] that unifies how we
-/// propagate transactions across different database implementations. This
-/// reference can appear in multiple components simultaneously, but can be used
-/// from only one place at a time via locking. Despite its async nature, this
-/// lock must be held only for the duration of the DB query and released when
-/// passing control into other components.
-#[derive(Clone)]
-pub struct TransactionRef {
-    inner: Arc<Mutex<TransactionRefInner>>,
-}
-
-impl TransactionRef {
-    pub fn new<DB: sqlx::Database>(connection_pool: sqlx::pool::Pool<DB>) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(TransactionRefInner::new(connection_pool))),
-        }
-    }
-
-    pub fn into_maybe_transaction<DB: sqlx::Database>(
-        self,
-    ) -> Option<sqlx::Transaction<'static, DB>> {
-        let inner = Arc::try_unwrap(self.inner)
-            .expect(
-                "Attempting to extract inner transaction while more than one strong reference is \
-                 present. This may be an indication that transaction reference is leaked, i.e. \
-                 held by some component whose lifetime exceeds the intended span of the \
-                 transaction scope.",
-            )
-            .into_inner();
-
-        inner
-            .maybe_transaction
-            .map(|t| *t.downcast::<sqlx::Transaction<'static, DB>>().unwrap())
-    }
-}
-
-#[derive(Debug)]
-pub struct TransactionRefInner {
-    connection_pool: Box<dyn Any + Send>,
-    maybe_transaction: Option<Box<dyn Any + Send>>,
-}
-
-impl TransactionRefInner {
-    fn new<DB: sqlx::Database>(connection_pool: sqlx::pool::Pool<DB>) -> Self {
-        Self {
-            connection_pool: Box::new(connection_pool),
-            maybe_transaction: None,
-        }
-    }
-}
-
-/// A typed wrapper over the [`TransactionRef`]. It propagates the type
-/// information to [`TransactionGuard`] to safely access typed
-/// [`sqlx::Transaction`] object.
-pub struct TransactionRefT<DB: sqlx::Database> {
-    tr: TransactionRef,
-    _phantom: PhantomData<DB>,
-}
-
-impl<DB: sqlx::Database> TransactionRefT<DB> {
-    pub fn new(tr: TransactionRef) -> Self {
-        Self {
-            tr,
-            _phantom: PhantomData,
-        }
-    }
-
-    pub async fn lock(&self) -> TransactionGuard<'_, DB> {
-        TransactionGuard::new(self.tr.inner.lock().await)
-    }
-}
-
-impl<DB: sqlx::Database> From<TransactionRef> for TransactionRefT<DB> {
-    fn from(value: TransactionRef) -> Self {
-        Self::new(value)
-    }
-}
-
-/// Represents a lock held over shared [`TransactionRef`] that allows to safely
-/// access typed [`sqlx::Transaction`] object. Despite its async nature, this
-/// lock must be held only for the duration of the DB query and released when
-/// passing control into other components.
-pub struct TransactionGuard<'a, DB: sqlx::Database> {
-    guard: tokio::sync::MutexGuard<'a, TransactionRefInner>,
-    _phantom: PhantomData<DB>,
-}
-
-impl<'a, DB: sqlx::Database> TransactionGuard<'a, DB> {
-    pub fn new(guard: tokio::sync::MutexGuard<'a, TransactionRefInner>) -> Self {
-        Self {
-            guard,
-            _phantom: PhantomData,
-        }
-    }
-
-    pub async fn connection_mut(&mut self) -> Result<&mut DB::Connection, InternalError> {
-        if self.guard.maybe_transaction.is_none() {
-            let pool = self
-                .guard
-                .connection_pool
-                .downcast_mut::<sqlx::pool::Pool<DB>>()
-                .unwrap();
-            let transaction = pool.begin().await.int_err()?;
-            self.guard.maybe_transaction = Some(Box::new(transaction));
-        }
-
-        let transaction = self.guard.maybe_transaction.as_deref_mut().unwrap();
-        Ok(transaction
-            .downcast_mut::<sqlx::Transaction<'static, DB>>()
-            .unwrap())
     }
 }
 

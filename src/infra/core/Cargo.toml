@@ -44,6 +44,7 @@ testing = [
 
 [dependencies]
 # Kamu
+database-common = { workspace = true, default-features = false }
 common-macros = { workspace = true }
 container-runtime = { workspace = true }
 crypto-utils = { workspace = true }
@@ -119,7 +120,12 @@ url = { version = "2", features = ["serde"] }
 # Optional dependencies
 kamu-auth-rebac-services = { optional = true, workspace = true }
 
-alloy = { optional = true, version = "1.0", default-features = false, features = ["std", "provider-http", "provider-ws"] }
+alloy = { optional = true, version = "1.0", default-features = false, features = [
+    "std",
+    "provider-http",
+    "provider-ws",
+    "reqwest-rustls-tls",
+] }
 bon = { optional = true, version = "3", default-features = false }
 # TODO: Using curl brings a lot of overhead including compiling and linking openssl
 # We should replace it with reqwest + a separate FTP client or drop FTP support in favor of container-based ingest.
@@ -158,7 +164,9 @@ test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.7", features = ["async_tokio"] }
-datafusion = { version = "49", default-features = false, features = ["parquet"] }
+datafusion = { version = "49", default-features = false, features = [
+    "parquet",
+] }
 filetime = "0.2"
 fs_extra = "1.3"
 indoc = "2"

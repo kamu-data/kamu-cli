@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::TransactionRef;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -38,6 +39,7 @@ pub struct PollingIngestServiceImpl {
     run_info_dir: Arc<RunInfoDir>,
     cache_dir: Arc<CacheDir>,
     time_source: Arc<dyn SystemTimeSource>,
+    tx: TransactionRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,6 +146,12 @@ impl PollingIngestServiceImpl {
         match self.ingest_iteration_inner(args).await {
             Ok(res) => {
                 tracing::info!(result = ?res, "Ingest iteration successful");
+
+                tracing::warn!("Attempting to commit transaction");
+                // Temporary hack to preserve progress between ingestion iterations
+                #[expect(deprecated)]
+                self.tx.commit().await.unwrap();
+
                 listener.success(&res);
                 Ok(res)
             }

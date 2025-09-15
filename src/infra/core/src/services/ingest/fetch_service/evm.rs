@@ -50,14 +50,24 @@ impl FetchService {
 
         use crate::PollingSourceState;
 
+        let config = datafusion_ethers::config::EthProviderConfig {
+            block_stride: self.eth_source_config.get_logs_block_stride,
+            use_block_timestamp_fallback: self.eth_source_config.use_block_timestamp_fallback,
+            ..Default::default()
+        };
+
+        let stream_options = config.stream_options();
+
         // Alloy does not support newlines in log signatures, but it's nice for
         // formatting
         let signature = fetch.signature.as_ref().map(|s| s.replace('\n', " "));
 
         let mut coder: Box<dyn Transcoder + Send> = if let Some(sig) = &signature {
-            Box::new(EthRawAndDecodedLogsToArrow::new_from_signature(sig).int_err()?)
+            Box::new(
+                EthRawAndDecodedLogsToArrow::new_from_signature(&stream_options, sig).int_err()?,
+            )
         } else {
-            Box::new(EthRawLogsToArrow::new())
+            Box::new(EthRawLogsToArrow::new(&stream_options))
         };
 
         // Get last state
@@ -91,7 +101,7 @@ impl FetchService {
             .int_err())?
         };
 
-        let rpc_client = ProviderBuilder::new()
+        let rpc_client = ProviderBuilder::new_with_network::<alloy::network::any::AnyNetwork>()
             .connect(node_url.as_str())
             .await
             .int_err()?
@@ -127,6 +137,7 @@ impl FetchService {
         ctx.register_catalog(
             "eth",
             Arc::new(datafusion_ethers::provider::EthCatalog::new(
+                config,
                 rpc_client.clone(),
             )),
         );
@@ -184,9 +195,7 @@ impl FetchService {
         let stream = datafusion_ethers::stream::RawLogsStream::paginate(
             rpc_client.clone(),
             filter,
-            StreamOptions {
-                block_stride: self.eth_source_config.get_logs_block_stride,
-            },
+            stream_options,
             resume_from_state.clone(),
         );
         futures::pin_mut!(stream);
