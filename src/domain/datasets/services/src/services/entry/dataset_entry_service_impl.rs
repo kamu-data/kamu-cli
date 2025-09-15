@@ -115,7 +115,7 @@ impl DatasetEntryServiceImpl {
 
     fn entries_as_handles(&self, entries: &[DatasetEntry]) -> Vec<odf::DatasetHandle> {
         // Convert the entries to handles
-        let mut handles = Vec::new();
+        let mut handles = Vec::with_capacity(entries.len());
         for entry in entries {
             // Form DatasetHandle
             handles.push(odf::DatasetHandle::new(
@@ -171,31 +171,23 @@ impl DatasetEntryServiceImpl {
     ) -> Result<HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>>, InternalError> {
         let mut res = HashMap::new();
 
-        let mut single_tenant_count = 0;
-        let mut multi_tenant_count = 0;
+        let is_multi_tenant = *self.tenancy_config == TenancyConfig::MultiTenant;
 
         for dataset_alias in dataset_aliases {
             let account_name = match &dataset_alias.account_name {
-                Some(account_name) => {
-                    multi_tenant_count += 1;
-                    account_name
-                }
-                None => {
-                    single_tenant_count += 1;
-                    self.current_account_subject.account_name_or_default()
+                Some(account_name) if is_multi_tenant => account_name,
+                None if !is_multi_tenant => self.current_account_subject.account_name_or_default(),
+                _ => {
+                    return Err(format!(
+                        "Mixed presence of single-tenant and multi-tenant aliases: {}",
+                        itertools::join(dataset_aliases, ",")
+                    )
+                    .int_err());
                 }
             };
 
             let owner_dataset_aliases = res.entry(account_name).or_insert_with(Vec::new);
             owner_dataset_aliases.push(*dataset_alias);
-        }
-
-        if single_tenant_count > 0 && multi_tenant_count > 0 {
-            return Err(format!(
-                "Simultaneous presence of single-tenant and multi-tenant account names: {}",
-                itertools::join(dataset_aliases, ",")
-            )
-            .int_err());
         }
 
         Ok(res)
@@ -711,22 +703,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     Ok(entry) => {
                         self.update_entries_cache(std::iter::once(&entry));
 
-                        Ok(odf::DatasetHandle::new(
-                            entry.id.clone(),
-                            odf::DatasetAlias::new(
-                                match self.tenancy_config.as_ref() {
-                                    TenancyConfig::SingleTenant => None,
-                                    TenancyConfig::MultiTenant => Some(
-                                        // We know the name, but since the search is
-                                        // case-insensitive, we'd like to know the stored version
-                                        // rather than queried
-                                        entry.owner_name.clone(),
-                                    ),
-                                },
-                                entry.name,
-                            ),
-                            entry.kind,
-                        ))
+                        Ok(self.make_dataset_handle(entry))
                     }
                     Err(GetDatasetEntryByNameError::NotFound(_)) => Err(
                         odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
