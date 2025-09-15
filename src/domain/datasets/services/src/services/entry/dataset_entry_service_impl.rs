@@ -602,6 +602,41 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
             }
         })
     }
+
+    async fn get_dataset_entries_by_owner_and_name(
+        &self,
+        owner_id_dataset_name_pairs: &[&(odf::AccountID, odf::DatasetName)],
+    ) -> Result<
+        BatchLookup<DatasetEntry, (odf::AccountID, odf::DatasetName), GetDatasetEntryByNameError>,
+        InternalError,
+    > {
+        let entries = self
+            .dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(owner_id_dataset_name_pairs)
+            .await
+            .int_err()?;
+
+        Ok(BatchLookup::from_found_items(
+            entries,
+            owner_id_dataset_name_pairs,
+            BatchLookupCreateOptions {
+                found_ids_fn: |entries| {
+                    entries
+                        .iter()
+                        .map(|entry| (entry.owner_id.clone(), entry.name.clone()))
+                        .collect()
+                },
+                not_found_err_fn: |(owner_id, dataset_name)| {
+                    DatasetEntryByNameNotFoundError::new(
+                        (*owner_id).clone(),
+                        (*dataset_name).clone(),
+                    )
+                    .into()
+                },
+                _phantom: Default::default(),
+            },
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
