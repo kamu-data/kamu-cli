@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use database_common::{
@@ -610,11 +610,49 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         BatchLookup<DatasetEntry, (odf::AccountID, odf::DatasetName), GetDatasetEntryByNameError>,
         InternalError,
     > {
+        let pairs_index = owner_id_dataset_name_pairs.iter().fold(
+            HashSet::new(),
+            |mut acc, (owner_id, dataset_name)| {
+                acc.insert((owner_id, dataset_name));
+                acc
+            },
+        );
+
+        // Try reading from the cache
+        let mut found_in_cache = Vec::with_capacity(owner_id_dataset_name_pairs.len());
+        {
+            let readable_cache = self.cache.read().unwrap();
+            for cached_entry in readable_cache.datasets.entries_by_id.values() {
+                if pairs_index.contains(&(&cached_entry.owner_id, &cached_entry.name)) {
+                    found_in_cache.push(cached_entry.clone());
+                }
+            }
+        }
+
+        let entries_count_to_query = owner_id_dataset_name_pairs.len() - found_in_cache.len();
+
+        if entries_count_to_query == 0 {
+            return Ok(BatchLookup {
+                found: found_in_cache,
+                not_found: vec![],
+            });
+        }
+
+        let mut owner_id_dataset_name_pairs_without_cache =
+            Vec::with_capacity(entries_count_to_query);
+        for pair @ (owner_id, dataset_name) in owner_id_dataset_name_pairs {
+            if !pairs_index.contains(&(owner_id, dataset_name)) {
+                owner_id_dataset_name_pairs_without_cache.push(*pair);
+            }
+        }
+
         let entries = self
             .dataset_entry_repo
             .get_dataset_entries_by_owner_and_name(owner_id_dataset_name_pairs)
             .await
             .int_err()?;
+
+        self.update_entries_cache(entries.iter());
 
         Ok(BatchLookup::from_found_items(
             entries,
