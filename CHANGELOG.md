@@ -11,6 +11,14 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Changed
+- (#1372): GQL: Performance improvement via query vectorization for APIs:
+  - `Dataset::by_ids()`;
+  - `DatasetMut::by_ids()`;
+  - `Account::by_ids()`;
+  - `AccountMut::by_ids()`.
+
 ## [0.248.1] - 2025-09-11
 ### Fixed
 - Crash on writing datasets with `List` field type

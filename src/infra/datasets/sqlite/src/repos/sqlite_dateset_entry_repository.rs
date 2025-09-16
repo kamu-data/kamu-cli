@@ -296,17 +296,17 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                    created_at,
                    kind
             FROM dataset_entries
-            WHERE (owner_id, dataset_name) IN (
+            WHERE (owner_id, dataset_name) IN
             "#,
         );
-        query_builder.push_values(
+        query_builder.push_tuples(
             owner_id_dataset_name_pairs,
             |mut b, (owner_id, dataset_name)| {
                 b.push_bind(owner_id.to_string());
                 b.push_bind(dataset_name.as_str());
             },
         );
-        query_builder.push(") ORDER BY owner_name, dataset_name");
+        query_builder.push("ORDER BY owner_name, dataset_name");
 
         let model_rows = query_builder
             .build_query_as::<DatasetEntryRowModel>()

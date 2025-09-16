@@ -850,14 +850,14 @@ pub async fn test_get_accounts_by_names(catalog: &Catalog) {
     account_repo.save_account(&account_2).await.unwrap();
     account_repo.save_account(&account_3).await.unwrap();
 
-    let accounts_is = [
-        &account_1_not_saved.id,
-        &account_2.id,
-        &account_3.id,
-        &account_4_not_saved.id,
+    let accounts_names = [
+        &account_1_not_saved.account_name,
+        &account_2.account_name,
+        &account_3.account_name,
+        &account_4_not_saved.account_name,
     ];
     let found_accounts = account_repo
-        .get_accounts_by_ids(&accounts_is)
+        .get_accounts_by_names(&accounts_names)
         .await
         .unwrap()
         .into_iter()

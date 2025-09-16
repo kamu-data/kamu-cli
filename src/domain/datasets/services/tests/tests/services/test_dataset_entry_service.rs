@@ -32,7 +32,6 @@ use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//
 #[test_log::test(tokio::test)]
 async fn test_indexes_datasets_correctly() {
     let dataset_name_1 = "dataset1";
