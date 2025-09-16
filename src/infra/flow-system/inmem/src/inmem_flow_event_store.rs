@@ -255,22 +255,18 @@ impl InMemoryFlowEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowState> for InMemoryFlowEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?opts))]
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowEvent> {
         self.inner.get_all_events(opts)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%query, ?opts))]
     fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
         self.inner.get_events(query, opts)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%query, num_events = events.len()))]
     async fn save_events(
         &self,
         query: &FlowID,
@@ -295,7 +291,6 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
 
 #[async_trait::async_trait]
 impl FlowEventStore for InMemoryFlowEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
     async fn new_flow_id(&self) -> Result<FlowID, InternalError> {
         Ok(self.inner.as_state().lock().unwrap().next_flow_id())
     }
@@ -331,7 +326,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .copied())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
     async fn try_get_all_scope_pending_flows(
         &self,
         flow_scope: &FlowScope,
@@ -374,7 +368,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .unwrap_or_default())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn get_flow_run_stats(
         &self,
         flow_binding: &FlowBinding,
@@ -385,59 +378,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .get(flow_binding)
             .copied()
             .unwrap_or_default())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
-    async fn get_current_consecutive_flow_failures_count(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<u32, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-        let count = g
-            .events
-            .iter()
-            .rev()
-            .filter(|event| {
-                if let FlowEvent::TaskFinished(e) = event {
-                    let a_flow_binding = g
-                        .flow_binding_by_flow_id
-                        .get(&e.flow_id)
-                        .expect("Previously unseen flow ID");
-                    a_flow_binding == flow_binding
-                } else {
-                    false
-                }
-            })
-            .take_while(|event| {
-                if let FlowEvent::TaskFinished(e) = event {
-                    !e.task_outcome.is_success()
-                } else {
-                    false
-                }
-            })
-            .count();
-        Ok(u32::try_from(count).unwrap())
-    }
-
-    async fn consecutive_flow_failures_by_binding(
-        &self,
-        flow_bindings: Vec<FlowBinding>,
-    ) -> Result<Vec<(FlowBinding, u32)>, InternalError> {
-        if flow_bindings.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let mut results = Vec::with_capacity(flow_bindings.len());
-
-        for binding in flow_bindings {
-            let failures_count = self
-                .get_current_consecutive_flow_failures_count(&binding)
-                .await?;
-            results.push((binding, failures_count));
-        }
-
-        Ok(results)
     }
 
     /// Returns nearest time when one or more flows are scheduled for activation
@@ -464,7 +404,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .unwrap_or_default())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query, ?filters))]
     async fn get_count_flows_matching_scope_query(
         &self,
         flow_scope_query: &FlowScopeQuery,
@@ -485,7 +424,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .count())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query, ?filters, ?pagination))]
     fn get_all_flow_ids_matching_scope_query(
         &self,
         flow_scope_query: FlowScopeQuery,
@@ -558,7 +496,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query))]
     fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         let flow_initiators: Vec<_> = {
             let state = self.inner.as_state();
@@ -592,7 +529,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Box::pin(futures::stream::iter(flow_initiators))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
     fn get_all_flow_ids(&self, filters: &FlowFilters, pagination: PaginationOpts) -> FlowIDStream {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
@@ -609,7 +545,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();

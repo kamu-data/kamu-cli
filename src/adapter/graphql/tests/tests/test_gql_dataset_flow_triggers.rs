@@ -15,6 +15,7 @@ use kamu_datasets::*;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,
     InMemoryFlowEventStore,
+    InMemoryFlowProcessState,
     InMemoryFlowTriggerEventStore,
 };
 use kamu_flow_system_services::FlowTriggerServiceImpl;
@@ -1390,7 +1391,8 @@ impl FlowTriggerHarness {
                 .add::<FlowTriggerServiceImpl>()
                 .add::<InMemoryFlowEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
-                .add::<InMemoryFlowConfigurationEventStore>();
+                .add::<InMemoryFlowConfigurationEventStore>()
+                .add::<InMemoryFlowProcessState>();
 
             b.build()
         };
