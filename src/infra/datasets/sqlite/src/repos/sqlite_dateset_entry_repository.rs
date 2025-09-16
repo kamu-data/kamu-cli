@@ -277,10 +277,46 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn get_dataset_entries_by_owner_and_name<'a>(
         &self,
-        _owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+        owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
-        dbg!();
-        todo!()
+        if owner_id_dataset_name_pairs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            SELECT dataset_id,
+                   owner_id,
+                   owner_name,
+                   dataset_name,
+                   created_at,
+                   kind
+            FROM dataset_entries
+            WHERE (owner_id, dataset_name) IN (
+            "#,
+        );
+        query_builder.push_values(
+            owner_id_dataset_name_pairs,
+            |mut b, (owner_id, dataset_name)| {
+                b.push_bind(owner_id.to_string());
+                b.push_bind(dataset_name.as_str());
+            },
+        );
+        query_builder.push(")");
+
+        let model_rows = query_builder
+            .build_query_as::<DatasetEntryRowModel>()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
+
+        let entries = model_rows.into_iter().map(Into::into).collect();
+
+        Ok(entries)
     }
 
     async fn get_dataset_entries_by_owner_id<'a>(
