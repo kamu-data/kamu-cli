@@ -93,7 +93,7 @@ impl DatasetsMut {
             DatasetActionAccess::Allowed => {
                 Ok(Some(DatasetMut::new_access_checked(dataset_request_state)))
             }
-            DatasetActionAccess::Limited => Err(utils::make_dataset_access_error(
+            DatasetActionAccess::Insufficient => Err(utils::make_dataset_access_error(
                 dataset_request_state.dataset_handle(),
             )),
             DatasetActionAccess::Forbidden => Ok(None),
@@ -113,58 +113,55 @@ impl DatasetsMut {
         )]
         skip_missing: bool,
     ) -> Result<Vec<DatasetMut>> {
-        let dataset_ids: Vec<std::borrow::Cow<odf::DatasetID>> = dataset_ids
+        let rebac_dataset_registry_facade =
+            from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacDatasetRegistryFacade);
+
+        let dataset_refs = dataset_ids
             .into_iter()
-            .map(|id| std::borrow::Cow::Owned(id.into()))
+            .map(|id| id.as_ref().as_local_ref())
+            .collect::<Vec<_>>();
+        let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
+
+        let resolution = rebac_dataset_registry_facade
+            .classify_dataset_refs_by_access(&dataset_refs_refs, auth::DatasetAction::Write)
+            .await?;
+
+        if !resolution.insufficient.is_empty() {
+            let mut error_msg = format!(
+                "Datasets with insufficient access level: [{}]",
+                itertools::join(
+                    resolution
+                        .insufficient
+                        .iter()
+                        .map(|(r, h)| format!("{r}({})", h.alias)),
+                    ","
+                )
+            );
+
+            if !skip_missing && !resolution.forbidden.is_empty() {
+                use std::fmt::Write as _;
+
+                write!(
+                    error_msg,
+                    "; unresolved datasets: [{}]",
+                    itertools::join(resolution.forbidden.iter().map(|(r, _)| r), ",")
+                )
+                .int_err()?;
+            }
+
+            return Err(GqlError::gql(error_msg));
+        }
+
+        let dataset_muts = resolution
+            .allowed
+            .into_iter()
+            .map(|(_, dataset_handle)| {
+                let dataset_request_state = DatasetRequestState::new(dataset_handle);
+                DatasetMut::new_access_checked(dataset_request_state)
+            })
             .collect();
 
-        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
-
-        let resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
-            .await
-            .int_err()?;
-
-        if !skip_missing && !resolution.unresolved_datasets.is_empty() {
-            return Err(GqlError::gql(format!(
-                "Unresolved dataset: {}",
-                resolution.unresolved_datasets.into_iter().next().unwrap().0
-            )));
-        }
-
-        let mut res = Vec::new();
-
-        // TODO: PERF: Vectorize access checks
-        for hdl in resolution.resolved_handles {
-            let dataset_request_state = DatasetRequestState::new(hdl);
-            let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
-            let current_dataset_action = auth::DatasetAction::Write;
-
-            let dataset = match auth::DatasetAction::resolve_access(
-                allowed_actions,
-                current_dataset_action,
-            ) {
-                DatasetActionAccess::Full => DatasetMut::new_access_checked(dataset_request_state),
-                DatasetActionAccess::Limited => {
-                    return Err(utils::make_dataset_access_error(
-                        dataset_request_state.dataset_handle(),
-                    ));
-                }
-                DatasetActionAccess::Forbidden => {
-                    if skip_missing {
-                        continue;
-                    }
-                    return Err(GqlError::gql(format!(
-                        "Unresolved dataset: {}",
-                        dataset_request_state.dataset_handle().id
-                    )));
-                }
-            };
-
-            res.push(dataset);
-        }
-
-        Ok(res)
+        Ok(dataset_muts)
     }
 
     /// Creates a new empty dataset

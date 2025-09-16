@@ -172,7 +172,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             .collect::<Vec<_>>();
 
         // Next sort according to allowed actions
-        let mut limited = Vec::new();
+        let mut insufficient = Vec::new();
         let mut allowed = Vec::new();
 
         for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
@@ -186,8 +186,8 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
                     dataset_ref.clone(),
                     RebacDatasetRefUnresolvedError::not_enough_permissions(dataset_ref, action),
                 )),
-                auth::DatasetActionAccess::Limited => {
-                    limited.push((dataset_ref, dataset_handle));
+                auth::DatasetActionAccess::Insufficient => {
+                    insufficient.push((dataset_ref, dataset_handle));
                 }
                 auth::DatasetActionAccess::Allowed => {
                     allowed.push((dataset_ref, dataset_handle));
@@ -197,7 +197,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
 
         Ok(ClassifyDatasetRefsByAccessResponse {
             forbidden,
-            limited,
+            insufficient,
             allowed,
         })
     }

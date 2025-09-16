@@ -87,7 +87,7 @@ impl ClassifyDatasetRefsByAllowanceResponse {
 #[derive(Debug)]
 pub struct ClassifyDatasetRefsByAccessResponse {
     pub forbidden: Vec<(odf::DatasetRef, RebacDatasetRefUnresolvedError)>,
-    pub limited: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub insufficient: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub allowed: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
 }
 

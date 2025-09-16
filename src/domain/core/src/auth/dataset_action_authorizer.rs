@@ -64,7 +64,7 @@ impl DatasetAction {
         if set.contains(&action) {
             DatasetActionAccess::Allowed
         } else if set.contains(&Self::Read) {
-            DatasetActionAccess::Limited
+            DatasetActionAccess::Insufficient
         } else {
             DatasetActionAccess::Forbidden
         }
@@ -77,7 +77,7 @@ pub enum DatasetActionAccess {
     Forbidden,
     /// Subject has access to an object's presence but lacks required
     /// permissions for the action.
-    Limited,
+    Insufficient,
     /// Action permission granted to subject.
     Allowed,
 }
@@ -133,15 +133,15 @@ fn test_dataset_action_resolve_access() {
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Limited,
+                    expected_access: DatasetActionAccess::Insufficient,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Limited,
+                    expected_access: DatasetActionAccess::Insufficient,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Limited,
+                    expected_access: DatasetActionAccess::Insufficient,
                 },
             ],
         },
@@ -158,11 +158,11 @@ fn test_dataset_action_resolve_access() {
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Limited,
+                    expected_access: DatasetActionAccess::Insufficient,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Limited,
+                    expected_access: DatasetActionAccess::Insufficient,
                 },
             ],
         },
@@ -183,7 +183,7 @@ fn test_dataset_action_resolve_access() {
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Limited,
+                    expected_access: DatasetActionAccess::Insufficient,
                 },
             ],
         },
