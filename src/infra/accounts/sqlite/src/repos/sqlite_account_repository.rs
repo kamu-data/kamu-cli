@@ -455,12 +455,7 @@ impl AccountRepository for SqliteAccountRepository {
         query_builder.push_values(account_names, |mut b, account_name| {
             b.push_bind(account_name.as_str());
         });
-        query_builder.push(
-            r#"
-            )
-            ORDER BY account_name
-            "#,
-        );
+        query_builder.push(") ORDER BY account_name");
 
         let account_rows = query_builder
             .build()

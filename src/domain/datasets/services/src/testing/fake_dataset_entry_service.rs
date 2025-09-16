@@ -135,7 +135,7 @@ impl DatasetEntryService for FakeDatasetEntryService {
     > {
         let guard = self.state.lock().unwrap();
 
-        let found_entries = owner_id_dataset_name_pairs
+        let mut found_entries = owner_id_dataset_name_pairs
             .iter()
             .filter_map(|(owner_id, dataset_name)| {
                 guard
@@ -144,7 +144,16 @@ impl DatasetEntryService for FakeDatasetEntryService {
                     .and_then(|entries| entries.iter().find(|e| &e.name == dataset_name))
                     .cloned()
             })
-            .collect();
+            .collect::<Vec<_>>();
+
+        found_entries.sort_by(|a, b| {
+            use std::cmp::Ordering;
+
+            match a.owner_name.cmp(&b.owner_name) {
+                Ordering::Equal => a.name.cmp(&b.name),
+                owner_id_cmp_res @ (Ordering::Greater | Ordering::Less) => owner_id_cmp_res,
+            }
+        });
 
         Ok(BatchLookup::from_found_items(
             found_entries,

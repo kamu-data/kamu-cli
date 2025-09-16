@@ -306,7 +306,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 b.push_bind(dataset_name.as_str());
             },
         );
-        query_builder.push(")");
+        query_builder.push(") ORDER BY owner_name, dataset_name");
 
         let model_rows = query_builder
             .build_query_as::<DatasetEntryRowModel>()

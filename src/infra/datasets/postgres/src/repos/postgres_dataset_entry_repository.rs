@@ -283,6 +283,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             WHERE (owner_id, dataset_name) IN (SELECT *
                                                FROM UNNEST($1::TEXT[],
                                                            $2::TEXT[]))
+            ORDER BY owner_name, dataset_name
             "#,
             &owner_ids,
             &dataset_names as &[&str],
