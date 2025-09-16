@@ -363,7 +363,12 @@ impl AccountRepository for MySqlAccountRepository {
         query_builder.push_values(account_names, |mut b, account_name| {
             b.push_bind(account_name.as_str());
         });
-        query_builder.push(")");
+        query_builder.push(
+            r#"
+            )
+            ORDER BY account_name
+            "#,
+        );
 
         let account_rows = query_builder
             .build()

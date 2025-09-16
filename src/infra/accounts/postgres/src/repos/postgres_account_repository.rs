@@ -495,6 +495,7 @@ impl AccountRepository for PostgresAccountRepository {
                    provider_identity_key
             FROM accounts
             WHERE account_name = ANY($1)
+            ORDER BY account_name
             "#,
             &account_names
         )

@@ -392,10 +392,12 @@ impl AccountRepository for InMemoryAccountRepository {
     ) -> Result<Vec<Account>, GetAccountsByNamesError> {
         let guard = self.state.lock().unwrap();
 
-        let accounts = account_names
+        let mut accounts = account_names
             .iter()
             .filter_map(|name| guard.accounts_by_name.get(*name).cloned())
-            .collect();
+            .collect::<Vec<_>>();
+
+        accounts.sort_by(|a, b| a.account_name.cmp(&b.account_name));
 
         Ok(accounts)
     }
