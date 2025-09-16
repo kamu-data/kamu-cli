@@ -41,7 +41,6 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
         action: auth::DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
 
-    // TODO: tests
     async fn classify_dataset_refs_by_access(
         &self,
         dataset_refs: &[&odf::DatasetRef],
