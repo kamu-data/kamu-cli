@@ -398,8 +398,6 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: use classify_datasets_by_allowance() name
-//       after migration
 #[derive(Debug)]
 pub struct ClassifyByAllowanceIdsResponse {
     pub authorized_ids: Vec<odf::DatasetID>,
