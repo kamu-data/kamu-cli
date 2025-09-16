@@ -17,6 +17,9 @@ use crate::{EventID, Projection};
 #[allow(clippy::len_without_is_empty)]
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
+    /// Returns the event history of all aggregates in chronological order
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<Proj::Event>;
+
     /// Returns the event history of an aggregate in chronological order
     fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event>;
 

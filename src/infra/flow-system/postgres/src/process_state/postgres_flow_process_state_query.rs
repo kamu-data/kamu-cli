@@ -63,6 +63,19 @@ impl PostgresFlowProcessStateQuery {
 
 #[async_trait::async_trait]
 impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
+    async fn has_any_process_states(&self) -> Result<bool, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let has_any: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM flow_process_states) AS has_any")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
+
+        Ok(has_any)
+    }
+
     async fn try_get_process_state(
         &self,
         flow_binding: &FlowBinding,

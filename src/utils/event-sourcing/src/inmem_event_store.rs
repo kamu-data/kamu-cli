@@ -87,6 +87,36 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
         Ok(self.state.lock().unwrap().events_count())
     }
 
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<Proj::Event> {
+        // TODO: This should be a buffered stream so we don't lock per event
+        Box::pin(async_stream::try_stream! {
+            let mut seen = opts.from.map_or(0, |id| usize::try_from(id.into_inner()).unwrap());
+
+            loop {
+                let next = {
+                    let g = self.state.lock().unwrap();
+                    let to = opts.to.map_or(g.events_count(), |id| usize::try_from(id.into_inner()).unwrap());
+
+                    g.get_events()[..to]
+                        .iter()
+                        .enumerate()
+                        .skip(seen)
+                        .map(|(i, e)| (i + 1, e.clone()))
+                        .next()
+
+                };
+
+                match next {
+                    None => break,
+                    Some((i, event)) => {
+                        seen = i;
+                        yield (EventID::new(i64::try_from(i).unwrap()), event)
+                    }
+                }
+            }
+        })
+    }
+
     fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event> {
         let query = query.clone();
 

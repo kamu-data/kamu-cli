@@ -21,6 +21,9 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait FlowProcessStateQuery: Send + Sync {
+    /// Determines if any process state exists in general
+    async fn has_any_process_states(&self) -> Result<bool, InternalError>;
+
     /// Load a single process
     async fn try_get_process_state(
         &self,

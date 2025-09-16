@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use kamu_flow_system::*;
 use messaging_outbox::*;
 
@@ -28,8 +29,91 @@ use messaging_outbox::*;
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
+
 pub struct FlowProcessStateProjector {
     flow_process_state_repository: Arc<dyn FlowProcessStateRepository>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl FlowProcessStateProjector {
+    pub async fn handle_trigger_updated(
+        &self,
+        trigger_event_id: EventID,
+        flow_binding: &FlowBinding,
+        trigger_status: FlowTriggerStatus,
+        stop_policy: FlowTriggerStopPolicy,
+    ) -> Result<(), InternalError> {
+        let paused_manual = trigger_status == FlowTriggerStatus::PausedByUser;
+
+        self.flow_process_state_repository
+            .upsert_process_state_on_trigger_event(
+                trigger_event_id,
+                flow_binding.clone(),
+                paused_manual,
+                stop_policy,
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Failed to insert new flow process"
+                );
+                e.int_err()
+            })?;
+
+        Ok(())
+    }
+
+    pub async fn handle_flow_scheduled(
+        &self,
+        flow_event_id: EventID,
+        flow_binding: &FlowBinding,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        self.flow_process_state_repository
+            .on_flow_scheduled(flow_event_id, flow_binding, scheduled_for_activation_at)
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Failed to handle flow scheduled"
+                );
+                e.int_err()
+            })?;
+
+        Ok(())
+    }
+
+    pub async fn handle_flow_finished(
+        &self,
+        flow_event_id: EventID,
+        flow_binding: &FlowBinding,
+        flow_outcome: &FlowOutcome,
+        finished_at: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        let is_success = match flow_outcome {
+            FlowOutcome::Success(_) => true,
+            FlowOutcome::Failed => false,
+            FlowOutcome::Aborted => return Ok(()), // Ignore aborted flows
+        };
+
+        self.flow_process_state_repository
+            .apply_flow_result(flow_event_id, flow_binding, is_success, finished_at)
+            .await
+            .map_err(|e| {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Failed to apply flow result"
+                );
+                e.int_err()
+            })?;
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,22 +136,13 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow trigger message");
 
-        self.flow_process_state_repository
-            .upsert_process_state_on_trigger_event(
-                message.event_id,
-                message.flow_binding.clone(),
-                message.trigger_status == FlowTriggerStatus::PausedByUser,
-                message.stop_policy,
-            )
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = ?e,
-                    error_msg = %e,
-                    "Failed to insert new flow process"
-                );
-                e.int_err()
-            })?;
+        self.handle_trigger_updated(
+            message.event_id,
+            &message.flow_binding,
+            message.trigger_status,
+            message.stop_policy,
+        )
+        .await?;
 
         Ok(())
     }
@@ -91,51 +166,27 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
 
         match message {
             FlowProgressMessage::Scheduled(scheduled_message) => {
-                self.flow_process_state_repository
-                    .on_flow_scheduled(
-                        scheduled_message.event_id,
-                        message.flow_binding(),
-                        scheduled_message.scheduled_for_activation_at,
-                    )
-                    .await
-                    .map_err(|e| {
-                        tracing::error!(
-                            error = ?e,
-                            error_msg = %e,
-                            "Failed to handle flow scheduled"
-                        );
-                        e.int_err()
-                    })?;
+                self.handle_flow_scheduled(
+                    scheduled_message.event_id,
+                    message.flow_binding(),
+                    scheduled_message.scheduled_for_activation_at,
+                )
+                .await?;
             }
             FlowProgressMessage::Finished(finished_message) => {
-                let is_success = match finished_message.outcome {
-                    FlowOutcome::Success(_) => true,
-                    FlowOutcome::Failed => false,
-                    FlowOutcome::Aborted => return Ok(()), // Ignore aborted flows
-                };
-
-                self.flow_process_state_repository
-                    .apply_flow_result(
-                        finished_message.event_id,
-                        message.flow_binding(),
-                        is_success,
-                        message.event_time(),
-                    )
-                    .await
-                    .map_err(|e| {
-                        tracing::error!(
-                            error = ?e,
-                            error_msg = %e,
-                            "Failed to apply flow result"
-                        );
-                        e.int_err()
-                    })?;
+                self.handle_flow_finished(
+                    finished_message.event_id,
+                    message.flow_binding(),
+                    &finished_message.outcome,
+                    finished_message.event_time,
+                )
+                .await?;
             }
 
             FlowProgressMessage::RetryScheduled(_)
             | FlowProgressMessage::Running(_)
             | FlowProgressMessage::Cancelled(_) => {
-                // Ignore for now
+                // Ignore
             }
         }
 
