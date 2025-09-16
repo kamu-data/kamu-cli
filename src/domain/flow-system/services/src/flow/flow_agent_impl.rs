@@ -515,6 +515,20 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
                         if let Some(flow_outcome) = flow.outcome.as_ref() {
+                            // Notify about finished flow
+                            outbox
+                                .post_message(
+                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                    FlowProgressMessage::finished(
+                                        message.event_time,
+                                        flow.last_stored_event_id().expect("Must have event ID"),
+                                        flow_id,
+                                        flow.flow_binding.clone(),
+                                        flow_outcome.clone(),
+                                    ),
+                                )
+                                .await?;
+
                             // Handle flow failure if it reached a terminal state
                             if message.outcome.is_failure() {
                                 let recoverable = message.outcome.is_recoverable_failure();
@@ -541,20 +555,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     )
                                     .await?;
                             }
-
-                            // Notify about finished flow
-                            outbox
-                                .post_message(
-                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                    FlowProgressMessage::finished(
-                                        message.event_time,
-                                        flow.last_stored_event_id().expect("Must have event ID"),
-                                        flow_id,
-                                        flow.flow_binding.clone(),
-                                        flow_outcome.clone(),
-                                    ),
-                                )
-                                .await?;
 
                             // In case of success: propagate success and dispatch sensitive events
                             if let Some(task_result) = flow.try_task_result_as_ref()
