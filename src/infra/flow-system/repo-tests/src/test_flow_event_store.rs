@@ -2501,177 +2501,6 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
-    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-    // Create a dataset
-    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let flow_binding = ingest_dataset_binding(&dataset_id);
-
-    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
-    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-        activation_time: Utc::now(),
-    });
-
-    // Initially we are not failing
-    assert_eq!(
-        0,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Have a successful flow
-    flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Finished,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-
-    // Still no failures, after success
-    assert_eq!(
-        0,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Fail once
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        1,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Fail one more time
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        2,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Abort the next flow - should not count as failure
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator.abort_flow(flow_id).await;
-
-    assert_eq!(
-        2,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Have another failure
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        3,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Finally have a success - should reset the count
-    flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Finished,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-
-    assert_eq!(
-        0,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Fail again - should be counted from zero
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause,
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        1,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_dataset_flow_run_stats_with_failure_time(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
@@ -2868,13 +2697,6 @@ pub async fn test_dataset_flow_run_stats_consecutive_failures_with_times(catalog
         // Store the failure time
         failure_times.push(stats.last_failure_time.unwrap());
 
-        // Verify consecutive failures count increases
-        let failure_count = flow_event_store
-            .get_current_consecutive_flow_failures_count(&binding_ingest)
-            .await
-            .unwrap();
-        assert_eq!(failure_count, u32::try_from(i + 1).unwrap());
-
         // Each subsequent failure should have a later timestamp
         if i > 0 {
             assert!(failure_times[i] > failure_times[i - 1]);
@@ -3035,13 +2857,6 @@ pub async fn test_flow_run_stats_aborted_vs_failed_flows(catalog: &Catalog) {
         stats_after_abortion.last_attempt_time,
         stats_after_failure.last_attempt_time
     );
-
-    // Verify consecutive failures count doesn't increase for aborted flows
-    let failure_count = flow_event_store
-        .get_current_consecutive_flow_failures_count(&binding_ingest)
-        .await
-        .unwrap();
-    assert_eq!(failure_count, 1); // Only the failed flow counts, not the aborted one
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

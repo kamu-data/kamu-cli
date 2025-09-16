@@ -27,6 +27,7 @@ pub struct FlowProcessSummary {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+#[graphql(remote = "kamu_flow_system::FlowProcessEffectiveState")]
 pub enum FlowProcessEffectiveState {
     Active,
     Failing,
