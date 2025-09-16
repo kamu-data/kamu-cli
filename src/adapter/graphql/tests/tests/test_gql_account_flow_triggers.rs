@@ -26,6 +26,7 @@ use kamu_flow_system::FlowAgentConfig;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,
     InMemoryFlowEventStore,
+    InMemoryFlowProcessState,
     InMemoryFlowTriggerEventStore,
 };
 use kamu_task_system_inmem::InMemoryTaskEventStore;
@@ -599,6 +600,7 @@ impl FlowTriggerHarness {
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()
+                .add::<InMemoryFlowProcessState>()
                 .add_value(FlowAgentConfig::new(
                     Duration::seconds(1),
                     Duration::minutes(1),
