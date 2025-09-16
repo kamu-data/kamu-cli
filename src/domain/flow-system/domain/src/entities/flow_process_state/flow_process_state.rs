@@ -62,6 +62,16 @@ impl FlowProcessState {
         }
     }
 
+    pub fn no_trigger_yet(current_time: DateTime<Utc>, flow_binding: FlowBinding) -> Self {
+        Self::new(
+            EventID::new(0),
+            current_time,
+            flow_binding,
+            true, // auto-paused, as there's no trigger yet
+            FlowTriggerStopPolicy::default(),
+        )
+    }
+
     pub fn rehydrate_from_snapshot(
         flow_binding: FlowBinding,
         paused_manual: bool,

@@ -65,7 +65,7 @@ impl<'a> DatasetFlowProcesses<'a> {
             dyn WebhookSubscriptionEventStore
         );
 
-        // Find trigers that point to webhooks bound to this dataset
+        // Find triggers that point to webhooks bound to this dataset
         let matched_triggers = flow_trigger_service
             .match_triggers(FlowScopeSubscription::query_for_subscriptions_of_dataset(
                 self.dataset_request_state.dataset_id(),

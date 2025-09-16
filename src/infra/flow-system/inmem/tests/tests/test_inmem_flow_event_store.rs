@@ -203,22 +203,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_dataset_flow_run_stats,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_system_flow_run_stats,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
     fixture =
         kamu_flow_system_repo_tests::test_flow_event_store::test_pending_flow_dataset_single_type_crud,
     harness = InMemoryFlowEventStoreHarness
@@ -309,51 +293,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_flow_through_retry_attempts,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture =
-        kamu_flow_system_repo_tests::test_flow_event_store::test_dataset_flow_run_stats_with_failure_time,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture =
-        kamu_flow_system_repo_tests::test_flow_event_store::test_dataset_flow_run_stats_mixed_success_failure_history,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture =
-        kamu_flow_system_repo_tests::test_flow_event_store::test_dataset_flow_run_stats_consecutive_failures_with_times,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture =
-        kamu_flow_system_repo_tests::test_flow_event_store::test_system_flow_run_stats_with_failures,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture =
-        kamu_flow_system_repo_tests::test_flow_event_store::test_flow_run_stats_aborted_vs_failed_flows,
     harness = InMemoryFlowEventStoreHarness
 );
 
