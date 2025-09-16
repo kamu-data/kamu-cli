@@ -90,7 +90,7 @@ impl DatasetsMut {
         let current_dataset_action = auth::DatasetAction::Write;
 
         match auth::DatasetAction::resolve_access(allowed_actions, current_dataset_action) {
-            DatasetActionAccess::Full => {
+            DatasetActionAccess::Allowed => {
                 Ok(Some(DatasetMut::new_access_checked(dataset_request_state)))
             }
             DatasetActionAccess::Limited => Err(utils::make_dataset_access_error(

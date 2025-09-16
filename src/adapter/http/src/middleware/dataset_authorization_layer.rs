@@ -150,7 +150,7 @@ where
                             &allowed_actions,
                             current_dataset_action,
                         ) {
-                            DatasetActionAccess::Full => Ok(CheckResult::Proceed),
+                            DatasetActionAccess::Allowed => Ok(CheckResult::Proceed),
                             DatasetActionAccess::Limited => {
                                 Ok(CheckResult::ErrorResponse(forbidden_access_response()))
                             }

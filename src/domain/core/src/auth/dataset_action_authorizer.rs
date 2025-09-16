@@ -62,7 +62,7 @@ pub enum DatasetAction {
 impl DatasetAction {
     pub fn resolve_access(set: &HashSet<Self>, action: Self) -> DatasetActionAccess {
         if set.contains(&action) {
-            DatasetActionAccess::Full
+            DatasetActionAccess::Allowed
         } else if set.contains(&Self::Read) {
             DatasetActionAccess::Limited
         } else {
@@ -79,7 +79,7 @@ pub enum DatasetActionAccess {
     /// permissions for the action.
     Limited,
     /// Action permission granted to subject.
-    Full,
+    Allowed,
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn test_dataset_action_resolve_access() {
             sub_tests: &[
                 FixtureSubTest {
                     current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Write,
@@ -150,11 +150,11 @@ fn test_dataset_action_resolve_access() {
             sub_tests: &[
                 FixtureSubTest {
                     current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Maintain,
@@ -171,15 +171,15 @@ fn test_dataset_action_resolve_access() {
             sub_tests: &[
                 FixtureSubTest {
                     current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Own,
@@ -197,19 +197,19 @@ fn test_dataset_action_resolve_access() {
             sub_tests: &[
                 FixtureSubTest {
                     current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
                 FixtureSubTest {
                     current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Full,
+                    expected_access: DatasetActionAccess::Allowed,
                 },
             ],
         },
