@@ -289,10 +289,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"
-            SELECT dataset_id,
+            SELECT dataset_id   as id,
                    owner_id,
                    owner_name,
-                   dataset_name,
+                   dataset_name as name,
                    created_at,
                    kind
             FROM dataset_entries
