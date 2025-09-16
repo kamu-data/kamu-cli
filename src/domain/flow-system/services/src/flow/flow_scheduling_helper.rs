@@ -22,6 +22,7 @@ pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
+    flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
     outbox: Arc<dyn Outbox>,
     agent_config: Arc<FlowAgentConfig>,
 }
@@ -132,9 +133,9 @@ impl FlowSchedulingHelper {
         );
 
         // Query previous runs stats to determine activation time
-        let flow_run_stats = self
-            .flow_event_store
-            .get_flow_run_stats(flow_binding)
+        let maybe_flow_process_state = self
+            .flow_process_state_query
+            .try_get_process_state(flow_binding)
             .await?;
 
         // Flows may not be attempted more frequent than mandatory throttling period.
@@ -144,11 +145,14 @@ impl FlowSchedulingHelper {
             .as_ref()
             .unwrap()
             .activation_time();
-        let mut throttling_boundary_time = flow_run_stats
-            .last_attempt_time
-            .map_or(activation_time, |t| {
-                t + self.agent_config.mandatory_throttling_period
-            });
+
+        let maybe_last_attempt_time = maybe_flow_process_state
+            .as_ref()
+            .and_then(FlowProcessState::last_attempt_at);
+
+        let mut throttling_boundary_time = maybe_last_attempt_time.map_or(activation_time, |t| {
+            t + self.agent_config.mandatory_throttling_period
+        });
         // It's also possible we are waiting for some start condition much longer..
         if throttling_boundary_time < activation_time {
             throttling_boundary_time = activation_time;
@@ -260,10 +264,13 @@ impl FlowSchedulingHelper {
                             // Next activation time depends on:
                             //  - last success time, if ever launched
                             //  - schedule
-                            let naive_next_activation_time = schedule.next_activation_time(
-                                activation_time,
-                                flow_run_stats.last_success_time,
-                            );
+
+                            let maybe_last_success_time = maybe_flow_process_state
+                                .as_ref()
+                                .and_then(FlowProcessState::last_success_at);
+
+                            let naive_next_activation_time = schedule
+                                .next_activation_time(activation_time, maybe_last_success_time);
 
                             // Apply throttling boundary
                             let next_activation_time =

@@ -70,3 +70,7 @@ CREATE INDEX idx_fps_updates_next
   WHERE flow_type IN ('dev.kamu.flow.dataset.ingest','dev.kamu.flow.dataset.transform');
 
 /* ------------------------------ */
+
+DROP INDEX IF EXISTS idx_flow_events_finished_by_flow_desc;
+
+/* ------------------------------ */
