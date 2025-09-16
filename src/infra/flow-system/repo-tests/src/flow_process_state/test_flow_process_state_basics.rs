@@ -32,8 +32,7 @@ pub async fn test_empty_state_table_initially(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -101,8 +100,7 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -193,8 +191,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -312,8 +309,7 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -451,8 +447,7 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -547,8 +542,7 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -601,8 +595,7 @@ pub async fn test_delete_process(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -634,8 +627,7 @@ pub async fn test_delete_process(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -760,8 +752,7 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -811,8 +802,7 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();

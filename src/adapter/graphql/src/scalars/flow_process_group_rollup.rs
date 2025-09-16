@@ -22,3 +22,18 @@ pub struct FlowProcessGroupRollup {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<kamu_flow_system::FlowProcessGroupRollup> for FlowProcessGroupRollup {
+    fn from(value: kamu_flow_system::FlowProcessGroupRollup) -> Self {
+        Self {
+            total: value.total,
+            active: value.active,
+            failing: value.failing,
+            paused: value.paused,
+            stopped: value.stopped,
+            worst_consecutive_failures: value.worst_consecutive_failures,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

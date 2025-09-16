@@ -23,23 +23,16 @@ pub(crate) async fn flow_process_summary(
 ) -> Result<FlowProcessSummary> {
     let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
 
-    let flow_binding = &flow_trigger.flow_binding;
-
+    // Query for the latest process state for this binding from projection
     let maybe_process_state = flow_process_state_query
-        .try_get_process_state(flow_binding)
+        .try_get_process_state(&flow_trigger.flow_binding)
         .await?;
 
     if let Some(process_state) = maybe_process_state {
-        Ok(FlowProcessSummary {
-            effective_state: process_state.effective_state().into(),
-            consecutive_failures: process_state.consecutive_failures(),
-            stop_policy: flow_trigger.stop_policy.into(),
-            last_success_at: process_state.last_success_at(),
-            last_attempt_at: process_state.last_attempt_at(),
-            last_failure_at: process_state.last_failure_at(),
-            next_planned_at: process_state.next_planned_at(),
-        })
+        // Projection exists
+        Ok(process_state.into())
     } else {
+        // Reasonable default state, when there were no executions yet
         Ok(FlowProcessSummary {
             effective_state: match flow_trigger.status {
                 fs::FlowTriggerStatus::Active => FlowProcessEffectiveState::Active,
