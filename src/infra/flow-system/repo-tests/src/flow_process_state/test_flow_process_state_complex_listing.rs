@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use dill::Catalog;
 use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
@@ -41,7 +42,14 @@ pub async fn test_dataset_page_recent_activity(catalog: &Catalog) {
 
     // Test first page (limit=3, offset=0)
     let first_page = flow_process_state_query
-        .list_processes(filter, ordering, 3, 0)
+        .list_processes(
+            filter,
+            ordering,
+            Some(PaginationOpts {
+                limit: 3,
+                offset: 0,
+            }),
+        )
         .await
         .unwrap();
 
@@ -85,7 +93,14 @@ pub async fn test_dataset_page_recent_activity(catalog: &Catalog) {
     let scope_query2 = FlowScopeDataset::query_for_single_dataset(&dataset_id);
     let filter2 = FlowProcessListFilter::for_scope(scope_query2);
     let second_page = flow_process_state_query
-        .list_processes(filter2, ordering, 3, 3)
+        .list_processes(
+            filter2,
+            ordering,
+            Some(PaginationOpts {
+                limit: 3,
+                offset: 3,
+            }),
+        )
         .await
         .unwrap();
 
@@ -125,7 +140,14 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
 
     // Test first page only (limit=5, offset=0)
     let triage_page = flow_process_state_query
-        .list_processes(filter, ordering, 5, 0)
+        .list_processes(
+            filter,
+            ordering,
+            Some(PaginationOpts {
+                limit: 5,
+                offset: 0,
+            }),
+        )
         .await
         .unwrap();
 
@@ -242,7 +264,14 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
 
     // Test first page (limit=5, offset=0)
     let first_page = flow_process_state_query
-        .list_processes(filter, ordering, 5, 0)
+        .list_processes(
+            filter,
+            ordering,
+            Some(PaginationOpts {
+                limit: 5,
+                offset: 0,
+            }),
+        )
         .await
         .unwrap();
 
@@ -329,7 +358,14 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     let filter2 = FlowProcessListFilter::all()
         .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]);
     let second_page = flow_process_state_query
-        .list_processes(filter2, ordering, 5, 5)
+        .list_processes(
+            filter2,
+            ordering,
+            Some(PaginationOpts {
+                limit: 5,
+                offset: 5,
+            }),
+        )
         .await
         .unwrap();
 

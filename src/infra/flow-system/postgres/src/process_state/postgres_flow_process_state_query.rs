@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Postgres;
@@ -91,23 +91,11 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
         }
     }
 
-    async fn list_process_states(
-        &self,
-        flow_bindings: &[FlowBinding],
-    ) -> Result<Vec<(FlowBinding, FlowProcessState)>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        crate::process_state::helpers::load_multiple_process_states(connection_mut, flow_bindings)
-            .await
-    }
-
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,
         order: FlowProcessOrder,
-        limit: usize,
-        offset: usize,
+        pagination: Option<PaginationOpts>,
     ) -> Result<FlowProcessStateListing, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -166,16 +154,21 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             .await
             .int_err()?;
 
-        // Then get the paginated results
-        // For the list query, scope parameters start at index 11 (8 filter params +
-        // limit + offset + 1)
         let (scope_conditions_list, _next) = generate_scope_query_condition_clauses(
             &filter.scope,
-            10, /* 7 params + limit + offset + 1 */
+            if pagination.is_some() { 10 } else { 8 }, /* 7 filter params + optional pagination
+                                                        * params + 1 */
         );
 
         // ORDER BY clauses
         let ordering_predicate = Self::generate_ordering_predicate(order);
+
+        // Pagination clause - use parameters if pagination is present
+        let pagination_clause = if pagination.is_some() {
+            "LIMIT $8 OFFSET $9"
+        } else {
+            ""
+        };
 
         let list_sql = format!(
             r#"
@@ -197,21 +190,19 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             FROM flow_process_states
                 WHERE
                     ({scope_conditions_list}) AND
-                    ($3::text[] IS NULL OR flow_type = ANY($3)) AND
-                    ($4::flow_process_effective_state[] IS NULL OR effective_state = ANY($4)) AND
-                    ($5::timestamptz[] IS NULL OR (last_attempt_at BETWEEN $5[1] AND $5[2])) AND
-                    ($6 IS NULL OR last_failure_at >= $6) AND
-                    ($7 IS NULL OR next_planned_at < $7) AND
-                    ($8 IS NULL OR next_planned_at > $8) AND
-                    ($9 IS NULL OR consecutive_failures >= $9)
+                    ($1::text[] IS NULL OR flow_type = ANY($1)) AND
+                    ($2::flow_process_effective_state[] IS NULL OR effective_state = ANY($2)) AND
+                    ($3::timestamptz[] IS NULL OR (last_attempt_at BETWEEN $3[1] AND $3[2])) AND
+                    ($4 IS NULL OR last_failure_at >= $4) AND
+                    ($5 IS NULL OR next_planned_at < $5) AND
+                    ($6 IS NULL OR next_planned_at > $6) AND
+                    ($7 IS NULL OR consecutive_failures >= $7)
                 ORDER BY {ordering_predicate}
-                LIMIT $1 OFFSET $2
+                {pagination_clause}
             "#
         );
 
         let mut list_query = sqlx::query_as::<_, PostgresFlowProcessStateRowModel>(&list_sql)
-            .bind(i64::try_from(limit).unwrap())
-            .bind(i64::try_from(offset).unwrap())
             .bind(maybe_flow_types)
             .bind(maybe_effective_states)
             .bind(maybe_last_attempt_between)
@@ -219,6 +210,13 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             .bind(filter.next_planned_before)
             .bind(filter.next_planned_after)
             .bind(filter.min_consecutive_failures.map(i64::from));
+
+        // Bind pagination parameters if present
+        if let Some(pagination) = pagination {
+            list_query = list_query
+                .bind(i64::try_from(pagination.limit).unwrap())
+                .bind(i64::try_from(pagination.offset).unwrap());
+        }
 
         for arr in &scope_values {
             list_query = list_query.bind(arr);

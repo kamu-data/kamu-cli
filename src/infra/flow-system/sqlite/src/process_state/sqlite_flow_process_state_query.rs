@@ -9,7 +9,12 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+    sqlite_generate_placeholders_list,
+};
 use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Sqlite;
@@ -103,23 +108,11 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         }
     }
 
-    async fn list_process_states(
-        &self,
-        flow_bindings: &[FlowBinding],
-    ) -> Result<Vec<(FlowBinding, FlowProcessState)>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        crate::process_state::helpers::load_multiple_process_states(connection_mut, flow_bindings)
-            .await
-    }
-
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,
         order: FlowProcessOrder,
-        limit: usize,
-        offset: usize,
+        pagination: Option<PaginationOpts>,
     ) -> Result<FlowProcessStateListing, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -200,15 +193,26 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             .await
             .int_err()?;
 
-        // Then get the paginated results
+        // Then get the results (with or without pagination)
         let ordering_predicate = Self::generate_ordering_predicate(order);
 
         // For the list query, adjust parameter indices for limit/offset
         let (list_scope_conditions, list_flow_types_parameter_index) =
-            generate_scope_query_condition_clauses(&filter.scope, 11 /* 10 params + 1 */);
+            generate_scope_query_condition_clauses(
+                &filter.scope,
+                if pagination.is_some() { 11 } else { 9 }, /* 8 filter params + optional
+                                                            * pagination params + 1 */
+            );
 
         let list_effective_state_parameter_index =
             list_flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
+
+        // Pagination clause
+        let pagination_clause = if pagination.is_some() {
+            "LIMIT $9 OFFSET $10"
+        } else {
+            ""
+        };
 
         let list_sql = format!(
             r#"
@@ -230,15 +234,15 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             FROM flow_process_states
                 WHERE
                     ({list_scope_conditions}) AND
-                    ($3 = 0 OR flow_type IN ({})) AND
-                    ($4 = 0 OR effective_state IN ({})) AND
-                    ($5 IS NULL OR $6 IS NULL OR (last_attempt_at BETWEEN $5 AND $6)) AND
-                    ($7 IS NULL OR last_failure_at >= $7) AND
-                    ($8 IS NULL OR next_planned_at < $8) AND
-                    ($9 IS NULL OR next_planned_at > $9) AND
-                    ($10 IS NULL OR consecutive_failures >= $10)
+                    ($1 = 0 OR flow_type IN ({})) AND
+                    ($2 = 0 OR effective_state IN ({})) AND
+                    ($3 IS NULL OR $4 IS NULL OR (last_attempt_at BETWEEN $3 AND $4)) AND
+                    ($5 IS NULL OR last_failure_at >= $5) AND
+                    ($6 IS NULL OR next_planned_at < $6) AND
+                    ($7 IS NULL OR next_planned_at > $7) AND
+                    ($8 IS NULL OR consecutive_failures >= $8)
                 ORDER BY {ordering_predicate}
-                LIMIT $1 OFFSET $2
+                {pagination_clause}
             "#,
             filter
                 .for_flow_types
@@ -260,8 +264,6 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
 
         let mut list_query =
             sqlx::query_as::<sqlx::Sqlite, SqliteFlowProcessStateRowModel>(&list_sql)
-                .bind(i64::try_from(limit).unwrap())
-                .bind(i64::try_from(offset).unwrap())
                 .bind(i32::from(
                     filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
                 ))
@@ -274,6 +276,13 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .bind(filter.next_planned_before)
                 .bind(filter.next_planned_after)
                 .bind(filter.min_consecutive_failures.map(i64::from));
+
+        // Bind pagination parameters if present
+        if let Some(pagination) = pagination {
+            list_query = list_query
+                .bind(i64::try_from(pagination.limit).unwrap())
+                .bind(i64::try_from(pagination.offset).unwrap());
+        }
 
         for scope_value in &scope_values {
             list_query = list_query.bind(scope_value);

@@ -10,14 +10,13 @@
 use {kamu_flow_system as fs, kamu_webhooks as wh};
 
 use crate::prelude::*;
-use crate::queries::flow_process_summary;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WebhookFlowSubProcess {
     id: wh::WebhookSubscriptionID,
     name: String,
-    flow_trigger: fs::FlowTriggerState,
+    flow_process_state: fs::FlowProcessState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -28,12 +27,12 @@ impl WebhookFlowSubProcess {
     pub fn new(
         id: wh::WebhookSubscriptionID,
         name: String,
-        flow_trigger: fs::FlowTriggerState,
+        flow_process_state: fs::FlowProcessState,
     ) -> Self {
         Self {
             id,
             name,
-            flow_trigger,
+            flow_process_state,
         }
     }
 
@@ -47,8 +46,9 @@ impl WebhookFlowSubProcess {
         self.name.clone()
     }
 
-    async fn summary(&self, ctx: &Context<'_>) -> Result<FlowProcessSummary> {
-        flow_process_summary(ctx, &self.flow_trigger).await
+    #[allow(clippy::unused_async)]
+    async fn summary(&self) -> Result<FlowProcessSummary> {
+        Ok(self.flow_process_state.clone().into())
     }
 }
 

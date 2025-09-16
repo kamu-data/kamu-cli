@@ -26,6 +26,22 @@ pub struct FlowProcessSummary {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl From<kamu_flow_system::FlowProcessState> for FlowProcessSummary {
+    fn from(value: kamu_flow_system::FlowProcessState) -> Self {
+        Self {
+            effective_state: value.effective_state().into(),
+            consecutive_failures: value.consecutive_failures(),
+            stop_policy: value.stop_policy().into(),
+            last_success_at: value.last_success_at(),
+            last_attempt_at: value.last_attempt_at(),
+            last_failure_at: value.last_failure_at(),
+            next_planned_at: value.next_planned_at(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 #[graphql(remote = "kamu_flow_system::FlowProcessEffectiveState")]
 pub enum FlowProcessEffectiveState {
