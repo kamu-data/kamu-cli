@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use dill::Catalog;
 use kamu_flow_system::*;
 
@@ -25,7 +26,7 @@ pub async fn test_list_processes_pagination(catalog: &Catalog) {
 
     // Get the full list for comparison
     let full_listing = flow_process_state_query
-        .list_processes(filter, order, 100, 0)
+        .list_processes(filter, order, None)
         .await
         .unwrap();
 
@@ -34,8 +35,10 @@ pub async fn test_list_processes_pagination(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            10,
-            0,
+            Some(PaginationOpts {
+                limit: 10,
+                offset: 0,
+            }),
         )
         .await
         .unwrap();
@@ -47,8 +50,10 @@ pub async fn test_list_processes_pagination(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            10,
-            10,
+            Some(PaginationOpts {
+                limit: 10,
+                offset: 10,
+            }),
         )
         .await
         .unwrap();
@@ -60,8 +65,10 @@ pub async fn test_list_processes_pagination(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            10,
-            20,
+            Some(PaginationOpts {
+                limit: 10,
+                offset: 20,
+            }),
         )
         .await
         .unwrap();
@@ -93,8 +100,10 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            0,
-            0,
+            Some(PaginationOpts {
+                limit: 0,
+                offset: 0,
+            }),
         )
         .await
         .unwrap();
@@ -106,8 +115,10 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            10,
-            1000, // Way beyond the 24 available records
+            Some(PaginationOpts {
+                limit: 10,
+                offset: 1000, // Way beyond the 24 available records
+            }),
         )
         .await
         .unwrap();
@@ -119,8 +130,10 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            1000, // Much larger than the 24 available records
-            0,
+            Some(PaginationOpts {
+                limit: 1000, // Much larger than the 24 available records
+                offset: 0,
+            }),
         )
         .await
         .unwrap();
@@ -132,8 +145,10 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            10,
-            23, // Should return 1 record (24th record)
+            Some(PaginationOpts {
+                limit: 10,
+                offset: 23, // Should return 1 record (24th record)
+            }),
         )
         .await
         .unwrap();
@@ -145,8 +160,10 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
-            10,
-            24, // Should return 0 records
+            Some(PaginationOpts {
+                limit: 10,
+                offset: 24, // Should return 0 records
+            }),
         )
         .await
         .unwrap();
@@ -168,7 +185,7 @@ pub async fn test_list_processes_pagination_with_filters(catalog: &Catalog) {
 
     // Get full filtered list first
     let full_filtered = flow_process_state_query
-        .list_processes(filter, FlowProcessOrder::recent(), 100, 0)
+        .list_processes(filter, FlowProcessOrder::recent(), None)
         .await
         .unwrap();
 
@@ -184,14 +201,28 @@ pub async fn test_list_processes_pagination_with_filters(catalog: &Catalog) {
     let filter1 =
         FlowProcessListFilter::all().with_effective_states(&[FlowProcessEffectiveState::Active]);
     let first_page = flow_process_state_query
-        .list_processes(filter1, FlowProcessOrder::recent(), page_size, 0)
+        .list_processes(
+            filter1,
+            FlowProcessOrder::recent(),
+            Some(PaginationOpts {
+                limit: page_size,
+                offset: 0,
+            }),
+        )
         .await
         .unwrap();
 
     let filter2 =
         FlowProcessListFilter::all().with_effective_states(&[FlowProcessEffectiveState::Active]);
     let second_page = flow_process_state_query
-        .list_processes(filter2, FlowProcessOrder::recent(), page_size, page_size)
+        .list_processes(
+            filter2,
+            FlowProcessOrder::recent(),
+            Some(PaginationOpts {
+                limit: page_size,
+                offset: page_size,
+            }),
+        )
         .await
         .unwrap();
 
@@ -238,7 +269,7 @@ pub async fn test_list_processes_pagination_different_orderings(catalog: &Catalo
     for order in orderings {
         // Get full list with this ordering
         let full_list = flow_process_state_query
-            .list_processes(FlowProcessListFilter::all(), order, 100, 0)
+            .list_processes(FlowProcessListFilter::all(), order, None)
             .await
             .unwrap();
 
@@ -249,7 +280,14 @@ pub async fn test_list_processes_pagination_different_orderings(catalog: &Catalo
         let mut offset = 0;
         loop {
             let page = flow_process_state_query
-                .list_processes(FlowProcessListFilter::all(), order, page_size, offset)
+                .list_processes(
+                    FlowProcessListFilter::all(),
+                    order,
+                    Some(PaginationOpts {
+                        limit: page_size,
+                        offset,
+                    }),
+                )
                 .await
                 .unwrap();
 
@@ -306,8 +344,7 @@ pub async fn test_list_processes_pagination_boundary_conditions(catalog: &Catalo
             .list_processes(
                 FlowProcessListFilter::all(),
                 FlowProcessOrder::recent(),
-                limit,
-                offset,
+                Some(PaginationOpts { limit, offset }),
             )
             .await
             .unwrap();

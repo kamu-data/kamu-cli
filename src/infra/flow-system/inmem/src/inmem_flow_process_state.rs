@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
 use time_source::SystemTimeSource;
@@ -243,13 +244,12 @@ impl InMemoryFlowProcessState {
     fn apply_pagination(
         &self,
         states: Vec<&FlowProcessState>,
-        limit: usize,
-        offset: usize,
+        pagination: PaginationOpts,
     ) -> Vec<FlowProcessState> {
         states
             .into_iter()
-            .skip(offset)
-            .take(limit)
+            .skip(pagination.offset)
+            .take(pagination.limit)
             .cloned()
             .collect()
     }
@@ -322,29 +322,11 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
         Ok(state.process_state_by_binding.get(flow_binding).cloned())
     }
 
-    async fn list_process_states(
-        &self,
-        flow_bindings: &[FlowBinding],
-    ) -> Result<Vec<(FlowBinding, FlowProcessState)>, InternalError> {
-        let state = self.state.read().unwrap();
-        let results = flow_bindings
-            .iter()
-            .filter_map(|binding| {
-                state
-                    .process_state_by_binding
-                    .get(binding)
-                    .map(|ps| (binding.clone(), ps.clone()))
-            })
-            .collect();
-        Ok(results)
-    }
-
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,
         order: FlowProcessOrder,
-        limit: usize,
-        offset: usize,
+        pagination: Option<PaginationOpts>,
     ) -> Result<FlowProcessStateListing, InternalError> {
         let state = self.state.read().unwrap();
 
@@ -358,7 +340,11 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
         self.apply_ordering(&mut matching_states, order);
 
         // Apply pagination
-        let processes = self.apply_pagination(matching_states, limit, offset);
+        let processes = if let Some(pagination) = pagination {
+            self.apply_pagination(matching_states, pagination)
+        } else {
+            matching_states.iter().map(|ps| (*ps).clone()).collect()
+        };
 
         Ok(FlowProcessStateListing {
             processes,

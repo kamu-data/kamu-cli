@@ -36,8 +36,7 @@ pub async fn test_list_processes_ordering_last_attempt_at_nulls_last(catalog: &C
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: false,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -54,8 +53,7 @@ pub async fn test_list_processes_ordering_last_attempt_at_nulls_last(catalog: &C
                 field: FlowProcessOrderField::LastAttemptAt,
                 desc: true,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -80,8 +78,7 @@ pub async fn test_list_processes_ordering_next_planned_at_nulls_last(catalog: &C
                 field: FlowProcessOrderField::NextPlannedAt,
                 desc: false,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -98,8 +95,7 @@ pub async fn test_list_processes_ordering_next_planned_at_nulls_last(catalog: &C
                 field: FlowProcessOrderField::NextPlannedAt,
                 desc: true,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -124,8 +120,7 @@ pub async fn test_list_processes_ordering_last_failure_at_nulls_last(catalog: &C
                 field: FlowProcessOrderField::LastFailureAt,
                 desc: false,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -142,8 +137,7 @@ pub async fn test_list_processes_ordering_last_failure_at_nulls_last(catalog: &C
                 field: FlowProcessOrderField::LastFailureAt,
                 desc: true,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -168,8 +162,7 @@ pub async fn test_list_processes_ordering_consecutive_failures(catalog: &Catalog
                 field: FlowProcessOrderField::ConsecutiveFailures,
                 desc: false,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -186,8 +179,7 @@ pub async fn test_list_processes_ordering_consecutive_failures(catalog: &Catalog
                 field: FlowProcessOrderField::ConsecutiveFailures,
                 desc: true,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -212,8 +204,7 @@ pub async fn test_list_processes_ordering_effective_state(catalog: &Catalog) {
                 field: FlowProcessOrderField::EffectiveState,
                 desc: false,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -230,8 +221,7 @@ pub async fn test_list_processes_ordering_effective_state(catalog: &Catalog) {
                 field: FlowProcessOrderField::EffectiveState,
                 desc: true,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -256,8 +246,7 @@ pub async fn test_list_processes_ordering_flow_type(catalog: &Catalog) {
                 field: FlowProcessOrderField::FlowType,
                 desc: false,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -273,8 +262,7 @@ pub async fn test_list_processes_ordering_flow_type(catalog: &Catalog) {
                 field: FlowProcessOrderField::FlowType,
                 desc: true,
             },
-            50, // Large limit to get all
-            0,
+            None,
         )
         .await
         .unwrap();
