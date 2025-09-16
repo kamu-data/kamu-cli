@@ -105,7 +105,7 @@ async fn test_internal_error() {
 
         async fn classify_dataset_refs_by_allowance(
             &self,
-            _dataset_refs: Vec<odf::DatasetRef>,
+            _dataset_refs: &[&odf::DatasetRef],
             _action: DatasetAction,
         ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
             unreachable!()

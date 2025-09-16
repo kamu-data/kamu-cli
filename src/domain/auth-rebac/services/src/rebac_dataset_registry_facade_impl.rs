@@ -108,37 +108,49 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
 
     async fn classify_dataset_refs_by_allowance(
         &self,
-        dataset_refs: Vec<odf::DatasetRef>,
+        dataset_refs: &[&odf::DatasetRef],
         action: auth::DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
-        let mut res = ClassifyDatasetRefsByAllowanceResponse {
-            accessible_resolved_refs: Vec::with_capacity(dataset_refs.len()),
-            inaccessible_refs: vec![],
-        };
+        // The next work will be done using handles, so we need to get them first.
+        let handles_resolution = self
+            .dataset_registry
+            .resolve_dataset_handles_by_refs(dataset_refs)
+            .await?;
 
-        // TODO: Private Datasets:
-        // TODO: PERF: resolve multi refs at once
-        for dataset_ref in dataset_refs {
-            match self
-                .resolve_dataset_handle_by_ref(&dataset_ref, action)
-                .await
-            {
-                Ok(handle) => {
-                    res.accessible_resolved_refs.push((dataset_ref, handle));
-                }
-                Err(e) => {
-                    use RebacDatasetRefUnresolvedError as E;
-                    match e {
-                        e @ (E::NotFound(_) | E::Access(_)) => {
-                            res.inaccessible_refs.push((dataset_ref, e));
-                        }
-                        e @ E::Internal(_) => return Err(e.int_err()),
-                    }
-                }
+        // If no datasets, then access to them cannot exist.
+        let mut inaccessible_refs = handles_resolution
+            .unresolved_refs
+            .into_iter()
+            .map(|(dataset_ref, e)| (dataset_ref, e.into()))
+            .collect::<Vec<_>>();
+
+        // Next sort according to allowed actions
+        let mut accessible_resolved_refs =
+            Vec::with_capacity(dataset_refs.len() - inaccessible_refs.len());
+
+        for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
+            use kamu_core::auth::DatasetActionAuthorizerExt;
+
+            let allowed = self
+                .dataset_action_authorizer
+                .is_action_allowed(&dataset_handle.id, action)
+                .await?;
+
+            if allowed {
+                accessible_resolved_refs.push((dataset_ref, dataset_handle));
+            } else {
+                let e = RebacDatasetRefUnresolvedError::not_enough_permissions(
+                    dataset_ref.clone(),
+                    action,
+                );
+                inaccessible_refs.push((dataset_ref, e));
             }
         }
 
-        Ok(res)
+        Ok(ClassifyDatasetRefsByAllowanceResponse {
+            accessible_resolved_refs,
+            inaccessible_refs,
+        })
     }
 
     async fn classify_dataset_refs_by_access(

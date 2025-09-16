@@ -65,8 +65,9 @@ impl Datasets {
             kamu_accounts::CurrentAccountSubject
         );
 
+        let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
         let resolution = rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(dataset_refs, auth::DatasetAction::Read)
+            .classify_dataset_refs_by_allowance(&dataset_refs_refs, auth::DatasetAction::Read)
             .await?;
 
         if !skip_missing && !resolution.inaccessible_refs.is_empty() {
