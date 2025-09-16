@@ -95,7 +95,12 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
             loop {
                 let next = {
                     let g = self.state.lock().unwrap();
-                    let to = opts.to.map_or(g.events_count(), |id| usize::try_from(id.into_inner()).unwrap());
+
+                    let total_events = g.events_count();
+                    let to = opts.to
+                        .map(|id| usize::try_from(id.into_inner()).unwrap())
+                        .map(|to| to.min(total_events))
+                        .unwrap_or(total_events);
 
                     g.get_events()[..to]
                         .iter()
