@@ -15,6 +15,7 @@ use database_common::PaginationOpts;
 use dill::Catalog;
 use email_utils::Email;
 use kamu_accounts::*;
+use pretty_assertions::assert_eq;
 
 use crate::make_test_account;
 
@@ -474,7 +475,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     let empty_accounts: [odf::AccountName; 0] = [];
 
     // All
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [
             name(&"admin1"),
             name(&"user1"),
@@ -485,19 +486,19 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     );
 
     // Search by account name
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1"), name(&"user2"), name(&"user3")],
         *search(&account_repo, "uS", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1"), name(&"user2"), name(&"user3")],
         *search(&account_repo, "sE", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1")],
         *search(&account_repo, "r1", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user2")],
         *search(
             &account_repo,
@@ -510,15 +511,15 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     );
 
     // Search by display name
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1"), name(&"user2")],
         *search(&account_repo, "ali", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user3")],
         *search(&account_repo, "ob", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         empty_accounts,
         *search(
             &account_repo,
@@ -816,4 +817,59 @@ pub async fn test_update_account_duplicate_provider_identity(catalog: &Catalog) 
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_accounts_by_names(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let account_1_not_saved = make_test_account(
+        "account_1_not_saved",
+        "account_1_not_saved@example.com",
+        AccountProvider::Password.into(),
+        "account_1_not_saved",
+    );
+    let account_2 = make_test_account(
+        "wasya",
+        "wasya@example.com",
+        AccountProvider::Password.into(),
+        "wasya",
+    );
+    let account_3 = make_test_account(
+        "petya",
+        "petya@example.com",
+        AccountProvider::Password.into(),
+        "petya",
+    );
+    let account_4_not_saved = make_test_account(
+        "account_4_not_saved",
+        "account_4_not_saved@example.com",
+        AccountProvider::Password.into(),
+        "account_4_not_saved",
+    );
+
+    account_repo.save_account(&account_2).await.unwrap();
+    account_repo.save_account(&account_3).await.unwrap();
+
+    let accounts_is = [
+        &account_1_not_saved.id,
+        &account_2.id,
+        &account_3.id,
+        &account_4_not_saved.id,
+    ];
+    let found_accounts = account_repo
+        .get_accounts_by_ids(&accounts_is)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| (a.account_name, a.id))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        [
+            (account_3.account_name, account_3.id),
+            (account_2.account_name, account_2.id),
+        ],
+        *found_accounts
+    );
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

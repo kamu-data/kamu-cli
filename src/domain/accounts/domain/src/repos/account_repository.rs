@@ -37,7 +37,6 @@ pub trait AccountRepository: Send + Sync {
         account_name: &odf::AccountName,
     ) -> Result<Account, GetAccountByNameError>;
 
-    // TODO: tests
     async fn get_accounts_by_names(
         &self,
         account_names: &[&odf::AccountName],

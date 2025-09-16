@@ -101,15 +101,11 @@ async fn test_multi_find() {
             .get_accounts_by_ids(&[&wasya_id, &petya_id, &not_found_account_id])
             .await
             .unwrap();
-        let found_accounts = {
-            let mut v = lookup
-                .found
-                .iter()
-                .map(|a| (a.account_name.as_str(), &a.id))
-                .collect::<Vec<_>>();
-            v.sort_by(|(_, a), (_, b)| a.cmp(b));
-            v
-        };
+        let found_accounts = lookup
+            .found
+            .iter()
+            .map(|a| (a.account_name.as_str(), &a.id))
+            .collect::<Vec<_>>();
         assert_eq!([(PETYA, &petya_id), (WASYA, &wasya_id)], *found_accounts);
 
         let not_found_account_ids = lookup
@@ -132,15 +128,11 @@ async fn test_multi_find() {
             ])
             .await
             .unwrap();
-        let found_accounts = {
-            let mut v = lookup
-                .found
-                .iter()
-                .map(|a| (a.account_name.as_str(), &a.id))
-                .collect::<Vec<_>>();
-            v.sort_by(|(_, a), (_, b)| a.cmp(b));
-            v
-        };
+        let found_accounts = lookup
+            .found
+            .iter()
+            .map(|a| (a.account_name.as_str(), &a.id))
+            .collect::<Vec<_>>();
         assert_eq!([(PETYA, &petya_id), (WASYA, &wasya_id)], *found_accounts);
 
         let not_found_account_names = lookup
