@@ -322,6 +322,23 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
         Ok(state.process_state_by_binding.get(flow_binding).cloned())
     }
 
+    async fn list_process_states(
+        &self,
+        flow_bindings: &[FlowBinding],
+    ) -> Result<Vec<(FlowBinding, FlowProcessState)>, InternalError> {
+        let state = self.state.read().unwrap();
+        let results = flow_bindings
+            .iter()
+            .filter_map(|binding| {
+                state
+                    .process_state_by_binding
+                    .get(binding)
+                    .map(|ps| (binding.clone(), ps.clone()))
+            })
+            .collect();
+        Ok(results)
+    }
+
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,

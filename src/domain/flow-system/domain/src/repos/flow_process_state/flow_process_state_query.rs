@@ -30,6 +30,12 @@ pub trait FlowProcessStateQuery: Send + Sync {
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowProcessState>, InternalError>;
 
+    /// Load multiple processes
+    async fn list_process_states(
+        &self,
+        flow_bindings: &[FlowBinding],
+    ) -> Result<Vec<(FlowBinding, FlowProcessState)>, InternalError>;
+
     /// List processes that match a scope filter (partial JSON) and optional
     /// flow-type filter. Use for dataset page (all processes for one
     /// dataset) or account lists.

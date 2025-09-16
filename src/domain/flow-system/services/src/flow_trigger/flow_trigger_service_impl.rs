@@ -22,7 +22,7 @@ use time_source::SystemTimeSource;
 #[interface(dyn FlowScopeRemovalHandler)]
 pub struct FlowTriggerServiceImpl {
     flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
-    flow_event_store: Arc<dyn FlowEventStore>,
+    flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
@@ -122,6 +122,21 @@ impl FlowTriggerServiceImpl {
         }
 
         Ok(())
+    }
+
+    async fn get_current_consecutive_flow_failures_count(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<u32, InternalError> {
+        let process_state = self
+            .flow_process_state_query
+            .try_get_process_state(flow_binding)
+            .await?;
+
+        Ok(process_state
+            .as_ref()
+            .map(FlowProcessState::consecutive_failures)
+            .unwrap_or(0))
     }
 }
 
@@ -372,8 +387,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                         // we know the flow has just failed.
                         let failures_count_value = failures_count.into();
                         let actual_failures_count = if failures_count_value > 1 {
-                            self.flow_event_store
-                                .get_current_consecutive_flow_failures_count(flow_binding)
+                            self.get_current_consecutive_flow_failures_count(flow_binding)
                                 .await?
                         } else {
                             1 /* this one */

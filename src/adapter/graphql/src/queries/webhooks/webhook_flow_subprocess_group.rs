@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{FlowEventStore, FlowTriggerState, FlowTriggerStatus};
+use kamu_flow_system::{FlowProcessStateQuery, FlowTriggerState, FlowTriggerStatus};
 use kamu_webhooks::WebhookSubscription;
 use tokio::sync::OnceCell;
 
@@ -60,16 +60,20 @@ impl WebhookFlowSubProcessGroup {
                 let mut failing = 0;
 
                 if !running_bindings.is_empty() {
-                    let flow_event_store = from_catalog_n!(ctx, dyn FlowEventStore);
-                    let results = flow_event_store
-                        .consecutive_flow_failures_by_binding(running_bindings)
+                    let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
+
+                    let results = flow_process_state_query
+                        .list_process_states(&running_bindings)
                         .await?;
 
-                    worst_consecutive_failures =
-                        results.iter().map(|(_, count)| *count).max().unwrap_or(0);
+                    worst_consecutive_failures = results
+                        .iter()
+                        .map(|(_, state)| state.consecutive_failures())
+                        .max()
+                        .unwrap_or(0);
 
-                    for (_, consecutive_failures_count) in results {
-                        if consecutive_failures_count > 0 {
+                    for (_, state) in results {
+                        if state.consecutive_failures() > 0 {
                             failing += 1;
                         } else {
                             active += 1;

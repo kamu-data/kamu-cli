@@ -103,6 +103,17 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         }
     }
 
+    async fn list_process_states(
+        &self,
+        flow_bindings: &[FlowBinding],
+    ) -> Result<Vec<(FlowBinding, FlowProcessState)>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        crate::process_state::helpers::load_multiple_process_states(connection_mut, flow_bindings)
+            .await
+    }
+
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,

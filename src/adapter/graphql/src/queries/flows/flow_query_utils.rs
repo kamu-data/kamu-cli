@@ -21,50 +21,42 @@ pub(crate) async fn flow_process_summary(
     ctx: &Context<'_>,
     flow_trigger: &fs::FlowTriggerState,
 ) -> Result<FlowProcessSummary> {
-    let flow_event_store = from_catalog_n!(ctx, dyn fs::FlowEventStore);
+    let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
 
     let flow_binding = &flow_trigger.flow_binding;
 
-    let consecutive_failures = flow_event_store
-        .get_current_consecutive_flow_failures_count(flow_binding)
+    let maybe_process_state = flow_process_state_query
+        .try_get_process_state(flow_binding)
         .await?;
 
-    let effective_state = match flow_trigger.status {
-        fs::FlowTriggerStatus::Active => {
-            if consecutive_failures == 0 {
-                FlowProcessEffectiveState::Active
-            } else {
-                FlowProcessEffectiveState::Failing
-            }
-        }
-        fs::FlowTriggerStatus::PausedByUser => FlowProcessEffectiveState::PausedManual,
-        fs::FlowTriggerStatus::StoppedAutomatically => FlowProcessEffectiveState::StoppedAuto,
-        fs::FlowTriggerStatus::ScopeRemoved => {
-            unreachable!("ScopeRemoved triggers are not expected here")
-        }
-    };
-
-    let run_stats = flow_event_store.get_flow_run_stats(flow_binding).await?;
-
-    let maybe_pending_flow_id = flow_event_store.try_get_pending_flow(flow_binding).await?;
-    let next_planned_at = if let Some(pending_flow_id) = maybe_pending_flow_id {
-        let pending_flow = fs::Flow::load(pending_flow_id, flow_event_store.as_ref())
-            .await
-            .int_err()?;
-        pending_flow.timing.scheduled_for_activation_at
+    if let Some(process_state) = maybe_process_state {
+        Ok(FlowProcessSummary {
+            effective_state: process_state.effective_state().into(),
+            consecutive_failures: process_state.consecutive_failures(),
+            stop_policy: flow_trigger.stop_policy.into(),
+            last_success_at: process_state.last_success_at(),
+            last_attempt_at: process_state.last_attempt_at(),
+            last_failure_at: process_state.last_failure_at(),
+            next_planned_at: process_state.next_planned_at(),
+        })
     } else {
-        None
-    };
-
-    Ok(FlowProcessSummary {
-        effective_state,
-        consecutive_failures,
-        stop_policy: flow_trigger.stop_policy.into(),
-        last_success_at: run_stats.last_success_time,
-        last_attempt_at: run_stats.last_attempt_time,
-        last_failure_at: run_stats.last_failure_time,
-        next_planned_at,
-    })
+        Ok(FlowProcessSummary {
+            effective_state: match flow_trigger.status {
+                fs::FlowTriggerStatus::Active => FlowProcessEffectiveState::Active,
+                fs::FlowTriggerStatus::PausedByUser => FlowProcessEffectiveState::PausedManual,
+                fs::FlowTriggerStatus::StoppedAutomatically => {
+                    FlowProcessEffectiveState::StoppedAuto
+                }
+                fs::FlowTriggerStatus::ScopeRemoved => unreachable!(),
+            },
+            consecutive_failures: 0,
+            stop_policy: flow_trigger.stop_policy.into(),
+            last_success_at: None,
+            last_attempt_at: None,
+            last_failure_at: None,
+            next_planned_at: None,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
