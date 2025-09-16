@@ -252,10 +252,48 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn get_dataset_entries_by_owner_and_name<'a>(
         &self,
-        _owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+        owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
-        dbg!();
-        todo!()
+        if owner_id_dataset_name_pairs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut owner_ids = Vec::with_capacity(owner_id_dataset_name_pairs.len());
+        let mut dataset_names = Vec::with_capacity(owner_id_dataset_name_pairs.len());
+
+        for (owner_id, dataset_name) in owner_id_dataset_name_pairs {
+            owner_ids.push(owner_id.to_string());
+            dataset_names.push(dataset_name.as_str());
+        }
+
+        let row_models = sqlx::query_as!(
+            DatasetEntryRowModel,
+            r#"
+            SELECT dataset_id   AS "id: _",
+                   owner_id     AS "owner_id: _",
+                   owner_name,
+                   dataset_name AS name,
+                   created_at   AS "created_at: _",
+                   kind         AS "kind: _"
+            FROM dataset_entries
+            WHERE (owner_id, dataset_name) IN (SELECT *
+                                               FROM UNNEST($1::TEXT[],
+                                                           $2::TEXT[]))
+            "#,
+            &owner_ids,
+            &dataset_names as &[&str],
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let entries = row_models.into_iter().map(Into::into).collect();
+
+        Ok(entries)
     }
 
     async fn get_dataset_entries_by_owner_id<'a>(
