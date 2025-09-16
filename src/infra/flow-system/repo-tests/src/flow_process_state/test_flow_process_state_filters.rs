@@ -35,11 +35,9 @@ pub async fn test_list_processes_from_csv_unfiltered_with_default_ordering(catal
     // Test unfiltered listing with default order (recent first) and wide pagination
     let filter = FlowProcessListFilter::all();
     let order = FlowProcessOrder::recent();
-    let limit = 100;
-    let offset = 0;
 
     let listing = flow_process_state_query
-        .list_processes(filter, order, limit, offset)
+        .list_processes(filter, order, None)
         .await
         .unwrap();
 
@@ -74,8 +72,7 @@ pub async fn test_list_processes_filter_by_flow_types(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all().for_flow_types(&[FLOW_TYPE_DATASET_INGEST]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -89,8 +86,7 @@ pub async fn test_list_processes_filter_by_flow_types(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all().for_flow_types(&[FLOW_TYPE_WEBHOOK_DELIVER]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -105,8 +101,7 @@ pub async fn test_list_processes_filter_by_flow_types(catalog: &Catalog) {
             FlowProcessListFilter::all()
                 .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -130,8 +125,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
             FlowProcessListFilter::all()
                 .with_effective_states(&[FlowProcessEffectiveState::Active]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -146,8 +140,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
             FlowProcessListFilter::all()
                 .with_effective_states(&[FlowProcessEffectiveState::Failing]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -162,8 +155,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
             FlowProcessListFilter::all()
                 .with_effective_states(&[FlowProcessEffectiveState::PausedManual]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -178,8 +170,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
             FlowProcessListFilter::all()
                 .with_effective_states(&[FlowProcessEffectiveState::StoppedAuto]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -196,8 +187,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
                 FlowProcessEffectiveState::StoppedAuto,
             ]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -230,8 +220,7 @@ pub async fn test_list_processes_filter_by_last_attempt_between(catalog: &Catalo
         .list_processes(
             FlowProcessListFilter::all().with_last_attempt_between(start_time, end_time),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -276,8 +265,7 @@ pub async fn test_list_processes_filter_by_last_failure_since(catalog: &Catalog)
         .list_processes(
             FlowProcessListFilter::all().with_last_failure_since(failure_since),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -316,8 +304,7 @@ pub async fn test_list_processes_filter_by_planned_before(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all().with_next_planned_before(planned_before),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -358,8 +345,7 @@ pub async fn test_list_processes_filter_by_planned_after(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::all().with_next_planned_after(planned_after),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -395,8 +381,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .list_processes(
             FlowProcessListFilter::all().with_min_consecutive_failures(0),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -412,8 +397,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .list_processes(
             FlowProcessListFilter::all().with_min_consecutive_failures(3),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -434,8 +418,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .list_processes(
             FlowProcessListFilter::all().with_min_consecutive_failures(10),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -455,8 +438,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .list_processes(
             FlowProcessListFilter::all().with_min_consecutive_failures(11),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -487,8 +469,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::for_scope(single_dataset_query),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -523,8 +504,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::for_scope(multi_dataset_query),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -542,8 +522,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::for_scope(subscription_query),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -571,8 +550,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::for_scope(dataset_only_query),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -597,8 +575,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::for_scope(all_webhooks_query),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -627,8 +604,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::for_scope(multi_webhook_query),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -660,8 +636,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .list_processes(
             FlowProcessListFilter::for_scope(system_query),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -687,8 +662,7 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
                 .for_flow_types(&[FLOW_TYPE_WEBHOOK_DELIVER])
                 .with_effective_states(&[FlowProcessEffectiveState::Failing]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
@@ -719,8 +693,7 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
                     FlowProcessEffectiveState::Failing,
                 ]),
             FlowProcessOrder::recent(),
-            100,
-            0,
+            None,
         )
         .await
         .unwrap();
