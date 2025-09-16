@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+
 use kamu_flow_system::{FlowProcessStateQuery, FlowTriggerState, FlowTriggerStatus};
 use kamu_webhooks::WebhookSubscription;
 use tokio::sync::OnceCell;
@@ -99,7 +101,7 @@ impl WebhookFlowSubProcessGroup {
 
     #[allow(clippy::unused_async)]
     async fn subprocesses(&self) -> Result<Vec<WebhookFlowSubProcess>> {
-        let mut subprocesses = Vec::new();
+        let mut subprocesses = BTreeMap::new();
 
         for (webhook_subscription, trigger) in &self.webhooks_with_triggers {
             let subprocess_name = if webhook_subscription.label().as_ref().is_empty() {
@@ -108,14 +110,17 @@ impl WebhookFlowSubProcessGroup {
                 webhook_subscription.label().as_ref().to_string()
             };
 
-            subprocesses.push(WebhookFlowSubProcess::new(
-                webhook_subscription.id(),
-                subprocess_name,
-                trigger.clone(),
-            ));
+            subprocesses.insert(
+                subprocess_name.clone(),
+                WebhookFlowSubProcess::new(
+                    webhook_subscription.id(),
+                    subprocess_name,
+                    trigger.clone(),
+                ),
+            );
         }
 
-        Ok(subprocesses)
+        Ok(subprocesses.into_values().collect())
     }
 }
 
