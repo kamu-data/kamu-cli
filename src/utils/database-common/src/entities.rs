@@ -174,7 +174,7 @@ pub struct ReturningEventModel {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct BatchLookup<T, Id, Err> {
     pub found: Vec<T>,
     pub not_found: Vec<(Id, Err)>,

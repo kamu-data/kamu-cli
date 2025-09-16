@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::{ResolvedDataset, auth};
 use thiserror::Error;
 
@@ -40,6 +40,13 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
         dataset_refs: Vec<odf::DatasetRef>,
         action: auth::DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
+
+    // TODO: tests
+    async fn classify_dataset_refs_by_access(
+        &self,
+        dataset_refs: &[&odf::DatasetRef],
+        action: auth::DatasetAction,
+    ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,6 +83,15 @@ impl ClassifyDatasetRefsByAllowanceResponse {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ClassifyDatasetRefsByAccessResponse {
+    pub forbidden: Vec<(odf::DatasetRef, RebacDatasetRefUnresolvedError)>,
+    pub limited: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub allowed: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,6 +113,32 @@ pub enum RebacDatasetRefUnresolvedError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl RebacDatasetRefUnresolvedError {
+    pub fn not_enough_permissions(
+        dataset_ref: odf::DatasetRef,
+        action: auth::DatasetAction,
+    ) -> Self {
+        Self::Access(odf::AccessError::Unauthorized(
+            auth::DatasetActionNotEnoughPermissionsError {
+                action,
+                dataset_ref,
+            }
+            .into(),
+        ))
+    }
+}
+
+impl From<odf::dataset::DatasetRefUnresolvedError> for RebacDatasetRefUnresolvedError {
+    fn from(e: odf::dataset::DatasetRefUnresolvedError) -> Self {
+        use odf::dataset::DatasetRefUnresolvedError as E;
+
+        match e {
+            E::NotFound(e) => Self::NotFound(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

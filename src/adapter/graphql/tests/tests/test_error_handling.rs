@@ -12,6 +12,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_auth_rebac::{
+    ClassifyDatasetRefsByAccessResponse,
     ClassifyDatasetRefsByAllowanceResponse,
     RebacDatasetIdUnresolvedError,
     RebacDatasetRefUnresolvedError,
@@ -19,7 +20,6 @@ use kamu_auth_rebac::{
 };
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetAction};
 use kamu_core::{ResolvedDataset, TenancyConfig};
-use odf::{DatasetHandle, DatasetRef};
 use thiserror::Error;
 use time_source::SystemTimeSourceDefault;
 
@@ -77,9 +77,9 @@ async fn test_internal_error() {
     impl RebacDatasetRegistryFacade for ErrorRebacDatasetRegistryFacadeImpl {
         async fn resolve_dataset_handle_by_ref(
             &self,
-            _dataset_ref: &DatasetRef,
+            _dataset_ref: &odf::DatasetRef,
             _action: DatasetAction,
-        ) -> Result<DatasetHandle, RebacDatasetRefUnresolvedError> {
+        ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError> {
             #[derive(Debug, Error)]
             #[error("I'm a dummy error that should not propagate through")]
             struct DummyError;
@@ -89,7 +89,7 @@ async fn test_internal_error() {
 
         async fn resolve_dataset_by_ref(
             &self,
-            _dataset_ref: &DatasetRef,
+            _dataset_ref: &odf::DatasetRef,
             _action: DatasetAction,
         ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError> {
             unreachable!()
@@ -97,7 +97,7 @@ async fn test_internal_error() {
 
         async fn resolve_dataset_by_handle(
             &self,
-            _dataset_handle: &DatasetHandle,
+            _dataset_handle: &odf::DatasetHandle,
             _action: DatasetAction,
         ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError> {
             unreachable!()
@@ -105,9 +105,17 @@ async fn test_internal_error() {
 
         async fn classify_dataset_refs_by_allowance(
             &self,
-            _dataset_refs: Vec<DatasetRef>,
+            _dataset_refs: Vec<odf::DatasetRef>,
             _action: DatasetAction,
         ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
+            unreachable!()
+        }
+
+        async fn classify_dataset_refs_by_access(
+            &self,
+            _dataset_refs: &[&odf::DatasetRef],
+            _action: DatasetAction,
+        ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError> {
             unreachable!()
         }
     }
