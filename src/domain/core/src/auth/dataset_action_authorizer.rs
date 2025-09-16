@@ -73,8 +73,12 @@ impl DatasetAction {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DatasetActionAccess {
+    /// Subject has no access to the object.
     Forbidden,
+    /// Subject has access to an object's presence but lacks required
+    /// permissions for the action.
     Limited,
+    /// Action permission granted to subject.
     Full,
 }
 
