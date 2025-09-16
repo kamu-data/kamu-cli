@@ -61,6 +61,11 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
         self.inner.len().await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?opts))]
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
+        self.inner.get_all_events(opts)
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
     fn get_events(
         &self,

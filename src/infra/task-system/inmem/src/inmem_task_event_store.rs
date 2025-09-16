@@ -94,6 +94,10 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
         self.inner.len().await
     }
 
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<TaskEvent> {
+        self.inner.get_all_events(opts)
+    }
+
     fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
         self.inner.get_events(task_id, opts)
     }

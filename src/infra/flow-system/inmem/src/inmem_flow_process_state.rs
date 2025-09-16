@@ -309,6 +309,11 @@ impl State {
 
 #[async_trait::async_trait]
 impl FlowProcessStateQuery for InMemoryFlowProcessState {
+    async fn has_any_process_states(&self) -> Result<bool, InternalError> {
+        let state = self.state.read().unwrap();
+        Ok(!state.process_state_by_binding.is_empty())
+    }
+
     async fn try_get_process_state(
         &self,
         flow_binding: &FlowBinding,

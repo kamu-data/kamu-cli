@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod flow_process_state_indexer;
 mod flow_process_state_projector;
 
+pub use flow_process_state_indexer::*;
 pub use flow_process_state_projector::*;

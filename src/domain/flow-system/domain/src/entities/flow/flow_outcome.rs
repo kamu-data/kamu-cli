@@ -31,4 +31,14 @@ impl FlowOutcome {
     }
 }
 
+impl From<ts::TaskOutcome> for FlowOutcome {
+    fn from(value: ts::TaskOutcome) -> Self {
+        match value {
+            ts::TaskOutcome::Success(result) => Self::Success(result),
+            ts::TaskOutcome::Failed(_) => Self::Failed,
+            ts::TaskOutcome::Cancelled => Self::Aborted,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
