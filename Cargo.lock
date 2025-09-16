@@ -8035,6 +8035,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "event-sourcing",
  "futures",
  "indoc 2.0.6",
  "init-on-startup",
