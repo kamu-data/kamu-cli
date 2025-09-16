@@ -35,12 +35,6 @@ pub trait FlowEventStore: EventStore<FlowState> {
         flow_scope: &FlowScope,
     ) -> Result<Vec<FlowID>, InternalError>;
 
-    /// Returns last run statistics for certain type
-    async fn get_flow_run_stats(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<FlowRunStats, InternalError>;
-
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError>;
 
@@ -104,29 +98,6 @@ pub struct FlowFilters {
 pub enum InitiatorFilter {
     System,
     Account(HashSet<odf::AccountID>),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FlowRunStats {
-    pub last_success_time: Option<DateTime<Utc>>,
-    pub last_attempt_time: Option<DateTime<Utc>>,
-    pub last_failure_time: Option<DateTime<Utc>>,
-}
-
-impl FlowRunStats {
-    pub fn merge(&mut self, new_stats: FlowRunStats) {
-        if new_stats.last_success_time.is_some() {
-            self.last_success_time = new_stats.last_success_time;
-        }
-        if new_stats.last_attempt_time.is_some() {
-            self.last_attempt_time = new_stats.last_attempt_time;
-        }
-        if new_stats.last_failure_time.is_some() {
-            self.last_failure_time = new_stats.last_failure_time;
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
