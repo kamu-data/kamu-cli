@@ -218,4 +218,47 @@ impl<T, Id, Err> BatchLookup<T, Id, Err> {
     }
 }
 
+#[test]
+fn test_batch_lookup_from_found_items() {
+    use pretty_assertions::assert_eq;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct Item {
+        id: u32,
+    }
+
+    let ids_to_search = vec![&0, &1, &2, &3, &4, &5, &6, &7];
+    // Found items have mixed order (simulating a database query result).
+    let found_items = vec![
+        Item { id: 2 },
+        Item { id: 1 },
+        Item { id: 3 },
+        Item { id: 5 },
+    ];
+
+    let lookup = BatchLookup::<Item, u32, String>::from_found_items(
+        found_items.clone(),
+        &ids_to_search,
+        BatchLookupCreateOptions {
+            found_ids_fn: |found_items| found_items.iter().map(|item| item.id).collect(),
+            not_found_err_fn: |id| format!("{id} not found"),
+            _phantom: PhantomData,
+        },
+    );
+
+    assert_eq!(
+        found_items, // Mixed order is preserved
+        lookup.found
+    );
+    assert_eq!(
+        [
+            (0, "0 not found".to_string()),
+            (4, "4 not found".to_string()),
+            (6, "6 not found".to_string()),
+            (7, "7 not found".to_string())
+        ],
+        *lookup.not_found
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
