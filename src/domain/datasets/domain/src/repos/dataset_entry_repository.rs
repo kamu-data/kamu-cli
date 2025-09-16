@@ -113,19 +113,15 @@ impl DatasetEntriesResolution {
             })
     }
 
-    pub fn into_resolution_map(self) -> HashMap<odf::DatasetID, DatasetResolution> {
+    pub fn into_resolution_map(self) -> HashMap<odf::DatasetID, Option<DatasetEntry>> {
         let mut map =
             HashMap::with_capacity(self.resolved_entries.len() + self.unresolved_entries.len());
         for entry in self.resolved_entries {
-            let has_no_duplicate = map
-                .insert(entry.id.clone(), DatasetResolution::Resolved(entry))
-                .is_none();
+            let has_no_duplicate = map.insert(entry.id.clone(), Some(entry)).is_none();
             debug_assert!(has_no_duplicate);
         }
         for dataset_id in self.unresolved_entries {
-            let has_no_duplicate = map
-                .insert(dataset_id, DatasetResolution::Unresolved)
-                .is_none();
+            let has_no_duplicate = map.insert(dataset_id, None).is_none();
             debug_assert!(has_no_duplicate);
         }
         map
