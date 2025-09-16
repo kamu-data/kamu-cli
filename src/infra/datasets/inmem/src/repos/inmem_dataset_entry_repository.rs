@@ -193,10 +193,21 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn get_dataset_entries_by_owner_and_name<'a>(
         &self,
-        _owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+        owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
-        dbg!();
-        todo!()
+        let readable_state = self.state.read().await;
+
+        let mut result = Vec::with_capacity(owner_id_dataset_name_pairs.len());
+        for (owner_id, dataset_name) in owner_id_dataset_name_pairs {
+            if let Some(entries_by_name) = readable_state.rows_by_owner_and_name.get(owner_id)
+                && let Some(dataset_id) = entries_by_name.get(dataset_name)
+                && let Some(entry) = readable_state.rows.get(dataset_id)
+            {
+                result.push(entry.clone());
+            }
+        }
+
+        Ok(result)
     }
 
     async fn save_dataset_entry(
