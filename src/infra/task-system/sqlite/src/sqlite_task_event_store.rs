@@ -142,6 +142,49 @@ impl SqliteTaskEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<TaskState> for SqliteTaskEventStore {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<TaskEvent> {
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+            struct EventRow {
+                pub event_id: i64,
+                pub event_payload: sqlx::types::JsonValue
+            }
+
+            let mut query_stream = sqlx::query_as!(
+                EventRow,
+                r#"
+                SELECT event_id as "event_id: _", event_payload as "event_payload: _" FROM task_events
+                    WHERE
+                         (cast($1 as INT8) IS NULL or event_id > $1) AND
+                         (cast($2 as INT8) IS NULL or event_id <= $2)
+                    ORDER BY event_id ASC
+                "#,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = match serde_json::from_value::<TaskEvent>(event_row.event_payload) {
+                    Ok(event) => event,
+                    Err(e) => return Err(sqlx::Error::Decode(Box::new(e))),
+                };
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
     fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
         let task_id: i64 = (*task_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
