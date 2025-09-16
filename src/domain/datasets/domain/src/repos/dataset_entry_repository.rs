@@ -91,12 +91,6 @@ pub type DatasetEntryStream<'a> = std::pin::Pin<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum DatasetResolution {
-    Resolved(DatasetEntry),
-    Unresolved,
-}
-
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct DatasetEntriesResolution {
     pub resolved_entries: Vec<DatasetEntry>,
