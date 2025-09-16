@@ -277,8 +277,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
-                // Skip this flow, must be a manual launch without any trigger existing
-                return Ok(());
+                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
             }
             Err(FlowProcessLoadError::Internal(e)) => {
                 return Err(FlowProcessFlowEventError::Internal(e));
@@ -327,8 +326,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
-                // Skip this flow, must be a manual launch without any trigger existing
-                return Ok(());
+                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
             }
             Err(FlowProcessLoadError::Internal(e)) => {
                 return Err(FlowProcessFlowEventError::Internal(e));

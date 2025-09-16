@@ -435,10 +435,13 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         event_time: DateTime<Utc>,
     ) -> Result<(), FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
-        let Some(process_state) = state.process_state_by_binding.get_mut(flow_binding) else {
-            // Skip this flow, must be a manual launch without any trigger existing
-            return Ok(());
-        };
+
+        let process_state = state
+            .process_state_by_binding
+            .entry(flow_binding.clone())
+            .or_insert_with(|| {
+                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
+            });
 
         if success {
             process_state
@@ -460,10 +463,13 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         planned_at: DateTime<Utc>,
     ) -> Result<(), FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
-        let Some(process_state) = state.process_state_by_binding.get_mut(flow_binding) else {
-            // Skip this flow, must be a manual launch without any trigger existing
-            return Ok(());
-        };
+
+        let process_state = state
+            .process_state_by_binding
+            .entry(flow_binding.clone())
+            .or_insert_with(|| {
+                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
+            });
 
         process_state
             .on_scheduled(flow_event_id, self.time_source.now(), planned_at)

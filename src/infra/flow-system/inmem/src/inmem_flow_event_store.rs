@@ -30,7 +30,6 @@ struct State {
     all_flows: Vec<FlowID>,
     flow_search_index: HashMap<FlowID, FlowIndexEntry>,
     flow_binding_by_flow_id: HashMap<FlowID, FlowBinding>,
-    flow_last_run_stats: HashMap<FlowBinding, FlowRunStats>,
     flows_by_scheduled_for_activation_time: BTreeMap<DateTime<Utc>, BTreeSet<FlowID>>,
     scheduled_for_activation_time_by_flow_id: HashMap<FlowID, DateTime<Utc>>,
 }
@@ -155,36 +154,6 @@ impl InMemoryFlowEventStore {
                 .get_mut(&event.flow_id())
                 .expect("Previously unseen flow ID")
                 .flow_status = new_status;
-
-            // Record last attempted/succeeded flows
-            if let FlowEvent::TaskFinished(e) = &event {
-                let flow_binding = state
-                    .flow_binding_by_flow_id
-                    .get(&e.flow_id)
-                    .expect("Previously unseen flow ID");
-
-                let new_run_stats = FlowRunStats {
-                    last_attempt_time: Some(e.event_time),
-                    last_success_time: if e.task_outcome.is_success() {
-                        Some(e.event_time)
-                    } else {
-                        None
-                    },
-                    last_failure_time: if e.task_outcome.is_failure() {
-                        Some(e.event_time)
-                    } else {
-                        None
-                    },
-                };
-
-                state
-                    .flow_last_run_stats
-                    .entry(flow_binding.clone())
-                    .and_modify(|flow_run_stats_mut_ref| {
-                        flow_run_stats_mut_ref.merge(new_run_stats);
-                    })
-                    .or_insert(new_run_stats);
-            }
         }
 
         // Manage scheduled time changes- insertions
@@ -365,18 +334,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
                     .copied()
                     .collect()
             })
-            .unwrap_or_default())
-    }
-
-    async fn get_flow_run_stats(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<FlowRunStats, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-        Ok(g.flow_last_run_stats
-            .get(flow_binding)
-            .copied()
             .unwrap_or_default())
     }
 
