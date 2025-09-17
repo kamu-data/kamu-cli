@@ -418,20 +418,25 @@ impl ExpensiveAccountRepository for InMemoryAccountRepository {
     }
 
     async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
-        let dataset_entries_page = {
+        let mut account_refs = {
             let readable_state = self.state.lock().unwrap();
 
             readable_state
                 .accounts_by_id
                 .values()
-                .skip(pagination.offset)
-                .take(pagination.limit)
                 .cloned()
-                .map(Ok)
                 .collect::<Vec<_>>()
         };
 
-        Box::pin(futures::stream::iter(dataset_entries_page))
+        account_refs.sort_by(|a, b| a.registered_at.cmp(&b.registered_at));
+
+        let accounts_page_it = account_refs
+            .into_iter()
+            .skip(pagination.offset)
+            .take(pagination.limit)
+            .map(Ok);
+
+        Box::pin(futures::stream::iter(accounts_page_it))
     }
 }
 
