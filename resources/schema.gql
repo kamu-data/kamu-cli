@@ -125,7 +125,7 @@ input AccountFlowFilters {
 
 type AccountFlowProcessDatasetCard {
 	dataset: Dataset!
-	processes: DatasetFlowProcesses!
+	primary: FlowProcess!
 }
 
 type AccountFlowProcessDatasetCardConnection {

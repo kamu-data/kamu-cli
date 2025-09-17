@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use kamu_adapter_flow_dataset::{ingest_dataset_binding, transform_dataset_binding};
 use kamu_adapter_flow_webhook::FlowScopeSubscription;
-use kamu_flow_system::FlowTriggerService;
+use kamu_flow_system::FlowProcessStateQuery;
 
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, FlowProcess, WebhookFlowSubProcessGroup};
@@ -31,7 +33,7 @@ impl<'a> DatasetFlowProcesses<'a> {
     }
 
     async fn primary(&self, ctx: &Context<'_>) -> Result<Option<FlowProcess>> {
-        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+        let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
 
         // Updates are the primary periodic process for datasets
         // Choose ingest or transform binding depending on dataset kind
@@ -46,11 +48,16 @@ impl<'a> DatasetFlowProcesses<'a> {
             }
         };
 
-        // Try to find existing trigger for this binding
-        let maybe_trigger = flow_trigger_service.find_trigger(&flow_binding).await?;
+        let maybe_process_state = flow_process_state_query
+            .try_get_process_state(&flow_binding)
+            .await?;
 
-        // If trigger is present, present it's execution history as a periodic process
-        Ok(maybe_trigger.map(FlowProcess::new))
+        // Fetch process state
+        if let Some(process_state) = maybe_process_state {
+            Ok(Some(FlowProcess::new(Cow::Owned(process_state))))
+        } else {
+            Ok(None)
+        }
     }
 
     // TODO: other secondary processes in future

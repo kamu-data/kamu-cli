@@ -139,12 +139,12 @@ where
         )
     )]
     pub async fn load_multi(
-        queries: Vec<Proj::Query>,
+        queries: &[Proj::Query],
         event_store: &Store,
     ) -> Result<Vec<Result<Self, LoadError<Proj>>>, GetEventsError> {
         use tokio_stream::StreamExt;
 
-        let mut event_stream = event_store.get_events_multi(queries.clone());
+        let mut event_stream = event_store.get_events_multi(queries);
         let mut agg_results: HashMap<Proj::Query, Result<Self, LoadError<Proj>>> = HashMap::new();
 
         while let Some(res) = event_stream.next().await {
@@ -166,8 +166,8 @@ where
 
         let mut result: Vec<Result<Self, LoadError<Proj>>> = vec![];
         for query in queries {
-            let item = match agg_results.remove(&query) {
-                None => Err(AggregateNotFoundError::new(query).into()),
+            let item = match agg_results.remove(query) {
+                None => Err(AggregateNotFoundError::new(query.clone()).into()),
                 Some(agg) => agg,
             };
 
@@ -191,7 +191,7 @@ where
     /// Same as `load_multi()` but returns a vector of loaded states and single
     /// error
     pub async fn load_multi_simple(
-        queries: Vec<Proj::Query>,
+        queries: &[Proj::Query],
         event_store: &Store,
     ) -> Result<Vec<Self>, InternalError> {
         Self::load_multi(queries, event_store)

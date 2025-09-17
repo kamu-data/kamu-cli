@@ -7,32 +7,32 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
-use crate::queries::flow_process_summary;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowProcess {
-    flow_trigger: fs::FlowTriggerState,
+pub struct FlowProcess<'a> {
+    process_state: Cow<'a, fs::FlowProcessState>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl FlowProcess {
+impl<'a> FlowProcess<'a> {
     #[graphql(skip)]
-    pub fn new(flow_trigger: fs::FlowTriggerState) -> Self {
-        Self { flow_trigger }
+    pub fn new(process_state: Cow<'a, fs::FlowProcessState>) -> Self {
+        Self { process_state }
     }
 
     async fn flow_type(&self) -> DatasetFlowType {
-        decode_dataset_flow_type(&self.flow_trigger.flow_binding.flow_type)
+        decode_dataset_flow_type(&self.process_state.flow_binding().flow_type)
     }
 
-    #[tracing::instrument(level = "debug", name = "Gql::FlowProcess::summary", skip_all)]
-    async fn summary(&self, ctx: &Context<'_>) -> Result<FlowProcessSummary> {
-        flow_process_summary(ctx, &self.flow_trigger).await
+    async fn summary(&self) -> FlowProcessSummary {
+        (*self.process_state).clone().into()
     }
 }
 

@@ -299,7 +299,9 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
         })
     }
 
-    fn get_events_multi(&self, queries: Vec<FlowID>) -> MultiEventStream<FlowID, FlowEvent> {
+    fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<FlowID, FlowEvent> {
+        let flow_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
+
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr
@@ -325,15 +327,14 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                     ORDER BY event_id ASC
                 "#,
                 sqlite_generate_placeholders_list(
-                    queries.len(),
+                    flow_ids.len(),
                     NonZeroUsize::new(1).unwrap()
                 )
             );
 
             let mut query = sqlx::query(&query_str);
-            for task_id in queries {
-                let task_id: i64 = task_id.try_into().unwrap();
-                query = query.bind(task_id);
+            for flow_id in flow_ids {
+                query = query.bind(flow_id);
             }
 
             use sqlx::Row;
@@ -942,7 +943,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             const CHUNK_SIZE: usize = 256;
             for chunk in flow_ids.chunks(CHUNK_SIZE) {
                 let flows = Flow::load_multi(
-                    chunk.to_vec(),
+                    chunk,
                     self
                 ).await.int_err()?;
                 for flow in flows {

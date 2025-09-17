@@ -516,7 +516,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
             const CHUNK_SIZE: usize = 256;
             for chunk in flow_ids.chunks(CHUNK_SIZE) {
                 let flows = Flow::load_multi(
-                    chunk.to_vec(),
+                    chunk,
                     self
                 ).await.int_err()?;
                 for flow in flows {

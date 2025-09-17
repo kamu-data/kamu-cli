@@ -164,16 +164,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         })
     }
 
-    async fn match_triggers(
+    async fn find_triggers(
         &self,
-        flow_scope_query: FlowScopeQuery,
+        flow_bindings: &[FlowBinding],
     ) -> Result<Vec<FlowTriggerState>, InternalError> {
-        let flow_bindings = self
-            .flow_trigger_event_store
-            .match_trigger_bindings_by_scope_query(flow_scope_query)
-            .await
-            .int_err()?;
-
         let flow_triggers =
             FlowTrigger::load_multi_simple(flow_bindings, self.flow_trigger_event_store.as_ref())
                 .await
@@ -227,7 +221,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             use futures::stream::{self, StreamExt, TryStreamExt};
             let flow_bindings: Vec<_> = self.flow_trigger_event_store.stream_all_active_flow_bindings().try_collect().await.int_err()?;
 
-            let flow_triggers = FlowTrigger::load_multi_simple(flow_bindings, self.flow_trigger_event_store.as_ref()).await.int_err()?;
+            let flow_triggers = FlowTrigger::load_multi_simple(&flow_bindings, self.flow_trigger_event_store.as_ref()).await.int_err()?;
             let stream = stream::iter(flow_triggers)
                 .map(|flow_trigger| Ok::<_, InternalError>(flow_trigger.into()));
 
@@ -290,7 +284,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 .int_err()?;
 
             let flow_triggers = FlowTrigger::load_multi_simple(
-                flow_bindings,
+                &flow_bindings,
                 self.flow_trigger_event_store.as_ref(),
             )
             .await
@@ -323,7 +317,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 .int_err()?;
 
             let flow_triggers = FlowTrigger::load_multi_simple(
-                flow_bindings,
+                &flow_bindings,
                 self.flow_trigger_event_store.as_ref(),
             )
             .await

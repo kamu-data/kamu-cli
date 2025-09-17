@@ -248,11 +248,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
     assert_matches!(events_3[2], WebhookSubscriptionEvent::Paused(_));
 
     let res = event_store
-        .get_events_multi(vec![
-            subscription_id_1,
-            subscription_id_2,
-            subscription_id_3,
-        ])
+        .get_events_multi(&[subscription_id_1, subscription_id_2, subscription_id_3])
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
