@@ -113,7 +113,7 @@ impl FlowScopeRemovalHandler for FlowAbortHelper {
 
         // Load these flows
         let flows_2_abort: Vec<Flow> =
-            Flow::load_multi_simple(flow_ids_2_abort, flow_event_store.as_ref())
+            Flow::load_multi_simple(&flow_ids_2_abort, flow_event_store.as_ref())
                 .await
                 .int_err()?;
 

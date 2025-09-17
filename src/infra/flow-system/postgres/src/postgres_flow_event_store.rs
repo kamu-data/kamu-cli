@@ -274,7 +274,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
         })
     }
 
-    fn get_events_multi(&self, queries: Vec<FlowID>) -> MultiEventStream<FlowID, FlowEvent> {
+    fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<FlowID, FlowEvent> {
         let flow_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
 
         Box::pin(async_stream::stream! {
@@ -726,7 +726,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             const CHUNK_SIZE: usize = 256;
             for chunk in flow_ids.chunks(CHUNK_SIZE) {
                 let flows = Flow::load_multi(
-                    chunk.to_vec(),
+                    chunk,
                     self
                 ).await.int_err()?;
                 for flow in flows {

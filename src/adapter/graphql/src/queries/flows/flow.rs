@@ -84,7 +84,7 @@ impl Flow {
             .flat_map(|flow_state| flow_state.task_ids.iter().copied())
             .collect();
         let flow_task_states: Vec<ts::TaskState> =
-            ts::Task::load_multi_simple(flow_task_ids, task_event_store.as_ref())
+            ts::Task::load_multi_simple(&flow_task_ids, task_event_store.as_ref())
                 .await
                 .int_err()?
                 .into_iter()
@@ -113,7 +113,7 @@ impl Flow {
             .collect::<Vec<_>>();
 
         let flow_triggers_res =
-            fs::FlowTrigger::load_multi(unique_bindings, flow_trigger_event_store.as_ref())
+            fs::FlowTrigger::load_multi(&unique_bindings, flow_trigger_event_store.as_ref())
                 .await
                 .map_err(|e| match e {
                     fs::GetEventsError::Internal(e) => e,

@@ -334,7 +334,7 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
 
     fn get_events_multi(
         &self,
-        queries: Vec<WebhookSubscriptionID>,
+        queries: &[WebhookSubscriptionID],
     ) -> MultiEventStream<WebhookSubscriptionID, WebhookSubscriptionEvent> {
         let subscription_ids: Vec<uuid::Uuid> = queries.iter().map(|id| *id.as_ref()).collect();
 

@@ -67,17 +67,18 @@ impl WebhookFlowSubProcessGroup {
             )
             .await?;
 
-        // Collect subscription ids from the processes
-        let mut subscription_ids = HashSet::new();
-        for process in &webhook_processes_listing.processes {
-            let subscription_id =
-                FlowScopeSubscription::new(&process.flow_binding().scope).subscription_id();
-            subscription_ids.insert(subscription_id);
-        }
+        // Collect unique subscription ids from the processes
+        let unique_subscription_ids = webhook_processes_listing
+            .processes
+            .iter()
+            .map(|p| FlowScopeSubscription::new(&p.flow_binding().scope).subscription_id())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
 
         // Load related subscriptions
         let subscriptions = WebhookSubscription::load_multi_simple(
-            subscription_ids.into_iter().collect(),
+            &unique_subscription_ids,
             webhook_subscription_event_store.as_ref(),
         )
         .await

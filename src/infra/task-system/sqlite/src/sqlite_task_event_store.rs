@@ -230,7 +230,9 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
         })
     }
 
-    fn get_events_multi(&self, queries: Vec<TaskID>) -> MultiEventStream<TaskID, TaskEvent> {
+    fn get_events_multi(&self, queries: &[TaskID]) -> MultiEventStream<TaskID, TaskEvent> {
+        let task_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
+
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr
@@ -256,14 +258,13 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
                     ORDER BY event_id
                 "#,
                 sqlite_generate_placeholders_list(
-                    queries.len(),
+                    task_ids.len(),
                     NonZeroUsize::new(1).unwrap()
                 )
             );
 
             let mut query = sqlx::query_as::<_, EventRow>(&query_str);
-            for task_id in queries {
-                let task_id: i64 = task_id.try_into().unwrap();
+            for task_id in task_ids {
                 query = query.bind(task_id);
             }
 

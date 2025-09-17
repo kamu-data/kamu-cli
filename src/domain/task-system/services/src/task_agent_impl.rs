@@ -117,7 +117,7 @@ impl TaskAgentImpl {
                 .await?;
             let batch_size = running_task_ids.len();
 
-            let tasks = Task::load_multi_simple(running_task_ids, task_event_store.as_ref())
+            let tasks = Task::load_multi_simple(&running_task_ids, task_event_store.as_ref())
                 .await
                 .int_err()?;
 
