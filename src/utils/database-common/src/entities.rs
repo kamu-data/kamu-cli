@@ -180,28 +180,43 @@ pub struct BatchLookup<T, Id, Err> {
     pub not_found: Vec<(Id, Err)>,
 }
 
-pub struct BatchLookupCreateOptions<T, Id, Err, FoundByFn, NotFoundErrFn>
+pub struct BatchLookupCreateOptions<T, Id, Err, FoundByFn, NotFoundErrFn, FoundItemsComparator>
 where
     Id: Clone + Hash + Eq,
     FoundByFn: FnOnce(&Vec<T>) -> HashSet<Id>,
     NotFoundErrFn: Fn(&Id) -> Err,
+    // Based on Vec::<T>::sort_by_key() type signature.
+    FoundItemsComparator: FnMut(&T, &T) -> std::cmp::Ordering,
 {
     pub found_ids_fn: FoundByFn,
     pub not_found_err_fn: NotFoundErrFn,
+    pub maybe_found_items_comparator: Option<FoundItemsComparator>,
     pub _phantom: PhantomData<T>,
 }
 
 impl<T, Id, Err> BatchLookup<T, Id, Err> {
-    pub fn from_found_items<FoundByFn, NotFoundErrFn>(
-        found: Vec<T>,
+    pub fn from_found_items<FoundByFn, NotFoundErrFn, FoundItemsComparator>(
+        mut found: Vec<T>,
         ids: &[&Id],
-        options: BatchLookupCreateOptions<T, Id, Err, FoundByFn, NotFoundErrFn>,
+        options: BatchLookupCreateOptions<
+            T,
+            Id,
+            Err,
+            FoundByFn,
+            NotFoundErrFn,
+            FoundItemsComparator,
+        >,
     ) -> BatchLookup<T, Id, Err>
     where
         Id: Clone + Hash + Eq,
         FoundByFn: FnOnce(&Vec<T>) -> HashSet<Id>,
         NotFoundErrFn: Fn(&Id) -> Err,
+        FoundItemsComparator: FnMut(&T, &T) -> std::cmp::Ordering,
     {
+        if let Some(comparator) = options.maybe_found_items_comparator {
+            found.sort_by(comparator);
+        }
+
         let found_ids_set = (options.found_ids_fn)(&found);
         let mut not_found = Vec::with_capacity(ids.len() - found.len());
 
@@ -242,6 +257,7 @@ fn test_batch_lookup_from_found_items() {
         BatchLookupCreateOptions {
             found_ids_fn: |found_items| found_items.iter().map(|item| item.id).collect(),
             not_found_err_fn: |id| format!("{id} not found"),
+            maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
             _phantom: PhantomData,
         },
     );

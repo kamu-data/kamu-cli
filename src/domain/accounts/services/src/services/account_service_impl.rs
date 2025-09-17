@@ -76,6 +76,7 @@ impl AccountService for AccountServiceImpl {
                         account_id: (*account_id).clone(),
                     })
                 },
+                maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
                 _phantom: Default::default(),
             },
         ))
@@ -108,6 +109,7 @@ impl AccountService for AccountServiceImpl {
                         account_name: account_name.clone(),
                     })
                 },
+                maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
                 _phantom: Default::default(),
             },
         ))

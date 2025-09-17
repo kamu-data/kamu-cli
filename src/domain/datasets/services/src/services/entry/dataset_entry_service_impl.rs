@@ -680,6 +680,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
                     )
                     .into()
                 },
+                maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
                 _phantom: Default::default(),
             },
         ))
