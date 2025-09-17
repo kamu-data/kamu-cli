@@ -114,7 +114,7 @@ async fn test_task_load_multi() {
 
     let delta = 2500;
     let ids: Vec<TaskID> = (delta..(delta + 2000)).map(TaskID::new).collect();
-    let tasks = Task::load_multi(ids, &event_store).await.unwrap();
+    let tasks = Task::load_multi(&ids, &event_store).await.unwrap();
 
     for (i, task_res) in tasks.into_iter().enumerate() {
         assert!(task_res.is_ok());

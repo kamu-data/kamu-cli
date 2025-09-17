@@ -18,43 +18,6 @@ use crate::queries::{FlowProcessTypeFilterInput, InitiatorFilterInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn flow_process_summary(
-    ctx: &Context<'_>,
-    flow_trigger: &fs::FlowTriggerState,
-) -> Result<FlowProcessSummary> {
-    let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
-
-    // Query for the latest process state for this binding from projection
-    let maybe_process_state = flow_process_state_query
-        .try_get_process_state(&flow_trigger.flow_binding)
-        .await?;
-
-    if let Some(process_state) = maybe_process_state {
-        // Projection exists
-        Ok(process_state.into())
-    } else {
-        // Reasonable default state, when there were no executions yet
-        Ok(FlowProcessSummary {
-            effective_state: match flow_trigger.status {
-                fs::FlowTriggerStatus::Active => FlowProcessEffectiveState::Active,
-                fs::FlowTriggerStatus::PausedByUser => FlowProcessEffectiveState::PausedManual,
-                fs::FlowTriggerStatus::StoppedAutomatically => {
-                    FlowProcessEffectiveState::StoppedAuto
-                }
-                fs::FlowTriggerStatus::ScopeRemoved => unreachable!(),
-            },
-            consecutive_failures: 0,
-            stop_policy: flow_trigger.stop_policy.into(),
-            last_success_at: None,
-            last_attempt_at: None,
-            last_failure_at: None,
-            next_planned_at: None,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn prepare_flows_filter_by_initiator(
     maybe_input: Option<InitiatorFilterInput>,
 ) -> Option<fs::InitiatorFilter> {

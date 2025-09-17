@@ -212,7 +212,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
         })
     }
 
-    fn get_events_multi(&self, queries: Vec<TaskID>) -> MultiEventStream<TaskID, TaskEvent> {
+    fn get_events_multi(&self, queries: &[TaskID]) -> MultiEventStream<TaskID, TaskEvent> {
         let task_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
 
         Box::pin(async_stream::stream! {
