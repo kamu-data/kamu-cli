@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following order:
   - `DatasetMut::by_ids()`;
   - `Account::by_ids()`;
   - `AccountMut::by_ids()`.
+- Improved compatibility with EVM-based sources
 
 ## [0.248.1] - 2025-09-11
 ### Fixed
