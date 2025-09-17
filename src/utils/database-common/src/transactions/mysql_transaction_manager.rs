@@ -37,7 +37,8 @@ impl DatabaseTransactionManager for MySqlTransactionManager {
         &self,
         transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
-        let maybe_open_mysql_transaction = transaction_ref.into_maybe_transaction::<sqlx::MySql>();
+        let transaction_typed = transaction_ref.downcast::<sqlx::MySql>();
+        let maybe_open_mysql_transaction = transaction_typed.into_maybe_transaction();
         if let Some(mysql_transaction) = maybe_open_mysql_transaction {
             mysql_transaction.commit().await.int_err()?;
         }
@@ -49,7 +50,8 @@ impl DatabaseTransactionManager for MySqlTransactionManager {
         &self,
         transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
-        let maybe_open_mysql_transaction = transaction_ref.into_maybe_transaction::<sqlx::MySql>();
+        let transaction_typed = transaction_ref.downcast::<sqlx::MySql>();
+        let maybe_open_mysql_transaction = transaction_typed.into_maybe_transaction();
         if let Some(mysql_transaction) = maybe_open_mysql_transaction {
             mysql_transaction.rollback().await.int_err()?;
         }

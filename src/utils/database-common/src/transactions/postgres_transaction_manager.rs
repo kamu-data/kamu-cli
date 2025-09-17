@@ -37,8 +37,8 @@ impl DatabaseTransactionManager for PostgresTransactionManager {
         &self,
         transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
-        let maybe_open_postgres_transaction =
-            transaction_ref.into_maybe_transaction::<sqlx::Postgres>();
+        let transaction_typed = transaction_ref.downcast::<sqlx::Postgres>();
+        let maybe_open_postgres_transaction = transaction_typed.into_maybe_transaction();
         if let Some(postgres_transaction) = maybe_open_postgres_transaction {
             postgres_transaction.commit().await.int_err()?;
         }
@@ -50,8 +50,8 @@ impl DatabaseTransactionManager for PostgresTransactionManager {
         &self,
         transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
-        let maybe_open_postgres_transaction =
-            transaction_ref.into_maybe_transaction::<sqlx::Postgres>();
+        let transaction_typed = transaction_ref.downcast::<sqlx::Postgres>();
+        let maybe_open_postgres_transaction = transaction_typed.into_maybe_transaction();
         if let Some(postgres_transaction) = maybe_open_postgres_transaction {
             postgres_transaction.rollback().await.int_err()?;
         }

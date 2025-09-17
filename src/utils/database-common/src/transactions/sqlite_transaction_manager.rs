@@ -37,8 +37,8 @@ impl DatabaseTransactionManager for SqliteTransactionManager {
         &self,
         transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
-        let maybe_open_sqlite_transaction =
-            transaction_ref.into_maybe_transaction::<sqlx::Sqlite>();
+        let transaction_typed = transaction_ref.downcast::<sqlx::Sqlite>();
+        let maybe_open_sqlite_transaction = transaction_typed.into_maybe_transaction();
         if let Some(sqlite_transaction) = maybe_open_sqlite_transaction {
             sqlite_transaction.commit().await.int_err()?;
         }
@@ -50,8 +50,8 @@ impl DatabaseTransactionManager for SqliteTransactionManager {
         &self,
         transaction_ref: TransactionRef,
     ) -> Result<(), InternalError> {
-        let maybe_open_sqlite_transaction =
-            transaction_ref.into_maybe_transaction::<sqlx::Sqlite>();
+        let transaction_typed = transaction_ref.downcast::<sqlx::Sqlite>();
+        let maybe_open_sqlite_transaction = transaction_typed.into_maybe_transaction();
         if let Some(sqlite_transaction) = maybe_open_sqlite_transaction {
             sqlite_transaction.rollback().await.int_err()?;
         }
