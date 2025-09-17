@@ -358,8 +358,8 @@ impl FlowProcessState {
 
         if let (Some(next_planned), Some(last_attempt)) = (next_planned_at, last_attempt_at) {
             debug_assert!(
-                next_planned > last_attempt,
-                "next_planned_at must be later than last_attempt_at"
+                next_planned >= last_attempt,
+                "next_planned_at must not be earlier than last_attempt_at"
             );
         }
     }

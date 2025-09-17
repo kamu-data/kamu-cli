@@ -29,6 +29,10 @@ impl FlowOutcome {
             _ => None,
         }
     }
+
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success(_))
+    }
 }
 
 impl From<ts::TaskOutcome> for FlowOutcome {

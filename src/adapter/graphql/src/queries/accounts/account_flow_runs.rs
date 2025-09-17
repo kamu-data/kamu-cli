@@ -105,11 +105,8 @@ impl<'a> AccountFlowRuns<'a> {
                 prepare_flows_scope_query(filters.by_process_type.as_ref(), &dataset_id_refs)
             })
             .unwrap_or_else(|| {
-                Some(afs::FlowScopeDataset::query_for_multiple_datasets(
-                    &dataset_id_refs,
-                ))
-            })
-            .unwrap();
+                afs::FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs)
+            });
 
         let dataset_flow_filters = filters
             .map(|filters| kamu_flow_system::FlowFilters {

@@ -91,20 +91,15 @@ pub trait FlowTriggerService: Sync + Send {
 
 #[async_trait::async_trait]
 pub trait FlowTriggerServiceExt {
-    async fn try_get_flow_active_schedule_rule(
+    async fn try_take_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, InternalError>;
-
-    async fn try_get_flow_active_reactive_rule(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<Option<ReactiveRule>, InternalError>;
 }
 
 #[async_trait::async_trait]
 impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
-    async fn try_get_flow_active_schedule_rule(
+    async fn try_take_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, InternalError> {
@@ -113,23 +108,7 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
             if let Some(trigger) = maybe_trigger
                 && trigger.is_active()
             {
-                trigger.try_get_schedule_rule()
-            } else {
-                None
-            },
-        )
-    }
-
-    async fn try_get_flow_active_reactive_rule(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<Option<ReactiveRule>, InternalError> {
-        let maybe_trigger = self.find_trigger(flow_binding).await?;
-        Ok(
-            if let Some(trigger) = maybe_trigger
-                && trigger.is_active()
-            {
-                trigger.try_get_reactive_rule()
+                trigger.try_take_schedule_rule()
             } else {
                 None
             },
