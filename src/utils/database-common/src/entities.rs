@@ -202,11 +202,11 @@ impl<T, Id, Err> BatchLookup<T, Id, Err> {
         FoundByFn: FnOnce(&Vec<T>) -> HashSet<Id>,
         NotFoundErrFn: Fn(&Id) -> Err,
     {
-        let found_ids = (options.found_ids_fn)(&found);
+        let found_ids_set = (options.found_ids_fn)(&found);
         let mut not_found = Vec::with_capacity(ids.len() - found.len());
 
         for id in ids {
-            if !found_ids.contains(*id) {
+            if !found_ids_set.contains(*id) {
                 let cloned_id = (*id).clone();
                 let not_found_err = (options.not_found_err_fn)(*id);
 
