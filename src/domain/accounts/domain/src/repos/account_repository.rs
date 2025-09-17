@@ -81,7 +81,6 @@ pub trait AccountRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait ExpensiveAccountRepository: AccountRepository {
     async fn accounts_count(&self) -> Result<usize, AccountsCountError>;
@@ -91,7 +90,6 @@ pub trait ExpensiveAccountRepository: AccountRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait ExpensiveAccountRepositoryExt: ExpensiveAccountRepository {
     fn all_accounts(&self) -> AccountPageStream;

@@ -63,6 +63,8 @@ impl MySqlAccountRepository {
     }
 
     fn map_account_row(account_row: &MySqlRow) -> Account {
+        // Reason for this method: SQLX Mysql Enum decode error
+        //                         https://github.com/launchbadge/sqlx/issues/1379
         Account {
             id: account_row.get(0),
             account_name: odf::AccountName::new_unchecked(account_row.get::<&str, _>(1)),
@@ -280,14 +282,15 @@ impl AccountRepository for MySqlAccountRepository {
         query_builder.push_tuples(account_ids, |mut b, account_id| {
             b.push_bind(account_id.to_string());
         });
+        query_builder.push("ORDER BY account_name");
 
-        let row_models = query_builder
-            .build_query_as::<AccountRowModel>()
+        let mysql_rows = query_builder
+            .build()
             .fetch_all(connection_mut)
             .await
             .int_err()?;
 
-        let accounts = row_models.into_iter().map(Into::into).collect();
+        let accounts = mysql_rows.iter().map(Self::map_account_row).collect();
 
         Ok(accounts)
     }
@@ -365,13 +368,13 @@ impl AccountRepository for MySqlAccountRepository {
         });
         query_builder.push("ORDER BY account_name");
 
-        let row_models = query_builder
-            .build_query_as::<AccountRowModel>()
+        let mysql_rows = query_builder
+            .build()
             .fetch_all(connection_mut)
             .await
             .int_err()?;
 
-        let accounts = row_models.into_iter().map(Into::into).collect();
+        let accounts = mysql_rows.iter().map(Self::map_account_row).collect();
 
         Ok(accounts)
     }
