@@ -126,29 +126,7 @@ impl DatasetsMut {
             .classify_dataset_refs_by_access(&dataset_refs_refs, auth::DatasetAction::Write)
             .await?;
 
-        if !resolution.insufficient.is_empty() {
-            let mut error_msg = format!(
-                "Datasets with insufficient access level: [{}]",
-                itertools::join(
-                    resolution
-                        .insufficient
-                        .iter()
-                        .map(|(r, h)| format!("{r}({})", h.alias)),
-                    ","
-                )
-            );
-
-            if !skip_missing && !resolution.forbidden.is_empty() {
-                use std::fmt::Write as _;
-
-                write!(
-                    error_msg,
-                    "; unresolved datasets: [{}]",
-                    itertools::join(resolution.forbidden.iter().map(|(r, _)| r), ",")
-                )
-                .int_err()?;
-            }
-
+        if let Some(error_msg) = resolution.try_get_error_message(skip_missing) {
             return Err(GqlError::gql(error_msg));
         }
 

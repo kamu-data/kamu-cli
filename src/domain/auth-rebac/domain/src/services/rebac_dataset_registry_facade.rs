@@ -90,6 +90,29 @@ pub struct ClassifyDatasetRefsByAccessResponse {
     pub allowed: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
 }
 
+impl ClassifyDatasetRefsByAccessResponse {
+    pub fn try_get_error_message(&self, skip_missing: bool) -> Option<String> {
+        let have_forbidden_to_report = !self.forbidden.is_empty() && !skip_missing;
+
+        if self.insufficient.is_empty() && !have_forbidden_to_report {
+            return None;
+        }
+
+        let error_msg = format!(
+            "Dataset access error: insufficient access level [{}]; unresolved: [{}].",
+            itertools::join(
+                self.insufficient
+                    .iter()
+                    .map(|(r, h)| format!("{r}({})", h.alias)),
+                ","
+            ),
+            itertools::join(self.forbidden.iter().map(|(r, _)| r), ",")
+        );
+
+        Some(error_msg)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
