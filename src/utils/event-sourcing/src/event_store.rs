@@ -27,10 +27,10 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
     /// Created to give a room for query optimisations when needed
     fn get_events_multi(
         &self,
-        queries: Vec<Proj::Query>,
+        queries: &[Proj::Query],
     ) -> MultiEventStream<Proj::Query, Proj::Event> {
         use tokio_stream::StreamExt;
-        let queries = queries.clone();
+        let queries = queries.to_vec();
 
         Box::pin(async_stream::try_stream! {
           for query in queries {
