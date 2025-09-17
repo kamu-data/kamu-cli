@@ -12,12 +12,7 @@ use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -25,23 +20,11 @@ use sqlx::Row;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetEntryRepository)]
 pub struct SqliteDatasetEntryRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetEntryRepository)]
-impl SqliteDatasetEntryRepository {
-    pub fn new(
-        transaction: TransactionRef,
-        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-    ) -> Self {
-        Self {
-            transaction: transaction.into(),
-            removal_listeners,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

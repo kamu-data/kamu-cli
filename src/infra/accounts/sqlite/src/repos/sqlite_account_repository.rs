@@ -9,12 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -26,21 +21,15 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn AccountRepository)]
+#[interface(dyn ExpensiveAccountRepository)]
+#[interface(dyn PasswordHashRepository)]
 pub struct SqliteAccountRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
-#[component(pub)]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
 impl SqliteAccountRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
         let sqlite_error_message = e.message();
 

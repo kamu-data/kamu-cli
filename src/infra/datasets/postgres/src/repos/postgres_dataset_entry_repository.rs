@@ -11,30 +11,19 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetEntryRepository)]
+
 pub struct PostgresDatasetEntryRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetEntryRepository)]
-impl PostgresDatasetEntryRepository {
-    pub fn new(
-        transaction: TransactionRef,
-        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-    ) -> Self {
-        Self {
-            transaction: transaction.into(),
-            removal_listeners,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

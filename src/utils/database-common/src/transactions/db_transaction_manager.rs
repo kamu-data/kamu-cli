@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{Catalog, CatalogBuilder, component};
+use dill::{Catalog, component};
 use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::TransactionRef;
@@ -72,9 +72,10 @@ impl DatabaseTransactionRunner {
         let result = {
             // Create a chained catalog for transaction-aware components,
             // but keep a local copy of a transaction pointer
-            let catalog_with_transaction = CatalogBuilder::new_chained(&self.catalog)
-                .add_value(transaction_ref.clone())
-                .build();
+            let mut b = self.catalog.builder_chained();
+            transaction_ref.register(&mut b);
+
+            let catalog_with_transaction = b.build();
 
             callback(catalog_with_transaction)
                 .instrument(tracing::trace_span!(

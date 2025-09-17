@@ -8,25 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use internal_error::ResultIntoInternal;
 
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresWeb3AuthEip4361NonceRepository {
-    transaction: TransactionRefT<sqlx::Postgres>,
-}
-
 #[dill::component(pub)]
 #[dill::interface(dyn Web3AuthEip4361NonceRepository)]
-impl PostgresWeb3AuthEip4361NonceRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
+pub struct PostgresWeb3AuthEip4361NonceRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

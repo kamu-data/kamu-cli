@@ -7,25 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetKeyBlockRepository)]
 pub struct PostgresDatasetKeyBlockRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetKeyBlockRepository)]
-impl PostgresDatasetKeyBlockRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

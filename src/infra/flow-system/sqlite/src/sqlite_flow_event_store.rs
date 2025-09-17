@@ -10,12 +10,7 @@
 use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -28,19 +23,13 @@ const SYSTEM_INITIATOR: &str = "<system>";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn FlowEventStore)]
 pub struct SqliteFlowEventStore {
     transaction: TransactionRefT<Sqlite>,
 }
 
-#[component(pub)]
-#[interface(dyn FlowEventStore)]
 impl SqliteFlowEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn prepare_initiator_filter(by_initiator: &InitiatorFilter) -> Vec<String> {
         match by_initiator {
             InitiatorFilter::System => vec![SYSTEM_INITIATOR.to_string()],

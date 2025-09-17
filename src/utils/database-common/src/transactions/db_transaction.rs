@@ -21,7 +21,7 @@ use internal_error::*;
 /// locking. Despite its async nature, this lock must be held only for the
 /// duration of the DB query and released when passing control into other
 /// components.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TransactionRef {
     inner: Arc<dyn TransactionStateErased + 'static>,
 }
@@ -38,13 +38,17 @@ impl TransactionRef {
         let inner_typed = inner_any.downcast::<TransactionState<DB>>().unwrap();
         TransactionRefT { inner: inner_typed }
     }
+
+    /// Use to register both `TransactionRef` and its typed `TransactionRef<DB>`
+    /// counterpart in the catalog
+    pub fn register(&self, catalog_builder: &mut dill::CatalogBuilder) {
+        TransactionStateErased::register(Arc::clone(&self.inner), catalog_builder);
+    }
 }
 
-// TODO: Replace with registering a typed wrapper in catalog and injecting
-// directly
-impl<DB: sqlx::Database> From<TransactionRef> for TransactionRefT<DB> {
-    fn from(value: TransactionRef) -> Self {
-        value.downcast::<DB>()
+impl<DB: sqlx::Database> From<TransactionRefT<DB>> for TransactionRef {
+    fn from(value: TransactionRefT<DB>) -> Self {
+        value.into_erased()
     }
 }
 
@@ -62,6 +66,14 @@ pub struct TransactionRefT<DB: sqlx::Database> {
     inner: Arc<TransactionState<DB>>,
 }
 
+impl<DB: sqlx::Database> Clone for TransactionRefT<DB> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
 impl<DB: sqlx::Database> TransactionRefT<DB> {
     pub fn new(connection_pool: sqlx::pool::Pool<DB>) -> Self {
         Self {
@@ -74,7 +86,11 @@ impl<DB: sqlx::Database> TransactionRefT<DB> {
         TransactionGuard::new(&self.inner, guard)
     }
 
-    pub fn into_maybe_transaction(self) -> Option<sqlx::Transaction<'static, DB>> {
+    pub fn into_erased(self) -> TransactionRef {
+        TransactionRef { inner: self.inner }
+    }
+
+    pub fn into_inner_db_transaction(self) -> Option<sqlx::Transaction<'static, DB>> {
         Arc::try_unwrap(self.inner)
             .expect(
                 "Attempting to extract inner transaction while more than one strong reference is \
@@ -82,17 +98,9 @@ impl<DB: sqlx::Database> TransactionRefT<DB> {
                  held by some component whose lifetime exceeds the intended span of the \
                  transaction scope.",
             )
-            .into_maybe_transaction()
+            .into_inner_db_transaction()
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-trait TransactionStateErased: Any + Send + Sync {}
-
-#[async_trait::async_trait]
-impl<DB: sqlx::Database> TransactionStateErased for TransactionState<DB> {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -110,8 +118,28 @@ impl<DB: sqlx::Database> TransactionState<DB> {
         }
     }
 
-    fn into_maybe_transaction(self) -> Option<sqlx::Transaction<'static, DB>> {
+    fn into_inner_db_transaction(self) -> Option<sqlx::Transaction<'static, DB>> {
         self.maybe_transaction.into_inner()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+trait TransactionStateErased: std::fmt::Debug + Any + Send + Sync {
+    fn register(self: Arc<Self>, catalog_builder: &mut dill::CatalogBuilder);
+}
+
+#[async_trait::async_trait]
+impl<DB: sqlx::Database> TransactionStateErased for TransactionState<DB> {
+    fn register(self: Arc<Self>, catalog_builder: &mut dill::CatalogBuilder) {
+        // Add typed wrapper
+        catalog_builder.add_value(TransactionRefT {
+            inner: Arc::clone(&self),
+        });
+
+        // Add erased wrapper
+        catalog_builder.add_value(TransactionRef { inner: self });
     }
 }
 

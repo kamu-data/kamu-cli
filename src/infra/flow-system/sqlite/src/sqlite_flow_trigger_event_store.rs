@@ -12,7 +12,6 @@ use std::num::NonZeroUsize;
 use database_common::{
     EventModel,
     ReturningEventModel,
-    TransactionRef,
     TransactionRefT,
     sqlite_generate_placeholders_list,
 };
@@ -23,18 +22,10 @@ use sqlx::{QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn FlowTriggerEventStore)]
 pub struct SqliteFlowTriggerEventStore {
     transaction: TransactionRefT<Sqlite>,
-}
-
-#[component(pub)]
-#[interface(dyn FlowTriggerEventStore)]
-impl SqliteFlowTriggerEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

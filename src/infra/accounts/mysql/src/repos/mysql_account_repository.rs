@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    mysql_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, mysql_generate_placeholders_list};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -24,21 +19,15 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn AccountRepository)]
+#[interface(dyn ExpensiveAccountRepository)]
+#[interface(dyn PasswordHashRepository)]
 pub struct MySqlAccountRepository {
     transaction: TransactionRefT<sqlx::MySql>,
 }
 
-#[component(pub)]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
 impl MySqlAccountRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
         let mysql_error_message = e.message();
 

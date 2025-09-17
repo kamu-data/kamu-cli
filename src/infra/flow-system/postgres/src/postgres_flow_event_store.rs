@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -21,19 +21,13 @@ const SYSTEM_INITIATOR: &str = "<system>";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn FlowEventStore)]
 pub struct PostgresFlowEventStore {
     transaction: TransactionRefT<Postgres>,
 }
 
-#[component(pub)]
-#[interface(dyn FlowEventStore)]
 impl PostgresFlowEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn prepare_initiator_filter(by_initiator: &InitiatorFilter) -> Vec<String> {
         match by_initiator {
             InitiatorFilter::System => vec![SYSTEM_INITIATOR.to_string()],

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use uuid::Uuid;
 
@@ -16,18 +16,10 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn OAuthDeviceCodeRepository)]
 pub struct SqliteOAuthDeviceCodeRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-#[dill::component(pub)]
-#[dill::interface(dyn OAuthDeviceCodeRepository)]
-impl SqliteOAuthDeviceCodeRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 #[async_trait::async_trait]

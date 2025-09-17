@@ -9,7 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
 use dill::*;
 use futures::TryStreamExt;
 use internal_error::InternalError;
@@ -17,19 +17,13 @@ use kamu_webhooks::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn WebhookSubscriptionEventStore)]
 pub struct SqliteWebhookSubscriptionEventStore {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
-#[component(pub)]
-#[interface(dyn WebhookSubscriptionEventStore)]
 impl SqliteWebhookSubscriptionEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn encode_event_types(event_types: &[WebhookEventType]) -> String {
         event_types
             .iter()

@@ -9,25 +9,17 @@
 
 use std::str::FromStr;
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetReferenceRepository)]
 pub struct PostgresDatasetReferenceRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetReferenceRepository)]
-impl PostgresDatasetReferenceRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
