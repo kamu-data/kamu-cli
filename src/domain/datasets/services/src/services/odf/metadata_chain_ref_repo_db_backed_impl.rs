@@ -93,7 +93,7 @@ where
             let mut write_guard = self.state.write().unwrap();
             write_guard
                 .cached_references
-                .insert(r.clone(), resolved_ref.clone());
+                .insert(*r, resolved_ref.clone());
 
             tracing::debug!(dataset_id=%self.dataset_id, %r, %resolved_ref, "Updated reference cache");
 

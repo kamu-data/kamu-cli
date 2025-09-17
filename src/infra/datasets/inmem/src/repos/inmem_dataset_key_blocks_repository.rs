@@ -51,7 +51,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         let guard = self.state.lock().unwrap();
         Ok(guard
             .key_blocks
-            .get(&(dataset_id.clone(), block_ref.clone()))
+            .get(&(dataset_id.clone(), *block_ref))
             .is_some_and(|v| !v.is_empty()))
     }
 
@@ -68,7 +68,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         let mut guard = self.state.lock().unwrap();
         let entry = guard
             .key_blocks
-            .entry((dataset_id.clone(), block_ref.clone()))
+            .entry((dataset_id.clone(), *block_ref))
             .or_default();
 
         let existing: std::collections::HashSet<_> =
@@ -95,7 +95,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         let guard = self.state.lock().unwrap();
         Ok(guard
             .key_blocks
-            .get(&(dataset_id.clone(), block_ref.clone()))
+            .get(&(dataset_id.clone(), *block_ref))
             .cloned()
             .unwrap_or_default())
     }
@@ -110,9 +110,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         let mut result = Vec::new();
 
         for dataset_id in dataset_ids {
-            if let Some(blocks) = guard
-                .key_blocks
-                .get(&(dataset_id.clone(), block_ref.clone()))
+            if let Some(blocks) = guard.key_blocks.get(&(dataset_id.clone(), *block_ref))
                 && let Some(block) = blocks
                     .iter()
                     .rev()
@@ -131,9 +129,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         block_ref: &odf::BlockRef,
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
-        guard
-            .key_blocks
-            .remove(&(dataset_id.clone(), block_ref.clone()));
+        guard.key_blocks.remove(&(dataset_id.clone(), *block_ref));
         Ok(())
     }
 }
