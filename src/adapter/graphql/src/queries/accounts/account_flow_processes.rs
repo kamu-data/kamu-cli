@@ -8,6 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::Account as AccountEntity;
+use kamu_adapter_flow_dataset::FlowScopeDataset;
+use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
+use kamu_flow_system::FlowProcessStateQuery;
 
 use crate::prelude::*;
 use crate::queries::{
@@ -37,24 +40,24 @@ impl<'a> AccountFlowProcesses<'a> {
     }
 
     #[allow(clippy::unused_async)]
-    pub async fn primary_rollup(&self) -> FlowProcessGroupRollup {
-        // TODO: Implement actual logic
+    pub async fn primary_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
+        let (dataset_entry_service, flow_process_state_query) =
+            from_catalog_n!(ctx, dyn DatasetEntryService, dyn FlowProcessStateQuery);
 
-        let active = 0;
-        let failing = 0;
-        let paused = 0;
-        let stopped = 0;
-        let total = active + failing + paused + stopped;
-        let worst_consecutive_failures = 0;
+        let owned_dataset_ids = dataset_entry_service
+            .get_owned_dataset_ids(&self.account.id)
+            .await
+            .int_err()?;
 
-        FlowProcessGroupRollup {
-            total,
-            active,
-            failing,
-            paused,
-            stopped,
-            worst_consecutive_failures,
-        }
+        let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
+
+        let scope_query = FlowScopeDataset::query_for_multiple_datasets(&owned_dataset_id_refs);
+
+        let rollup = flow_process_state_query
+            .rollup_by_scope(scope_query, None, None)
+            .await?;
+
+        Ok(rollup.into())
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_dataset_cards, skip_all, fields(?page, ?per_page))]
