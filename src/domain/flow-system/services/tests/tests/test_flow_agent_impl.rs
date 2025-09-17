@@ -8122,12 +8122,12 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
                 });
                 let foo_task1_handle = foo_task1_driver.run();
 
-                // Task 2: start running at 130ms, finish at 140ms
+                // Task 2: start running at 160ms, finish at 170ms
                 let foo_task2_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(2),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(130),
+                    run_since_start: Duration::milliseconds(160),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
@@ -8136,12 +8136,12 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
                 });
                 let foo_task2_handle = foo_task2_driver.run();
 
-                // Task 3: start running at 170ms, finish at 180ms
+                // Task 3: start running at 240ms, finish at 250ms
                 let foo_task3_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(3),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(170),
+                    run_since_start: Duration::milliseconds(240),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
@@ -8201,50 +8201,50 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
 
             #8: +100ms:
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Throttling(for=20ms, wakeup=120ms, shifted=100ms)
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #9: +120ms:
+            #9: +160ms:
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=120ms)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=160ms)
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #10: +130ms:
+            #10: +160ms:
               "foo" Ingest:
                 Flow ID = 2 Running(task=2)
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #11: +140ms:
+            #11: +170ms:
               "foo" Ingest:
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #12: +140ms:
+            #12: +170ms:
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Throttling(for=20ms, wakeup=160ms, shifted=140ms)
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=230ms)
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #13: +160ms:
+            #13: +230ms:
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Executor(task=3, since=160ms)
+                Flow ID = 3 Waiting AutoPolling Executor(task=3, since=230ms)
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #14: +170ms:
+            #14: +240ms:
               "foo" Ingest:
                 Flow ID = 3 Running(task=3)
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #15: +180ms:
+            #15: +250ms:
               "foo" Ingest:
                 Flow ID = 3 Finished Failed
                 Flow ID = 2 Finished Failed
@@ -8335,12 +8335,12 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
                 });
                 let foo_task1_handle = foo_task1_driver.run();
 
-                // Task 2: start running at 130ms, finish at 140ms
+                // Task 2: start running at 170, finish at 180ms
                 let foo_task2_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(2),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(130),
+                    run_since_start: Duration::milliseconds(170),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
@@ -8349,12 +8349,12 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
                 });
                 let foo_task2_handle = foo_task2_driver.run();
 
-                // Task 3: start running at 170ms, finish at 180ms
+                // Task 3: start running at 250ms, finish at 260ms
                 let foo_task3_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(3),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(170),
+                    run_since_start: Duration::milliseconds(250),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
                     expected_logical_plan: LogicalPlanDatasetUpdate {
                       dataset_id: foo_id.clone(),
@@ -8371,7 +8371,6 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
-
     pretty_assertions::assert_eq!(
         format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
@@ -8414,67 +8413,59 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
 
             #8: +100ms:
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Throttling(for=20ms, wakeup=120ms, shifted=100ms)
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #9: +120ms:
+            #9: +160ms:
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=120ms)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=160ms)
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #10: +130ms:
+            #10: +170ms:
               "foo" Ingest:
                 Flow ID = 2 Running(task=2)
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #11: +140ms:
+            #11: +180ms:
               "foo" Ingest:
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #12: +140ms:
+            #12: +180ms:
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Throttling(for=20ms, wakeup=160ms, shifted=140ms)
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=240ms)
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #13: +160ms:
+            #13: +240ms:
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Executor(task=3, since=160ms)
+                Flow ID = 3 Waiting AutoPolling Executor(task=3, since=240ms)
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #14: +170ms:
+            #14: +250ms:
               "foo" Ingest:
                 Flow ID = 3 Running(task=3)
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #15: +180ms:
+            #15: +260ms:
               "foo" Ingest:
                 Flow ID = 3 Finished Failed
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed
                 Flow ID = 0 Finished Success
 
-            #16: +180ms:
+            #16: +260ms:
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Throttling(for=20ms, wakeup=200ms, shifted=180ms)
-                Flow ID = 3 Finished Failed
-                Flow ID = 2 Finished Failed
-                Flow ID = 1 Finished Failed
-                Flow ID = 0 Finished Success
-
-            #17: +200ms:
-              "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=4, since=200ms)
+                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=320ms)
                 Flow ID = 3 Finished Failed
                 Flow ID = 2 Finished Failed
                 Flow ID = 1 Finished Failed

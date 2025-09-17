@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 use kamu_flow_system as fs;
 
@@ -105,7 +106,7 @@ pub(crate) fn prepare_flows_filter_by_types(
 pub(crate) fn prepare_flows_scope_query(
     maybe_input: Option<&FlowProcessTypeFilterInput>,
     dataset_id_refs: &[&odf::DatasetID],
-) -> Option<fs::FlowScopeQuery> {
+) -> fs::FlowScopeQuery {
     match maybe_input {
         Some(FlowProcessTypeFilterInput::Webhooks(webhooks_filter)) => {
             // Particular subscriptions listed?
@@ -122,20 +123,18 @@ pub(crate) fn prepare_flows_scope_query(
                 // We want a flow scope query for these subscriptions
                 // Note: we don't have to use "dataset_id_refs",
                 // it would be a redundant condition at the database level
-                Some(FlowScopeSubscription::query_for_multiple_subscriptions(
-                    &subscription_ids,
-                ))
+                FlowScopeSubscription::query_for_multiple_subscriptions(&subscription_ids)
             } else {
                 // No particular channels listed, use all subscriptions
                 // that belong to the datasets
-                Some(
-                    FlowScopeSubscription::query_for_subscriptions_of_multiple_datasets(
-                        dataset_id_refs,
-                    ),
-                )
+                FlowScopeSubscription::query_for_subscriptions_of_multiple_datasets(dataset_id_refs)
             }
         }
-        Some(FlowProcessTypeFilterInput::Primary(_)) | None => None, // we'll use default query
+        Some(FlowProcessTypeFilterInput::Primary(_)) => {
+            // Primary flows only, use specific "type" field
+            FlowScopeDataset::query_for_multiple_datasets_only(dataset_id_refs)
+        }
+        None => FlowScopeDataset::query_for_multiple_datasets(dataset_id_refs), /* we'll use default query */
     }
 }
 
