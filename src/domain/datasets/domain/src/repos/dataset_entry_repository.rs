@@ -55,6 +55,11 @@ pub trait DatasetEntryRepository: Send + Sync {
         name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError>;
 
+    async fn get_dataset_entries_by_owner_and_name<'a>(
+        &self,
+        owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError>;
+
     async fn save_dataset_entry(
         &self,
         dataset_entry: &DatasetEntry,
@@ -86,12 +91,6 @@ pub type DatasetEntryStream<'a> = std::pin::Pin<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum DatasetResolution {
-    Resolved(DatasetEntry),
-    Unresolved,
-}
-
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct DatasetEntriesResolution {
     pub resolved_entries: Vec<DatasetEntry>,
@@ -108,19 +107,15 @@ impl DatasetEntriesResolution {
             })
     }
 
-    pub fn into_resolution_map(self) -> HashMap<odf::DatasetID, DatasetResolution> {
+    pub fn into_resolution_map(self) -> HashMap<odf::DatasetID, Option<DatasetEntry>> {
         let mut map =
             HashMap::with_capacity(self.resolved_entries.len() + self.unresolved_entries.len());
         for entry in self.resolved_entries {
-            let has_no_duplicate = map
-                .insert(entry.id.clone(), DatasetResolution::Resolved(entry))
-                .is_none();
+            let has_no_duplicate = map.insert(entry.id.clone(), Some(entry)).is_none();
             debug_assert!(has_no_duplicate);
         }
         for dataset_id in self.unresolved_entries {
-            let has_no_duplicate = map
-                .insert(dataset_id, DatasetResolution::Unresolved)
-                .is_none();
+            let has_no_duplicate = map.insert(dataset_id, None).is_none();
             debug_assert!(has_no_duplicate);
         }
         map
@@ -191,6 +186,14 @@ impl DatasetEntryByNameNotFoundError {
             dataset_name,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetEntriesByNameError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

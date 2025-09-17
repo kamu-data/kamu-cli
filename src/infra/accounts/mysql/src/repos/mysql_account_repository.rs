@@ -63,6 +63,8 @@ impl MySqlAccountRepository {
     }
 
     fn map_account_row(account_row: &MySqlRow) -> Account {
+        // Reason for this method: SQLX Mysql Enum decode error
+        //                         https://github.com/launchbadge/sqlx/issues/1379
         Account {
             id: account_row.get(0),
             account_name: odf::AccountName::new_unchecked(account_row.get::<&str, _>(1)),
@@ -252,8 +254,8 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         if account_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -262,34 +264,35 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let query_str = format!(
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::MySql>::new(
             r#"
-                SELECT
-                    id,
-                    account_name,
-                    email,
-                    display_name,
-                    account_type,
-                    avatar_url,
-                    registered_at,
-                    provider,
-                    provider_identity_key
-                FROM accounts
-                WHERE id IN ({})
-                "#,
-            mysql_generate_placeholders_list(account_ids.len())
+            SELECT id,
+                   account_name,
+                   email,
+                   display_name,
+                   account_type,
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE id IN
+            "#,
         );
+        query_builder.push_tuples(account_ids, |mut b, account_id| {
+            b.push_bind(account_id.to_string());
+        });
+        query_builder.push("ORDER BY account_name");
 
-        // ToDo replace it by macro once sqlx will support it
-        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let mut query = sqlx::query(&query_str);
-        for account_id in account_ids {
-            query = query.bind(account_id.to_string());
-        }
+        let mysql_rows = query_builder
+            .build()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
 
-        let account_rows = query.fetch_all(connection_mut).await.int_err()?;
+        let accounts = mysql_rows.iter().map(Self::map_account_row).collect();
 
-        Ok(account_rows.iter().map(Self::map_account_row).collect())
+        Ok(accounts)
     }
 
     async fn get_account_by_name(
@@ -331,6 +334,49 @@ impl AccountRepository for MySqlAccountRepository {
                 },
             ))
         }
+    }
+
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError> {
+        if account_names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::MySql>::new(
+            r#"
+            SELECT id,
+                   account_name,
+                   email,
+                   display_name,
+                   account_type,
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE account_name IN
+            "#,
+        );
+        query_builder.push_tuples(account_names, |mut b, account_name| {
+            b.push_bind(account_name.as_str());
+        });
+        query_builder.push("ORDER BY account_name");
+
+        let mysql_rows = query_builder
+            .build()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
+
+        let accounts = mysql_rows.iter().map(Self::map_account_row).collect();
+
+        Ok(accounts)
     }
 
     async fn find_account_id_by_provider_identity_key(

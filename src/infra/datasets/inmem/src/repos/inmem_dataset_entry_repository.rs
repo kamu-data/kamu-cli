@@ -191,6 +191,34 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Box::pin(futures::stream::iter(dataset_entries_page))
     }
 
+    async fn get_dataset_entries_by_owner_and_name<'a>(
+        &self,
+        owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
+        let readable_state = self.state.read().await;
+
+        let mut found_entries = Vec::with_capacity(owner_id_dataset_name_pairs.len());
+        for (owner_id, dataset_name) in owner_id_dataset_name_pairs {
+            if let Some(entries_by_name) = readable_state.rows_by_owner_and_name.get(owner_id)
+                && let Some(dataset_id) = entries_by_name.get(dataset_name)
+                && let Some(entry) = readable_state.rows.get(dataset_id)
+            {
+                found_entries.push(entry.clone());
+            }
+        }
+
+        found_entries.sort_by(|a, b| {
+            use std::cmp::Ordering;
+
+            match a.owner_name.cmp(&b.owner_name) {
+                Ordering::Equal => a.name.cmp(&b.name),
+                owner_id_cmp_res @ (Ordering::Greater | Ordering::Less) => owner_id_cmp_res,
+            }
+        });
+
+        Ok(found_entries)
+    }
+
     async fn save_dataset_entry(
         &self,
         dataset_entry: &DatasetEntry,

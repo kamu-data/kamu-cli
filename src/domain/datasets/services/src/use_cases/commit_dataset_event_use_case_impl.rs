@@ -36,12 +36,12 @@ impl CommitDatasetEventUseCaseImpl {
             let inputs_dataset_refs = set_transform
                 .inputs
                 .iter()
-                .map(|input| input.dataset_ref.clone())
+                .map(|input| &input.dataset_ref)
                 .collect::<Vec<_>>();
 
             let classify_response = self
                 .rebac_dataset_registry_facade
-                .classify_dataset_refs_by_allowance(inputs_dataset_refs, auth::DatasetAction::Read)
+                .classify_dataset_refs_by_allowance(&inputs_dataset_refs, auth::DatasetAction::Read)
                 .await?;
 
             if !classify_response.inaccessible_refs.is_empty() {

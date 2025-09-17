@@ -15,6 +15,7 @@ use dill::Catalog;
 use kamu_accounts::{Account, AccountRepository};
 use kamu_datasets::{
     DatasetEntriesResolution,
+    DatasetEntry,
     DatasetEntryByNameNotFoundError,
     DatasetEntryNotFoundError,
     DatasetEntryRepository,
@@ -310,6 +311,114 @@ pub async fn test_get_dataset_entry_by_name(catalog: &Catalog) {
             Ok(actual_dataset_entry)
                 if actual_dataset_entry == dataset_entry
         );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    {
+        let found_entries = dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(&[])
+            .await
+            .unwrap();
+
+        assert_eq!([] as [DatasetEntry; 0], *found_entries);
+    }
+
+    let account_1 = new_account_with_name(&account_repo, "account_1").await;
+    let account_2 = new_account_with_name(&account_repo, "account_2").await;
+
+    let account_1_dataset_1 =
+        new_dataset_entry_with(&account_1, "dataset1", odf::DatasetKind::Root);
+    let account_1_dataset_2 =
+        new_dataset_entry_with(&account_1, "dataset2", odf::DatasetKind::Root);
+    let account_2_dataset_3 =
+        new_dataset_entry_with(&account_2, "dataset3", odf::DatasetKind::Root);
+
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&account_1_dataset_1)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&account_1_dataset_2)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo
+            .save_dataset_entry(&account_2_dataset_3)
+            .await;
+
+        assert_matches!(save_res, Ok(_));
+    }
+
+    {
+        let found_entries = dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(&[
+                &(account_1.id.clone(), account_1_dataset_1.name.clone()),
+                &(account_1.id.clone(), account_1_dataset_2.name.clone()),
+                &(account_2.id.clone(), account_2_dataset_3.name.clone()),
+            ])
+            .await
+            .unwrap();
+        let found_entries_for_eq = found_entries
+            .iter()
+            .map(|e| (e.owner_name.as_str(), e.name.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            [
+                ("account_1", "dataset1"),
+                ("account_1", "dataset2"),
+                ("account_2", "dataset3")
+            ],
+            *found_entries_for_eq
+        );
+    }
+
+    {
+        let not_found_account_id = odf::AccountID::new_seeded_ed25519(b"not-found-account-id");
+
+        let found_entries = dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(&[
+                &(not_found_account_id, account_1_dataset_1.name.clone()),
+                &(account_1.id.clone(), account_1_dataset_2.name.clone()),
+            ])
+            .await
+            .unwrap();
+        let found_entries_for_eq = found_entries
+            .iter()
+            .map(|e| (e.owner_name.as_str(), e.name.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!([("account_1", "dataset2")], *found_entries_for_eq);
+    }
+
+    {
+        let not_found_dataset_name = odf::DatasetName::new_unchecked("not-found-dataset-name");
+
+        let found_entries = dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(&[
+                &(account_1.id.clone(), account_1_dataset_1.name.clone()),
+                &(account_1.id.clone(), not_found_dataset_name),
+            ])
+            .await
+            .unwrap();
+        let found_entries_for_eq = found_entries
+            .iter()
+            .map(|e| (e.owner_name.as_str(), e.name.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!([("account_1", "dataset1")], *found_entries_for_eq);
     }
 }
 

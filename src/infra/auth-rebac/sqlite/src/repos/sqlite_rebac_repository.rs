@@ -587,18 +587,16 @@ impl RebacRepository for SqliteRebacRepository {
             WHERE (subject_entity_type,
                    subject_entity_id,
                    object_entity_type,
-                   object_entity_id) IN (
+                   object_entity_id) IN
             "#,
         );
 
-        query_builder.push_values(operations, |mut b, op| {
+        query_builder.push_tuples(operations, |mut b, op| {
             b.push_bind(op.subject_entity.entity_type);
             b.push_bind(op.subject_entity.entity_id.as_ref());
             b.push_bind(op.object_entity.entity_type);
             b.push_bind(op.object_entity.entity_id.as_ref());
         });
-
-        query_builder.push(")");
 
         query_builder
             .build()

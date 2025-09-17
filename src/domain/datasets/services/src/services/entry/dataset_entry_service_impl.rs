@@ -8,10 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
-use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
+use database_common::{
+    BatchLookup,
+    BatchLookupCreateOptions,
+    EntityPageListing,
+    EntityPageStreamer,
+    PaginationOpts,
+};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -109,7 +115,7 @@ impl DatasetEntryServiceImpl {
 
     fn entries_as_handles(&self, entries: &[DatasetEntry]) -> Vec<odf::DatasetHandle> {
         // Convert the entries to handles
-        let mut handles = Vec::new();
+        let mut handles = Vec::with_capacity(entries.len());
         for entry in entries {
             // Form DatasetHandle
             handles.push(odf::DatasetHandle::new(
@@ -157,6 +163,152 @@ impl DatasetEntryServiceImpl {
                 ))
             }
         }
+    }
+
+    fn group_aliases_by_resolved_owner_account_name<'a>(
+        &'a self,
+        dataset_aliases: &'a [&'a odf::DatasetAlias],
+    ) -> Result<HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>>, InternalError> {
+        let mut res = HashMap::new();
+
+        let is_multi_tenant = *self.tenancy_config == TenancyConfig::MultiTenant;
+
+        for dataset_alias in dataset_aliases {
+            let account_name = match &dataset_alias.account_name {
+                Some(account_name) if is_multi_tenant => account_name,
+                None if !is_multi_tenant => self.current_account_subject.account_name_or_default(),
+                _ => {
+                    return Err(format!(
+                        "Mixed presence of single-tenant and multi-tenant aliases: {}",
+                        itertools::join(dataset_aliases, ",")
+                    )
+                    .int_err());
+                }
+            };
+
+            let owner_dataset_aliases = res.entry(account_name).or_insert_with(Vec::new);
+            owner_dataset_aliases.push(*dataset_alias);
+        }
+
+        Ok(res)
+    }
+
+    async fn resolve_account_ids_by_maybe_names(
+        &self,
+        maybe_account_names: &[Option<&odf::AccountName>],
+    ) -> Result<ResolveAccountIdsByMaybeNamesResponse, InternalError> {
+        let mut single_tenant_count = 0;
+        let mut multi_tenant_count = 0;
+
+        let account_names = maybe_account_names
+            .iter()
+            .map(|maybe_account_name| match maybe_account_name {
+                Some(account_name) => {
+                    multi_tenant_count += 1;
+                    account_name
+                }
+                None => {
+                    single_tenant_count += 1;
+                    self.current_account_subject.account_name_or_default()
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Early return checks
+        if single_tenant_count > 0 {
+            return if multi_tenant_count > 0 {
+                Err(format!(
+                    "Simultaneous presence of single-tenant and multi-tenant account names: {}",
+                    itertools::join(
+                        maybe_account_names
+                            .iter()
+                            .map(|maybe_account_name| { format!("{maybe_account_name:?}") }),
+                        ","
+                    )
+                )
+                .int_err())
+            } else {
+                // Edge case: trying to resolve a slice of empty names [None, None, None] in
+                // single-tenant mode.
+                let account_name = self.current_account_subject.account_name_or_default();
+                let account = self
+                    .account_svc
+                    .get_account_by_name(account_name)
+                    .await
+                    .int_err()?;
+
+                Ok(ResolveAccountIdsByMaybeNamesResponse {
+                    resolved_account_ids: vec![(account.account_name, account.id)],
+                    unresolved_account_names: Vec::new(),
+                })
+            };
+        }
+
+        // 1. Read all available data from the cache
+        let cached_name_id_pairs = {
+            let readable_cache = self.cache.read().unwrap();
+            account_names
+                .iter()
+                .fold(HashMap::new(), |mut acc, account_name| {
+                    if let Some(id) = readable_cache.accounts.names2ids.get(account_name) {
+                        acc.insert(*account_name, id.clone());
+                    }
+                    acc
+                })
+        };
+
+        let mut resolved_account_ids = Vec::with_capacity(cached_name_id_pairs.len());
+        for (name, resolved_id) in &cached_name_id_pairs {
+            resolved_account_ids.push(((*name).clone(), resolved_id.clone()));
+        }
+
+        let mut unresolved_account_names = Vec::new();
+
+        // 2. Request unresolved account names from the service
+        if account_names.len() != resolved_account_ids.len() {
+            let mut account_names_to_request =
+                Vec::with_capacity(account_names.len() - resolved_account_ids.len());
+            for account_name in account_names {
+                if !cached_name_id_pairs.contains_key(account_name) {
+                    account_names_to_request.push(account_name);
+                }
+            }
+
+            let lookup = self
+                .account_svc
+                .get_accounts_by_names(&account_names_to_request)
+                .await?;
+            let resolved_account_ids_from_service = lookup
+                .found
+                .into_iter()
+                .map(|a| (a.account_name, a.id))
+                .collect::<Vec<_>>();
+
+            // Cache the resolved results
+            {
+                let mut writable_cache = self.cache.write().unwrap();
+                for (account_name, account_id) in &resolved_account_ids_from_service {
+                    writable_cache
+                        .accounts
+                        .names2ids
+                        .insert(account_name.clone(), account_id.clone());
+                }
+            }
+
+            // Add service-{un,}resolved ones to response
+            resolved_account_ids.extend(resolved_account_ids_from_service);
+
+            unresolved_account_names = lookup
+                .not_found
+                .into_iter()
+                .map(|(id, e)| (id, e.into()))
+                .collect::<Vec<_>>();
+        }
+
+        Ok(ResolveAccountIdsByMaybeNamesResponse {
+            resolved_account_ids,
+            unresolved_account_names,
+        })
     }
 
     async fn list_all_entries(
@@ -236,6 +388,132 @@ impl DatasetEntryServiceImpl {
         Ok(EntityPageListing {
             total_count: dataset_entry_listing.total_count,
             list: self.entries_as_handles(&dataset_entry_listing.list),
+        })
+    }
+
+    fn make_dataset_handle(&self, entry: DatasetEntry) -> odf::DatasetHandle {
+        odf::DatasetHandle::new(
+            entry.id,
+            self.tenancy_config.make_alias(entry.owner_name, entry.name),
+            entry.kind,
+        )
+    }
+
+    async fn resolve_dataset_handles_by_dataset_ids<'a>(
+        &'a self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<odf::dataset::ResolveDatasetHandlesByRefsResponse, InternalError> {
+        let entries_resolution_by_ids = self.get_multiple_entries(dataset_ids).await.int_err()?;
+
+        let mut resolved_handles =
+            Vec::with_capacity(entries_resolution_by_ids.resolved_entries.len());
+        let mut unresolved_refs =
+            Vec::with_capacity(entries_resolution_by_ids.unresolved_entries.len());
+
+        for entry in entries_resolution_by_ids.resolved_entries {
+            resolved_handles.push((entry.id.as_local_ref(), self.make_dataset_handle(entry)));
+        }
+
+        for unresolved_dataset_id in entries_resolution_by_ids.unresolved_entries {
+            let dataset_ref = unresolved_dataset_id.as_local_ref();
+            unresolved_refs.push((
+                dataset_ref.clone(),
+                odf::DatasetNotFoundError::new(dataset_ref).into(),
+            ));
+        }
+
+        Ok(odf::dataset::ResolveDatasetHandlesByRefsResponse {
+            resolved_handles,
+            unresolved_refs,
+        })
+    }
+
+    async fn resolve_dataset_handles_by_dataset_aliases(
+        &self,
+        dataset_aliases: &[&odf::DatasetAlias],
+    ) -> Result<odf::dataset::ResolveDatasetHandlesByRefsResponse, InternalError> {
+        let mut resolved_handles = Vec::with_capacity(dataset_aliases.len());
+        let mut unresolved_refs = Vec::with_capacity(dataset_aliases.len());
+
+        // First, we attempt to resolve accounts
+        let owner_name_dataset_aliases_mapping =
+            self.group_aliases_by_resolved_owner_account_name(dataset_aliases)?;
+        let maybe_owner_names = dataset_aliases
+            .iter()
+            .map(|alias| alias.account_name.as_ref())
+            .collect::<Vec<_>>();
+
+        let owner_ids_resolution_by_names = self
+            .resolve_account_ids_by_maybe_names(&maybe_owner_names)
+            .await?;
+
+        for (unresolved_owner_name, _) in owner_ids_resolution_by_names.unresolved_account_names {
+            // If a dataset owner account not found, then no datasets
+            let dataset_aliases_without_owner = owner_name_dataset_aliases_mapping
+                .get(&unresolved_owner_name)
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "{unresolved_owner_name} not found in \
+                         {owner_name_dataset_aliases_mapping:?}"
+                    );
+                });
+            for dataset_alias_without_owner in dataset_aliases_without_owner {
+                let dataset_ref = dataset_alias_without_owner.as_local_ref();
+                let e = odf::DatasetNotFoundError::new(dataset_ref.clone());
+                unresolved_refs.push((dataset_ref, e.into()));
+            }
+        }
+
+        // After that, try to resolve dataset entries
+        let owner_id_name_mapping = owner_ids_resolution_by_names
+            .resolved_account_ids
+            .into_iter()
+            .map(|(name, id)| (id, name))
+            .collect::<HashMap<_, _>>();
+        let mut owner_id_dataset_name_pairs =
+            Vec::with_capacity(dataset_aliases.len() - unresolved_refs.len());
+
+        for (owner_id, owner_name) in &owner_id_name_mapping {
+            let dataset_aliases = owner_name_dataset_aliases_mapping
+                .get(&owner_name)
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "{owner_name} not found in {owner_name_dataset_aliases_mapping:?}"
+                    );
+                });
+            for dataset_alias in dataset_aliases {
+                owner_id_dataset_name_pairs
+                    .push((owner_id.clone(), dataset_alias.dataset_name.clone()));
+            }
+        }
+
+        let owner_id_dataset_name_pairs_refs =
+            owner_id_dataset_name_pairs.iter().collect::<Vec<_>>();
+
+        let entries_lookup = self
+            .get_dataset_entries_by_owner_and_name(&owner_id_dataset_name_pairs_refs)
+            .await?;
+
+        for ((owner_id, dataset_name), _e) in entries_lookup.not_found {
+            let owner_name = owner_id_name_mapping.get(&owner_id).unwrap_or_else(|| {
+                unreachable!("{owner_id} not found in {owner_id_dataset_name_pairs:?}");
+            });
+            let alias = self
+                .tenancy_config
+                .make_alias(owner_name.clone(), dataset_name);
+            let dataset_ref = alias.as_local_ref();
+            let e = odf::DatasetNotFoundError::new(dataset_ref.clone());
+            unresolved_refs.push((dataset_ref, e.into()));
+        }
+
+        for entry in entries_lookup.found {
+            let dataset_handle = self.make_dataset_handle(entry);
+            resolved_handles.push((dataset_handle.alias.as_local_ref(), dataset_handle));
+        }
+
+        Ok(odf::dataset::ResolveDatasetHandlesByRefsResponse {
+            resolved_handles,
+            unresolved_refs,
         })
     }
 }
@@ -333,6 +611,80 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
             }
         })
     }
+
+    async fn get_dataset_entries_by_owner_and_name(
+        &self,
+        owner_id_dataset_name_pairs: &[&(odf::AccountID, odf::DatasetName)],
+    ) -> Result<
+        BatchLookup<DatasetEntry, (odf::AccountID, odf::DatasetName), GetDatasetEntryByNameError>,
+        InternalError,
+    > {
+        let pairs_index = owner_id_dataset_name_pairs.iter().fold(
+            HashSet::new(),
+            |mut acc, (owner_id, dataset_name)| {
+                acc.insert((owner_id, dataset_name));
+                acc
+            },
+        );
+
+        // Try reading from the cache
+        let mut found_in_cache = Vec::with_capacity(owner_id_dataset_name_pairs.len());
+        {
+            let readable_cache = self.cache.read().unwrap();
+            for cached_entry in readable_cache.datasets.entries_by_id.values() {
+                if pairs_index.contains(&(&cached_entry.owner_id, &cached_entry.name)) {
+                    found_in_cache.push(cached_entry.clone());
+                }
+            }
+        }
+
+        let entries_count_to_query = owner_id_dataset_name_pairs.len() - found_in_cache.len();
+
+        if entries_count_to_query == 0 {
+            return Ok(BatchLookup {
+                found: found_in_cache,
+                not_found: vec![],
+            });
+        }
+
+        let mut owner_id_dataset_name_pairs_without_cache =
+            Vec::with_capacity(entries_count_to_query);
+        for pair @ (owner_id, dataset_name) in owner_id_dataset_name_pairs {
+            if !pairs_index.contains(&(owner_id, dataset_name)) {
+                owner_id_dataset_name_pairs_without_cache.push(*pair);
+            }
+        }
+
+        let entries = self
+            .dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(owner_id_dataset_name_pairs)
+            .await
+            .int_err()?;
+
+        self.update_entries_cache(entries.iter());
+
+        Ok(BatchLookup::from_found_items(
+            entries,
+            owner_id_dataset_name_pairs,
+            BatchLookupCreateOptions {
+                found_ids_fn: |entries| {
+                    entries
+                        .iter()
+                        .map(|entry| (entry.owner_id.clone(), entry.name.clone()))
+                        .collect()
+                },
+                not_found_err_fn: |(owner_id, dataset_name)| {
+                    DatasetEntryByNameNotFoundError::new(
+                        (*owner_id).clone(),
+                        (*dataset_name).clone(),
+                    )
+                    .into()
+                },
+                maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
+                _phantom: Default::default(),
+            },
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -369,22 +721,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     Ok(entry) => {
                         self.update_entries_cache(std::iter::once(&entry));
 
-                        Ok(odf::DatasetHandle::new(
-                            entry.id.clone(),
-                            odf::DatasetAlias::new(
-                                match self.tenancy_config.as_ref() {
-                                    TenancyConfig::SingleTenant => None,
-                                    TenancyConfig::MultiTenant => Some(
-                                        // We know the name, but since the search is
-                                        // case-insensitive, we'd like to know the stored version
-                                        // rather than queried
-                                        entry.owner_name.clone(),
-                                    ),
-                                },
-                                entry.name,
-                            ),
-                            entry.kind,
-                        ))
+                        Ok(self.make_dataset_handle(entry))
                     }
                     Err(GetDatasetEntryByNameError::NotFound(_)) => Err(
                         odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
@@ -397,12 +734,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                 }
             }
             odf::DatasetRef::ID(id) => match self.get_entry(id).await {
-                Ok(entry) => Ok(odf::DatasetHandle::new(
-                    entry.id.clone(),
-                    self.tenancy_config
-                        .make_alias(entry.owner_name, entry.name.clone()),
-                    entry.kind,
-                )),
+                Ok(entry) => Ok(self.make_dataset_handle(entry)),
                 Err(GetDatasetEntryError::NotFound(_)) => Err(
                     odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
@@ -413,6 +745,62 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                 }
             },
         }
+    }
+
+    // TODO: tests
+    #[tracing::instrument(level = "debug", skip_all, fields(dataset_refs_count = dataset_refs.len()))]
+    async fn resolve_dataset_handles_by_refs(
+        &self,
+        dataset_refs: &[&odf::DatasetRef],
+    ) -> Result<odf::dataset::ResolveDatasetHandlesByRefsResponse, InternalError> {
+        let mut resolved_handles = Vec::with_capacity(dataset_refs.len());
+
+        let mut dataset_ids = Vec::new();
+        let mut dataset_aliases = Vec::new();
+
+        for dataset_ref in dataset_refs {
+            match dataset_ref {
+                odf::DatasetRef::Handle(h) => {
+                    // 1. We got lucky and nothing to do.
+                    resolved_handles.push(((*dataset_ref).clone(), h.clone()));
+                }
+                odf::DatasetRef::ID(id) => {
+                    // Store for later resolving.
+                    dataset_ids.push(Cow::Borrowed(id));
+                }
+                odf::DatasetRef::Alias(alias) => {
+                    // Store for later resolving.
+                    dataset_aliases.push(alias);
+                }
+            }
+        }
+
+        // 2. Resolve IDs.
+        let resolution_by_ids = self
+            .resolve_dataset_handles_by_dataset_ids(&dataset_ids)
+            .await?;
+        resolved_handles.extend(resolution_by_ids.resolved_handles);
+
+        // 3. Resolve aliases.
+        let resolution_by_aliases = self
+            .resolve_dataset_handles_by_dataset_aliases(&dataset_aliases)
+            .await?;
+        resolved_handles.extend(resolution_by_aliases.resolved_handles);
+
+        let unresolved_refs = {
+            let mut v = Vec::with_capacity(
+                resolution_by_ids.unresolved_refs.len()
+                    + resolution_by_aliases.unresolved_refs.len(),
+            );
+            v.extend(resolution_by_ids.unresolved_refs);
+            v.extend(resolution_by_aliases.unresolved_refs);
+            v
+        };
+
+        Ok(odf::dataset::ResolveDatasetHandlesByRefsResponse {
+            resolved_handles,
+            unresolved_refs,
+        })
     }
 }
 
@@ -681,6 +1069,13 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
 
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ResolveAccountIdsByMaybeNamesResponse {
+    resolved_account_ids: Vec<(odf::AccountName, odf::AccountID)>,
+    unresolved_account_names: Vec<(odf::AccountName, ResolveAccountIdByNameError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

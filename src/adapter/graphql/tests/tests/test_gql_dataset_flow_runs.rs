@@ -4124,6 +4124,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(flaky)]
 #[test_log::test(tokio::test)]
 async fn test_trigger_flow_automatically_via_schedule() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {

@@ -29,13 +29,18 @@ pub trait AccountRepository: Send + Sync {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError>;
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError>;
 
     async fn get_account_by_name(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<Account, GetAccountByNameError>;
+
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError>;
 
     async fn find_account_id_by_provider_identity_key(
         &self,
@@ -76,7 +81,6 @@ pub trait AccountRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait ExpensiveAccountRepository: AccountRepository {
     async fn accounts_count(&self) -> Result<usize, AccountsCountError>;
@@ -86,7 +90,6 @@ pub trait ExpensiveAccountRepository: AccountRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait ExpensiveAccountRepositoryExt: ExpensiveAccountRepository {
     fn all_accounts(&self) -> AccountPageStream;
@@ -205,6 +208,14 @@ pub struct AccountNotFoundByIdError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum GetAccountsByIdsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 pub enum GetAccountByNameError {
     #[error(transparent)]
     NotFound(AccountNotFoundByNameError),
@@ -217,6 +228,14 @@ pub enum GetAccountByNameError {
 #[error("Account not found by name: '{account_name}'")]
 pub struct AccountNotFoundByNameError {
     pub account_name: odf::AccountName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetAccountsByNamesError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

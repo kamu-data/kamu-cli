@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::future::Future;
+use std::hash::Hash;
+use std::marker::PhantomData;
 use std::pin::Pin;
 
 use futures::Stream;
@@ -168,3 +171,110 @@ pub struct EventModel {
 pub struct ReturningEventModel {
     pub event_id: i64,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct BatchLookup<T, Id, Err> {
+    pub found: Vec<T>,
+    pub not_found: Vec<(Id, Err)>,
+}
+
+pub struct BatchLookupCreateOptions<T, Id, Err, FoundByFn, NotFoundErrFn, FoundItemsComparator>
+where
+    Id: Clone + Hash + Eq,
+    FoundByFn: FnOnce(&Vec<T>) -> HashSet<Id>,
+    NotFoundErrFn: Fn(&Id) -> Err,
+    // Based on Vec::<T>::sort_by_key() type signature.
+    FoundItemsComparator: FnMut(&T, &T) -> std::cmp::Ordering,
+{
+    pub found_ids_fn: FoundByFn,
+    pub not_found_err_fn: NotFoundErrFn,
+    pub maybe_found_items_comparator: Option<FoundItemsComparator>,
+    pub _phantom: PhantomData<T>,
+}
+
+impl<T, Id, Err> BatchLookup<T, Id, Err> {
+    pub fn from_found_items<FoundByFn, NotFoundErrFn, FoundItemsComparator>(
+        mut found: Vec<T>,
+        ids: &[&Id],
+        options: BatchLookupCreateOptions<
+            T,
+            Id,
+            Err,
+            FoundByFn,
+            NotFoundErrFn,
+            FoundItemsComparator,
+        >,
+    ) -> BatchLookup<T, Id, Err>
+    where
+        Id: Clone + Hash + Eq,
+        FoundByFn: FnOnce(&Vec<T>) -> HashSet<Id>,
+        NotFoundErrFn: Fn(&Id) -> Err,
+        FoundItemsComparator: FnMut(&T, &T) -> std::cmp::Ordering,
+    {
+        if let Some(comparator) = options.maybe_found_items_comparator {
+            found.sort_by(comparator);
+        }
+
+        let found_ids_set = (options.found_ids_fn)(&found);
+        let mut not_found = Vec::with_capacity(ids.len() - found.len());
+
+        for id in ids {
+            if !found_ids_set.contains(*id) {
+                let cloned_id = (*id).clone();
+                let not_found_err = (options.not_found_err_fn)(*id);
+
+                not_found.push((cloned_id, not_found_err));
+            }
+        }
+
+        BatchLookup { found, not_found }
+    }
+}
+
+#[test]
+fn test_batch_lookup_from_found_items() {
+    use pretty_assertions::assert_eq;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct Item {
+        id: u32,
+    }
+
+    let ids_to_search = vec![&0, &1, &2, &3, &4, &5, &6, &7];
+    // Found items have mixed order (simulating a database query result).
+    let found_items = vec![
+        Item { id: 2 },
+        Item { id: 1 },
+        Item { id: 3 },
+        Item { id: 5 },
+    ];
+
+    let lookup = BatchLookup::<Item, u32, String>::from_found_items(
+        found_items.clone(),
+        &ids_to_search,
+        BatchLookupCreateOptions {
+            found_ids_fn: |found_items| found_items.iter().map(|item| item.id).collect(),
+            not_found_err_fn: |id| format!("{id} not found"),
+            maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
+            _phantom: PhantomData,
+        },
+    );
+
+    assert_eq!(
+        found_items, // Mixed order is preserved
+        lookup.found
+    );
+    assert_eq!(
+        [
+            (0, "0 not found".to_string()),
+            (4, "4 not found".to_string()),
+            (6, "6 not found".to_string()),
+            (7, "7 not found".to_string())
+        ],
+        *lookup.not_found
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

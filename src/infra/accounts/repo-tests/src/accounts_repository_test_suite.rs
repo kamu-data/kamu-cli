@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -15,6 +14,7 @@ use database_common::PaginationOpts;
 use dill::Catalog;
 use email_utils::Email;
 use kamu_accounts::*;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::make_test_account;
 
@@ -192,7 +192,7 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
         .unwrap();
 
     let mut db_accounts = account_repo
-        .get_accounts_by_ids(&[account_id_wasya, account_id_petya])
+        .get_accounts_by_ids(&[&account_id_wasya, &account_id_petya])
         .await
         .unwrap();
 
@@ -474,7 +474,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     let empty_accounts: [odf::AccountName; 0] = [];
 
     // All
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [
             name(&"admin1"),
             name(&"user1"),
@@ -485,19 +485,19 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     );
 
     // Search by account name
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1"), name(&"user2"), name(&"user3")],
         *search(&account_repo, "uS", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1"), name(&"user2"), name(&"user3")],
         *search(&account_repo, "sE", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1")],
         *search(&account_repo, "r1", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user2")],
         *search(
             &account_repo,
@@ -510,15 +510,15 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     );
 
     // Search by display name
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user1"), name(&"user2")],
         *search(&account_repo, "ali", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [name(&"user3")],
         *search(&account_repo, "ob", Filters::default()).await
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         empty_accounts,
         *search(
             &account_repo,
@@ -814,6 +814,149 @@ pub async fn test_update_account_duplicate_provider_identity(catalog: &Catalog) 
             account_field: AccountDuplicateField::ProviderIdentityKey
         }))
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_accounts_by_names(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let account_1_not_saved = make_test_account(
+        "account_1_not_saved",
+        "account_1_not_saved@example.com",
+        AccountProvider::Password.into(),
+        "account_1_not_saved",
+    );
+    let account_2 = make_test_account(
+        "wasya",
+        "wasya@example.com",
+        AccountProvider::Password.into(),
+        "wasya",
+    );
+    let account_3 = make_test_account(
+        "petya",
+        "petya@example.com",
+        AccountProvider::Password.into(),
+        "petya",
+    );
+    let account_4_not_saved = make_test_account(
+        "account_4_not_saved",
+        "account_4_not_saved@example.com",
+        AccountProvider::Password.into(),
+        "account_4_not_saved",
+    );
+
+    account_repo.save_account(&account_2).await.unwrap();
+    account_repo.save_account(&account_3).await.unwrap();
+
+    let accounts_names = [
+        &account_1_not_saved.account_name,
+        &account_2.account_name,
+        &account_3.account_name,
+        &account_4_not_saved.account_name,
+    ];
+    let found_accounts = account_repo
+        .get_accounts_by_names(&accounts_names)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| (a.account_name, a.id))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        [
+            (account_3.account_name, account_3.id),
+            (account_2.account_name, account_2.id),
+        ],
+        *found_accounts
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_all_accounts(catalog: &Catalog) {
+    use futures::TryStreamExt;
+
+    let account_repo = catalog.get_one::<dyn ExpensiveAccountRepository>().unwrap();
+
+    assert_matches!(account_repo.accounts_count().await, Ok(0));
+    let accounts = account_repo
+        .all_accounts()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!([] as [Account; 0], *accounts);
+
+    let account_1 = make_test_account(
+        "account_1",
+        "account_1@example.com",
+        AccountProvider::Password.into(),
+        "account_1",
+    );
+    let account_2 = make_test_account(
+        "account_2",
+        "account_2@example.com",
+        AccountProvider::Password.into(),
+        "account_2",
+    );
+    let account_3 = make_test_account(
+        "account_3",
+        "account_3@example.com",
+        AccountProvider::Password.into(),
+        "account_3",
+    );
+    let account_4 = make_test_account(
+        "account_4",
+        "account_4@example.com",
+        AccountProvider::Password.into(),
+        "account_4",
+    );
+
+    account_repo.save_account(&account_1).await.unwrap();
+    account_repo.save_account(&account_2).await.unwrap();
+
+    {
+        assert_matches!(account_repo.accounts_count().await, Ok(2));
+        let accounts = account_repo
+            .all_accounts()
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|a| (a.account_name, a.id))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            [
+                (account_1.account_name.clone(), account_1.id.clone()),
+                (account_2.account_name.clone(), account_2.id.clone())
+            ],
+            *accounts
+        );
+    }
+
+    account_repo.save_account(&account_3).await.unwrap();
+    account_repo.save_account(&account_4).await.unwrap();
+
+    {
+        assert_matches!(account_repo.accounts_count().await, Ok(4));
+        let accounts = account_repo
+            .all_accounts()
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|a| (a.account_name, a.id))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            [
+                (account_1.account_name, account_1.id),
+                (account_2.account_name, account_2.id),
+                (account_3.account_name, account_3.id),
+                (account_4.account_name, account_4.id)
+            ],
+            *accounts
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

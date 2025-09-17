@@ -9,6 +9,7 @@
 
 use std::borrow::Cow;
 
+use database_common::BatchLookup;
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
@@ -16,13 +17,13 @@ use crate::{
     DatasetEntriesResolution,
     DatasetEntry,
     DatasetEntryStream,
+    GetDatasetEntryByNameError,
     GetDatasetEntryError,
     GetMultipleDatasetEntriesError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait DatasetEntryService: Sync + Send {
     fn all_entries(&self) -> DatasetEntryStream;
@@ -38,6 +39,14 @@ pub trait DatasetEntryService: Sync + Send {
         &self,
         dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError>;
+
+    async fn get_dataset_entries_by_owner_and_name(
+        &self,
+        owner_id_dataset_name_pairs: &[&(odf::AccountID, odf::DatasetName)],
+    ) -> Result<
+        BatchLookup<DatasetEntry, (odf::AccountID, odf::DatasetName), GetDatasetEntryByNameError>,
+        InternalError,
+    >;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

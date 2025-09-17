@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::{
     DatasetHandlesResolution,
@@ -19,6 +19,7 @@ use kamu_core::{
     ResolvedDataset,
     TenancyConfig,
 };
+use odf::dataset::ResolveDatasetHandlesByRefsResponse;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -126,6 +127,32 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
             }
             odf::DatasetRef::ID(dataset_id) => self.resolve_dataset_handle_by_id(dataset_id).await,
         }
+    }
+
+    async fn resolve_dataset_handles_by_refs(
+        &self,
+        dataset_refs: &[&odf::DatasetRef],
+    ) -> Result<ResolveDatasetHandlesByRefsResponse, InternalError> {
+        let mut resolved_refs = Vec::with_capacity(dataset_refs.len());
+        let mut inaccessible_refs = Vec::new();
+
+        for dataset_ref in dataset_refs {
+            let dataset_ref_clone = (*dataset_ref).clone();
+
+            match self.resolve_dataset_handle_by_ref(dataset_ref).await {
+                Ok(handle) => {
+                    resolved_refs.push((dataset_ref_clone, handle));
+                }
+                Err(e) => {
+                    inaccessible_refs.push((dataset_ref_clone, e));
+                }
+            }
+        }
+
+        Ok(ResolveDatasetHandlesByRefsResponse {
+            resolved_handles: resolved_refs,
+            unresolved_refs: inaccessible_refs,
+        })
     }
 }
 

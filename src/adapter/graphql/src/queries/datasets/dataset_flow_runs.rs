@@ -128,7 +128,8 @@ impl<'a> DatasetFlowRuns<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_list_flow_initiators, skip_all)]
     async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
-        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
+        let (flow_query_service, account_service) =
+            from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn AccountService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service
             .list_scoped_flow_initiators(afs::FlowScopeDataset::query_for_single_dataset(
@@ -140,11 +141,11 @@ impl<'a> DatasetFlowRuns<'a> {
             .try_collect()
             .await?;
 
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
-
+        let flow_initiator_ids_refs = flow_initiator_ids.iter().collect::<Vec<_>>();
         let matched_flow_initiators: Vec<_> = account_service
-            .get_accounts_by_ids(&flow_initiator_ids)
+            .get_accounts_by_ids(&flow_initiator_ids_refs)
             .await?
+            .found
             .into_iter()
             .map(Account::from_account)
             .collect();
