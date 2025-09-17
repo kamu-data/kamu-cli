@@ -51,7 +51,8 @@ impl<'a> AccountFlowProcesses<'a> {
 
         let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
 
-        let scope_query = FlowScopeDataset::query_for_multiple_datasets(&owned_dataset_id_refs);
+        let scope_query =
+            FlowScopeDataset::query_for_multiple_datasets_only(&owned_dataset_id_refs);
 
         let rollup = flow_process_state_query
             .rollup_by_scope(scope_query, None, None)
