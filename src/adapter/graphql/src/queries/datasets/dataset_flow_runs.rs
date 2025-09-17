@@ -91,8 +91,7 @@ impl<'a> DatasetFlowRuns<'a> {
                 .map(|f| f.by_process_type.as_ref())
                 .unwrap_or_default(),
             &[dataset_id],
-        )
-        .unwrap_or_else(|| afs::FlowScopeDataset::query_for_single_dataset(dataset_id));
+        );
 
         let maybe_filters = match filters {
             Some(filters) => {

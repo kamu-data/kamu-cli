@@ -24,6 +24,7 @@ pub struct FlowRunServiceImpl {
     flow_abort_helper: Arc<FlowAbortHelper>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
     flow_event_store: Arc<dyn FlowEventStore>,
+    flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
 
     agent_config: Arc<FlowAgentConfig>,
 }
@@ -47,10 +48,20 @@ impl FlowRunService for FlowRunServiceImpl {
     ) -> Result<FlowState, RunFlowError> {
         let activation_time = self.agent_config.round_time(activation_time)?;
 
+        // Query previous runs stats to determine last attempt time
+        let maybe_flow_process_state = self
+            .flow_process_state_query
+            .try_get_process_state(flow_binding)
+            .await?;
+        let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
+            .as_ref()
+            .and_then(FlowProcessState::last_attempt_at);
+
         self.flow_scheduling_helper
             .trigger_flow_common(
                 activation_time,
                 flow_binding,
+                maybe_last_attempt_time,
                 None,
                 vec![FlowActivationCause::Manual(FlowActivationCauseManual {
                     activation_time,
@@ -72,10 +83,22 @@ impl FlowRunService for FlowRunServiceImpl {
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError> {
+        let activation_time = self.agent_config.round_time(activation_time)?;
+
+        // Query previous runs stats to determine last attempt time
+        let maybe_flow_process_state = self
+            .flow_process_state_query
+            .try_get_process_state(flow_binding)
+            .await?;
+        let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
+            .as_ref()
+            .and_then(FlowProcessState::last_attempt_at);
+
         self.flow_scheduling_helper
             .trigger_flow_common(
                 activation_time,
                 flow_binding,
+                maybe_last_attempt_time,
                 maybe_flow_trigger_rule,
                 activation_causes,
                 maybe_forced_flow_config_rule,
@@ -115,7 +138,7 @@ impl FlowRunService for FlowRunServiceImpl {
         // Find a trigger and pause it if it's periodic
         let maybe_active_schedule = self
             .flow_trigger_service
-            .try_get_flow_active_schedule_rule(&flow.flow_binding)
+            .try_take_flow_active_schedule_rule(&flow.flow_binding)
             .await?;
         if maybe_active_schedule.is_some() {
             // TODO: avoid double-loading the trigger
