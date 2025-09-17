@@ -214,17 +214,34 @@ impl DatasetEntryServiceImpl {
             })
             .collect::<Vec<_>>();
 
-        if single_tenant_count > 0 && multi_tenant_count > 0 {
-            return Err(format!(
-                "Simultaneous presence of single-tenant and multi-tenant account names: {}",
-                itertools::join(
-                    maybe_account_names
-                        .iter()
-                        .map(|maybe_account_name| { format!("{maybe_account_name:?}") }),
-                    ","
+        // Early return checks
+        if single_tenant_count > 0 {
+            return if multi_tenant_count > 0 {
+                Err(format!(
+                    "Simultaneous presence of single-tenant and multi-tenant account names: {}",
+                    itertools::join(
+                        maybe_account_names
+                            .iter()
+                            .map(|maybe_account_name| { format!("{maybe_account_name:?}") }),
+                        ","
+                    )
                 )
-            )
-            .int_err());
+                .int_err())
+            } else {
+                // Edge case: trying to resolve a slice of empty names [None, None, None] in
+                // single-tenant mode.
+                let account_name = self.current_account_subject.account_name_or_default();
+                let account = self
+                    .account_svc
+                    .get_account_by_name(account_name)
+                    .await
+                    .int_err()?;
+
+                Ok(ResolveAccountIdsByMaybeNamesResponse {
+                    resolved_account_ids: vec![(account.account_name, account.id)],
+                    unresolved_account_names: Vec::new(),
+                })
+            };
         }
 
         // 1. Read all available data from the cache
