@@ -295,6 +295,7 @@ impl AccountRepository for SqliteAccountRepository {
         query_builder.push_tuples(account_ids, |mut b, account_id| {
             b.push_bind(account_id.to_string());
         });
+        query_builder.push("ORDER BY account_name");
 
         let row_models = query_builder
             .build_query_as::<AccountRowModel>()
