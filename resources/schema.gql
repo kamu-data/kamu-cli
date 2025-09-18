@@ -150,7 +150,7 @@ type AccountFlowProcessDatasetCardEdge {
 
 type AccountFlowProcesses {
 	primaryRollup: FlowProcessGroupRollup!
-	datasetCards(page: Int, perPage: Int): AccountFlowProcessDatasetCardConnection!
+	datasetCards(ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessDatasetCardConnection!
 }
 
 type AccountFlowRuns {
@@ -2449,6 +2449,38 @@ type FlowProcessGroupRollup {
 	worstConsecutiveFailures: Int!
 }
 
+enum FlowProcessOrderField {
+	"""
+	Default for “recent activity”.
+	"""
+	LAST_ATTEMPT_AT
+	"""
+	“What’s next”
+	"""
+	NEXT_PLANNED_AT
+	"""
+	Triage hot spots.
+	"""
+	LAST_FAILURE_AT
+	"""
+	Chronic issues first.
+	"""
+	CONSECUTIVE_FAILURES
+	"""
+	Severity bucketing
+	"""
+	EFFECTIVE_STATE
+	"""
+	By flow type
+	"""
+	FLOW_TYPE
+}
+
+input FlowProcessOrdering {
+	field: FlowProcessOrderField!
+	direction: OrderingDirection!
+}
+
 type FlowProcessSummary {
 	effectiveState: FlowProcessEffectiveState!
 	consecutiveFailures: Int!
@@ -3011,6 +3043,11 @@ type OffsetInterval {
 	End of the closed interval [start; end].
 	"""
 	end: Int!
+}
+
+enum OrderingDirection {
+	ASC
+	DESC
 }
 
 type PageBasedInfo {

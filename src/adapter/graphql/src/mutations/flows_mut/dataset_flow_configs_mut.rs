@@ -33,7 +33,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowConfigsMut_set_ingest_config, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_ingest_config(
+    pub async fn set_ingest_config(
         &self,
         ctx: &Context<'_>,
         ingest_config_input: FlowConfigIngestInput,
@@ -80,7 +80,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowConfigsMut_set_ingest_config, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_compaction_config(
+    pub async fn set_compaction_config(
         &self,
         ctx: &Context<'_>,
         compaction_config_input: FlowConfigCompactionInput,
@@ -137,7 +137,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum SetFlowConfigResult {
+pub enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     PreconditionsNotMet(FlowPreconditionsNotMet),
@@ -146,7 +146,7 @@ enum SetFlowConfigResult {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-struct SetFlowConfigSuccess {
+pub struct SetFlowConfigSuccess {
     pub config: FlowConfiguration,
 }
 

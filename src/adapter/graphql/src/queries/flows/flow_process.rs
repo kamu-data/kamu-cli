@@ -27,11 +27,11 @@ impl<'a> FlowProcess<'a> {
         Self { process_state }
     }
 
-    async fn flow_type(&self) -> DatasetFlowType {
+    pub async fn flow_type(&self) -> DatasetFlowType {
         decode_dataset_flow_type(&self.process_state.flow_binding().flow_type)
     }
 
-    async fn summary(&self) -> FlowProcessSummary {
+    pub async fn summary(&self) -> FlowProcessSummary {
         (*self.process_state).clone().into()
     }
 }

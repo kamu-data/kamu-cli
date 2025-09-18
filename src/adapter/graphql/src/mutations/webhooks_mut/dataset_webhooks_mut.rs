@@ -37,7 +37,7 @@ impl<'a> DatasetWebhooksMut<'a> {
         })
     }
 
-    async fn create_subscription(
+    pub async fn create_subscription(
         &self,
         ctx: &Context<'_>,
         input: WebhookSubscriptionInput,

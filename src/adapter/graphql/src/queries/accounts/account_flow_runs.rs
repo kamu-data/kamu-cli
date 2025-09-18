@@ -48,7 +48,7 @@ impl<'a> AccountFlowRuns<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_flows, skip_all, fields(?page, ?per_page, ?filters))]
-    async fn list_flows(
+    pub async fn list_flows(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
@@ -138,7 +138,7 @@ impl<'a> AccountFlowRuns<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_datasets_with_flow, skip_all)]
-    async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
+    pub async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
         let logged = utils::logged_account(ctx);
         if !logged {
             return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
