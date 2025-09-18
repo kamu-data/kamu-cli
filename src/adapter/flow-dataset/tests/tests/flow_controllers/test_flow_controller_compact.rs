@@ -16,9 +16,10 @@ use kamu_adapter_task_dataset::{LogicalPlanDatasetHardCompact, TaskResultDataset
 use kamu_core::CompactionResult;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
-use kamu_flow_system_inmem::InMemoryFlowEventStore;
+use kamu_flow_system_inmem::*;
 use kamu_task_system::LogicalPlan;
 use serde_json::json;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -163,9 +164,11 @@ impl FlowControllerCompactHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerCompact>()
             .add::<InMemoryFlowEventStore>()
+            .add::<InMemoryFlowSystemEventStore>()
             .add_value(mock_flow_sensor_dispatcher)
             .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
-            .add::<FakeDatasetEntryService>();
+            .add::<FakeDatasetEntryService>()
+            .add::<SystemTimeSourceDefault>();
 
         let catalog = b.build();
         Self {

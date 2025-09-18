@@ -23,12 +23,7 @@ use kamu_datasets_services::testing::{
     MockDatasetIncrementQueryService,
 };
 use kamu_flow_system::FlowAgentConfig;
-use kamu_flow_system_inmem::{
-    InMemoryFlowConfigurationEventStore,
-    InMemoryFlowEventStore,
-    InMemoryFlowProcessState,
-    InMemoryFlowTriggerEventStore,
-};
+use kamu_flow_system_inmem::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use odf::metadata::testing::MetadataFactory;
@@ -600,6 +595,7 @@ impl FlowTriggerHarness {
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()
+                .add::<InMemoryFlowSystemEventStore>()
                 .add::<InMemoryFlowProcessState>()
                 .add_value(FlowAgentConfig::new(
                     Duration::seconds(1),

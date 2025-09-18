@@ -157,6 +157,7 @@ pub fn configure_database_components(
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
+            b.add::<kamu_flow_system_inmem::InMemoryFlowSystemEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowProcessState>();
 
             b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
@@ -226,6 +227,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
+    b.add::<kamu_flow_system_inmem::InMemoryFlowSystemEventStore>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowProcessState>();
 
     b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
