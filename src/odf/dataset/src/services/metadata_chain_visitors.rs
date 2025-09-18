@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::{HashSet, VecDeque};
 use std::error::Error;
 use std::marker::PhantomData;
 
@@ -15,6 +16,7 @@ use odf_metadata::{
     AddData,
     AddPushSource,
     AsTypedBlock,
+    DatasetKind,
     ExecuteTransform,
     IntoDataStreamBlock,
     MetadataBlock,
@@ -292,18 +294,30 @@ impl MetadataChainVisitor for SearchSingleDataBlockVisitor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SearchActivePushSourcesVisitor {
-    hashed_blocks: Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>,
+    dataset_kind: DatasetKind,
+    disabled_push_source_names: HashSet<String>,
+    active_push_sources: VecDeque<(Multihash, MetadataBlockTyped<AddPushSource>)>,
 }
 
 impl SearchActivePushSourcesVisitor {
-    pub fn new() -> Self {
+    const ROOT_SOURCE_RELATED_FLAGS: Flag = Flag::from_bits_retain(
+        Flag::SET_POLLING_SOURCE.bits()
+            | Flag::DISABLE_POLLING_SOURCE.bits()
+            | Flag::ADD_PUSH_SOURCE.bits()
+            | Flag::DISABLE_PUSH_SOURCE.bits(),
+    );
+
+    pub fn new(dataset_kind: DatasetKind) -> Self {
         Self {
-            hashed_blocks: vec![],
+            dataset_kind,
+            disabled_push_source_names: HashSet::new(),
+            active_push_sources: VecDeque::new(),
         }
     }
 
     pub fn into_hashed_blocks(self) -> Vec<(Multihash, MetadataBlockTyped<AddPushSource>)> {
-        self.hashed_blocks
+        // No reallocation
+        Vec::from(self.active_push_sources)
     }
 }
 
@@ -311,19 +325,46 @@ impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
     type Error = Infallible;
 
     fn initial_decision(&self) -> Decision {
-        Decision::NextOfType(Flag::ADD_PUSH_SOURCE)
+        match self.dataset_kind {
+            DatasetKind::Root => Decision::NextOfType(Self::ROOT_SOURCE_RELATED_FLAGS),
+            DatasetKind::Derivative => Decision::Stop,
+        }
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        // TODO: Add support of `DisablePushSource` events
-        let flag = Flag::from(&block.event);
+        match &block.event {
+            MetadataEvent::SetPollingSource(_) | MetadataEvent::DisablePollingSource(_) => {
+                // > Push and polling sources are mutually exclusive.
+                // > (c) RFC-011 (https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/011-push-ingest-sources.md#guide-level-explanation)
+                //
+                // Thus, if we encounter anything related to a polling source,
+                // it means earlier push source events are no longer relevant.
+                return Ok(Decision::Stop);
+            }
+            MetadataEvent::AddPushSource(add_push_source) => {
+                // Since we move backwards, we already know in advance whether a source is
+                // disabled.
+                let is_not_disabled = !self
+                    .disabled_push_source_names
+                    .contains(&add_push_source.source_name);
 
-        if flag == Flag::ADD_PUSH_SOURCE {
-            self.hashed_blocks
-                .push((hash.clone(), block.clone().into_typed().unwrap()));
+                if is_not_disabled {
+                    // SAFETY: block type verified
+                    let typed_block = block.clone().into_typed().unwrap();
+                    self.active_push_sources
+                        .push_front((hash.clone(), typed_block));
+                }
+            }
+            MetadataEvent::DisablePushSource(disable_push_source) => {
+                // Within this visitor, we assume the correctness of the metadata chain was
+                // already validated during event appending.
+                self.disabled_push_source_names
+                    .insert(disable_push_source.source_name.clone());
+            }
+            _ => { /* no action needed */ }
         }
 
-        Ok(Decision::NextOfType(Flag::ADD_PUSH_SOURCE))
+        Ok(Decision::NextOfType(Self::ROOT_SOURCE_RELATED_FLAGS))
     }
 }
 

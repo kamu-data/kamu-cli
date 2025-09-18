@@ -48,17 +48,18 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         )>,
         InternalError,
     > {
-        use futures::TryStreamExt;
-        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
-        use odf::metadata::AsTypedBlock;
+        use odf::dataset::MetadataChainExt;
 
-        // TODO: Support source disabling and evolution
-        let stream = target
+        let visitor = target
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(h, b)| b.into_typed().map(|b| (h, b)));
+            .accept_one(odf::dataset::SearchActivePushSourcesVisitor::new(
+                target.get_kind(),
+            ))
+            .await
+            .int_err()?;
+        let blocks = visitor.into_hashed_blocks();
 
-        Ok(stream.try_collect().await.int_err()?)
+        Ok(blocks)
     }
 
     /// Returns an active transform, if any

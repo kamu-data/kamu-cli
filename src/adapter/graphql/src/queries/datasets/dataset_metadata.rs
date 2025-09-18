@@ -333,6 +333,7 @@ impl<'a> DatasetMetadata<'a> {
             Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
                 .await?
                 .expect("Account must exist");
+        let dataset_kind = self.dataset_request_state.dataset_handle().kind;
 
         let mut attachments_visitor = event_types
             .contains(&MetadataEventType::SetAttachments)
@@ -360,7 +361,7 @@ impl<'a> DatasetMetadata<'a> {
             .then(odf::dataset::SearchSetTransformVisitor::new);
         let mut push_sources_visitor = event_types
             .contains(&MetadataEventType::AddPushSource)
-            .then(odf::dataset::SearchActivePushSourcesVisitor::new);
+            .then(|| odf::dataset::SearchActivePushSourcesVisitor::new(dataset_kind));
 
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
