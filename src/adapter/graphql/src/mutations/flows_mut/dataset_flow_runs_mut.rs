@@ -41,7 +41,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_ingest_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn trigger_ingest_flow(
+    pub async fn trigger_ingest_flow(
         &self,
         ctx: &Context<'_>,
         ingest_config_input: Option<FlowConfigIngestInput>,
@@ -98,7 +98,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_transform_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn trigger_transform_flow(&self, ctx: &Context<'_>) -> Result<TriggerFlowResult> {
+    pub async fn trigger_transform_flow(&self, ctx: &Context<'_>) -> Result<TriggerFlowResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         if let Err(e) = ensure_flow_applied_to_expected_dataset_kind(
             resolved_dataset,
@@ -139,7 +139,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_compaction_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn trigger_compaction_flow(
+    pub async fn trigger_compaction_flow(
         &self,
         ctx: &Context<'_>,
         compaction_config_input: Option<FlowConfigCompactionInput>,
@@ -205,7 +205,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_reset_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn trigger_reset_flow(
+    pub async fn trigger_reset_flow(
         &self,
         ctx: &Context<'_>,
         reset_config_input: Option<FlowConfigResetInput>,
@@ -287,7 +287,10 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_reset_to_metadata_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn trigger_reset_to_metadata_flow(&self, ctx: &Context<'_>) -> Result<TriggerFlowResult> {
+    pub async fn trigger_reset_to_metadata_flow(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<TriggerFlowResult> {
         // No constraints on dataset kind for reset to metadata flows
 
         if let Some(e) = ensure_flow_preconditions(
@@ -322,7 +325,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_cancel_flow_run, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn cancel_flow_run(
+    pub async fn cancel_flow_run(
         &self,
         ctx: &Context<'_>,
         flow_id: FlowID,
@@ -362,7 +365,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum TriggerFlowResult {
+pub enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     PreconditionsNotMet(FlowPreconditionsNotMet),
@@ -371,7 +374,7 @@ enum TriggerFlowResult {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-struct TriggerFlowSuccess {
+pub struct TriggerFlowSuccess {
     pub flow: Flow,
 }
 
@@ -386,14 +389,14 @@ impl TriggerFlowSuccess {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum CancelFlowRunResult {
+pub enum CancelFlowRunResult {
     Success(CancelFlowRunSuccess),
     NotFound(FlowNotFound),
 }
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-struct CancelFlowRunSuccess {
+pub struct CancelFlowRunSuccess {
     pub flow: Flow,
 }
 

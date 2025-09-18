@@ -32,7 +32,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
-    async fn update(
+    pub async fn update(
         &self,
         ctx: &Context<'_>,
         input: WebhookSubscriptionInput,
@@ -95,7 +95,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
-    async fn pause(&self, ctx: &Context<'_>) -> Result<PauseWebhookSubscriptionResult> {
+    pub async fn pause(&self, ctx: &Context<'_>) -> Result<PauseWebhookSubscriptionResult> {
         let pause_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::PauseWebhookSubscriptionUseCase);
 
@@ -123,7 +123,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
-    async fn resume(&self, ctx: &Context<'_>) -> Result<ResumeWebhookSubscriptionResult> {
+    pub async fn resume(&self, ctx: &Context<'_>) -> Result<ResumeWebhookSubscriptionResult> {
         let resume_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::ResumeWebhookSubscriptionUseCase);
 
@@ -151,7 +151,10 @@ impl WebhookSubscriptionMut {
         }
     }
 
-    async fn reactivate(&self, ctx: &Context<'_>) -> Result<ReactivateWebhookSubscriptionResult> {
+    pub async fn reactivate(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<ReactivateWebhookSubscriptionResult> {
         let reactivate_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::ReactivateWebhookSubscriptionUseCase);
 
@@ -179,7 +182,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
-    async fn remove(&self, ctx: &Context<'_>) -> Result<RemoveWebhookSubscriptionResult> {
+    pub async fn remove(&self, ctx: &Context<'_>) -> Result<RemoveWebhookSubscriptionResult> {
         let remove_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::RemoveWebhookSubscriptionUseCase);
 

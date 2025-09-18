@@ -30,28 +30,28 @@ impl WebhookSubscription {
 #[Object]
 impl WebhookSubscription {
     /// Unique identifier of the webhook subscription
-    async fn id(&self) -> WebhookSubscriptionID {
+    pub async fn id(&self) -> WebhookSubscriptionID {
         self.state.id().into()
     }
 
     /// Optional label for the subscription. Maybe an empty string.
-    async fn label(&self) -> String {
+    pub async fn label(&self) -> String {
         self.state.label().to_string()
     }
 
     /// Associated dataset ID
     /// Not present for system subscriptions
-    async fn dataset_id(&self) -> Option<DatasetID<'_>> {
+    pub async fn dataset_id(&self) -> Option<DatasetID<'_>> {
         self.state.dataset_id().map(Into::into)
     }
 
     /// Target URL for the webhook
-    async fn target_url(&self) -> String {
+    pub async fn target_url(&self) -> String {
         self.state.target_url().to_string()
     }
 
     /// List of events that trigger the webhook
-    async fn event_types(&self) -> Vec<String> {
+    pub async fn event_types(&self) -> Vec<String> {
         self.state
             .event_types()
             .iter()
@@ -60,7 +60,7 @@ impl WebhookSubscription {
     }
 
     /// Status of the subscription
-    async fn status(&self) -> WebhookSubscriptionStatus {
+    pub async fn status(&self) -> WebhookSubscriptionStatus {
         self.state.status().into()
     }
 }

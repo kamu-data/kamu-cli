@@ -30,7 +30,7 @@ impl<'a> AccountFlowTriggersMut<'a> {
     }
 
     #[graphql(skip)]
-    async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<odf::DatasetID>> {
+    pub async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<odf::DatasetID>> {
         let dataset_entry_service = from_catalog_n!(ctx, dyn DatasetEntryService);
         let dataset_ids: Vec<_> = dataset_entry_service
             .get_owned_dataset_ids(&self.account.id)
@@ -41,7 +41,7 @@ impl<'a> AccountFlowTriggersMut<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowTriggersMut_resume_account_dataset_flows, skip_all)]
-    async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
+    pub async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
@@ -59,7 +59,7 @@ impl<'a> AccountFlowTriggersMut<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowTriggersMut_pause_account_dataset_flows, skip_all)]
-    async fn pause_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
+    pub async fn pause_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;

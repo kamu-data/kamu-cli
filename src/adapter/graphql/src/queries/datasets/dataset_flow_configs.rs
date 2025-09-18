@@ -31,7 +31,7 @@ impl<'a> DatasetFlowConfigs<'a> {
 
     /// Returns defined configuration for a flow of specified type
     #[tracing::instrument(level = "info", name = DatasetFlowConfigs_by_type, skip_all, fields(?dataset_flow_type))]
-    async fn by_type(
+    pub async fn by_type(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
