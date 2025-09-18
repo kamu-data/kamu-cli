@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Postgres;
@@ -18,6 +18,8 @@ use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn FlowProcessStateRepository)]
 pub struct PostgresFlowProcessStateRepository {
     transaction: TransactionRefT<Postgres>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -25,16 +27,7 @@ pub struct PostgresFlowProcessStateRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn FlowProcessStateRepository)]
 impl PostgresFlowProcessStateRepository {
-    pub fn new(transaction: TransactionRef, time_source: Arc<dyn SystemTimeSource>) -> Self {
-        Self {
-            transaction: transaction.into(),
-            time_source,
-        }
-    }
-
     async fn load_process_state(
         &self,
         flow_binding: &FlowBinding,
