@@ -17,12 +17,13 @@ use kamu_adapter_task_webhook::LogicalPlanWebhookDeliver;
 use kamu_datasets::DatasetEntry;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
-use kamu_flow_system_inmem::InMemoryFlowEventStore;
+use kamu_flow_system_inmem::*;
 use kamu_task_system::{LogicalPlan, TaskResult};
 use kamu_webhooks::{WebhookEventType, WebhookEventTypeCatalog, WebhookSubscriptionID};
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use kamu_webhooks_services::WebhookSubscriptionQueryServiceImpl;
 use serde_json::json;
+use time_source::SystemTimeSourceDefault;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -246,7 +247,9 @@ impl FlowControllerWebhookDeliverHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerWebhookDeliver>()
             .add::<InMemoryFlowEventStore>()
+            .add::<InMemoryFlowSystemEventStore>()
             .add::<FakeDatasetEntryService>()
+            .add::<SystemTimeSourceDefault>()
             .add_value(mock_flow_sensor_dispatcher)
             .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
             .add::<WebhookSubscriptionQueryServiceImpl>()
