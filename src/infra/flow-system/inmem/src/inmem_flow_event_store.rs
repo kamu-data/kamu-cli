@@ -8,16 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
 
+use crate::flow_event_data_helper::FlowEventDataHelper;
+use crate::{FlowSystemEventSourceType, InMemoryFlowSystemEventStore};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowEventStore {
     inner: InMemoryEventStore<FlowState, State>,
+    flow_system_event_store: Arc<InMemoryFlowSystemEventStore>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,9 +123,10 @@ impl FlowIndexEntry {
 #[interface(dyn FlowEventStore)]
 #[scope(Singleton)]
 impl InMemoryFlowEventStore {
-    pub fn new() -> Self {
+    pub fn new(flow_system_event_store: Arc<InMemoryFlowSystemEventStore>) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
+            flow_system_event_store,
         }
     }
 
@@ -242,6 +248,19 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        // Skip empty writes
+        if events.is_empty() {
+            return Err(SaveEventsError::NothingToSave);
+        }
+
+        // Prepare data for FlowSystemEventStore - a merged stream
+        let merge_event_data = FlowEventDataHelper::prepare_merge_event_data(
+            &events,
+            maybe_prev_stored_event_id,
+            FlowEvent::event_time,
+        );
+
+        // Update in-memory indexes
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
@@ -250,9 +269,17 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
             }
         }
 
-        self.inner
+        // Save events to this store
+        let event_id = self
+            .inner
             .save_events(query, maybe_prev_stored_event_id, events)
-            .await
+            .await?;
+
+        // Save merged events to FlowSystemEventStore
+        self.flow_system_event_store
+            .save_events(FlowSystemEventSourceType::Flow, &merge_event_data);
+
+        Ok(event_id)
     }
 }
 

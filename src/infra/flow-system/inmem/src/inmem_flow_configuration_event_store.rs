@@ -8,14 +8,19 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use dill::*;
 use kamu_flow_system::*;
+
+use crate::flow_event_data_helper::FlowEventDataHelper;
+use crate::{FlowSystemEventSourceType, InMemoryFlowSystemEventStore};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowConfigurationEventStore {
     inner: InMemoryEventStore<FlowConfigurationState, State>,
+    flow_system_event_store: Arc<InMemoryFlowSystemEventStore>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,9 +50,10 @@ impl EventStoreState<FlowConfigurationState> for State {
 #[interface(dyn FlowConfigurationEventStore)]
 #[scope(Singleton)]
 impl InMemoryFlowConfigurationEventStore {
-    pub fn new() -> Self {
+    pub fn new(flow_system_event_store: Arc<InMemoryFlowSystemEventStore>) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
+            flow_system_event_store,
         }
     }
 }
@@ -82,13 +88,31 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        // Skip empty saves
         if events.is_empty() {
             return Err(SaveEventsError::NothingToSave);
         }
 
-        self.inner
+        // Prepare data for FlowSystemEventStore - a merged stream
+        let merge_event_data = FlowEventDataHelper::prepare_merge_event_data(
+            &events,
+            maybe_prev_stored_event_id,
+            FlowConfigurationEvent::event_time,
+        );
+
+        // Save events to this store
+        let event_id = self
+            .inner
             .save_events(query, maybe_prev_stored_event_id, events)
-            .await
+            .await?;
+
+        // Save merged events to FlowSystemEventStore
+        self.flow_system_event_store.save_events(
+            FlowSystemEventSourceType::FlowConfiguration,
+            &merge_event_data,
+        );
+
+        Ok(event_id)
     }
 }
 
