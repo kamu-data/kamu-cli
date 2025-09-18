@@ -9766,7 +9766,6 @@ dependencies = [
  "base64 0.22.1",
  "bitflags",
  "chrono",
- "datafusion",
  "digest 0.10.7",
  "ed25519-dalek",
  "enum-variants",

@@ -482,7 +482,7 @@ impl SetDataSchemaBuilder {
     }
 
     #[cfg(feature = "arrow")]
-    pub fn schema_from_arrow(mut self, schema: &datafusion::arrow::datatypes::Schema) -> Self {
+    pub fn schema_from_arrow(mut self, schema: &arrow::datatypes::Schema) -> Self {
         self.v = SetDataSchema::new(DataSchema::new_from_arrow(schema).unwrap().strip_encoding());
         self
     }

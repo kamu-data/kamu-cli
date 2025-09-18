@@ -32,7 +32,7 @@ sqlx = ["dep:sqlx"]
 sqlx-mysql = ["sqlx", "sqlx/mysql"]
 sqlx-postgres = ["sqlx", "sqlx/postgres"]
 sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
-testing = ["dep:datafusion", "dep:rand", "did-pkh"]
+testing = ["dep:rand", "did-pkh"]
 utoipa = ["multiformats/utoipa", "dep:utoipa"]
 
 
@@ -62,7 +62,7 @@ ed25519-dalek = { version = "2", default-features = false, features = [
 base64 = { version = "0.22", default-features = false, features = ["std"] }
 flatbuffers = "25"
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", default-features = false }
+serde_json = { version = "1", default-features = false, features = ["std"] }
 serde_with = "3"
 serde_yaml = "0.9"
 
@@ -81,7 +81,6 @@ tonic = { version = "0.12", default-features = false, features = [
 arrow = { optional = true, version = "55", default-features = false, features = [
     "ipc",
 ] }
-datafusion = { optional = true, version = "49", default-features = false }
 rand = { optional = true, version = "0.8", default-features = false }
 sqlx = { optional = true, version = "0.8", default-features = false }
 ssi-caips = { optional = true, version = "0.2", default-features = false, features = [
@@ -91,7 +90,6 @@ utoipa = { optional = true, version = "5", default-features = false }
 
 
 [dev-dependencies]
-datafusion = { version = "49", default-features = false }
 indoc = "2"
 pretty_assertions = { version = "1" }
 rand = { version = "0.8", default-features = false }
