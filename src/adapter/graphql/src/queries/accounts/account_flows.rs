@@ -26,17 +26,17 @@ impl<'a> AccountFlows<'a> {
     }
 
     /// Returns interface for flow processes summary queries
-    async fn processes(&self) -> AccountFlowProcesses {
+    pub async fn processes(&self) -> AccountFlowProcesses {
         AccountFlowProcesses::new(self.account)
     }
 
     /// Returns interface for flow runs queries
-    async fn runs(&self) -> AccountFlowRuns {
+    pub async fn runs(&self) -> AccountFlowRuns {
         AccountFlowRuns::new(self.account)
     }
 
     /// Returns interface for flow triggers queries
-    async fn triggers(&self) -> AccountFlowTriggers {
+    pub async fn triggers(&self) -> AccountFlowTriggers {
         AccountFlowTriggers::new(self.account)
     }
 }

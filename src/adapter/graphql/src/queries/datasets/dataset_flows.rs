@@ -27,22 +27,22 @@ impl<'a> DatasetFlows<'a> {
     }
 
     /// Returns interface for flow configurations queries
-    async fn configs(&self) -> DatasetFlowConfigs {
+    pub async fn configs(&self) -> DatasetFlowConfigs {
         DatasetFlowConfigs::new(self.dataset_request_state)
     }
 
     /// Returns interface for flow triggers queries
-    async fn triggers(&self) -> DatasetFlowTriggers {
+    pub async fn triggers(&self) -> DatasetFlowTriggers {
         DatasetFlowTriggers::new(self.dataset_request_state)
     }
 
     /// Returns interface for flow runs queries
-    async fn runs(&self) -> DatasetFlowRuns {
+    pub async fn runs(&self) -> DatasetFlowRuns {
         DatasetFlowRuns::new(self.dataset_request_state)
     }
 
     /// Returns interface for flow processes queries
-    async fn processes(&self) -> DatasetFlowProcesses {
+    pub async fn processes(&self) -> DatasetFlowProcesses {
         DatasetFlowProcesses::new(self.dataset_request_state)
     }
 }

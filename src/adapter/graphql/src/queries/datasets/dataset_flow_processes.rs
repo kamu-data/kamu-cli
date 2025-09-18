@@ -32,7 +32,7 @@ impl<'a> DatasetFlowProcesses<'a> {
         }
     }
 
-    async fn primary(&self, ctx: &Context<'_>) -> Result<Option<FlowProcess>> {
+    pub async fn primary(&self, ctx: &Context<'_>) -> Result<Option<FlowProcess>> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
 
         // Updates are the primary periodic process for datasets

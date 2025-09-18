@@ -19,12 +19,7 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_core::DatasetRegistry;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use kamu_flow_system::{
-    FlowProcessListFilter,
-    FlowProcessOrder,
-    FlowProcessState,
-    FlowProcessStateQuery,
-};
+use kamu_flow_system as fs;
 
 use crate::prelude::*;
 use crate::queries::{
@@ -54,19 +49,9 @@ impl<'a> AccountFlowProcesses<'a> {
 
     #[allow(clippy::unused_async)]
     pub async fn primary_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
-        let (dataset_entry_service, flow_process_state_query) =
-            from_catalog_n!(ctx, dyn DatasetEntryService, dyn FlowProcessStateQuery);
+        let scope_query = self.build_scope_query(ctx).await?;
 
-        let owned_dataset_ids = dataset_entry_service
-            .get_owned_dataset_ids(&self.account.id)
-            .await
-            .int_err()?;
-
-        let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
-
-        let scope_query =
-            FlowScopeDataset::query_for_multiple_datasets_only(&owned_dataset_id_refs);
-
+        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
         let rollup = flow_process_state_query
             .rollup_by_scope(
                 scope_query,
@@ -79,18 +64,61 @@ impl<'a> AccountFlowProcesses<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_dataset_cards, skip_all, fields(?page, ?per_page))]
-    async fn dataset_cards(
+    pub async fn dataset_cards(
         &self,
         ctx: &Context<'_>,
+        ordering: Option<FlowProcessOrdering>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<AccountFlowProcessDatasetCardConnection> {
-        let (dataset_entry_service, dataset_registry, flow_process_state_query) = from_catalog_n!(
-            ctx,
-            dyn DatasetEntryService,
-            dyn DatasetRegistry,
-            dyn FlowProcessStateQuery
+        let scope_query = self.build_scope_query(ctx).await?;
+        let filter = fs::FlowProcessListFilter::for_scope(scope_query)
+            .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]);
+
+        let ordering = self.convert_ordering(ordering);
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+        let pagination = PaginationOpts::from_page(page, per_page);
+
+        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
+        let listing = flow_process_state_query
+            .list_processes(filter, ordering, Some(pagination))
+            .await?;
+
+        let dataset_handles_by_id = self.build_dataset_id_handle_mapping(ctx, &listing).await?;
+
+        let account = Account::new(
+            self.account.id.clone().into(),
+            self.account.account_name.clone().into(),
         );
+
+        let dataset_cards: Vec<_> = listing
+            .processes
+            .into_iter()
+            .map(|process_state| {
+                let dataset_id =
+                    FlowScopeDataset::new(&process_state.flow_binding().scope).dataset_id();
+                let hdl = dataset_handles_by_id
+                    .get(&dataset_id)
+                    .expect("Inconsistent state: all datasets with flows must exist")
+                    .clone();
+
+                AccountFlowProcessDatasetCard::new(account.clone(), hdl, process_state)
+            })
+            .collect();
+
+        Ok(AccountFlowProcessDatasetCardConnection::new(
+            dataset_cards,
+            page,
+            per_page,
+            listing.total_count,
+        ))
+    }
+
+    #[graphql(skip)]
+    async fn build_scope_query(&self, ctx: &Context<'_>) -> Result<fs::FlowScopeQuery> {
+        let dataset_entry_service = from_catalog_n!(ctx, dyn DatasetEntryService);
 
         let owned_dataset_ids = dataset_entry_service
             .get_owned_dataset_ids(&self.account.id)
@@ -99,23 +127,33 @@ impl<'a> AccountFlowProcesses<'a> {
 
         let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
 
-        let scope_query =
-            FlowScopeDataset::query_for_multiple_datasets_only(&owned_dataset_id_refs);
+        Ok(FlowScopeDataset::query_for_multiple_datasets_only(
+            &owned_dataset_id_refs,
+        ))
+    }
 
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+    #[graphql(skip)]
+    fn convert_ordering(&self, ordering: Option<FlowProcessOrdering>) -> fs::FlowProcessOrder {
+        ordering
+            .map(|ordering| fs::FlowProcessOrder {
+                field: ordering.field.into(),
+                desc: match ordering.direction {
+                    OrderingDirection::Asc => false,
+                    OrderingDirection::Desc => true,
+                },
+            })
+            .unwrap_or_else(fs::FlowProcessOrder::recent)
+    }
 
-        let listing = flow_process_state_query
-            .list_processes(
-                FlowProcessListFilter::for_scope(scope_query)
-                    .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]),
-                FlowProcessOrder::recent(),
-                Some(PaginationOpts::from_page(page, per_page)),
-            )
-            .await?;
+    #[graphql(skip)]
+    async fn build_dataset_id_handle_mapping(
+        &self,
+        ctx: &Context<'_>,
+        matched_processes_listing: &fs::FlowProcessStateListing,
+    ) -> Result<HashMap<odf::DatasetID, odf::DatasetHandle>> {
+        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
 
-        // The way we queried for processes guarantees the IDs won't duplicate
-        let matched_dataset_ids = listing
+        let matched_dataset_ids = matched_processes_listing
             .processes
             .iter()
             .map(|proc| FlowScopeDataset::new(&proc.flow_binding().scope).dataset_id())
@@ -135,38 +173,11 @@ impl<'a> AccountFlowProcesses<'a> {
             unreachable!("Inconsistent state: all datasets with flows must exist");
         }
 
-        let dataset_handles_by_ids = dataset_handles_resolution
+        Ok(dataset_handles_resolution
             .resolved_handles
             .into_iter()
             .map(|hdl| (hdl.id.clone(), hdl))
-            .collect::<HashMap<_, _>>();
-
-        let account = Account::new(
-            self.account.id.clone().into(),
-            self.account.account_name.clone().into(),
-        );
-
-        let dataset_cards: Vec<_> = listing
-            .processes
-            .into_iter()
-            .map(|process_state| {
-                let dataset_id =
-                    FlowScopeDataset::new(&process_state.flow_binding().scope).dataset_id();
-                let hdl = dataset_handles_by_ids
-                    .get(&dataset_id)
-                    .expect("Inconsistent state: all datasets with flows must exist")
-                    .clone();
-
-                AccountFlowProcessDatasetCard::new(account.clone(), hdl, process_state)
-            })
-            .collect();
-
-        Ok(AccountFlowProcessDatasetCardConnection::new(
-            dataset_cards,
-            page,
-            per_page,
-            listing.total_count,
-        ))
+            .collect::<HashMap<_, _>>())
     }
 }
 
@@ -174,7 +185,7 @@ impl<'a> AccountFlowProcesses<'a> {
 
 pub struct AccountFlowProcessDatasetCard {
     dataset_request_state: DatasetRequestStateWithOwner,
-    process_state: FlowProcessState,
+    process_state: fs::FlowProcessState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -184,7 +195,7 @@ impl AccountFlowProcessDatasetCard {
     pub fn new(
         account: Account,
         dataset_handle: odf::DatasetHandle,
-        process_state: FlowProcessState,
+        process_state: fs::FlowProcessState,
     ) -> Self {
         Self {
             dataset_request_state: DatasetRequestState::new(dataset_handle).with_owner(account),
@@ -213,5 +224,35 @@ page_based_connection!(
     AccountFlowProcessDatasetCardConnection,
     AccountFlowProcessDatasetCardEdge
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject, Debug, Clone)]
+pub(crate) struct FlowProcessOrdering {
+    pub field: FlowProcessOrderField,
+    pub direction: OrderingDirection,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
+#[graphql(remote = "fs::FlowProcessOrderField")]
+pub(crate) enum FlowProcessOrderField {
+    /// Default for “recent activity”.
+    LastAttemptAt,
+
+    /// “What’s next”
+    NextPlannedAt,
+
+    /// Triage hot spots.
+    LastFailureAt,
+
+    /// Chronic issues first.
+    ConsecutiveFailures,
+
+    /// Severity bucketing
+    EffectiveState,
+
+    /// By flow type
+    FlowType,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

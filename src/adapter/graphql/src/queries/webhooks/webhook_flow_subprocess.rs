@@ -47,7 +47,7 @@ impl WebhookFlowSubProcess {
     }
 
     #[allow(clippy::unused_async)]
-    async fn summary(&self) -> Result<FlowProcessSummary> {
+    pub async fn summary(&self) -> Result<FlowProcessSummary> {
         Ok(self.flow_process_state.clone().into())
     }
 }

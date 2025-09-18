@@ -32,15 +32,15 @@ impl<'a> DatasetFlowsMut<'a> {
         })
     }
 
-    async fn configs(&self) -> DatasetFlowConfigsMut {
+    pub async fn configs(&self) -> DatasetFlowConfigsMut {
         DatasetFlowConfigsMut::new(self.dataset_request_state)
     }
 
-    async fn runs(&self) -> DatasetFlowRunsMut {
+    pub async fn runs(&self) -> DatasetFlowRunsMut {
         DatasetFlowRunsMut::new(self.dataset_request_state)
     }
 
-    async fn triggers(&self) -> DatasetFlowTriggersMut {
+    pub async fn triggers(&self) -> DatasetFlowTriggersMut {
         DatasetFlowTriggersMut::new(self.dataset_request_state)
     }
 }

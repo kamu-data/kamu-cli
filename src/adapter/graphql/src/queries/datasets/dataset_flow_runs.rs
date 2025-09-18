@@ -42,7 +42,7 @@ impl<'a> DatasetFlowRuns<'a> {
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_get_flow, skip_all, fields(%flow_id))]
-    async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
+    pub async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
         if let Some(error) = check_if_flow_belongs_to_dataset(
             ctx,
             flow_id,
@@ -71,7 +71,7 @@ impl<'a> DatasetFlowRuns<'a> {
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_list_flows, skip_all, fields(?page, ?per_page))]
-    async fn list_flows(
+    pub async fn list_flows(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
@@ -129,7 +129,7 @@ impl<'a> DatasetFlowRuns<'a> {
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_list_flow_initiators, skip_all)]
-    async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
+    pub async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
         let (flow_query_service, account_service) =
             from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn AccountService);
 
@@ -172,14 +172,14 @@ page_based_connection!(Account, AccountConnection, AccountEdge);
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum GetFlowResult {
+pub enum GetFlowResult {
     Success(GetFlowSuccess),
     NotFound(FlowNotFound),
 }
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-struct GetFlowSuccess {
+pub struct GetFlowSuccess {
     pub flow: Flow,
 }
 
