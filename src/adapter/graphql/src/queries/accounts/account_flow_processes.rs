@@ -10,6 +10,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use kamu_accounts::Account as AccountEntity;
 use kamu_adapter_flow_dataset::{
@@ -67,13 +68,33 @@ impl<'a> AccountFlowProcesses<'a> {
     pub async fn dataset_cards(
         &self,
         ctx: &Context<'_>,
+        filters: Option<FlowProcessFilters>,
         ordering: Option<FlowProcessOrdering>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<AccountFlowProcessDatasetCardConnection> {
+        let filters = filters.unwrap_or_default();
+
         let scope_query = self.build_scope_query(ctx).await?;
+
+        let effective_state_in_converted: Option<Vec<fs::FlowProcessEffectiveState>> = filters
+            .effective_state_in
+            .as_ref()
+            .map(|v| v.iter().map(|s| (*s).into()).collect());
+
         let filter = fs::FlowProcessListFilter::for_scope(scope_query)
-            .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]);
+            .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM])
+            .with_effective_states_opt(effective_state_in_converted.as_deref())
+            .with_last_attempt_between_opt(
+                filters
+                    .last_attempt_between
+                    .as_ref()
+                    .map(|r| (r.start, r.end)),
+            )
+            .with_last_failure_since_opt(filters.last_failure_since)
+            .with_next_planned_after_opt(filters.next_planned_after)
+            .with_next_planned_before_opt(filters.next_planned_before)
+            .with_min_consecutive_failures_opt(filters.min_consecutive_failures);
 
         let ordering = self.convert_ordering(ordering);
 
@@ -227,15 +248,44 @@ page_based_connection!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(InputObject, Debug, Default)]
+pub struct FlowProcessFilters {
+    /// State filter
+    pub effective_state_in: Option<Vec<FlowProcessEffectiveState>>,
+
+    /// All processes with last attempt between these times, inclusive
+    pub last_attempt_between: Option<FlowProcessFiltersTimeRange>,
+
+    /// All processes with last failure since this time, inclusive
+    pub last_failure_since: Option<DateTime<Utc>>,
+
+    /// All processes with next planned before this time, inclusive
+    pub next_planned_before: Option<DateTime<Utc>>,
+
+    /// All processes with next planned after this time, inclusive
+    pub next_planned_after: Option<DateTime<Utc>>,
+
+    /// Minimum number of consecutive failures
+    pub min_consecutive_failures: Option<u32>,
+}
+
+#[derive(InputObject, Debug)]
+pub struct FlowProcessFiltersTimeRange {
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(InputObject, Debug, Clone)]
-pub(crate) struct FlowProcessOrdering {
+pub struct FlowProcessOrdering {
     pub field: FlowProcessOrderField,
     pub direction: OrderingDirection,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
 #[graphql(remote = "fs::FlowProcessOrderField")]
-pub(crate) enum FlowProcessOrderField {
+pub enum FlowProcessOrderField {
     /// Default for “recent activity”.
     LastAttemptAt,
 

@@ -150,7 +150,7 @@ type AccountFlowProcessDatasetCardEdge {
 
 type AccountFlowProcesses {
 	primaryRollup: FlowProcessGroupRollup!
-	datasetCards(ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessDatasetCardConnection!
+	datasetCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessDatasetCardConnection!
 }
 
 type AccountFlowRuns {
@@ -2438,6 +2438,38 @@ enum FlowProcessEffectiveState {
 	FAILING
 	PAUSED_MANUAL
 	STOPPED_AUTO
+}
+
+input FlowProcessFilters {
+	"""
+	State filter
+	"""
+	effectiveStateIn: [FlowProcessEffectiveState!]
+	"""
+	All processes with last attempt between these times, inclusive
+	"""
+	lastAttemptBetween: FlowProcessFiltersTimeRange
+	"""
+	All processes with last failure since this time, inclusive
+	"""
+	lastFailureSince: DateTime
+	"""
+	All processes with next planned before this time, inclusive
+	"""
+	nextPlannedBefore: DateTime
+	"""
+	All processes with next planned after this time, inclusive
+	"""
+	nextPlannedAfter: DateTime
+	"""
+	Minimum number of consecutive failures
+	"""
+	minConsecutiveFailures: Int
+}
+
+input FlowProcessFiltersTimeRange {
+	start: DateTime!
+	end: DateTime!
 }
 
 type FlowProcessGroupRollup {

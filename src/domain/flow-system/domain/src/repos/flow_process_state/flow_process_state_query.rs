@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
@@ -71,11 +72,10 @@ pub struct FlowProcessListFilter<'a> {
     pub effective_state_in: Option<&'a [FlowProcessEffectiveState]>,
 
     /// Time windows (UTC). Bounds inclusive.
-    pub last_attempt_between:
-        Option<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)>,
-    pub last_failure_since: Option<chrono::DateTime<chrono::Utc>>,
-    pub next_planned_before: Option<chrono::DateTime<chrono::Utc>>,
-    pub next_planned_after: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_attempt_between: Option<(DateTime<Utc>, DateTime<Utc>)>,
+    pub last_failure_since: Option<DateTime<Utc>>,
+    pub next_planned_before: Option<DateTime<Utc>>,
+    pub next_planned_after: Option<DateTime<Utc>>,
 
     /// Severity cut.
     pub min_consecutive_failures: Option<u32>,
@@ -140,46 +140,68 @@ impl<'a> FlowProcessListFilter<'a> {
     }
 
     /// Adding last attempt time window filter.
-    pub fn with_last_attempt_between(
-        self,
-        start: chrono::DateTime<chrono::Utc>,
-        end: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
+    pub fn with_last_attempt_between(self, start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
         Self {
             last_attempt_between: Some((start, end)),
             ..self
         }
     }
 
-    /// Adding last failure since filter.
-    pub fn with_last_failure_since(
+    /// Adding last attempt time window filter (optional).
+    pub fn with_last_attempt_between_opt(
         self,
-        last_failure_since: chrono::DateTime<chrono::Utc>,
+        last_attempt_between: Option<(DateTime<Utc>, DateTime<Utc>)>,
     ) -> Self {
+        Self {
+            last_attempt_between,
+            ..self
+        }
+    }
+
+    /// Adding last failure since filter.
+    pub fn with_last_failure_since(self, last_failure_since: DateTime<Utc>) -> Self {
         Self {
             last_failure_since: Some(last_failure_since),
             ..self
         }
     }
 
+    /// Adding last failure since filter (optional).
+    pub fn with_last_failure_since_opt(self, last_failure_since: Option<DateTime<Utc>>) -> Self {
+        Self {
+            last_failure_since,
+            ..self
+        }
+    }
+
     /// Adding next planned before filter.
-    pub fn with_next_planned_before(
-        self,
-        next_planned_before: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
+    pub fn with_next_planned_before(self, next_planned_before: DateTime<Utc>) -> Self {
         Self {
             next_planned_before: Some(next_planned_before),
             ..self
         }
     }
 
+    /// Adding next planned before filter (optional).
+    pub fn with_next_planned_before_opt(self, next_planned_before: Option<DateTime<Utc>>) -> Self {
+        Self {
+            next_planned_before,
+            ..self
+        }
+    }
+
     /// Adding next planned after filter.
-    pub fn with_next_planned_after(
-        self,
-        next_planned_after: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
+    pub fn with_next_planned_after(self, next_planned_after: DateTime<Utc>) -> Self {
         Self {
             next_planned_after: Some(next_planned_after),
+            ..self
+        }
+    }
+
+    /// Adding next planned after filter (optional).
+    pub fn with_next_planned_after_opt(self, next_planned_after: Option<DateTime<Utc>>) -> Self {
+        Self {
+            next_planned_after,
             ..self
         }
     }
@@ -188,6 +210,14 @@ impl<'a> FlowProcessListFilter<'a> {
     pub fn with_min_consecutive_failures(self, min_consecutive_failures: u32) -> Self {
         Self {
             min_consecutive_failures: Some(min_consecutive_failures),
+            ..self
+        }
+    }
+
+    /// Adding minimum consecutive failures filter (optional).
+    pub fn with_min_consecutive_failures_opt(self, min_consecutive_failures: Option<u32>) -> Self {
+        Self {
+            min_consecutive_failures,
             ..self
         }
     }
