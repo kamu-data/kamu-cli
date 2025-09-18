@@ -231,14 +231,13 @@ where
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         let flag = Flag::from(&block.event);
 
-        let decision = if self.requested_flag.contains(flag) {
-            self.hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
-            Decision::Stop
-        } else {
-            Decision::NextOfType(self.requested_flag)
-        };
+        if !self.requested_flag.contains(flag) {
+            unreachable!();
+        }
 
-        Ok(decision)
+        self.hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
+
+        Ok(Decision::Stop)
     }
 }
 
