@@ -90,15 +90,19 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         resolved_dataset: &ResolvedDataset,
     ) -> Result<Option<DateTime<Utc>>, InternalError> {
         use odf::dataset::MetadataChainExt;
-        let mut add_data_visitor = odf::dataset::SearchAddDataVisitor::new();
 
-        resolved_dataset
+        let visitor = resolved_dataset
             .as_metadata_chain()
-            .accept(&mut [&mut add_data_visitor])
+            .accept_one(odf::dataset::SearchAddDataVisitor::new(
+                resolved_dataset.get_kind(),
+            ))
             .await
             .int_err()?;
 
-        let current_watermark = add_data_visitor.into_event().and_then(|e| e.new_watermark);
+        let current_watermark = visitor
+            .into_inner()
+            .into_event()
+            .and_then(|e| e.new_watermark);
 
         Ok(current_watermark)
     }

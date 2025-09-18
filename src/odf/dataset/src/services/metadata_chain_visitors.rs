@@ -71,9 +71,28 @@ macro_rules! typed_search_single_typed_block_visitor_impl {
         pub struct $name {}
 
         impl $name {
-            #[allow(clippy::new_ret_no_self)]
+            #[expect(clippy::new_ret_no_self)]
             pub fn new() -> SearchSingleTypedBlockVisitor<$event_struct> {
                 SearchSingleTypedBlockVisitor::new($block_type_flags)
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! typed_kind_based_search_single_typed_block_visitor_impl {
+    ($expected_kind:expr, $name:ident, $event_struct:ty, $block_type_flags:expr) => {
+        pub struct $name {}
+
+        impl $name {
+            #[expect(clippy::new_ret_no_self)]
+            pub fn new(
+                actual_dataset_kind: DatasetKind,
+            ) -> DatasetKindBasedVisitor<SearchSingleTypedBlockVisitor<$event_struct>, Infallible>
+            {
+                let visitor = SearchSingleTypedBlockVisitor::new($block_type_flags);
+                DatasetKindBasedVisitor::new($expected_kind, actual_dataset_kind, visitor)
             }
         }
     };
@@ -114,7 +133,12 @@ typed_search_single_typed_block_visitor_impl!(
     SetLicense,
     Flag::SET_LICENSE
 );
-typed_search_single_typed_block_visitor_impl!(SearchAddDataVisitor, AddData, Flag::ADD_DATA);
+typed_kind_based_search_single_typed_block_visitor_impl!(
+    DatasetKind::Root,
+    SearchAddDataVisitor,
+    AddData,
+    Flag::ADD_DATA
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -215,6 +239,74 @@ where
         };
 
         Ok(decision)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DatasetKindBasedVisitor<V, E>
+where
+    V: MetadataChainVisitor<Error = E>,
+{
+    expected_dataset_kind: DatasetKind,
+    actual_dataset_kind: DatasetKind,
+    visitor: V,
+}
+
+impl<V, E> DatasetKindBasedVisitor<V, E>
+where
+    V: MetadataChainVisitor<Error = E>,
+{
+    pub fn new(
+        expected_dataset_kind: DatasetKind,
+        actual_dataset_kind: DatasetKind,
+        visitor: V,
+    ) -> Self {
+        Self {
+            expected_dataset_kind,
+            actual_dataset_kind,
+            visitor,
+        }
+    }
+
+    pub fn into_inner(self) -> V {
+        self.visitor
+    }
+}
+
+impl<V, E> MetadataChainVisitor for DatasetKindBasedVisitor<V, E>
+where
+    V: MetadataChainVisitor<Error = E>,
+    E: Error + Send,
+{
+    type Error = E;
+
+    fn initial_decision(&self) -> Decision {
+        if self.expected_dataset_kind != self.actual_dataset_kind {
+            Decision::Stop
+        } else {
+            self.visitor.initial_decision()
+        }
+    }
+
+    #[inline]
+    fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        self.visitor.visit(hashed_block_ref)
+    }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        self.visitor.finish()
+    }
+}
+
+impl<V, E> std::ops::Deref for DatasetKindBasedVisitor<V, E>
+where
+    V: MetadataChainVisitor<Error = E>,
+{
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        &self.visitor
     }
 }
 
