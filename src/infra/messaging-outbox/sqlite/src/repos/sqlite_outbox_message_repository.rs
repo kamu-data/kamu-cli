@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -17,18 +17,10 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn OutboxMessageRepository)]
 pub struct SqliteOutboxMessageRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-#[component(pub)]
-#[interface(dyn OutboxMessageRepository)]
-impl SqliteOutboxMessageRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 #[async_trait::async_trait]

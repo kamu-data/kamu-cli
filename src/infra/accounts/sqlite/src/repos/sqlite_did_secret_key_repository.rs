@@ -7,24 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn DidSecretKeyRepository)]
 pub struct SqliteDidSecretKeyRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-#[dill::component(pub)]
-#[dill::interface(dyn DidSecretKeyRepository)]
-impl SqliteDidSecretKeyRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

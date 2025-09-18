@@ -12,25 +12,17 @@
 use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetKeyBlockRepository)]
 pub struct SqliteDatasetKeyBlockRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetKeyBlockRepository)]
-impl SqliteDatasetKeyBlockRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

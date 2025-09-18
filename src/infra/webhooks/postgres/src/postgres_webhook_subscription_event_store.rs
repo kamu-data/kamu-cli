@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::*;
 use futures::TryStreamExt;
 use internal_error::InternalError;
@@ -15,19 +15,13 @@ use kamu_webhooks::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn WebhookSubscriptionEventStore)]
 pub struct PostgresWebhookSubscriptionEventStore {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
 
-#[component(pub)]
-#[interface(dyn WebhookSubscriptionEventStore)]
 impl PostgresWebhookSubscriptionEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     async fn register_subscription(
         &self,
         tr: &mut database_common::TransactionGuard<'_, sqlx::Postgres>,

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -15,18 +15,10 @@ use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn FlowConfigurationEventStore)]
 pub struct PostgresFlowConfigurationEventStore {
     transaction: TransactionRefT<Postgres>,
-}
-
-#[component(pub)]
-#[interface(dyn FlowConfigurationEventStore)]
-impl PostgresFlowConfigurationEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

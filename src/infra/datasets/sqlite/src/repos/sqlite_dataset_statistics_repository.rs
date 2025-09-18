@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -16,18 +16,10 @@ use sqlx::FromRow;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetStatisticsRepository)]
 pub struct SqliteDatasetStatisticsRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetStatisticsRepository)]
-impl SqliteDatasetStatisticsRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
