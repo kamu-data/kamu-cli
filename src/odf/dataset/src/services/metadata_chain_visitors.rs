@@ -103,11 +103,6 @@ macro_rules! typed_kind_based_search_single_typed_block_visitor_impl {
 typed_search_single_typed_block_visitor_impl!(SearchSetVocabVisitor, SetVocab, Flag::SET_VOCAB);
 typed_search_single_typed_block_visitor_impl!(SearchSeedVisitor, Seed, Flag::SEED);
 typed_search_single_typed_block_visitor_impl!(
-    SearchSetPollingSourceVisitor,
-    SetPollingSource,
-    Flag::SET_POLLING_SOURCE
-);
-typed_search_single_typed_block_visitor_impl!(
     SearchSetTransformVisitor,
     SetTransform,
     Flag::SET_TRANSFORM
@@ -452,10 +447,75 @@ impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
                 self.disabled_push_source_names
                     .insert(disable_push_source.source_name.clone());
             }
-            _ => { /* no action needed */ }
+            _ => {
+                unreachable!()
+            }
         }
 
         Ok(Decision::NextOfType(Self::ROOT_SOURCE_RELATED_FLAGS))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchActivePollingSourceVisitor {
+    dataset_kind: DatasetKind,
+    hashed_block: Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>,
+}
+
+impl SearchActivePollingSourceVisitor {
+    const ROOT_SOURCE_RELATED_FLAGS: Flag = Flag::from_bits_retain(
+        Flag::SET_POLLING_SOURCE.bits()
+            | Flag::DISABLE_POLLING_SOURCE.bits()
+            | Flag::ADD_PUSH_SOURCE.bits()
+            | Flag::DISABLE_PUSH_SOURCE.bits(),
+    );
+
+    pub fn new(dataset_kind: DatasetKind) -> Self {
+        Self {
+            dataset_kind,
+            hashed_block: None,
+        }
+    }
+
+    pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<SetPollingSource>)> {
+        self.hashed_block
+    }
+}
+
+impl MetadataChainVisitor for SearchActivePollingSourceVisitor {
+    type Error = Infallible;
+
+    fn initial_decision(&self) -> Decision {
+        match self.dataset_kind {
+            DatasetKind::Root => Decision::NextOfType(Self::ROOT_SOURCE_RELATED_FLAGS),
+            DatasetKind::Derivative => Decision::Stop,
+        }
+    }
+
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        #[expect(clippy::match_same_arms)]
+        match &block.event {
+            MetadataEvent::AddPushSource(_) | MetadataEvent::DisablePushSource(_) => {
+                // > Push and polling sources are mutually exclusive.
+                // > (c) RFC-011 (https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/011-push-ingest-sources.md#guide-level-explanation)
+                //
+                // Thus, if we encounter anything related to push sources,
+                // it means earlier pulling source events are no longer
+                // relevant.
+            }
+            MetadataEvent::SetPollingSource(_) => {
+                // SAFETY: block type verified
+                let typed_block = block.clone().into_typed().unwrap();
+                self.hashed_block = Some((hash.clone(), typed_block));
+            }
+            MetadataEvent::DisablePollingSource(_) => {
+                // No active one exists
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(Decision::Stop)
     }
 }
 

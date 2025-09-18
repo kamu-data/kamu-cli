@@ -27,11 +27,13 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         &self,
         target: &ResolvedDataset,
     ) -> Result<Option<PollingSourceBlockInfo>, InternalError> {
-        // TODO: Support source evolution
         use odf::dataset::MetadataChainExt;
+
         Ok(target
             .as_metadata_chain()
-            .accept_one(odf::dataset::SearchSetPollingSourceVisitor::new())
+            .accept_one(odf::dataset::SearchActivePollingSourceVisitor::new(
+                target.get_kind(),
+            ))
             .await
             .int_err()?
             .into_hashed_block())
@@ -50,16 +52,14 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     > {
         use odf::dataset::MetadataChainExt;
 
-        let visitor = target
+        Ok(target
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchActivePushSourcesVisitor::new(
                 target.get_kind(),
             ))
             .await
-            .int_err()?;
-        let blocks = visitor.into_hashed_blocks();
-
-        Ok(blocks)
+            .int_err()?
+            .into_hashed_blocks())
     }
 
     /// Returns an active transform, if any
