@@ -69,7 +69,7 @@ kamu-adapter-http = { workspace = true, features = [
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-odf = { workspace = true, features = ["http", "s3"] }
+odf = { workspace = true, features = ["datafusion", "http", "s3"] }
 random-strings = { workspace = true }
 
 kamu-flow-system = { workspace = true }
@@ -201,7 +201,14 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "49", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
+datafusion = { version = "49", default-features = false, features = [
+    "crypto_expressions",
+    "encoding_expressions",
+    "parquet",
+    "regex_expressions",
+    "unicode_expressions",
+    "compression",
+] }
 dill = { version = "0.14", default-features = false }
 dirs = "6"
 fs_extra = "1.3"
