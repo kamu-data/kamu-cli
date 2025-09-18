@@ -36,7 +36,7 @@ impl WebhookFlowSubProcessGroup {
     }
 
     #[allow(clippy::unused_async)]
-    async fn rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
+    pub async fn rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
         let rollup = flow_process_state_query
             .rollup_by_scope(
@@ -50,7 +50,7 @@ impl WebhookFlowSubProcessGroup {
     }
 
     #[allow(clippy::unused_async)]
-    async fn subprocesses(&self, ctx: &Context<'_>) -> Result<Vec<WebhookFlowSubProcess>> {
+    pub async fn subprocesses(&self, ctx: &Context<'_>) -> Result<Vec<WebhookFlowSubProcess>> {
         let (flow_process_state_query, webhook_subscription_event_store) = from_catalog_n!(
             ctx,
             dyn FlowProcessStateQuery,

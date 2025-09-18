@@ -7,24 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::Object;
+use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Webhooks;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
-impl Webhooks {
-    /// List of supported event types
-    pub async fn event_types(&self) -> Vec<String> {
-        kamu_webhooks::WebhookEventTypeCatalog::all_non_test_as_str()
-            .iter()
-            .map(ToString::to_string)
-            .collect()
-    }
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
+pub enum OrderingDirection {
+    Asc,
+    Desc,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

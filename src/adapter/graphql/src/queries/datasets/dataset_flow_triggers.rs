@@ -31,7 +31,7 @@ impl<'a> DatasetFlowTriggers<'a> {
 
     /// Returns defined trigger for a flow of specified type
     #[tracing::instrument(level = "info", name = DatasetFlowTriggers_by_type, skip_all, fields(?dataset_flow_type))]
-    async fn by_type(
+    pub async fn by_type(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
@@ -52,7 +52,7 @@ impl<'a> DatasetFlowTriggers<'a> {
 
     /// Checks if all triggers of this dataset are disabled
     #[tracing::instrument(level = "info", name = DatasetFlowTriggers_all_paused, skip_all)]
-    async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
+    pub async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
