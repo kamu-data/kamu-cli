@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Postgres;
@@ -17,21 +17,15 @@ use crate::helpers::{form_scope_query_condition_values, generate_scope_query_con
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn FlowProcessStateQuery)]
 pub struct PostgresFlowProcessStateQuery {
     transaction: TransactionRefT<Postgres>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn FlowProcessStateQuery)]
 impl PostgresFlowProcessStateQuery {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn generate_ordering_predicate(order: FlowProcessOrder) -> String {
         let direction = if order.desc { "DESC" } else { "ASC" };
         let default_tiebreaker = "last_attempt_at DESC NULLS LAST, flow_type ASC";
