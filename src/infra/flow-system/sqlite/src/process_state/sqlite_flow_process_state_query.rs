@@ -9,12 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use kamu_flow_system::*;
 use sqlx::Sqlite;
@@ -24,21 +19,15 @@ use crate::helpers::{form_scope_query_condition_values, generate_scope_query_con
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn FlowProcessStateQuery)]
 pub struct SqliteFlowProcessStateQuery {
     transaction: TransactionRefT<Sqlite>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn FlowProcessStateQuery)]
 impl SqliteFlowProcessStateQuery {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn generate_ordering_predicate(order: FlowProcessOrder) -> String {
         let direction = if order.desc { "DESC" } else { "ASC" };
         let default_tiebreaker = "last_attempt_at DESC NULLS LAST, flow_type ASC";
