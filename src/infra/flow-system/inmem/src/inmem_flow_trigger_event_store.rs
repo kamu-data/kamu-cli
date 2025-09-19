@@ -13,8 +13,8 @@ use std::sync::Arc;
 use dill::*;
 use kamu_flow_system::*;
 
+use crate::InMemoryFlowSystemEventStore;
 use crate::flow_event_data_helper::FlowEventDataHelper;
-use crate::{FlowSystemEventSourceType, InMemoryFlowSystemEventStore};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

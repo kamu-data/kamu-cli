@@ -151,8 +151,8 @@ where
 
                 let check_result: Result<CheckResult, InternalError> =
                     DatabaseTransactionRunner::new(catalog.clone())
-                        .transactional(|transactional_catalog| async move {
-                            let dataset_registry = transactional_catalog
+                        .transactional(|transaction_catalog| async move {
+                            let dataset_registry = transaction_catalog
                                 .get_one::<dyn DatasetRegistry>()
                                 .unwrap();
                             match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
