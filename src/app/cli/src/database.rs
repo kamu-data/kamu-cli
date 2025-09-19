@@ -121,6 +121,7 @@ pub fn configure_database_components(
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowTriggerEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowEventStore>();
+            b.add::<kamu_flow_system_postgres::PostgresFlowSystemEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowProcessStateRepository>();
             b.add::<kamu_flow_system_postgres::PostgresFlowProcessStateQuery>();
 
@@ -190,6 +191,7 @@ pub fn configure_database_components(
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowEventStore>();
+            b.add::<kamu_flow_system_sqlite::SqliteFlowSystemEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowProcessStateRepository>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowProcessStateQuery>();
 
