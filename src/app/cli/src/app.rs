@@ -991,11 +991,7 @@ pub fn register_config_in_catalog(
     ));
 
     // TODO: Make this configurable
-    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig {
-        batch_size: 500,
-        min_listening_timeout: std::time::Duration::from_millis(100),
-        max_listening_timeout: std::time::Duration::from_secs(60),
-    });
+    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig::local_default());
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(

@@ -112,7 +112,7 @@ impl FlowSystemEventStore for InMemoryFlowSystemEventStore {
     async fn wait_wake(
         &self,
         timeout: Duration,
-        _min_polling_interval: Duration,
+        _min_debounce_interval: Duration,
     ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
         // Subscribe to events broadcast channel
         let mut rx = self.tx.subscribe();
@@ -122,8 +122,8 @@ impl FlowSystemEventStore for InMemoryFlowSystemEventStore {
         match tokio::time::timeout(timeout, rx.recv()).await {
             Ok(Ok(event_id)) => {
                 // New event arrived
-                Ok(FlowSystemEventStoreWakeHint {
-                    upper_event_id_bound: Some(event_id),
+                Ok(FlowSystemEventStoreWakeHint::NewEvents {
+                    upper_event_id_bound: event_id,
                 })
             }
             Ok(Err(broadcast::error::RecvError::Closed)) => {
@@ -132,15 +132,15 @@ impl FlowSystemEventStore for InMemoryFlowSystemEventStore {
             }
             Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
                 // We lagged behind, but that's fine, just indicate new events are available
-                Ok(FlowSystemEventStoreWakeHint {
-                    upper_event_id_bound: Some(EventID::new(
+                Ok(FlowSystemEventStoreWakeHint::NewEvents {
+                    upper_event_id_bound: EventID::new(
                         i64::try_from(self.get_events_count()).unwrap(),
-                    )),
+                    ),
                 })
             }
             Err(_elapsed) => {
                 // Timeout elapsed
-                Ok(FlowSystemEventStoreWakeHint::default())
+                Ok(FlowSystemEventStoreWakeHint::Timeout)
             }
         }
     }
