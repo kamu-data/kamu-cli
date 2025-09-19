@@ -10,8 +10,16 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use internal_error::InternalError;
-use kamu_flow_system::{EventID, FlowSystemEventStore, FlowSystemEventStoreWakeHint};
+use database_common::TransactionRefT;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_flow_system::{
+    EventID,
+    FlowSystemEvent,
+    FlowSystemEventSourceType,
+    FlowSystemEventStore,
+    FlowSystemEventStoreWakeHint,
+};
+use sqlx::Postgres;
 use sqlx::postgres::PgListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -225,6 +233,102 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                 }
             }
         }
+    }
+
+    /// Fetch next batch for the given projector; order by global id.
+    async fn fetch_next_batch(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        projector_name: &'static str,
+        limit: usize,
+        maybe_upper_event_id_bound: Option<EventID>,
+    ) -> Result<Vec<FlowSystemEvent>, InternalError> {
+        let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        let rows = sqlx::query!(
+            r#"
+            WITH next AS (
+                SELECT e.event_id
+                FROM flow_system_events e
+                LEFT JOIN flow_system_projected_events a
+                    ON a.projector = $1 AND a.event_id = e.event_id
+                WHERE a.event_id IS NULL AND e.event_id <= $2
+                ORDER BY e.event_id
+                LIMIT $3
+            )
+                SELECT
+                    e.event_id,
+                    e.source_stream as "source_stream: String",
+                    e.source_event_id,
+                    e.occurred_at,
+                    e.inserted_at
+                FROM flow_system_events e
+                JOIN next n ON n.event_id = e.event_id
+                ORDER BY e.event_id
+                "#,
+            projector_name,
+            maybe_upper_event_id_bound
+                .map(EventID::into_inner)
+                .unwrap_or(i64::MAX),
+            i64::try_from(limit).unwrap()
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let events = rows
+            .into_iter()
+            .map(|r| FlowSystemEvent {
+                event_id: EventID::new(r.event_id),
+                source_type: match r.source_stream.as_str() {
+                    "flows" => FlowSystemEventSourceType::Flow,
+                    "triggers" => FlowSystemEventSourceType::FlowTrigger,
+                    _ => FlowSystemEventSourceType::FlowConfiguration,
+                },
+                source_event_id: EventID::new(r.source_event_id),
+                occurred_at: r.occurred_at,
+                inserted_at: r.inserted_at,
+            })
+            .collect();
+
+        Ok(events)
+    }
+
+    /// Mark these events as applied for this projector (idempotent).
+    async fn mark_applied(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        projector_name: &'static str,
+        event_ids: &[EventID],
+    ) -> Result<(), InternalError> {
+        if event_ids.is_empty() {
+            return Ok(());
+        }
+
+        let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        // Convert event IDs to a vector of i64 for bulk insert
+        let event_id_values: Vec<i64> = event_ids.iter().map(|id| id.into_inner()).collect();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO flow_system_projected_events(projector, event_id)
+                SELECT $1, UNNEST($2::BIGINT[]) ON CONFLICT DO NOTHING
+            "#,
+            projector_name,
+            &event_id_values
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
     }
 }
 

@@ -10,16 +10,12 @@
 // Temporary:
 #![allow(dead_code)]
 
+use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use kamu_flow_system::{
-    EventID,
-    FlowSystemEventStore,
-    FlowSystemEventStoreWakeHint,
-    InternalError,
-};
+use kamu_flow_system::*;
 use time_source::SystemTimeSource;
 use tokio::sync::broadcast;
 
@@ -36,6 +32,10 @@ pub struct InMemoryFlowSystemEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<FlowSystemEvent>,
+    // projector name -> applied event ids
+    applied: HashMap<&'static str, BTreeSet<EventID>>,
+    // projector name -> next scan position in `merged`
+    next_pos: HashMap<&'static str, usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,24 +144,61 @@ impl FlowSystemEventStore for InMemoryFlowSystemEventStore {
             }
         }
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// Fetch next batch for the given projector; order by global id.
+    async fn fetch_next_batch(
+        &self,
+        _: &dill::Catalog,
+        projector_name: &'static str,
+        limit: usize,
+        maybe_upper_event_id_bound: Option<EventID>,
+    ) -> Result<Vec<FlowSystemEvent>, InternalError> {
+        let mut state = self.state.lock().unwrap();
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct FlowSystemEvent {
-    pub(crate) event_id: EventID,
-    pub(crate) source_type: FlowSystemEventSourceType,
-    pub(crate) source_event_id: EventID,
-    pub(crate) occurred_at: DateTime<Utc>,
-    pub(crate) inserted_at: DateTime<Utc>,
-}
+        let pos = state.next_pos.get(projector_name).copied().unwrap_or(0);
+        let applied = state.applied.entry(projector_name).or_default().clone();
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) enum FlowSystemEventSourceType {
-    FlowConfiguration,
-    Flow,
-    FlowTrigger,
+        let mut res = Vec::with_capacity(limit);
+        let mut i = pos;
+
+        while i < state.events.len() && res.len() < limit {
+            let e = &state.events[i];
+
+            if let Some(upper_bound) = maybe_upper_event_id_bound
+                && e.event_id > upper_bound
+            {
+                break; // don’t scan beyond the hint
+            }
+
+            if !applied.contains(&e.event_id) {
+                res.push(*e);
+            }
+            i += 1;
+        }
+
+        // Advance the scan cursor to where we stopped scanning.
+        // (Safe because we only ever consume in order.)
+        state.next_pos.insert(projector_name, i);
+
+        Ok(res)
+    }
+
+    /// Mark these events as applied for this projector (idempotent).
+    async fn mark_applied(
+        &self,
+        _: &dill::Catalog,
+        projector_name: &'static str,
+        event_ids: &[EventID],
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.lock().unwrap();
+
+        let set = state.applied.entry(projector_name).or_default();
+        for &id in event_ids {
+            set.insert(id);
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

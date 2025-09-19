@@ -10,8 +10,16 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use internal_error::InternalError;
-use kamu_flow_system::{EventID, FlowSystemEventStore, FlowSystemEventStoreWakeHint};
+use database_common::TransactionRefT;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_flow_system::{
+    EventID,
+    FlowSystemEvent,
+    FlowSystemEventSourceType,
+    FlowSystemEventStore,
+    FlowSystemEventStoreWakeHint,
+};
+use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -88,6 +96,108 @@ impl FlowSystemEventStore for SqliteFlowSystemEventStore {
             // (exponential backoff with max limit of timeout)
             poll_interval = std::cmp::min(poll_interval * 2, timeout);
         }
+    }
+
+    /// Fetch next batch for the given projector; order by global id.
+    async fn fetch_next_batch(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        projector_name: &'static str,
+        limit: usize,
+        maybe_upper_event_id_bound: Option<EventID>,
+    ) -> Result<Vec<FlowSystemEvent>, InternalError> {
+        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        let upper_bound = maybe_upper_event_id_bound
+            .map(EventID::into_inner)
+            .unwrap_or(i64::MAX);
+        let limit = i64::try_from(limit).unwrap();
+
+        let rows = sqlx::query!(
+            r#"
+            WITH next AS (
+                SELECT e.event_id
+                FROM flow_system_events e
+                LEFT JOIN flow_system_projected_events a
+                    ON a.projector = $1 AND a.event_id = e.event_id
+                WHERE a.event_id IS NULL AND e.event_id <= $2
+                ORDER BY e.event_id
+                LIMIT $3
+            )
+                SELECT
+                    e.event_id,
+                    e.source_stream as "source_stream: String",
+                    e.source_event_id,
+                    e.occurred_at as "occurred_at: chrono::DateTime<chrono::Utc>",
+                    e.inserted_at as "inserted_at: chrono::DateTime<chrono::Utc>"
+                FROM flow_system_events e
+                JOIN next n ON n.event_id = e.event_id
+                ORDER BY e.event_id
+                "#,
+            projector_name,
+            upper_bound,
+            limit
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let events = rows
+            .into_iter()
+            .map(|r| FlowSystemEvent {
+                event_id: EventID::new(r.event_id),
+                source_type: match r.source_stream.as_str() {
+                    "flows" => FlowSystemEventSourceType::Flow,
+                    "triggers" => FlowSystemEventSourceType::FlowTrigger,
+                    _ => FlowSystemEventSourceType::FlowConfiguration,
+                },
+                source_event_id: EventID::new(r.source_event_id),
+                occurred_at: r.occurred_at,
+                inserted_at: r.inserted_at,
+            })
+            .collect();
+
+        Ok(events)
+    }
+
+    /// Mark these events as applied for this projector (idempotent).
+    async fn mark_applied(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        projector_name: &'static str,
+        event_ids: &[EventID],
+    ) -> Result<(), InternalError> {
+        if event_ids.is_empty() {
+            return Ok(());
+        }
+
+        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        // Convert event IDs to JSON array for SQLite
+        let event_id_values: Vec<i64> = event_ids.iter().map(|id| id.into_inner()).collect();
+        let json_array = serde_json::to_string(&event_id_values).int_err()?;
+
+        // Use json_each for bulk insert in SQLite
+        sqlx::query!(
+            r#"
+            INSERT OR IGNORE INTO flow_system_projected_events(projector, event_id)
+                SELECT $1, CAST(value AS INTEGER)
+                FROM json_each($2)
+            "#,
+            projector_name,
+            json_array
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
     }
 }
 
