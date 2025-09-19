@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
+use std::time::Duration;
 
-use chrono::Duration;
 use internal_error::InternalError;
-use kamu_flow_system::FlowSystemEventStore;
+use kamu_flow_system::{EventID, FlowSystemEventStore, FlowSystemEventStoreWakeHint};
 use sqlx::postgres::PgListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,6 +51,60 @@ impl PostgresFlowSystemEventStore {
             }
         }
     }
+
+    fn calculate_retry_delay(
+        &self,
+        deadline: tokio::time::Instant,
+        min_polling_interval: Duration,
+    ) -> Duration {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        std::cmp::min(min_polling_interval, remaining)
+    }
+
+    async fn buffer_notifications(
+        &self,
+        listener: &mut PgListener,
+        initial_payload: Option<serde_json::Value>,
+        elapsed: Duration,
+        remaining_timeout: Duration,
+        min_polling_interval: Duration,
+    ) -> Option<EventID> {
+        #[derive(Debug, serde::Deserialize)]
+        struct Payload {
+            #[allow(dead_code)]
+            min: i64,
+            max: i64,
+        }
+
+        let mut upper_bound = initial_payload
+            .and_then(|p| serde_json::from_value::<Payload>(p).ok())
+            .map(|p| EventID::new(p.max));
+
+        // If we got notification quickly (before min_polling_interval),
+        // try to buffer for a bit more to accumulate additional events
+        if elapsed < min_polling_interval {
+            let buffer_timeout = min_polling_interval.saturating_sub(elapsed);
+            let remaining_after_buffer = remaining_timeout.saturating_sub(buffer_timeout);
+
+            // Only buffer if we have enough remaining time
+            if !remaining_after_buffer.is_zero() {
+                // Try to collect more notifications during buffering period
+                while let Ok(Ok(additional_notification)) =
+                    tokio::time::timeout(buffer_timeout, listener.recv()).await
+                {
+                    if let Ok(additional_payload) =
+                        serde_json::from_str::<Payload>(additional_notification.payload())
+                    {
+                        // Update upper bound to the latest max value
+                        upper_bound = Some(EventID::new(additional_payload.max));
+                    }
+                    // Continue collecting until buffer timeout
+                }
+            }
+        }
+
+        upper_bound
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,46 +124,106 @@ impl PostgresFlowSystemEventStore {
 
 #[async_trait::async_trait]
 impl FlowSystemEventStore for PostgresFlowSystemEventStore {
-    async fn wait_wake(&self, timeout: Duration) -> Result<(), InternalError> {
-        // Fast path: use the existing listener if present.
-        if let Some(mut l) = { self.listener.lock().await.take() } {
-            match tokio::time::timeout(timeout.to_std().unwrap(), l.recv()).await {
-                // Got a NOTIFY — stash the listener back and return so runner can drain
-                Ok(Ok(notification)) => {
-                    // payload is a JSON string like: {"min":123,"max":130}
-                    let payload =
-                        serde_json::from_str::<serde_json::Value>(notification.payload()).ok();
-                    println!("New flow system events detected, notification={payload:?}");
-                    *self.listener.lock().await = Some(l);
-                    return Ok(());
+    async fn wait_wake(
+        &self,
+        timeout: Duration,
+        min_polling_interval: Duration,
+    ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
+        let deadline = tokio::time::Instant::now() + timeout;
+
+        loop {
+            // Try to get or create a listener
+            let mut listener = match self.listener.lock().await.take() {
+                Some(existing_listener) => existing_listener,
+                None => {
+                    // No listener available, try to create one
+                    match self.try_create_listener().await {
+                        Some(new_listener) => new_listener,
+                        None => {
+                            // Failed to create listener, wait for min_listening_timeout and then
+                            // sleep for remaining timeout if any
+                            let delay = self.calculate_retry_delay(deadline, min_polling_interval);
+                            if !delay.is_zero() {
+                                tokio::time::sleep(delay).await;
+                            }
+
+                            // Check if we still have time left after the delay
+                            let remaining_after_delay =
+                                deadline.saturating_duration_since(tokio::time::Instant::now());
+                            if remaining_after_delay.is_zero() {
+                                return Ok(FlowSystemEventStoreWakeHint::default());
+                            }
+
+                            // Continue to next iteration to try again
+                            continue;
+                        }
+                    }
                 }
-                // Socket/conn error — drop it so we go to reconnect path below
+            };
+
+            // Calculate remaining timeout for this iteration
+            let remaining_timeout = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining_timeout.is_zero() {
+                // Timeout exceeded, put listener back and return
+                *self.listener.lock().await = Some(listener);
+                return Ok(FlowSystemEventStoreWakeHint::default());
+            }
+
+            // Wait for notification with remaining timeout
+            match tokio::time::timeout(remaining_timeout, listener.recv()).await {
+                // Got a NOTIFY — check if we should buffer for more events
+                Ok(Ok(notification)) => {
+                    // Parse initial payload
+                    let initial_payload = serde_json::from_str(notification.payload()).ok();
+
+                    // Calculate how long we've been waiting since the start
+                    let elapsed = deadline
+                        .saturating_duration_since(tokio::time::Instant::now())
+                        .saturating_sub(remaining_timeout);
+
+                    // Buffer additional notifications if appropriate
+                    let upper_bound = self
+                        .buffer_notifications(
+                            &mut listener,
+                            initial_payload,
+                            elapsed,
+                            remaining_timeout,
+                            min_polling_interval,
+                        )
+                        .await;
+
+                    // Stash the listener back
+                    *self.listener.lock().await = Some(listener);
+
+                    // Return the (potentially updated) upper bound
+                    return Ok(FlowSystemEventStoreWakeHint {
+                        upper_event_id_bound: upper_bound,
+                    });
+                }
+
+                // Socket/conn error — drop listener and try to reconnect after delay
                 Ok(Err(conn_err)) => {
                     tracing::error!(
                         error = ?conn_err,
                         error_msg = %conn_err,
-                        "PgListener connection error",
+                        "PgListener connection error, will attempt to reconnect after delay",
                     );
-                    // fall through: no put-back; listener stays None
+
+                    // Wait for min_listening_timeout before retrying, if we have remaining time
+                    let delay = self.calculate_retry_delay(deadline, min_polling_interval);
+                    if !delay.is_zero() {
+                        tokio::time::sleep(delay).await;
+                    }
+                    // Loop will try to reconnect
                 }
-                // Timed out waiting — stash it back and return (runner may sweep/back off)
-                Err(_) => {
-                    *self.listener.lock().await = Some(l);
-                    return Ok(());
+
+                // Timed out waiting — stash listener back and return
+                Err(_elapsed) => {
+                    *self.listener.lock().await = Some(listener);
+                    return Ok(FlowSystemEventStoreWakeHint::default());
                 }
             }
         }
-
-        // No listener yet OR it broke above → try a single reconnect attempt
-        if let Some(nl) = self.try_create_listener().await {
-            *self.listener.lock().await = Some(nl);
-            // Re-subscribed; return immediately (runner will try a drain or wait again)
-            return Ok(());
-        }
-
-        // Reconnect failed — avoid tight spin
-        tokio::time::sleep(timeout.to_std().unwrap()).await;
-        Ok(())
     }
 }
 
