@@ -8,10 +8,29 @@
 // by the Apache License, Version 2.0.
 
 use async_utils::BackgroundAgent;
+use chrono::Duration;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FlowSystemEventAgent: BackgroundAgent {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct FlowSystemEventAgentConfig {
+    pub min_listening_timeout: Duration,
+    pub max_listening_timeout: Duration,
+    pub batch_size: usize,
+}
+
+impl Default for FlowSystemEventAgentConfig {
+    fn default() -> Self {
+        Self {
+            min_listening_timeout: Duration::milliseconds(100),
+            max_listening_timeout: Duration::seconds(60),
+            batch_size: 500,
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

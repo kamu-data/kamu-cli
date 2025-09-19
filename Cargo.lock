@@ -8056,6 +8056,7 @@ dependencies = [
  "test-group",
  "test-log",
  "time-source",
+ "tokio",
  "tracing",
 ]
 
@@ -8146,6 +8147,7 @@ dependencies = [
  "test-group",
  "test-log",
  "time-source",
+ "tokio",
  "tracing",
 ]
 
