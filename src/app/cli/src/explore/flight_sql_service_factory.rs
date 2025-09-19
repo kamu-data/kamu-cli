@@ -52,7 +52,7 @@ impl FlightSqlServiceFactory {
 
         let server_future = tonic::transport::Server::builder()
             .layer(observability::tonic::grpc_layer())
-            .layer(tonic::service::interceptor(
+            .layer(tonic::service::interceptor::InterceptorLayer::new(
                 move |mut req: tonic::Request<()>| {
                     req.extensions_mut().insert(catalog.clone());
                     Ok(req)

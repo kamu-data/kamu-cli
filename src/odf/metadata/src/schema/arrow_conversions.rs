@@ -362,6 +362,20 @@ impl DataType {
                     "Dictionary types are not yet supported in ODF schema",
                 ));
             }
+            ArrowDataType::Decimal32(precision, scale) => (
+                DataType::Decimal(DataTypeDecimal {
+                    precision: (*precision).into(),
+                    scale: (*scale).into(),
+                }),
+                Some(ArrowDecimalEncoding { bit_width: 32 }.into()),
+            ),
+            ArrowDataType::Decimal64(precision, scale) => (
+                DataType::Decimal(DataTypeDecimal {
+                    precision: (*precision).into(),
+                    scale: (*scale).into(),
+                }),
+                Some(ArrowDecimalEncoding { bit_width: 64 }.into()),
+            ),
             ArrowDataType::Decimal128(precision, scale) => (
                 DataType::Decimal(DataTypeDecimal {
                     precision: (*precision).into(),
@@ -682,6 +696,14 @@ impl DataType {
                 decimal: Some(ArrowDecimalEncoding { bit_width }),
             }) => match self {
                 DataType::Decimal(DataTypeDecimal { precision, scale }) => match bit_width {
+                    32 => ArrowDataType::Decimal32(
+                        u8::try_from(*precision).unwrap(),
+                        i8::try_from(*scale).unwrap(),
+                    ),
+                    64 => ArrowDataType::Decimal64(
+                        u8::try_from(*precision).unwrap(),
+                        i8::try_from(*scale).unwrap(),
+                    ),
                     128 => ArrowDataType::Decimal128(
                         u8::try_from(*precision).unwrap(),
                         i8::try_from(*scale).unwrap(),

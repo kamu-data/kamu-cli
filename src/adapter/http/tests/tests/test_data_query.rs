@@ -500,14 +500,14 @@ async fn test_data_query_handler_success() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620e171eff1f41f0f28e7ee96786ea5ec261a5580ea1b571da7d9049aa308f94df3",
+                    "inputHash": "f1620f230a79ac4e50c086d7f02ea670763bb91abbfa3902e386689d8be98c3ebee6e",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u5GvSnQTuMFJIs8Xk--52DsPqy3Mqlq0KE_27bRfHDbhxxS-YmSCzz7O3VTaAoE23eMG-hhROZZycgVCbMNnbCg",
+                    "proofValue": "ujLRAWAtSUyBN1xOoqyn3plkoy0CSQd_lZMJ76jH-hp8g8gyUrzzMY8qYxArjAyyml1RN5axC5-VJEh29kCuIDw",
                 }
             }),
             response
@@ -658,14 +658,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f162022d6314a38b9b816309b470408e6d25fd8b91b7e6cf596c391d82e8ca5e4d515",
+                    "inputHash": "f1620a83cfca0b19a81550b1a60607be4d870b47b6aafb59757e16eb810d838d4dd65",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uDxDvHwRohhOwQMKpRpQ5RZsRQIjWNupGLqFKzXL18JtqUJ_qz5RxpE8Fr4cmMQCzq2SxBX4pyF333Lh4f11MAA",
+                    "proofValue": "uFNfLp8HHhiS6dV1RCrFytGlZsRTN6kklfNZ6v3t3-cLoDiPpOcWr8ryRbWsicLNG6lQQQlLUBomExVaiMNT8DQ",
                 }
             }),
             response

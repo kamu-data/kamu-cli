@@ -19,6 +19,7 @@ Recommendation: for ease of reading, use the following order:
   - `Account::by_ids()`;
   - `AccountMut::by_ids()`.
 - Improved compatibility with EVM-based sources
+- Upgraded to `datafusion v50`
 
 ## [0.248.1] - 2025-09-11
 ### Fixed

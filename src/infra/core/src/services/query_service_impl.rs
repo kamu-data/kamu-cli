@@ -265,7 +265,12 @@ impl QueryServiceImpl {
                     }
 
                     let datafusion::sql::sqlparser::ast::ObjectNamePart::Identifier(ident) =
-                        table.0.pop().unwrap();
+                        table.0.pop().unwrap()
+                    else {
+                        tracing::warn!(?table, "Ignoring identifier");
+                        continue;
+                    };
+
                     let alias = ident.value;
                     let Ok(dataset_ref) = odf::DatasetRef::try_from(&alias) else {
                         tracing::warn!(alias, "Ignoring table with invalid alias");
@@ -771,7 +776,11 @@ fn extract_table_refs_rec_set_expr(
             extract_table_refs_rec_set_expr(right, tables)?;
             Ok(())
         }
-        SetExpr::Table(_) | SetExpr::Values(_) | SetExpr::Insert(_) | SetExpr::Update(_) => Ok(()),
+        SetExpr::Table(_)
+        | SetExpr::Values(_)
+        | SetExpr::Insert(_)
+        | SetExpr::Update(_)
+        | SetExpr::Delete(_) => Ok(()),
     }
 }
 

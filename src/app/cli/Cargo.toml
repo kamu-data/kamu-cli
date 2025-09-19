@@ -156,13 +156,13 @@ read_input = "0.8"                                                # Basic user i
 webbrowser = "1"                                                  # For opening URLs in default system browser
 
 # APIs
-arrow-flight = { version = "55", features = ["flight-sql-experimental"] }
+arrow-flight = { version = "56", features = ["flight-sql-experimental"] }
 async-graphql = { version = "7", default-features = false }
 async-graphql-axum = "7"
 axum = { version = "0.8", features = ["ws"] }
 http = "1"
 serde_json = "1"
-tonic = { version = "0.12", default-features = false }
+tonic = { version = "0.13", default-features = false }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "cors", "catch-panic"] }
 utoipa = { version = "5", default-features = true, features = ["macros"] }
@@ -201,7 +201,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "49", default-features = false, features = [
+datafusion = { version = "50", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",

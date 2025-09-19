@@ -434,6 +434,8 @@ impl DataWriterDataFusion {
                 | DataType::FixedSizeList(_, _)
                 | DataType::Union(_, _)
                 | DataType::Dictionary(_, _)
+                | DataType::Decimal32(_, _)
+                | DataType::Decimal64(_, _)
                 | DataType::Decimal128(_, _)
                 | DataType::Decimal256(_, _)
                 | DataType::Map(_, _)

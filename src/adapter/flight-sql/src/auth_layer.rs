@@ -21,7 +21,6 @@ use kamu_accounts::{
     GetAccountInfoError,
 };
 use tonic::Status;
-use tonic::body::BoxBody;
 use tower::{Layer, Service};
 
 use crate::SessionId;
@@ -97,14 +96,15 @@ impl<Svc> AuthenticationMiddleware<Svc> {
     }
 }
 
-impl<Svc, ReqBody> Service<http::Request<ReqBody>> for AuthenticationMiddleware<Svc>
+impl<Svc, ReqBody, ResBody> Service<http::Request<ReqBody>> for AuthenticationMiddleware<Svc>
 where
     ReqBody: Send + 'static,
-    Svc: Service<http::Request<ReqBody>, Response = http::Response<BoxBody>>,
+    ResBody: Default,
+    Svc: Service<http::Request<ReqBody>, Response = http::Response<ResBody>>,
     Svc: Clone + Send + 'static,
     Svc::Future: Send + 'static,
 {
-    type Response = http::Response<BoxBody>;
+    type Response = Svc::Response;
     type Error = Svc::Error;
     type Future =
         Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;

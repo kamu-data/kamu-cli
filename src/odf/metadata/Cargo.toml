@@ -78,7 +78,7 @@ tonic = { version = "0.12", default-features = false, features = [
 ] }
 
 # Optional
-arrow = { optional = true, version = "55", default-features = false, features = [
+arrow = { optional = true, version = "56", default-features = false, features = [
     "ipc",
 ] }
 rand = { optional = true, version = "0.8", default-features = false }

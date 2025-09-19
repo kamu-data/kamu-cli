@@ -43,7 +43,8 @@ deny = [
     # { name = "rustls", deny-multiple-versions = true },
     { name = "sqlx", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
-    { name = "tonic", deny-multiple-versions = true },
+    # TODO: waiting for qdrant-client and opentelemetry to update
+    # { name = "tonic", deny-multiple-versions = true },
 ]
 
 
@@ -110,5 +111,5 @@ ignore = [
     "RUSTSEC-2022-0040",
     # Unmaintained (custom_derive)
     # https://rustsec.org/advisories/RUSTSEC-2025-0058
-    "RUSTSEC-2025-0058"
+    "RUSTSEC-2025-0058",
 ]
