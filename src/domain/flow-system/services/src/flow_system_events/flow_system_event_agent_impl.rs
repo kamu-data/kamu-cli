@@ -32,20 +32,22 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
     }
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
-        let mut backoff = self.agent_config.min_listening_timeout;
-
         loop {
             println!(
-                "Starting iteration with backoff {:?}, current time {:?}",
-                backoff,
+                "Starting iteration, current time {:?}",
                 std::time::Instant::now()
             );
 
-            // 1) Wait for push or timeout.
-            self.flow_system_event_store.wait_wake(backoff).await?;
+            // 1) Wait for push or timeout - let the store handle the backoff strategy
+            self.flow_system_event_store
+                .wait_wake(
+                    self.agent_config.max_listening_timeout,
+                    self.agent_config.min_listening_timeout,
+                )
+                .await?;
             println!("Woke up at {:?}", std::time::Instant::now());
 
-            let made_progress = false;
+            let _made_progress = false;
 
             // 2) For each projector, drain until no work.
             /*for p in &self.projectors {
@@ -75,12 +77,8 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
                 }
             }*/
 
-            // 3) Adjust backoff
-            if made_progress {
-                backoff = self.agent_config.min_listening_timeout;
-            } else {
-                backoff = std::cmp::min(backoff * 2, self.agent_config.max_listening_timeout);
-            }
+            // No need for agent-level backoff - the stores handle their own
+            // waiting strategies
         }
     }
 }

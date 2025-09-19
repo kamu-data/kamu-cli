@@ -8,18 +8,19 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use chrono::Duration;
-use database_common::{DatabaseTransactionRunner, TransactionRefT};
+use database_common::TransactionRefT;
+use database_common_macros::transactional_method1;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_flow_system::FlowSystemEventStore;
+use kamu_flow_system::{EventID, FlowSystemEventStore, FlowSystemEventStoreWakeHint};
 use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventStore {
     catalog: dill::Catalog,
-    last_seen_max_flow_system_event_id: Mutex<i64>,
+    max_seen_event_id: Mutex<EventID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +31,31 @@ impl SqliteFlowSystemEventStore {
     pub fn new(catalog: dill::Catalog) -> Self {
         Self {
             catalog,
-            last_seen_max_flow_system_event_id: Mutex::new(0),
+            max_seen_event_id: Mutex::new(EventID::new(0)),
+        }
+    }
+
+    #[transactional_method1(transaction: Arc<TransactionRefT<Sqlite>>)]
+    async fn check_for_new_events(&self) -> Result<Option<EventID>, InternalError> {
+        let max_present_event_id = {
+            let mut tr = transaction.lock().await;
+            let connection_mut = tr.connection_mut().await.int_err()?;
+
+            let (max_present_event_id,): (Option<i64>,) =
+                sqlx::query_as("SELECT MAX(event_id) FROM flow_system_events")
+                    .fetch_one(connection_mut)
+                    .await
+                    .unwrap_or((None,));
+
+            Ok(EventID::new(max_present_event_id.unwrap_or_default()))
+        }?;
+
+        let mut max_seen_event_id = self.max_seen_event_id.lock().unwrap();
+        if max_present_event_id > *max_seen_event_id {
+            *max_seen_event_id = max_present_event_id;
+            Ok(Some(max_present_event_id))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -39,37 +64,37 @@ impl SqliteFlowSystemEventStore {
 
 #[async_trait::async_trait]
 impl FlowSystemEventStore for SqliteFlowSystemEventStore {
-    async fn wait_wake(&self, timeout: Duration) -> Result<(), InternalError> {
-        let max_id = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional(|transaction_catalog| async move {
-                let transaction: Arc<TransactionRefT<Sqlite>> =
-                    transaction_catalog.get_one().unwrap();
+    async fn wait_wake(
+        &self,
+        timeout: Duration,
+        min_polling_interval: Duration,
+    ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        let mut poll_interval = min_polling_interval;
 
-                let mut tr = transaction.lock().await;
-                let connection_mut = tr.connection_mut().await.int_err()?;
-
-                let max_id: (Option<i64>,) =
-                    sqlx::query_as("SELECT MAX(event_id) FROM flow_system_events")
-                        .fetch_one(connection_mut)
-                        .await
-                        .unwrap_or((None,));
-                let max_id = max_id.0.unwrap_or(0);
-                Ok(max_id)
-            })
-            .await?;
-
-        {
-            let mut last = self.last_seen_max_flow_system_event_id.lock().unwrap();
-            if max_id > *last {
-                *last = max_id;
-                println!("New flow system events detected, max_id={max_id}",);
-                return Ok(()); // new work detected
+        loop {
+            // Check for new events
+            if let Some(event_id) = self.check_for_new_events().await? {
+                return Ok(FlowSystemEventStoreWakeHint {
+                    upper_event_id_bound: Some(event_id),
+                });
             }
+
+            // Calculate remaining time
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                // Timeout elapsed, no new work
+                return Ok(FlowSystemEventStoreWakeHint::default());
+            }
+
+            // Sleep for the shorter of poll_interval or remaining time
+            let sleep_duration = std::cmp::min(poll_interval, remaining);
+            tokio::time::sleep(sleep_duration).await;
+
+            // Increase poll interval for next iteration
+            // (exponential backoff with max limit of timeout)
+            poll_interval = std::cmp::min(poll_interval * 2, timeout);
         }
-
-        tokio::time::sleep(timeout.to_std().unwrap()).await;
-
-        Ok(())
     }
 }
 

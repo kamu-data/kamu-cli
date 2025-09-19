@@ -7951,6 +7951,7 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
+ "serde",
  "serde_json",
  "sqlx",
  "test-group",
