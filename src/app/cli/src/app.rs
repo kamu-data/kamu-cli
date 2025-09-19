@@ -380,7 +380,7 @@ where
         let transaction_runner = DatabaseTransactionRunner::new(catalog);
 
         transaction_runner
-            .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
+            .transactional(|transaction_catalog| async move { f(transaction_catalog).await })
             .await
     }
 }
@@ -991,7 +991,7 @@ pub fn register_config_in_catalog(
     ));
 
     // TODO: Make this configurable
-    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig::local_default());
+    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig::production_default());
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
