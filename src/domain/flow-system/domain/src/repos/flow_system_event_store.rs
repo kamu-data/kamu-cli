@@ -12,6 +12,8 @@ use std::time::Duration;
 use event_sourcing::EventID;
 use internal_error::InternalError;
 
+use crate::FlowSystemEvent;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -22,6 +24,23 @@ pub trait FlowSystemEventStore: Send + Sync {
         timeout: Duration,
         min_debounce_interval: Duration,
     ) -> Result<FlowSystemEventStoreWakeHint, InternalError>;
+
+    /// Fetch next batch for the given projector; order by global id.
+    async fn fetch_next_batch(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        projector_name: &'static str,
+        limit: usize,
+        maybe_upper_event_id_bound: Option<EventID>,
+    ) -> Result<Vec<FlowSystemEvent>, InternalError>;
+
+    /// Mark these events as applied for this projector (idempotent).
+    async fn mark_applied(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        projector_name: &'static str,
+        event_ids: &[EventID],
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

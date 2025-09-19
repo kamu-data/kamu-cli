@@ -273,7 +273,7 @@ impl FlowAgentImpl {
         &self,
         activation_moment: DateTime<Utc>,
         flow_event_store: Arc<dyn FlowEventStore>,
-        transaction_catalog: dill::Catalog,
+        transaction_catalog: Catalog,
     ) -> Result<(), InternalError> {
         let planned_flow_ids: Vec<_> = flow_event_store
             .get_flows_scheduled_for_activation_at(activation_moment)

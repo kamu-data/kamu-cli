@@ -298,7 +298,7 @@ pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStrea
         #method_visibility #method_signature {
             use tracing::Instrument;
             ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional(|transaction_catalog: Catalog| async move {
+                .transactional(|transaction_catalog: ::dill::Catalog| async move {
                     #method_body
                 })
                 .instrument(tracing::debug_span!(stringify!(#method_name)))

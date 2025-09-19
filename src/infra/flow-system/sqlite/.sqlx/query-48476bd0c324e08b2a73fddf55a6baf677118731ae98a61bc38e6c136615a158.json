@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH next AS (\n                SELECT e.event_id\n                FROM flow_system_events e\n                LEFT JOIN flow_system_projected_events a\n                    ON a.projector = $1 AND a.event_id = e.event_id\n                WHERE a.event_id IS NULL AND e.event_id <= $2\n                ORDER BY e.event_id\n                LIMIT $3\n            )\n                SELECT\n                    e.event_id,\n                    e.source_stream as \"source_stream: String\",\n                    e.source_event_id,\n                    e.occurred_at as \"occurred_at: chrono::DateTime<chrono::Utc>\",\n                    e.inserted_at as \"inserted_at: chrono::DateTime<chrono::Utc>\"\n                FROM flow_system_events e\n                JOIN next n ON n.event_id = e.event_id\n                ORDER BY e.event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "source_stream: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "source_event_id",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "occurred_at: chrono::DateTime<chrono::Utc>",
+        "ordinal": 3,
+        "type_info": "Null"
+      },
+      {
+        "name": "inserted_at: chrono::DateTime<chrono::Utc>",
+        "ordinal": 4,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "48476bd0c324e08b2a73fddf55a6baf677118731ae98a61bc38e6c136615a158"
+}

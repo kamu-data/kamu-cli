@@ -10,7 +10,16 @@
 use std::sync::Arc;
 
 use async_utils::BackgroundAgent;
-use kamu_flow_system::{FlowSystemEventAgent, FlowSystemEventAgentConfig, FlowSystemEventStore};
+use database_common_macros::transactional_method;
+use event_sourcing::EventID;
+use internal_error::InternalError;
+use kamu_flow_system::{
+    FlowSystemEventAgent,
+    FlowSystemEventAgentConfig,
+    FlowSystemEventProjector,
+    FlowSystemEventStore,
+    FlowSystemEventStoreWakeHint,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,8 +28,51 @@ use kamu_flow_system::{FlowSystemEventAgent, FlowSystemEventAgentConfig, FlowSys
 #[dill::interface(dyn FlowSystemEventAgent)]
 #[dill::scope(dill::Singleton)]
 pub struct FlowSystemEventAgentImpl {
+    catalog: dill::Catalog,
     flow_system_event_store: Arc<dyn FlowSystemEventStore>,
+    projectors: Vec<Arc<dyn FlowSystemEventProjector>>,
     agent_config: Arc<FlowSystemEventAgentConfig>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl FlowSystemEventAgentImpl {
+    #[transactional_method]
+    async fn apply_batch_to_projector(
+        &self,
+        projector: &dyn FlowSystemEventProjector,
+        maybe_upper_event_id_bound: Option<EventID>,
+    ) -> Result<(), InternalError> {
+        let batch = self
+            .flow_system_event_store
+            .fetch_next_batch(
+                &transaction_catalog,
+                projector.name(),
+                self.agent_config.batch_size,
+                maybe_upper_event_id_bound,
+            )
+            .await?;
+
+        if batch.is_empty() {
+            return Ok(());
+        }
+
+        // Optional: prefilter in memory to avoid useless writes
+        let ids: Vec<EventID> = batch.iter().map(|e| e.event_id).collect();
+
+        for e in &batch {
+            if projector.interested(e) {
+                projector.apply(&transaction_catalog, e).await?;
+            }
+        }
+
+        // Mark projection progress
+        self.flow_system_event_store
+            .mark_applied(&transaction_catalog, projector.name(), &ids)
+            .await?;
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +84,17 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
     }
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
+        // On startup, immediately sync all projectors to catch up with existing events
+        println!(
+            "Initial sync at startup, current time {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+
+        for projector in &self.projectors {
+            self.apply_batch_to_projector(projector.as_ref(), None)
+                .await?;
+        }
+
         loop {
             println!(
                 "Starting iteration, current time {}",
@@ -52,32 +115,17 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
             );
 
             // 2) For each projector, drain until no work.
-            /*for p in &self.projectors {
-                loop {
-                    let mut tx = self.store.begin(p.name()).await?;
+            let maybe_upper_event_id_bound = match hint {
+                FlowSystemEventStoreWakeHint::NewEvents {
+                    upper_event_id_bound,
+                } => Some(upper_event_id_bound),
+                FlowSystemEventStoreWakeHint::Timeout => None,
+            };
 
-                    let batch = tx.fetch_next_batch(self.batch_size).await?;
-                    if batch.is_empty() {
-                        tx.rollback().await.ok();
-                        break;
-                    }
-
-                    // Optional: prefilter in memory to avoid useless writes
-                    let ids: Vec<i64> = batch.iter().map(|e| e.id).collect();
-
-                    for e in &batch {
-                        if p.interested(e) {
-                            p.apply(tx.as_mut(), e).await?;
-                        }
-                    }
-
-                    // mark & commit atomically with view writes
-                    tx.mark_applied(&ids).await?;
-                    tx.commit().await?;
-
-                    made_progress = true;
-                }
-            }*/
+            for projector in &self.projectors {
+                self.apply_batch_to_projector(projector.as_ref(), maybe_upper_event_id_bound)
+                    .await?;
+            }
         }
     }
 }

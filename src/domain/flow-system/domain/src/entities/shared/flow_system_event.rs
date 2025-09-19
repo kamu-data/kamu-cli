@@ -7,36 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::ops::Deref;
-
-use dill::{Catalog, component};
+use chrono::{DateTime, Utc};
+use event_sourcing::EventID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A wrapper structure for the catalog, for a visual understanding of what we
-/// will be inside the transaction
-#[derive(Clone)]
-pub struct TransactionalCatalog(Catalog);
-
-#[component(pub)]
-impl TransactionalCatalog {
-    pub fn new(catalog: Catalog) -> Self {
-        Self(catalog)
-    }
-
-    pub fn into_inner(self) -> Catalog {
-        self.0
-    }
+#[derive(Debug, Copy, Clone)]
+pub struct FlowSystemEvent {
+    pub event_id: EventID,
+    pub source_type: FlowSystemEventSourceType,
+    pub source_event_id: EventID,
+    pub occurred_at: DateTime<Utc>,
+    pub inserted_at: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Deref for TransactionalCatalog {
-    type Target = Catalog;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+#[derive(Debug, Copy, Clone)]
+pub enum FlowSystemEventSourceType {
+    FlowConfiguration,
+    Flow,
+    FlowTrigger,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

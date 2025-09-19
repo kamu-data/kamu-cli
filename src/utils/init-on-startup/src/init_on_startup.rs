@@ -161,8 +161,8 @@ pub async fn run_startup_jobs_ex(
 
         if job_metadata.requires_transaction {
             DatabaseTransactionRunner::new(catalog.clone())
-                .transactional(|transactional_catalog| async move {
-                    let job = job_builder.get(&transactional_catalog).unwrap();
+                .transactional(|transaction_catalog| async move {
+                    let job = job_builder.get(&transaction_catalog).unwrap();
                     job.run_initialization().await
                 })
                 .await?;
