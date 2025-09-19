@@ -13,6 +13,7 @@ use axum::middleware::Next;
 use axum::response::Response;
 use http::Method;
 use http_common::ApiError;
+use messaging_outbox::OutboxAgent;
 use serde::Deserialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +30,7 @@ pub async fn e2e_middleware_fn(request: Request, next: Next) -> Result<Response,
     let response = next.run(request).await;
 
     if is_mutable_request && response.status().is_success() {
-        let outbox_agent = base_catalog
-            .get_one::<messaging_outbox::OutboxAgent>()
-            .unwrap();
-
+        let outbox_agent = base_catalog.get_one::<dyn OutboxAgent>().unwrap();
         outbox_agent.run_while_has_tasks().await?;
     }
 
