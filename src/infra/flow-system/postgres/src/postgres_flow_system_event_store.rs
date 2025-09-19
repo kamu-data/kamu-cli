@@ -55,50 +55,48 @@ impl PostgresFlowSystemEventStore {
     fn calculate_retry_delay(
         &self,
         deadline: tokio::time::Instant,
-        min_polling_interval: Duration,
+        min_debounce_interval: Duration,
     ) -> Duration {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        std::cmp::min(min_polling_interval, remaining)
+        std::cmp::min(min_debounce_interval, remaining)
     }
 
     async fn buffer_notifications(
         &self,
         listener: &mut PgListener,
-        initial_payload: Option<serde_json::Value>,
+        initial_payload: Option<PgNotifyPayload>,
         elapsed: Duration,
         remaining_timeout: Duration,
         min_polling_interval: Duration,
     ) -> Option<EventID> {
-        #[derive(Debug, serde::Deserialize)]
-        struct Payload {
-            #[allow(dead_code)]
-            min: i64,
-            max: i64,
-        }
+        let mut upper_bound = initial_payload.map(|p| p.max);
 
-        let mut upper_bound = initial_payload
-            .and_then(|p| serde_json::from_value::<Payload>(p).ok())
-            .map(|p| EventID::new(p.max));
-
-        // If we got notification quickly (before min_polling_interval),
-        // try to buffer for a bit more to accumulate additional events
+        // Only buffer if we got the first NOTIFY faster than our debounce
         if elapsed < min_polling_interval {
-            let buffer_timeout = min_polling_interval.saturating_sub(elapsed);
-            let remaining_after_buffer = remaining_timeout.saturating_sub(buffer_timeout);
+            // Calculate how much time we have left in the debounce window
+            // also respect the outer wait_wake timeout
+            let budget = std::cmp::min(min_polling_interval - elapsed, remaining_timeout);
+            if !budget.is_zero() {
+                use tokio::time::{Instant, timeout};
+                let end = Instant::now() + budget;
 
-            // Only buffer if we have enough remaining time
-            if !remaining_after_buffer.is_zero() {
-                // Try to collect more notifications during buffering period
-                while let Ok(Ok(additional_notification)) =
-                    tokio::time::timeout(buffer_timeout, listener.recv()).await
-                {
-                    if let Ok(additional_payload) =
-                        serde_json::from_str::<Payload>(additional_notification.payload())
-                    {
-                        // Update upper bound to the latest max value
-                        upper_bound = Some(EventID::new(additional_payload.max));
+                loop {
+                    let remaining = end.saturating_duration_since(Instant::now());
+                    if remaining.is_zero() {
+                        break;
                     }
-                    // Continue collecting until buffer timeout
+
+                    match timeout(remaining, listener.recv()).await {
+                        Ok(Ok(n)) => {
+                            if let Ok(p) = serde_json::from_str::<PgNotifyPayload>(n.payload()) {
+                                let u = p.max;
+                                upper_bound = Some(upper_bound.map_or(u, |old| old.max(u)));
+                            }
+                            // continue until time budget is exhausted
+                        }
+                        Ok(Err(_conn_err)) => break, // caller will reconnect
+                        Err(_elapsed) => break,      // time budget elapsed
+                    }
                 }
             }
         }
@@ -127,7 +125,7 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
     async fn wait_wake(
         &self,
         timeout: Duration,
-        min_polling_interval: Duration,
+        min_debounce_interval: Duration,
     ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
 
@@ -140,9 +138,9 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                     match self.try_create_listener().await {
                         Some(new_listener) => new_listener,
                         None => {
-                            // Failed to create listener, wait for min_listening_timeout and then
+                            // Failed to create listener, wait for min_debounce_interval and then
                             // sleep for remaining timeout if any
-                            let delay = self.calculate_retry_delay(deadline, min_polling_interval);
+                            let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
                             if !delay.is_zero() {
                                 tokio::time::sleep(delay).await;
                             }
@@ -151,7 +149,7 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                             let remaining_after_delay =
                                 deadline.saturating_duration_since(tokio::time::Instant::now());
                             if remaining_after_delay.is_zero() {
-                                return Ok(FlowSystemEventStoreWakeHint::default());
+                                return Ok(FlowSystemEventStoreWakeHint::Timeout);
                             }
 
                             // Continue to next iteration to try again
@@ -166,7 +164,7 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
             if remaining_timeout.is_zero() {
                 // Timeout exceeded, put listener back and return
                 *self.listener.lock().await = Some(listener);
-                return Ok(FlowSystemEventStoreWakeHint::default());
+                return Ok(FlowSystemEventStoreWakeHint::Timeout);
             }
 
             // Wait for notification with remaining timeout
@@ -174,7 +172,8 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                 // Got a NOTIFY — check if we should buffer for more events
                 Ok(Ok(notification)) => {
                     // Parse initial payload
-                    let initial_payload = serde_json::from_str(notification.payload()).ok();
+                    let initial_payload: Option<PgNotifyPayload> =
+                        serde_json::from_str(notification.payload()).ok();
 
                     // Calculate how long we've been waiting since the start
                     let elapsed = deadline
@@ -188,7 +187,7 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                             initial_payload,
                             elapsed,
                             remaining_timeout,
-                            min_polling_interval,
+                            min_debounce_interval,
                         )
                         .await;
 
@@ -196,9 +195,12 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                     *self.listener.lock().await = Some(listener);
 
                     // Return the (potentially updated) upper bound
-                    return Ok(FlowSystemEventStoreWakeHint {
-                        upper_event_id_bound: upper_bound,
-                    });
+                    return match upper_bound {
+                        Some(event_id) => Ok(FlowSystemEventStoreWakeHint::NewEvents {
+                            upper_event_id_bound: event_id,
+                        }),
+                        None => Ok(FlowSystemEventStoreWakeHint::Timeout),
+                    };
                 }
 
                 // Socket/conn error — drop listener and try to reconnect after delay
@@ -209,8 +211,8 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                         "PgListener connection error, will attempt to reconnect after delay",
                     );
 
-                    // Wait for min_listening_timeout before retrying, if we have remaining time
-                    let delay = self.calculate_retry_delay(deadline, min_polling_interval);
+                    // Wait for min_debounce_interval before retrying, if we have remaining time
+                    let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
                     if !delay.is_zero() {
                         tokio::time::sleep(delay).await;
                     }
@@ -220,11 +222,20 @@ impl FlowSystemEventStore for PostgresFlowSystemEventStore {
                 // Timed out waiting — stash listener back and return
                 Err(_elapsed) => {
                     *self.listener.lock().await = Some(listener);
-                    return Ok(FlowSystemEventStoreWakeHint::default());
+                    return Ok(FlowSystemEventStoreWakeHint::Timeout);
                 }
             }
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, serde::Deserialize)]
+struct PgNotifyPayload {
+    #[allow(dead_code)]
+    min: EventID,
+    max: EventID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

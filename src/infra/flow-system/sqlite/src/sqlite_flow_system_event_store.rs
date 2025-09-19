@@ -10,16 +10,13 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use database_common::TransactionRefT;
-use database_common_macros::transactional_method1;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_flow_system::{EventID, FlowSystemEventStore, FlowSystemEventStoreWakeHint};
-use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventStore {
-    catalog: dill::Catalog,
+    pool: Arc<sqlx::SqlitePool>,
     max_seen_event_id: Mutex<EventID>,
 }
 
@@ -28,22 +25,18 @@ pub struct SqliteFlowSystemEventStore {
 #[dill::component(pub)]
 #[dill::interface(dyn FlowSystemEventStore)]
 impl SqliteFlowSystemEventStore {
-    pub fn new(catalog: dill::Catalog) -> Self {
+    pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self {
-            catalog,
+            pool,
             max_seen_event_id: Mutex::new(EventID::new(0)),
         }
     }
 
-    #[transactional_method1(transaction: Arc<TransactionRefT<Sqlite>>)]
     async fn check_for_new_events(&self) -> Result<Option<EventID>, InternalError> {
         let max_present_event_id = {
-            let mut tr = transaction.lock().await;
-            let connection_mut = tr.connection_mut().await.int_err()?;
-
             let (max_present_event_id,): (Option<i64>,) =
                 sqlx::query_as("SELECT MAX(event_id) FROM flow_system_events")
-                    .fetch_one(connection_mut)
+                    .fetch_one(self.pool.as_ref())
                     .await
                     .unwrap_or((None,));
 
@@ -67,16 +60,16 @@ impl FlowSystemEventStore for SqliteFlowSystemEventStore {
     async fn wait_wake(
         &self,
         timeout: Duration,
-        min_polling_interval: Duration,
+        min_debounce_interval: Duration,
     ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
-        let mut poll_interval = min_polling_interval;
+        let mut poll_interval = min_debounce_interval;
 
         loop {
             // Check for new events
             if let Some(event_id) = self.check_for_new_events().await? {
-                return Ok(FlowSystemEventStoreWakeHint {
-                    upper_event_id_bound: Some(event_id),
+                return Ok(FlowSystemEventStoreWakeHint::NewEvents {
+                    upper_event_id_bound: event_id,
                 });
             }
 
@@ -84,7 +77,7 @@ impl FlowSystemEventStore for SqliteFlowSystemEventStore {
             let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
             if remaining.is_zero() {
                 // Timeout elapsed, no new work
-                return Ok(FlowSystemEventStoreWakeHint::default());
+                return Ok(FlowSystemEventStoreWakeHint::Timeout);
             }
 
             // Sleep for the shorter of poll_interval or remaining time

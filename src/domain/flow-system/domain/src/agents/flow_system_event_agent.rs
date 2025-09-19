@@ -19,15 +19,23 @@ pub trait FlowSystemEventAgent: BackgroundAgent {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowSystemEventAgentConfig {
-    pub min_listening_timeout: Duration,
+    pub min_debounce_interval: Duration,
     pub max_listening_timeout: Duration,
     pub batch_size: usize,
 }
 
-impl Default for FlowSystemEventAgentConfig {
-    fn default() -> Self {
+impl FlowSystemEventAgentConfig {
+    pub fn local_default() -> Self {
         Self {
-            min_listening_timeout: Duration::from_millis(100),
+            min_debounce_interval: Duration::from_millis(100),
+            max_listening_timeout: Duration::from_secs(2),
+            batch_size: 100,
+        }
+    }
+
+    pub fn production_default() -> Self {
+        Self {
+            min_debounce_interval: Duration::from_millis(100),
             max_listening_timeout: Duration::from_secs(60),
             batch_size: 500,
         }
