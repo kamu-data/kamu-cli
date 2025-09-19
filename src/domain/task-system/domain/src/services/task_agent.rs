@@ -7,15 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use async_utils::BackgroundAgent;
+
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskAgent: Sync + Send {
-    /// Runs the agent main loop
-    async fn run(&self) -> Result<(), InternalError>;
-
+pub trait TaskAgent: BackgroundAgent {
     /// Runs single task only, blocks until it is available (for tests only!)
     async fn run_single_task(&self) -> Result<(), InternalError>;
 }

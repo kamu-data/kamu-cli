@@ -1542,6 +1542,7 @@ name = "async-utils"
 version = "0.250.0"
 dependencies = [
  "async-trait",
+ "internal-error",
  "tokio",
 ]
 
@@ -8087,6 +8088,7 @@ version = "0.250.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "async-utils",
  "chrono",
  "common-macros",
  "cron",
@@ -8333,6 +8335,7 @@ name = "kamu-task-system"
 version = "0.250.0"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "enum-variants",
@@ -8404,6 +8407,7 @@ name = "kamu-task-system-services"
 version = "0.250.0"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -9125,6 +9129,7 @@ name = "messaging-outbox"
 version = "0.250.0"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "database-common-macros",

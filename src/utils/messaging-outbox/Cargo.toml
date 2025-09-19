@@ -25,6 +25,7 @@ default = []
 sqlx = ["dep:sqlx"]
 
 [dependencies]
+async-utils = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }

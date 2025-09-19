@@ -14,6 +14,8 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 - Follow the project's existing code style and formatting
 - The project uses rustfmt for code formatting
 - Respect the existing module structure and naming conventions
+- **Use inline format syntax**: Prefer `format!("Message: {variable}")` over `format!("Message: {}", variable)` for better readability and Clippy compliance
+- **Use safe numeric casting**: Prefer `usize::try_from(x).unwrap()` over `x as usize` for potentially unsafe numeric casts to avoid Clippy warnings
 
 ## Testing
 - This project uses `cargo nextest` for running tests

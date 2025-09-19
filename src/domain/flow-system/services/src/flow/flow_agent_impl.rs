@@ -11,6 +11,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use async_utils::BackgroundAgent;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use database_common_macros::transactional_method;
@@ -39,6 +40,7 @@ pub struct FlowAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn BackgroundAgent)]
 #[interface(dyn FlowAgent)]
 #[interface(dyn FlowAgentTestDriver)]
 #[interface(dyn MessageConsumer)]
@@ -389,8 +391,16 @@ impl FlowAgentImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl FlowAgent for FlowAgentImpl {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
-impl FlowAgent for FlowAgentImpl {
+impl BackgroundAgent for FlowAgentImpl {
+    fn agent_name(&self) -> &'static str {
+        "dev.kamu.domain.flow-system.FlowAgent"
+    }
+
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
         // Main scanning loop
