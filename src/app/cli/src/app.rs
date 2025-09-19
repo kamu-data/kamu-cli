@@ -304,7 +304,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         if is_outbox_processing_required {
             // Process the Outbox messages while they are present
             let outbox_agent = cli_catalog
-                .get_one::<messaging_outbox::OutboxAgent>()
+                .get_one::<dyn messaging_outbox::OutboxAgent>()
                 .int_err()?;
             outbox_agent
                 .run_while_has_tasks()
@@ -546,7 +546,7 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-    b.add::<messaging_outbox::OutboxAgent>();
+    b.add::<messaging_outbox::OutboxAgentImpl>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);

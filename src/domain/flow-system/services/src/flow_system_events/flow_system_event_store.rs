@@ -7,18 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_utils::BackgroundAgent;
-use init_on_startup::InitOnStartup;
-use internal_error::InternalError;
+use chrono::Duration;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait OutboxAgent: BackgroundAgent + InitOnStartup {
-    async fn run_while_has_tasks(&self) -> Result<(), InternalError>;
+pub trait FlowSystemEventStore: Send + Sync {
+    /// Block until there *might* be new work, or timeout.
+    async fn wait_wake(&self, timeout: Duration) -> FlowSystemEventStoreWakeReason;
+}
 
-    // To be used by tests only!
-    async fn run_single_iteration_only(&self) -> Result<(), InternalError>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum FlowSystemEventStoreWakeReason {
+    NewWork,
+    Timeout,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

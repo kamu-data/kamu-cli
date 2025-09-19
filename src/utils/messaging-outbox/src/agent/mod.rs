@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod outbox_agent;
+mod outbox_agent_impl;
 mod outbox_agent_metrics;
 mod outbox_agent_shared;
 mod outbox_consumption_iteration_planner;
 mod outbox_producer_consumption_job;
 
 pub use outbox_agent::*;
+pub use outbox_agent_impl::*;
 pub use outbox_agent_metrics::*;
 pub(crate) use outbox_agent_shared::*;
 pub(crate) use outbox_consumption_iteration_planner::*;
