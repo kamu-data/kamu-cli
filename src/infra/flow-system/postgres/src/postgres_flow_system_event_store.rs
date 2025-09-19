@@ -27,7 +27,16 @@ pub struct PostgresFlowSystemEventStore {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component(pub)]
+#[dill::interface(dyn FlowSystemEventStore)]
 impl PostgresFlowSystemEventStore {
+    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
+        Self {
+            pool,
+            listener: tokio::sync::Mutex::new(None),
+        }
+    }
+
     async fn try_create_listener(&self) -> Option<PgListener> {
         match PgListener::connect_with(&self.pool).await {
             Ok(mut l) => match l.listen(NOTIFY_CHANNEL_NAME).await {
@@ -105,19 +114,6 @@ impl PostgresFlowSystemEventStore {
         }
 
         upper_bound
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[dill::component(pub)]
-#[dill::interface(dyn FlowSystemEventStore)]
-impl PostgresFlowSystemEventStore {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
-        Self {
-            pool,
-            listener: tokio::sync::Mutex::new(None),
-        }
     }
 }
 
