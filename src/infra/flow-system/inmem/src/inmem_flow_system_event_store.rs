@@ -13,24 +13,38 @@
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use dill::{Singleton, component, scope};
-use kamu_flow_system::EventID;
+use kamu_flow_system::{EventID, FlowSystemEventStore, InternalError};
 use time_source::SystemTimeSource;
+use tokio::sync::broadcast;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowSystemEventStore {
     time_source: Arc<dyn SystemTimeSource>,
     state: Mutex<State>,
+    tx: broadcast::Sender<()>,
 }
 
-#[component(pub)]
-#[scope(Singleton)]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct State {
+    events: Vec<FlowSystemEvent>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component(pub)]
+#[dill::scope(dill::Singleton)]
+#[dill::interface(dyn FlowSystemEventStore)]
 impl InMemoryFlowSystemEventStore {
     pub fn new(time_source: Arc<dyn SystemTimeSource>) -> Self {
+        let (tx, _rx) = broadcast::channel(1024);
+
         Self {
             time_source,
             state: Mutex::new(State::default()),
+            tx,
         }
     }
 
@@ -70,14 +84,22 @@ impl InMemoryFlowSystemEventStore {
             };
             state.events.push(event);
         }
+
+        // Wake up listeners
+        let _ = self.tx.send(());
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-struct State {
-    events: Vec<FlowSystemEvent>,
+#[async_trait::async_trait]
+impl FlowSystemEventStore for InMemoryFlowSystemEventStore {
+    async fn wait_wake(&self, timeout: chrono::Duration) -> Result<(), InternalError> {
+        let mut rx = self.tx.subscribe();
+        // Wait until a new event arrives or timeout elapses
+        let _ = tokio::time::timeout(timeout.to_std().unwrap(), rx.recv()).await;
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
