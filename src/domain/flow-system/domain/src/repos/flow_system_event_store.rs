@@ -20,15 +20,19 @@ pub trait FlowSystemEventStore: Send + Sync {
     async fn wait_wake(
         &self,
         timeout: Duration,
-        min_polling_interval: Duration,
+        min_debounce_interval: Duration,
     ) -> Result<FlowSystemEventStoreWakeHint, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
-pub struct FlowSystemEventStoreWakeHint {
-    pub upper_event_id_bound: Option<EventID>,
+#[derive(Debug)]
+pub enum FlowSystemEventStoreWakeHint {
+    /// Timeout elapsed without new events
+    Timeout,
+
+    /// New events detected with upper bound
+    NewEvents { upper_event_id_bound: EventID },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
