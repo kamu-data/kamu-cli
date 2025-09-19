@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flow_agent;
-mod flow_system_event_agent;
+mod flow_system_event_agent_impl;
+mod flow_system_event_store;
 
-pub use flow_agent::*;
-pub use flow_system_event_agent::*;
+pub use flow_system_event_agent_impl::*;
+pub use flow_system_event_store::*;

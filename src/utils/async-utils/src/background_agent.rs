@@ -7,18 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_utils::BackgroundAgent;
-use init_on_startup::InitOnStartup;
 use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait OutboxAgent: BackgroundAgent + InitOnStartup {
-    async fn run_while_has_tasks(&self) -> Result<(), InternalError>;
+pub trait BackgroundAgent: Sync + Send {
+    /// Returns the name of the agent for debugging purposes
+    fn agent_name(&self) -> &'static str;
 
-    // To be used by tests only!
-    async fn run_single_iteration_only(&self) -> Result<(), InternalError>;
+    /// Runs the update main loop
+    async fn run(&self) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

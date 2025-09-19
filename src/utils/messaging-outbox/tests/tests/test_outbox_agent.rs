@@ -11,7 +11,6 @@ use std::sync::{Arc, Mutex};
 
 use database_common::NoOpDatabasePlugin;
 use dill::*;
-use init_on_startup::InitOnStartup;
 use internal_error::InternalError;
 use kamu_messaging_outbox_inmem::{
     InMemoryOutboxMessageConsumptionRepository,
@@ -553,7 +552,7 @@ async fn test_consumer_with_latest_messages_consume_all_messages() {
 
 struct OutboxAgentHarness {
     catalog: Catalog,
-    outbox_agent: Arc<OutboxAgent>,
+    outbox_agent: Arc<dyn OutboxAgent>,
     outbox: Arc<dyn Outbox>,
     outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
     metrics: Arc<OutboxAgentMetrics>,
@@ -562,7 +561,7 @@ struct OutboxAgentHarness {
 impl OutboxAgentHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
-        b.add::<OutboxAgent>();
+        b.add::<OutboxAgentImpl>();
         b.add::<OutboxAgentMetrics>();
         b.add_value(OutboxConfig::default());
         b.add::<InMemoryOutboxMessageRepository>();
@@ -585,7 +584,7 @@ impl OutboxAgentHarness {
 
         let catalog = b.build();
 
-        let outbox_agent = catalog.get_one::<OutboxAgent>().unwrap();
+        let outbox_agent = catalog.get_one::<dyn OutboxAgent>().unwrap();
         let outbox = catalog.get_one::<dyn Outbox>().unwrap();
         let outbox_consumption_repository = catalog
             .get_one::<dyn OutboxMessageConsumptionRepository>()

@@ -8,17 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use async_utils::BackgroundAgent;
-use init_on_startup::InitOnStartup;
-use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait OutboxAgent: BackgroundAgent + InitOnStartup {
-    async fn run_while_has_tasks(&self) -> Result<(), InternalError>;
-
-    // To be used by tests only!
-    async fn run_single_iteration_only(&self) -> Result<(), InternalError>;
-}
+pub trait FlowSystemEventAgent: BackgroundAgent {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
