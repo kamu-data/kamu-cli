@@ -67,19 +67,23 @@ impl PostgresFlowSystemEventStore {
         initial_payload: Option<PgNotifyPayload>,
         elapsed: Duration,
         remaining_timeout: Duration,
-        min_polling_interval: Duration,
+        min_debounce_interval: Duration,
     ) -> Option<EventID> {
+        use tokio::time::{Instant, timeout};
+
+        // Seed from the first payload (if any)
         let mut upper_bound = initial_payload.map(|p| p.max);
 
-        // Only buffer if we got the first NOTIFY faster than our debounce
-        if elapsed < min_polling_interval {
+        // Only buffer if first NOTIFY arrived "too fast"
+        if elapsed < min_debounce_interval {
             // Calculate how much time we have left in the debounce window
             // also respect the outer wait_wake timeout
-            let budget = std::cmp::min(min_polling_interval - elapsed, remaining_timeout);
+            let budget = std::cmp::min(
+                min_debounce_interval.saturating_sub(elapsed),
+                remaining_timeout,
+            );
             if !budget.is_zero() {
-                use tokio::time::{Instant, timeout};
                 let end = Instant::now() + budget;
-
                 loop {
                     let remaining = end.saturating_duration_since(Instant::now());
                     if remaining.is_zero() {
@@ -89,13 +93,12 @@ impl PostgresFlowSystemEventStore {
                     match timeout(remaining, listener.recv()).await {
                         Ok(Ok(n)) => {
                             if let Ok(p) = serde_json::from_str::<PgNotifyPayload>(n.payload()) {
-                                let u = p.max;
-                                upper_bound = Some(upper_bound.map_or(u, |old| old.max(u)));
+                                upper_bound = Some(upper_bound.map_or(p.max, |old| old.max(p.max)));
                             }
-                            // continue until time budget is exhausted
+                            // keep draining until time budget is up
                         }
-                        Ok(Err(_conn_err)) => break, // caller will reconnect
-                        Err(_elapsed) => break,      // time budget elapsed
+                        Ok(Err(_)) | Err(_) => break, /* connection error → caller handles
+                                                       * reconnect, or time budget elapsed */
                     }
                 }
             }
