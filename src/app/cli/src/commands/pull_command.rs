@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use database_common::DatabaseTransactionRunner;
 use futures::TryStreamExt;
 use kamu::domain::auth::DatasetActionNotEnoughPermissionsError;
 use kamu::domain::*;
@@ -30,9 +31,8 @@ use crate::output::OutputConfig;
 #[dill::interface(dyn Command)]
 pub struct PullCommand {
     output_config: Arc<OutputConfig>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    search_svc: Arc<dyn SearchServiceRemote>,
     pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+    catalog: dill::Catalog,
     tenancy_config: TenancyConfig,
     current_account_subject: Arc<CurrentAccountSubject>,
 
@@ -115,19 +115,26 @@ impl PullCommand {
         listener: Option<Arc<dyn PullMultiListener>>,
         current_account_name: &odf::AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_any_refs: Vec<_> = if !self.all {
-            filter_datasets_by_any_pattern(
-                self.dataset_registry.as_ref(),
-                self.search_svc.clone(),
-                self.refs.clone(),
-                current_account_name,
-                self.tenancy_config,
+        let dataset_any_refs = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |dataset_registry: Arc<dyn DatasetRegistry>,
+                 search_svc: Arc<dyn SearchServiceRemote>| async move {
+                    if !self.all {
+                        filter_datasets_by_any_pattern(
+                            dataset_registry.as_ref(),
+                            search_svc,
+                            self.refs.clone(),
+                            current_account_name,
+                            self.tenancy_config,
+                        )
+                        .try_collect()
+                        .await
+                    } else {
+                        Ok(vec![])
+                    }
+                },
             )
-            .try_collect()
-            .await?
-        } else {
-            vec![]
-        };
+            .await?;
 
         let options = PullOptions {
             recursive: self.recursive,
