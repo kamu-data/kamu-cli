@@ -11,6 +11,7 @@ use chrono::{Duration, DurationRound, Utc};
 use dill::Catalog;
 use kamu_adapter_flow_dataset::ingest_dataset_binding;
 use kamu_flow_system::*;
+use kamu_task_system::{TaskError, TaskResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -136,7 +137,12 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
+        .apply_flow_result(
+            EventID::new(2),
+            &flow_binding,
+            &FlowOutcome::Success(TaskResult::empty()),
+            success_time,
+        )
         .await
         .unwrap();
 
@@ -152,7 +158,12 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
+        .apply_flow_result(
+            EventID::new(4),
+            &flow_binding,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            failure_time,
+        )
         .await
         .unwrap();
 
@@ -225,7 +236,12 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
+        .apply_flow_result(
+            EventID::new(2),
+            &flow_binding,
+            &FlowOutcome::Success(TaskResult::empty()),
+            success_time,
+        )
         .await
         .unwrap();
 
@@ -241,7 +257,12 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
+        .apply_flow_result(
+            EventID::new(4),
+            &flow_binding,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            failure_time,
+        )
         .await
         .unwrap();
 
@@ -258,7 +279,12 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
     let second_failure_time = failure_time + Duration::hours(1);
     let next_run_time = Some(second_failure_time + Duration::hours(1));
     flow_process_repository
-        .apply_flow_result(EventID::new(6), &flow_binding, false, second_failure_time)
+        .apply_flow_result(
+            EventID::new(6),
+            &flow_binding,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            second_failure_time,
+        )
         .await
         .unwrap();
 
@@ -339,7 +365,12 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
+        .apply_flow_result(
+            EventID::new(2),
+            &flow_binding,
+            &FlowOutcome::Success(TaskResult::empty()),
+            success_time,
+        )
         .await
         .unwrap();
 
@@ -355,7 +386,12 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
+        .apply_flow_result(
+            EventID::new(4),
+            &flow_binding,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            failure_time,
+        )
         .await
         .unwrap();
 
@@ -371,7 +407,12 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     let second_failure_time = failure_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(6), &flow_binding, false, second_failure_time)
+        .apply_flow_result(
+            EventID::new(6),
+            &flow_binding,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            second_failure_time,
+        )
         .await
         .unwrap();
 
@@ -387,7 +428,12 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     let recovery_time = second_failure_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(8), &flow_binding, true, recovery_time)
+        .apply_flow_result(
+            EventID::new(8),
+            &flow_binding,
+            &FlowOutcome::Success(TaskResult::empty()),
+            recovery_time,
+        )
         .await
         .unwrap();
 
@@ -471,7 +517,12 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
+        .apply_flow_result(
+            EventID::new(2),
+            &flow_binding,
+            &FlowOutcome::Success(TaskResult::empty()),
+            success_time,
+        )
         .await
         .unwrap();
 
@@ -687,14 +738,24 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
 
     // Ingest process: successful
     flow_process_repository
-        .apply_flow_result(EventID::new(4), &ingest_binding, true, success_time)
+        .apply_flow_result(
+            EventID::new(4),
+            &ingest_binding,
+            &FlowOutcome::Success(TaskResult::empty()),
+            success_time,
+        )
         .await
         .unwrap();
 
     // Transform process: failed
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(5), &transform_binding, false, failure_time)
+        .apply_flow_result(
+            EventID::new(5),
+            &transform_binding,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            failure_time,
+        )
         .await
         .unwrap();
 
@@ -824,7 +885,12 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     // Apply some flow results to create history
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
+        .apply_flow_result(
+            EventID::new(2),
+            &flow_binding,
+            &FlowOutcome::Success(TaskResult::empty()),
+            success_time,
+        )
         .await
         .unwrap();
 
@@ -840,7 +906,12 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
+        .apply_flow_result(
+            EventID::new(4),
+            &flow_binding,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            failure_time,
+        )
         .await
         .unwrap();
 

@@ -412,7 +412,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         &self,
         event_id: EventID,
         flow_binding: &FlowBinding,
-        success: bool,
+        flow_outcome: &FlowOutcome,
         event_time: DateTime<Utc>,
     ) -> Result<(), FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
@@ -424,15 +424,9 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
                 FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
             });
 
-        if success {
-            process_state
-                .on_success(event_id, self.time_source.now(), event_time)
-                .int_err()?;
-        } else {
-            process_state
-                .on_failure(event_id, self.time_source.now(), event_time)
-                .int_err()?;
-        }
+        process_state
+            .on_flow_outcome(event_id, self.time_source.now(), event_time, flow_outcome)
+            .int_err()?;
 
         Ok(())
     }

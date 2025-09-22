@@ -17,7 +17,7 @@ pub enum FlowOutcome {
     /// Flow succeeded
     Success(ts::TaskResult),
     /// Flow failed to complete, even after retry logic
-    Failed,
+    Failed(ts::TaskError),
     /// Flow was aborted by user or by system
     Aborted,
 }
@@ -39,7 +39,7 @@ impl From<ts::TaskOutcome> for FlowOutcome {
     fn from(value: ts::TaskOutcome) -> Self {
         match value {
             ts::TaskOutcome::Success(result) => Self::Success(result),
-            ts::TaskOutcome::Failed(_) => Self::Failed,
+            ts::TaskOutcome::Failed(error) => Self::Failed(error),
             ts::TaskOutcome::Cancelled => Self::Aborted,
         }
     }

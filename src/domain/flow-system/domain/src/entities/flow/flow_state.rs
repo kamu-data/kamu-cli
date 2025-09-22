@@ -299,7 +299,7 @@ impl Projection for FlowState {
                                     timing,
                                     ..s
                                 }),
-                                ts::TaskOutcome::Failed(_) => {
+                                ts::TaskOutcome::Failed(error) => {
                                     // Retry logic - don't set outcome yet
                                     if let Some(next_attempt_at) = next_attempt_at {
                                         Ok(FlowState {
@@ -319,7 +319,7 @@ impl Projection for FlowState {
                                         })
                                     } else {
                                         Ok(FlowState {
-                                            outcome: Some(FlowOutcome::Failed),
+                                            outcome: Some(FlowOutcome::Failed(error.clone())),
                                             timing,
                                             ..s
                                         })

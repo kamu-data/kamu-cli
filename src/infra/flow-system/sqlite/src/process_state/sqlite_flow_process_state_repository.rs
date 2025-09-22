@@ -120,7 +120,7 @@ impl SqliteFlowProcessStateRepository {
 impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
     async fn upsert_process_state_on_trigger_event(
         &self,
-        trigger_event_id: EventID,
+        event_id: EventID,
         flow_binding: FlowBinding,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
@@ -135,7 +135,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                 // Apply updates in memory
                 process_state
                     .update_trigger_state(
-                        trigger_event_id,
+                        event_id,
                         self.time_source.now(),
                         paused_manual,
                         stop_policy,
@@ -160,7 +160,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             // No existing row, create new
             Err(FlowProcessLoadError::NotFound(_)) => {
                 let process_state = FlowProcessState::new(
-                    trigger_event_id,
+                    event_id,
                     self.time_source.now(),
                     flow_binding,
                     paused_manual,
@@ -249,9 +249,9 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
     async fn apply_flow_result(
         &self,
-        flow_event_id: EventID,
+        event_id: EventID,
         flow_binding: &FlowBinding,
-        success: bool,
+        flow_outcome: &FlowOutcome,
         event_time: DateTime<Utc>,
     ) -> Result<(), FlowProcessFlowEventError> {
         // Load current state
@@ -269,15 +269,9 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         let current_event_id = process_state.last_applied_event_id();
 
         // Apply updates in memory
-        if success {
-            process_state
-                .on_success(flow_event_id, self.time_source.now(), event_time)
-                .int_err()?;
-        } else {
-            process_state
-                .on_failure(flow_event_id, self.time_source.now(), event_time)
-                .int_err()?;
-        }
+        process_state
+            .on_flow_outcome(event_id, self.time_source.now(), event_time, flow_outcome)
+            .int_err()?;
 
         // Try saving back
         match self
@@ -294,7 +288,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
     async fn on_flow_scheduled(
         &self,
-        flow_event_id: EventID,
+        event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
     ) -> Result<(), FlowProcessFlowEventError> {
@@ -314,7 +308,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
         // Apply flow scheduling
         process_state
-            .on_scheduled(flow_event_id, self.time_source.now(), planned_at)
+            .on_scheduled(event_id, self.time_source.now(), planned_at)
             .int_err()?;
 
         // Try saving back

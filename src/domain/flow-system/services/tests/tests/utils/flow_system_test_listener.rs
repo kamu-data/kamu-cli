@@ -330,7 +330,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                                 match outcome {
                                     FlowOutcome::Success(_) => "Success",
                                     FlowOutcome::Aborted => "Aborted",
-                                    FlowOutcome::Failed => "Failed",
+                                    FlowOutcome::Failed(_) => "Failed",
                                 }
                             )?;
                         } else {
