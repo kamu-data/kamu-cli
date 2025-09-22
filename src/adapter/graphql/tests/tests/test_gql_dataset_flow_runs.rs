@@ -3174,7 +3174,7 @@ async fn test_history_of_completed_transform_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_execute_transfrom_flow_error_after_compaction() {
+async fn test_execute_transform_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
