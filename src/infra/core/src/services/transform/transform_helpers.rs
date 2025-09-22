@@ -47,7 +47,8 @@ pub async fn build_preliminary_request_ext(
         let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new(dataset_kind);
         let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
         let mut set_data_schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
-        let mut execute_transform_visitor = odf::dataset::SearchExecuteTransformVisitor::new();
+        let mut execute_transform_visitor =
+            odf::dataset::SearchExecuteTransformVisitor::new(dataset_kind);
 
         use odf::dataset::MetadataChainExt;
         target
@@ -74,7 +75,7 @@ pub async fn build_preliminary_request_ext(
                 .int_err()?
                 .map(Arc::new),
             set_vocab_visitor.into_event(),
-            execute_transform_visitor.into_event(),
+            execute_transform_visitor.into_inner().into_event(),
         )
     };
 

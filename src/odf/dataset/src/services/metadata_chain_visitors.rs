@@ -113,7 +113,8 @@ typed_search_single_typed_block_visitor_impl!(
     SetDataSchema,
     Flag::SET_DATA_SCHEMA
 );
-typed_search_single_typed_block_visitor_impl!(
+typed_kind_based_search_single_typed_block_visitor_impl!(
+    DatasetKind::Derivative,
     SearchExecuteTransformVisitor,
     ExecuteTransform,
     Flag::EXECUTE_TRANSFORM
