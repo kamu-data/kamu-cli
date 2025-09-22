@@ -16,15 +16,15 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     EventID,
     FlowSystemEvent,
+    FlowSystemEventBridge,
     FlowSystemEventSourceType,
-    FlowSystemEventStore,
     FlowSystemEventStoreWakeHint,
 };
 use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteFlowSystemEventStore {
+pub struct SqliteFlowSystemEventBridge {
     pool: Arc<sqlx::SqlitePool>,
     max_seen_event_id: Mutex<EventID>,
 }
@@ -32,8 +32,8 @@ pub struct SqliteFlowSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn FlowSystemEventStore)]
-impl SqliteFlowSystemEventStore {
+#[dill::interface(dyn FlowSystemEventBridge)]
+impl SqliteFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self {
             pool,
@@ -65,7 +65,7 @@ impl SqliteFlowSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowSystemEventStore for SqliteFlowSystemEventStore {
+impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
     async fn wait_wake(
         &self,
         timeout: Duration,

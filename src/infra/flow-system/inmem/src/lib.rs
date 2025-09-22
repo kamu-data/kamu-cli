@@ -16,11 +16,11 @@ mod flow_event_data_helper;
 mod inmem_flow_configuration_event_store;
 mod inmem_flow_event_store;
 mod inmem_flow_process_state;
-mod inmem_flow_system_event_store;
+mod inmem_flow_system_event_bridge;
 mod inmem_flow_trigger_event_store;
 
 pub use inmem_flow_configuration_event_store::*;
 pub use inmem_flow_event_store::*;
 pub use inmem_flow_process_state::*;
-pub use inmem_flow_system_event_store::*;
+pub use inmem_flow_system_event_bridge::*;
 pub use inmem_flow_trigger_event_store::*;

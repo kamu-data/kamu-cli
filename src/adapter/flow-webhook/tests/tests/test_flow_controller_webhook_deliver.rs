@@ -247,7 +247,7 @@ impl FlowControllerWebhookDeliverHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerWebhookDeliver>()
             .add::<InMemoryFlowEventStore>()
-            .add::<InMemoryFlowSystemEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
             .add::<FakeDatasetEntryService>()
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_flow_sensor_dispatcher)

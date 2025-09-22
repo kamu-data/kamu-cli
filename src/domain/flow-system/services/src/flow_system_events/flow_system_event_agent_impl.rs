@@ -16,8 +16,8 @@ use internal_error::InternalError;
 use kamu_flow_system::{
     FlowSystemEventAgent,
     FlowSystemEventAgentConfig,
+    FlowSystemEventBridge,
     FlowSystemEventProjector,
-    FlowSystemEventStore,
     FlowSystemEventStoreWakeHint,
 };
 
@@ -29,7 +29,7 @@ use kamu_flow_system::{
 #[dill::scope(dill::Singleton)]
 pub struct FlowSystemEventAgentImpl {
     catalog: dill::Catalog,
-    flow_system_event_store: Arc<dyn FlowSystemEventStore>,
+    flow_system_event_store: Arc<dyn FlowSystemEventBridge>,
     projectors: Vec<Arc<dyn FlowSystemEventProjector>>,
     agent_config: Arc<FlowSystemEventAgentConfig>,
 }

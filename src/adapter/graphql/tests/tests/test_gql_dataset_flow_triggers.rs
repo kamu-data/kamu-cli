@@ -1387,7 +1387,7 @@ impl FlowTriggerHarness {
                 .add::<InMemoryFlowEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<InMemoryFlowSystemEventStore>()
+                .add::<InMemoryFlowSystemEventBridge>()
                 .add::<InMemoryFlowProcessState>();
 
             b.build()

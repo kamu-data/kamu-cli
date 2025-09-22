@@ -595,7 +595,7 @@ impl FlowTriggerHarness {
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()
-                .add::<InMemoryFlowSystemEventStore>()
+                .add::<InMemoryFlowSystemEventBridge>()
                 .add::<InMemoryFlowProcessState>()
                 .add_value(FlowAgentConfig::new(
                     Duration::seconds(1),

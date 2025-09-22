@@ -310,7 +310,7 @@ impl FlowTriggerHarness {
             .add::<FlowDatasetsEventBridge>()
             .add::<FlowSensorDispatcherImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
-            .add::<InMemoryFlowSystemEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
             .add::<InMemoryFlowProcessState>()
             .add::<SystemTimeSourceDefault>();
 

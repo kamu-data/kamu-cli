@@ -21,7 +21,7 @@ use tokio::sync::broadcast;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryFlowSystemEventStore {
+pub struct InMemoryFlowSystemEventBridge {
     time_source: Arc<dyn SystemTimeSource>,
     state: Mutex<State>,
     tx: broadcast::Sender<EventID>,
@@ -42,8 +42,8 @@ struct State {
 
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
-#[dill::interface(dyn FlowSystemEventStore)]
-impl InMemoryFlowSystemEventStore {
+#[dill::interface(dyn FlowSystemEventBridge)]
+impl InMemoryFlowSystemEventBridge {
     pub fn new(time_source: Arc<dyn SystemTimeSource>) -> Self {
         let (tx, _rx) = broadcast::channel(1024);
 
@@ -109,7 +109,7 @@ impl InMemoryFlowSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowSystemEventStore for InMemoryFlowSystemEventStore {
+impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
     async fn wait_wake(
         &self,
         timeout: Duration,

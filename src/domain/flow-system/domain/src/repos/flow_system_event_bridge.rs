@@ -17,8 +17,8 @@ use crate::FlowSystemEvent;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowSystemEventStore: Send + Sync {
-    /// Block until there *might* be new work, or timeout.
+pub trait FlowSystemEventBridge: Send + Sync {
+    /// Block until there *might* be new events, or timeout elapses.
     async fn wait_wake(
         &self,
         timeout: Duration,
@@ -34,7 +34,7 @@ pub trait FlowSystemEventStore: Send + Sync {
         maybe_upper_event_id_bound: Option<EventID>,
     ) -> Result<Vec<FlowSystemEvent>, InternalError>;
 
-    /// Mark these events as applied for this projector (idempotent).
+    /// Mark these events as applied for this projector (should be idempotent!).
     async fn mark_applied(
         &self,
         transaction_catalog: &dill::Catalog,

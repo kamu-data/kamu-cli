@@ -12,7 +12,7 @@ use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
-use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowSystemEventStore};
+use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowSystemEventBridge};
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use odf::metadata::testing::MetadataFactory;
 
@@ -428,7 +428,7 @@ impl FlowConfigHarness {
             b.add::<MetadataQueryServiceImpl>()
                 .add::<FlowConfigurationServiceImpl>()
                 .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<InMemoryFlowSystemEventStore>();
+                .add::<InMemoryFlowSystemEventBridge>();
 
             b.build()
         };

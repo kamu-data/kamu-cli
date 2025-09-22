@@ -173,7 +173,7 @@ impl FlowControllerResetHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerReset>()
             .add::<InMemoryFlowEventStore>()
-            .add::<InMemoryFlowSystemEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
             .add_value(mock_flow_sensor_dispatcher)
             .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
             .add::<FakeDatasetEntryService>()
