@@ -15,6 +15,7 @@ use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -199,25 +200,29 @@ async fn test_current_push_source_blocks() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "metadataProjection": [{
-                            "__typename": "MetadataBlockExtended",
-                            "event": {
-                                "__typename": "AddPushSource",
-                                "sourceName": "source2",
-                                "read": {
-                                    "__typename": "ReadStepNdJson",
+                        "metadataProjection": [
+                            {
+                                "__typename": "MetadataBlockExtended",
+                                "event": {
+                                    "__typename": "AddPushSource",
+                                    "sourceName": "source1",
+                                    "read": {
+                                        "__typename": "ReadStepCsv",
+                                    }
+                                }
+
+                            },
+                            {
+                                "__typename": "MetadataBlockExtended",
+                                "event": {
+                                    "__typename": "AddPushSource",
+                                    "sourceName": "source2",
+                                    "read": {
+                                        "__typename": "ReadStepNdJson",
+                                    }
                                 }
                             }
-                         }, {
-                            "__typename": "MetadataBlockExtended",
-                            "event": {
-                                "__typename": "AddPushSource",
-                                "sourceName": "source1",
-                                "read": {
-                                    "__typename": "ReadStepCsv",
-                                }
-                            }
-                        }]
+                        ]
                     }
                 }
             }
