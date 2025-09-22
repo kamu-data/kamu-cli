@@ -15,14 +15,14 @@ use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
 
-use crate::InMemoryFlowSystemEventStore;
+use crate::InMemoryFlowSystemEventBridge;
 use crate::flow_event_data_helper::FlowEventDataHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowEventStore {
     inner: InMemoryEventStore<FlowState, State>,
-    flow_system_event_store: Arc<InMemoryFlowSystemEventStore>,
+    flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +123,7 @@ impl FlowIndexEntry {
 #[interface(dyn FlowEventStore)]
 #[scope(Singleton)]
 impl InMemoryFlowEventStore {
-    pub fn new(flow_system_event_store: Arc<InMemoryFlowSystemEventStore>) -> Self {
+    pub fn new(flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
             flow_system_event_store,
