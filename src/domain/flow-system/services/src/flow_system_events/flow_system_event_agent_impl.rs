@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use async_utils::BackgroundAgent;
 use database_common_macros::transactional_method;
+use dill::Builder;
 use event_sourcing::EventID;
 use internal_error::InternalError;
 use kamu_flow_system::{
@@ -29,22 +30,129 @@ use kamu_flow_system::{
 #[dill::scope(dill::Singleton)]
 pub struct FlowSystemEventAgentImpl {
     catalog: dill::Catalog,
-    flow_system_event_store: Arc<dyn FlowSystemEventBridge>,
-    projectors: Vec<Arc<dyn FlowSystemEventProjector>>,
+    flow_system_event_bridge: Arc<dyn FlowSystemEventBridge>,
     agent_config: Arc<FlowSystemEventAgentConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowSystemEventAgentImpl {
+    /// Runs initial catch-up phase for all projectors
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn initial_catch_up_phase(&self) {
+        // For each projector, apply all existing unprocessed events
+        let projector_builders = self
+            .catalog
+            .builders_for::<dyn FlowSystemEventProjector>()
+            .collect::<Vec<_>>();
+
+        // Loop until each projector is totally caught up
+        for builder in projector_builders {
+            tracing::debug!(
+                instance_type = builder.instance_type_name(),
+                "Catching up projector"
+            );
+
+            // If projector is far behind, it might take multiple batches to catch up
+            let mut num_total_processed = 0;
+            loop {
+                // Apply a batch of events to the projector
+                match self.apply_batch_to_projector(&builder, None).await {
+                    // Success
+                    Ok(num_processed) => {
+                        tracing::debug!(
+                            instance_type = builder.instance_type_name(),
+                            num_processed,
+                            "Projector batch processed",
+                        );
+                        if num_processed == 0 {
+                            tracing::debug!(
+                                instance_type = builder.instance_type_name(),
+                                num_total_processed,
+                                "Projector caught up",
+                            );
+                            break;
+                        }
+                        num_total_processed += num_processed;
+                    }
+
+                    // Problem: log issue and continue with other projectors
+                    Err(e) => {
+                        tracing::error!(
+                            error = ?e,
+                            error_msg = %e,
+                            instance_type = builder.instance_type_name(),
+                            "Projector batch processing failed",
+                        );
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Run a single iteration of the agent main loop.
+    /// Returns number of still active projectors
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn run_single_iteration(&self, hint: FlowSystemEventStoreWakeHint) {
+        tracing::debug!(hint = ?hint, "Agent woke up with a hint");
+
+        // We might have a hint from the event bridge about upper bound of new events
+        let maybe_upper_event_id_bound = match hint {
+            FlowSystemEventStoreWakeHint::NewEvents {
+                upper_event_id_bound,
+            } => Some(upper_event_id_bound),
+            FlowSystemEventStoreWakeHint::Timeout => None,
+        };
+
+        // For each projector, apply a batch of new events, just 1 batch per iteration
+        // to ensure fairness. Each projector will run in a separate
+        // transaction.
+        let projector_builders = self
+            .catalog
+            .builders_for::<dyn FlowSystemEventProjector>()
+            .collect::<Vec<_>>();
+
+        for builder in projector_builders {
+            match self
+                .apply_batch_to_projector(&builder, maybe_upper_event_id_bound)
+                .await
+            {
+                // Success
+                Ok(num_processed) => {
+                    tracing::debug!(
+                        instance_type = builder.instance_type_name(),
+                        num_processed,
+                        "Projector batch processed",
+                    );
+                }
+
+                // Problem: log issue and continue with other projectors
+                Err(e) => {
+                    tracing::error!(
+                        error = ?e,
+                        error_msg = %e,
+                        instance_type = builder.instance_type_name(),
+                        "Projector batch processing failed",
+                    );
+                }
+            }
+        }
+    }
+
     #[transactional_method]
+    #[tracing::instrument(level = "debug", skip_all, fields(projector = builder.instance_type_name()))]
     async fn apply_batch_to_projector(
         &self,
-        projector: &dyn FlowSystemEventProjector,
+        projector_builder: &dill::TypecastBuilder<'_, dyn FlowSystemEventProjector>,
         maybe_upper_event_id_bound: Option<EventID>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<usize, InternalError> {
+        // Construct projector instance
+        let projector = projector_builder.get(&transaction_catalog).unwrap();
+
+        // Try load next batch
         let batch = self
-            .flow_system_event_store
+            .flow_system_event_bridge
             .fetch_next_batch(
                 &transaction_catalog,
                 projector.name(),
@@ -52,23 +160,26 @@ impl FlowSystemEventAgentImpl {
                 maybe_upper_event_id_bound,
             )
             .await?;
+        tracing::debug!(batch_size = batch.len(), "Fetched batch");
 
+        // Quick exit if no events
         if batch.is_empty() {
-            return Ok(());
+            return Ok(0);
         }
 
-        // Apply events to build projections
+        // Apply each event to build projection
         for e in &batch {
-            projector.apply(&transaction_catalog, e).await?;
+            projector.apply(e).await?;
         }
 
         // Mark projection progress
         let ids: Vec<EventID> = batch.iter().map(|e| e.event_id).collect();
-        self.flow_system_event_store
+        self.flow_system_event_bridge
             .mark_applied(&transaction_catalog, projector.name(), &ids)
             .await?;
 
-        Ok(())
+        // Return number of processed events
+        Ok(batch.len())
     }
 }
 
@@ -82,39 +193,21 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
         // On startup, immediately sync all projectors to catch up with existing events
-        tracing::info!("Initial projectors sync at startup");
-        for projector in &self.projectors {
-            self.apply_batch_to_projector(projector.as_ref(), None)
-                .await?;
-        }
+        self.initial_catch_up_phase().await;
 
-        tracing::info!("Starting main event listening loop");
-
+        // Then enter the infinite main loop
         loop {
-            tracing::debug!("Starting iteration");
-
-            // 1) Wait for push or timeout - let the store handle the backoff strategy
+            // Wait for push or timeout - let the store handle the backoff strategy
             let hint = self
-                .flow_system_event_store
+                .flow_system_event_bridge
                 .wait_wake(
                     self.agent_config.max_listening_timeout,
                     self.agent_config.min_debounce_interval,
                 )
                 .await?;
-            tracing::debug!("Woke up, hint: {hint:?}");
 
-            // 2) For each projector, drain until no work.
-            let maybe_upper_event_id_bound = match hint {
-                FlowSystemEventStoreWakeHint::NewEvents {
-                    upper_event_id_bound,
-                } => Some(upper_event_id_bound),
-                FlowSystemEventStoreWakeHint::Timeout => None,
-            };
-
-            for projector in &self.projectors {
-                self.apply_batch_to_projector(projector.as_ref(), maybe_upper_event_id_bound)
-                    .await?;
-            }
+            // Process a single iteration using the hint
+            self.run_single_iteration(hint).await;
         }
     }
 }

@@ -29,7 +29,7 @@ impl FlowSystemEventAgentConfig {
         Self {
             min_debounce_interval: Duration::from_millis(100),
             max_listening_timeout: Duration::from_secs(2),
-            batch_size: 100,
+            batch_size: 20,
         }
     }
 
@@ -37,7 +37,7 @@ impl FlowSystemEventAgentConfig {
         Self {
             min_debounce_interval: Duration::from_millis(100),
             max_listening_timeout: Duration::from_secs(60),
-            batch_size: 500,
+            batch_size: 100,
         }
     }
 }

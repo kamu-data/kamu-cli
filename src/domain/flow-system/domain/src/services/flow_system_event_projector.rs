@@ -18,13 +18,9 @@ pub trait FlowSystemEventProjector: Send + Sync {
     /// Stable name; used as key in the `flow_system_projected_events` ledger.
     fn name(&self) -> &'static str;
 
-    /// Apply a *single* event using the given transaction.
+    /// Apply a *single* event using the open transaction.
     /// Must be idempotent: safe to re-run for the same event id.
-    async fn apply(
-        &self,
-        transaction_catalog: &dill::Catalog,
-        e: &FlowSystemEvent,
-    ) -> Result<(), InternalError>;
+    async fn apply(&self, e: &FlowSystemEvent) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
