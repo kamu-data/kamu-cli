@@ -361,7 +361,9 @@ pub trait MetadataChainExt: MetadataChain {
 
         // Iterate over blocks until we satisfy all visitors or reach the tail
         while let Some((hash, block)) = &current_hashed_block {
-            if !options.inclusive_tail && tail_hash == Some(hash) {
+            let is_tail = tail_hash == Some(hash);
+
+            if !options.inclusive_tail && is_tail {
                 break;
             }
 
@@ -414,6 +416,12 @@ pub trait MetadataChainExt: MetadataChain {
                 break;
             }
 
+            // We have processed the inclusive tail block,
+            // not overwriting current_hashed_block for potential checks.
+            if is_tail {
+                break;
+            }
+
             current_hashed_block = if options.ignore_hints_when_getting_preceding_block {
                 // Simply trying to get the previous block
                 if let Some(prev_block_hash) = &block.prev_block_hash {
@@ -438,13 +446,16 @@ pub trait MetadataChainExt: MetadataChain {
             visitor.finish().map_err(AcceptVisitorError::Visitor)?;
         }
 
+        // Important: If there was no iteration (head is None), the interval correctness
+        //            check will not be performed.
         if !options.ignore_missing_tail
             && let Some((current_hash, _current_block)) = current_hashed_block
             && let Some(tail_hash) = tail_hash
             && current_hash != *tail_hash
+            && let Some(head_hash) = head_hash
         {
             Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                head: current_hash,
+                head: head_hash.clone(),
                 tail: tail_hash.clone(),
             }))?;
         }
