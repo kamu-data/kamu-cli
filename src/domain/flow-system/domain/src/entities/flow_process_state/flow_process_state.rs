@@ -12,7 +12,13 @@ use event_sourcing::EventID;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{FlowBinding, FlowOutcome, FlowProcessEffectiveState, FlowTriggerStopPolicy};
+use crate::{
+    FlowBinding,
+    FlowOutcome,
+    FlowProcessAutoStopReason,
+    FlowProcessEffectiveState,
+    FlowTriggerStopPolicy,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,8 +34,10 @@ pub struct FlowProcessState {
     last_failure_at: Option<DateTime<Utc>>,
     last_attempt_at: Option<DateTime<Utc>>,
     next_planned_at: Option<DateTime<Utc>>,
+    auto_stopped_at: Option<DateTime<Utc>>,
 
     effective_state: FlowProcessEffectiveState,
+    auto_stopped_reason: Option<FlowProcessAutoStopReason>,
 
     updated_at: DateTime<Utc>,
     last_applied_event_id: EventID,
@@ -54,7 +62,9 @@ impl FlowProcessState {
             last_failure_at: None,
             last_attempt_at: None,
             next_planned_at: None,
+            auto_stopped_at: None,
             effective_state: FlowProcessEffectiveState::calculate(paused_manual, 0, stop_policy),
+            auto_stopped_reason: None,
             updated_at: current_time,
             last_applied_event_id: event_id,
         }
@@ -79,15 +89,31 @@ impl FlowProcessState {
         last_failure_at: Option<DateTime<Utc>>,
         last_attempt_at: Option<DateTime<Utc>>,
         next_planned_at: Option<DateTime<Utc>>,
+        auto_stopped_at: Option<DateTime<Utc>>,
         effective_state: FlowProcessEffectiveState,
+        auto_stopped_reason: Option<FlowProcessAutoStopReason>,
         updated_at: DateTime<Utc>,
         last_applied_event_id: EventID,
     ) -> Result<Self, InternalError> {
-        debug_assert_eq!(
-            effective_state,
-            FlowProcessEffectiveState::calculate(paused_manual, consecutive_failures, stop_policy,),
-            "Inconsistent effective state in storage row"
-        );
+        // Only validate effective state if not auto-stopped, as auto-stopped state
+        // overrides the calculated state
+        if auto_stopped_reason.is_none() {
+            debug_assert_eq!(
+                effective_state,
+                FlowProcessEffectiveState::calculate(
+                    paused_manual,
+                    consecutive_failures,
+                    stop_policy,
+                ),
+                "Inconsistent effective state in storage row"
+            );
+        } else {
+            debug_assert_eq!(
+                effective_state,
+                FlowProcessEffectiveState::StoppedAuto,
+                "Auto-stopped flow must have StoppedAuto effective state"
+            );
+        }
 
         Self::validate_timing_properties(
             last_success_at,
@@ -105,7 +131,9 @@ impl FlowProcessState {
             last_failure_at,
             last_attempt_at,
             next_planned_at,
+            auto_stopped_at,
             effective_state,
+            auto_stopped_reason,
             updated_at,
             last_applied_event_id,
         })
@@ -153,8 +181,18 @@ impl FlowProcessState {
     }
 
     #[inline]
+    pub fn auto_stopped_at(&self) -> Option<DateTime<Utc>> {
+        self.auto_stopped_at
+    }
+
+    #[inline]
     pub fn effective_state(&self) -> FlowProcessEffectiveState {
         self.effective_state
+    }
+
+    #[inline]
+    pub fn auto_stopped_reason(&self) -> Option<FlowProcessAutoStopReason> {
+        self.auto_stopped_reason
     }
 
     #[inline]
@@ -184,13 +222,24 @@ impl FlowProcessState {
         self.paused_manual = paused_manual;
         self.stop_policy = stop_policy;
 
-        // Reset consecutive failures when resuming from stopped state
-        // This gives users a fresh start after they've corrected issues
+        // Reset consecutive failures and clear auto-stop state when resuming from
+        // stopped state This gives users a fresh start after they've corrected
+        // issues
         if is_resuming {
             self.consecutive_failures = 0;
+            self.auto_stopped_reason = None;
+            self.auto_stopped_at = None;
         }
 
-        self.actualize_effective_state();
+        // If we were auto-stopped but now manually changing the trigger state,
+        // clear the auto-stop reason since it's no longer relevant
+        if was_stopped_auto && !is_resuming {
+            self.auto_stopped_reason = None;
+            self.auto_stopped_at = None;
+        }
+
+        // Use simple actualize since this is trigger state update, not flow outcome
+        self.actualize_effective_state_simple();
 
         self.updated_at = current_time;
         self.last_applied_event_id = event_id;
@@ -212,11 +261,23 @@ impl FlowProcessState {
                 self.consecutive_failures = 0;
                 self.last_success_at = Some(event_time);
                 self.last_attempt_at = Some(event_time);
+                // Clear auto-stop reason on success as the flow is working again
+                self.auto_stopped_reason = None;
+                self.auto_stopped_at = None;
             }
-            FlowOutcome::Failed(_) => {
+            FlowOutcome::Failed(task_error) => {
                 self.consecutive_failures += 1;
                 self.last_failure_at = Some(event_time);
                 self.last_attempt_at = Some(event_time);
+
+                // Check if this is an unrecoverable failure that should auto-stop immediately
+                if !task_error.recoverable {
+                    self.auto_stopped_reason =
+                        Some(FlowProcessAutoStopReason::UnrecoverableFailure);
+                    self.auto_stopped_at = Some(event_time);
+                }
+                // For recoverable failures, the stop policy will be evaluated
+                // in actualize_effective_state
             }
             FlowOutcome::Aborted => {
                 // Unexpected, we don't track aborted flows in this projection
@@ -225,7 +286,7 @@ impl FlowProcessState {
         }
 
         self.handle_next_planned_at_update(event_time);
-        self.actualize_effective_state();
+        self.actualize_effective_state_with_auto_stop_check(event_time);
 
         self.last_applied_event_id = event_id;
         self.updated_at = current_time;
@@ -249,7 +310,49 @@ impl FlowProcessState {
         Ok(())
     }
 
-    fn actualize_effective_state(&mut self) {
+    fn actualize_effective_state_with_auto_stop_check(&mut self, event_time: DateTime<Utc>) {
+        // If we already have an auto-stop reason (like unrecoverable failure), maintain
+        // stopped state
+        if self.auto_stopped_reason.is_some() {
+            self.effective_state = FlowProcessEffectiveState::StoppedAuto;
+        } else {
+            // Check if stop policy should trigger auto-stop for recoverable failures
+            let should_auto_stop_per_policy = if self.consecutive_failures > 0 {
+                match self.stop_policy {
+                    FlowTriggerStopPolicy::AfterConsecutiveFailures { failures_count }
+                        if self.consecutive_failures >= failures_count.into_inner() =>
+                    {
+                        true
+                    }
+                    FlowTriggerStopPolicy::AfterConsecutiveFailures { .. }
+                    | FlowTriggerStopPolicy::Never => false,
+                }
+            } else {
+                false
+            };
+
+            if should_auto_stop_per_policy {
+                self.auto_stopped_reason = Some(FlowProcessAutoStopReason::StopPolicy);
+                self.auto_stopped_at = Some(event_time);
+                self.effective_state = FlowProcessEffectiveState::StoppedAuto;
+            } else {
+                // Calculate normal effective state
+                self.effective_state = FlowProcessEffectiveState::calculate(
+                    self.paused_manual,
+                    self.consecutive_failures,
+                    self.stop_policy,
+                );
+            }
+        }
+
+        // Clear next_planned_at when flow process is not running (stopped or paused)
+        if !self.effective_state.is_running() {
+            self.next_planned_at = None;
+        }
+    }
+
+    fn actualize_effective_state_simple(&mut self) {
+        // Simple version without auto-stop reason update (for trigger state updates)
         self.effective_state = FlowProcessEffectiveState::calculate(
             self.paused_manual,
             self.consecutive_failures,
@@ -933,6 +1036,255 @@ mod tests {
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 1); // failures preserved
+    }
+
+    #[test]
+    fn test_unrecoverable_failure_auto_stop() {
+        let current_time = Utc::now();
+        let event_time = current_time;
+
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(5), // High threshold
+        );
+
+        // Trigger an unrecoverable failure - should auto-stop immediately
+        state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time + Duration::minutes(1),
+                event_time + Duration::minutes(1),
+                &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(state.consecutive_failures, 1);
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::UnrecoverableFailure)
+        );
+        assert_eq!(
+            state.auto_stopped_at(),
+            Some(event_time + Duration::minutes(1))
+        );
+    }
+
+    #[test]
+    fn test_recoverable_vs_unrecoverable_failure() {
+        let current_time = Utc::now();
+        let event_time = current_time;
+
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(3),
+        );
+
+        // First: recoverable failure - should not auto-stop yet
+        state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time + Duration::minutes(1),
+                event_time + Duration::minutes(1),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(state.consecutive_failures, 1);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
+        assert_eq!(state.auto_stopped_reason(), None);
+
+        // Second: another recoverable failure - should not auto-stop yet
+        state
+            .on_flow_outcome(
+                EventID::new(3),
+                current_time + Duration::minutes(2),
+                event_time + Duration::minutes(2),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(state.consecutive_failures, 2);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
+        assert_eq!(state.auto_stopped_reason(), None);
+
+        // Third: unrecoverable failure - should auto-stop immediately regardless of
+        // policy
+        state
+            .on_flow_outcome(
+                EventID::new(4),
+                current_time + Duration::minutes(3),
+                event_time + Duration::minutes(3),
+                &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(state.consecutive_failures, 3);
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::UnrecoverableFailure)
+        );
+    }
+
+    #[test]
+    fn test_stop_policy_auto_stop_reason() {
+        let current_time = Utc::now();
+        let event_time = current_time;
+
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(2),
+        );
+
+        // First failure - should not auto-stop
+        state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time + Duration::minutes(1),
+                event_time + Duration::minutes(1),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(state.consecutive_failures, 1);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
+        assert_eq!(state.auto_stopped_reason(), None);
+
+        // Second failure - should auto-stop due to policy
+        state
+            .on_flow_outcome(
+                EventID::new(3),
+                current_time + Duration::minutes(2),
+                event_time + Duration::minutes(2),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(state.consecutive_failures, 2);
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::StopPolicy)
+        );
+        assert_eq!(
+            state.auto_stopped_at(),
+            Some(event_time + Duration::minutes(2))
+        );
+    }
+
+    #[test]
+    fn test_success_clears_auto_stop_reason() {
+        let current_time = Utc::now();
+        let event_time = current_time;
+
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(1),
+        );
+
+        // Trigger unrecoverable failure - should auto-stop
+        state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time + Duration::minutes(1),
+                event_time + Duration::minutes(1),
+                &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::UnrecoverableFailure)
+        );
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+
+        // Success should clear auto-stop reason
+        state
+            .on_flow_outcome(
+                EventID::new(3),
+                current_time + Duration::minutes(2),
+                event_time + Duration::minutes(2),
+                &FlowOutcome::Success(TaskResult::empty()),
+            )
+            .unwrap();
+
+        assert_eq!(state.consecutive_failures, 0);
+        assert_eq!(state.auto_stopped_reason(), None);
+        assert_eq!(state.auto_stopped_at(), None);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
+    }
+
+    #[test]
+    fn test_resume_from_auto_stopped_state() {
+        let current_time = Utc::now();
+
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(1),
+        );
+
+        // Trigger auto-stop via stop policy
+        state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time + Duration::minutes(1),
+                current_time + Duration::minutes(1),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::StopPolicy)
+        );
+
+        // Resume by updating trigger state (unpause)
+        state
+            .update_trigger_state(
+                EventID::new(3),
+                current_time + Duration::minutes(2),
+                false, // not paused
+                make_test_stop_policy_with_failures(2),
+            )
+            .unwrap();
+
+        // Should reset auto-stop state and consecutive failures
+        assert_eq!(state.consecutive_failures, 0);
+        assert_eq!(state.auto_stopped_reason(), None);
+        assert_eq!(state.auto_stopped_at(), None);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
     }
 }
 

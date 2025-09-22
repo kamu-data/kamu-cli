@@ -20,7 +20,7 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 use kamu_flow_system::*;
-use kamu_task_system::TaskResult;
+use kamu_task_system::{TaskError, TaskResult};
 use kamu_webhooks::{WebhookEventTypeCatalog, WebhookSubscriptionID};
 use uuid::Uuid;
 
@@ -48,6 +48,9 @@ pub(crate) struct CsvFlowProcessRecord {
     pub last_attempt_at: Option<DateTime<Utc>>,
     #[serde(deserialize_with = "deserialize_optional_datetime")]
     pub next_planned_at: Option<DateTime<Utc>>,
+    pub auto_stopped_reason: Option<String>,
+    #[serde(deserialize_with = "deserialize_optional_datetime")]
+    pub auto_stopped_at: Option<DateTime<Utc>>,
     pub effective_state: String,
 }
 
@@ -157,6 +160,10 @@ impl CsvFlowProcessStateLoader {
         // Apply timing-based results if any
         self.apply_results_from_record(&flow_binding, &record).await;
 
+        // Apply auto-stop result if needed
+        self.apply_auto_stop_from_record(&flow_binding, &record)
+            .await;
+
         // Verify effective state matches
         let current_state = self
             .flow_process_query
@@ -248,14 +255,15 @@ impl CsvFlowProcessStateLoader {
 
             let flow_event_id = self.next_event_id();
 
-            // First apply the flow result
+            // Apply the appropriate flow result
+            let flow_outcome = if success {
+                FlowOutcome::Success(TaskResult::empty())
+            } else {
+                FlowOutcome::Failed(TaskError::empty_recoverable())
+            };
+
             self.flow_process_repository
-                .apply_flow_result(
-                    flow_event_id,
-                    flow_binding,
-                    &FlowOutcome::Success(TaskResult::empty()),
-                    event_time,
-                )
+                .apply_flow_result(flow_event_id, flow_binding, &flow_outcome, event_time)
                 .await
                 .expect("Failed to apply flow result");
 
@@ -266,6 +274,40 @@ impl CsvFlowProcessStateLoader {
                     .on_flow_scheduled(schedule_event_id, flow_binding, planned_at)
                     .await
                     .expect("Failed to schedule flow");
+            }
+        }
+    }
+
+    /// Apply auto-stop result based on record data
+    async fn apply_auto_stop_from_record(
+        &mut self,
+        flow_binding: &FlowBinding,
+        record: &CsvFlowProcessRecord,
+    ) {
+        if let Some(ref auto_stopped_reason) = record.auto_stopped_reason {
+            if let Some(auto_stopped_at) = record.auto_stopped_at {
+                match auto_stopped_reason.as_str() {
+                    "unrecoverable_failure" => {
+                        // For unrecoverable failure, we need to apply an unrecoverable failure
+                        // at the auto_stopped_at time to set the auto-stop state
+                        let event_id = self.next_event_id();
+                        self.flow_process_repository
+                            .apply_flow_result(
+                                event_id,
+                                flow_binding,
+                                &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
+                                auto_stopped_at,
+                            )
+                            .await
+                            .expect("Failed to apply unrecoverable failure");
+                    }
+                    "stop_policy" => {
+                        // For stop policy, the auto-stop should have been
+                        // triggered by the consecutive
+                        // failures. No additional action needed.
+                    }
+                    _ => panic!("Unknown auto stopped reason: {auto_stopped_reason}",),
+                }
             }
         }
     }

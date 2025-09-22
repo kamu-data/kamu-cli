@@ -12,6 +12,7 @@ use internal_error::InternalError;
 use kamu_flow_system::{
     EventID,
     FlowBinding,
+    FlowProcessAutoStopReason,
     FlowProcessEffectiveState,
     FlowProcessState,
     FlowTriggerStopPolicy,
@@ -31,7 +32,9 @@ pub(crate) struct SqliteFlowProcessStateRowModel {
     pub last_failure_at: Option<DateTime<Utc>>,
     pub last_attempt_at: Option<DateTime<Utc>>,
     pub next_planned_at: Option<DateTime<Utc>>,
+    pub auto_stopped_at: Option<DateTime<Utc>>,
     pub effective_state: String,
+    pub auto_stopped_reason: Option<String>,
     pub updated_at: DateTime<Utc>,
     pub last_applied_flow_system_event_id: i64,
 }
@@ -66,6 +69,12 @@ impl TryFrom<SqliteFlowProcessStateRowModel> for FlowProcessState {
         let effective_state =
             FlowProcessEffectiveState::from_str(&row.effective_state).int_err()?;
 
+        let auto_stopped_reason = row
+            .auto_stopped_reason
+            .map(|s| FlowProcessAutoStopReason::from_str(&s))
+            .transpose()
+            .int_err()?;
+
         Self::rehydrate_from_snapshot(
             flow_binding,
             row.paused_manual != 0,
@@ -75,7 +84,9 @@ impl TryFrom<SqliteFlowProcessStateRowModel> for FlowProcessState {
             row.last_failure_at,
             row.last_attempt_at,
             row.next_planned_at,
+            row.auto_stopped_at,
             effective_state,
+            auto_stopped_reason,
             row.updated_at,
             EventID::new(row.last_applied_flow_system_event_id),
         )

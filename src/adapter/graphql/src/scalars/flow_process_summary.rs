@@ -22,6 +22,8 @@ pub struct FlowProcessSummary {
     pub last_attempt_at: Option<DateTime<Utc>>,
     pub last_failure_at: Option<DateTime<Utc>>,
     pub next_planned_at: Option<DateTime<Utc>>,
+    pub auto_stopped_reason: Option<FlowProcessAutoStopReason>,
+    pub auto_stopped_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,6 +38,8 @@ impl From<kamu_flow_system::FlowProcessState> for FlowProcessSummary {
             last_attempt_at: value.last_attempt_at(),
             last_failure_at: value.last_failure_at(),
             next_planned_at: value.next_planned_at(),
+            auto_stopped_reason: value.auto_stopped_reason().map(Into::into),
+            auto_stopped_at: value.auto_stopped_at(),
         }
     }
 }
@@ -49,6 +53,15 @@ pub enum FlowProcessEffectiveState {
     Failing,
     PausedManual,
     StoppedAuto,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+#[graphql(remote = "kamu_flow_system::FlowProcessAutoStopReason")]
+pub enum FlowProcessAutoStopReason {
+    StopPolicy,
+    UnrecoverableFailure,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

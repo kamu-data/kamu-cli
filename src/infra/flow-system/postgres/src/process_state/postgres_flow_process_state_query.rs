@@ -177,7 +177,9 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                 last_failure_at,
                 last_attempt_at,
                 next_planned_at,
+                auto_stopped_at,
                 effective_state,
+                auto_stopped_reason,
                 updated_at,
                 last_applied_flow_system_event_id
             FROM flow_process_states
