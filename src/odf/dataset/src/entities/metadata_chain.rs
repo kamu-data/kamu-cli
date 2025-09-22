@@ -486,8 +486,7 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<S, IterBlocksError>
     where
         S: Send,
-        F: Send,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision + Send,
     {
         let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
 
@@ -510,9 +509,8 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<S, AcceptVisitorError<E>>
     where
         S: Send,
-        F: Send,
         E: Error + Send,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E> + Send,
     {
         let head_hash = self
             .resolve_ref(&BlockRef::Head)
@@ -534,9 +532,8 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<S, AcceptVisitorError<E>>
     where
         S: Send,
-        F: Send,
         E: Error + Send,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E> + Send,
     {
         let mut visitor = GenericFallibleCallbackVisitor::new(state, initial_decision, callback);
 
