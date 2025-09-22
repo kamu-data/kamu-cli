@@ -176,8 +176,19 @@ impl FlowProcessState {
     ) -> Result<(), FlowProcessStateError> {
         self.validate_event_order(event_id)?;
 
+        // Check if we're resuming from a stopped state
+        // (transition from STOPPED -> ACTIVE)
+        let was_stopped_auto = self.effective_state == FlowProcessEffectiveState::StoppedAuto;
+        let is_resuming = was_stopped_auto && !paused_manual;
+
         self.paused_manual = paused_manual;
         self.stop_policy = stop_policy;
+
+        // Reset consecutive failures when resuming from stopped state
+        // This gives users a fresh start after they've corrected issues
+        if is_resuming {
+            self.consecutive_failures = 0;
+        }
 
         self.actualize_effective_state();
 
@@ -817,6 +828,68 @@ mod tests {
             .unwrap();
         assert_eq!(state.consecutive_failures, 0);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
+    }
+
+    #[test]
+    fn test_failure_reset_on_resume_from_stopped_state() {
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            Utc::now(),
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(2),
+        );
+
+        let base_time = Utc::now();
+
+        // Generate enough failures to trigger auto-stop
+        state
+            .on_failure(EventID::new(2), base_time, base_time)
+            .unwrap();
+        state
+            .on_failure(EventID::new(3), base_time, base_time)
+            .unwrap();
+        assert_eq!(state.consecutive_failures, 2);
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+
+        // Resume (unpause) from stopped state -> should reset failures
+        state
+            .update_trigger_state(
+                EventID::new(4),
+                base_time + Duration::minutes(1),
+                false, // not paused (resume)
+                make_test_stop_policy_with_failures(2),
+            )
+            .unwrap();
+        assert_eq!(state.consecutive_failures, 0); // failures reset
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
+
+        // Normal pause/unpause should NOT reset failures
+        state
+            .on_failure(EventID::new(5), base_time, base_time)
+            .unwrap();
+        assert_eq!(state.consecutive_failures, 1);
+
+        state
+            .update_trigger_state(
+                EventID::new(6),
+                base_time + Duration::minutes(2),
+                true, // pause
+                make_test_stop_policy_with_failures(2),
+            )
+            .unwrap();
+        state
+            .update_trigger_state(
+                EventID::new(7),
+                base_time + Duration::minutes(3),
+                false, // unpause (but wasn't in StoppedAuto)
+                make_test_stop_policy_with_failures(2),
+            )
+            .unwrap();
+        assert_eq!(state.consecutive_failures, 1); // failures preserved
     }
 }
 
