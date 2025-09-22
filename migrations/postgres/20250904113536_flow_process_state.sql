@@ -16,6 +16,10 @@ CREATE TYPE flow_process_effective_state AS ENUM (
 
 /* ------------------------------ */
 
+CREATE TYPE flow_process_auto_stop_reason AS ENUM ('stop_policy', 'unrecoverable_failure');
+
+/* ------------------------------ */
+
 CREATE TABLE flow_process_states (
     scope_data      JSONB NOT NULL,
     flow_type       VARCHAR(100) NOT NULL,
@@ -26,11 +30,13 @@ CREATE TABLE flow_process_states (
     stop_policy_data JSONB,
 
     consecutive_failures INT NOT NULL DEFAULT 0,
+    auto_stopped_reason flow_process_auto_stop_reason DEFAULT NULL,
 
     last_success_at  TIMESTAMPTZ,
     last_failure_at  TIMESTAMPTZ,
     last_attempt_at  TIMESTAMPTZ,
     next_planned_at  TIMESTAMPTZ,
+    auto_stopped_at  TIMESTAMPTZ,
 
     effective_state  flow_process_effective_state NOT NULL,
 

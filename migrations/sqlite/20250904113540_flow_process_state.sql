@@ -16,10 +16,13 @@ CREATE TABLE flow_process_states (
     last_failure_at  TIMESTAMPTZ,
     last_attempt_at  TIMESTAMPTZ,
     next_planned_at  TIMESTAMPTZ,
+    auto_stopped_at  TIMESTAMPTZ,
 
     effective_state  TEXT NOT NULL
         CHECK (effective_state IN ('failing', 'stopped_auto', 'paused_manual', 'active')),
-
+    auto_stopped_reason TEXT DEFAULT NULL
+        CHECK (auto_stopped_reason IN ('stop_policy', 'unrecoverable_failure')),
+        
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT (CURRENT_TIMESTAMP),
     last_applied_flow_system_event_id INTEGER NOT NULL DEFAULT 0,
 

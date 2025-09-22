@@ -59,12 +59,14 @@ impl PostgresFlowProcessStateRepository {
                     last_failure_at = $6,
                     last_attempt_at = $7,
                     next_planned_at = $8,
-                    effective_state = $9,
-                    updated_at = $10,
-                    last_applied_flow_system_event_id = $11
+                    auto_stopped_at = $9,
+                    effective_state = $10,
+                    auto_stopped_reason = $11,
+                    updated_at = $12,
+                    last_applied_flow_system_event_id = $13
                 WHERE
-                    flow_type = $12 AND scope_data = $13 AND
-                    last_applied_flow_system_event_id = $14
+                    flow_type = $14 AND scope_data = $15 AND
+                    last_applied_flow_system_event_id = $16
             "#,
             state.paused_manual(),
             state.stop_policy().kind_to_string() as &str,
@@ -74,7 +76,9 @@ impl PostgresFlowProcessStateRepository {
             state.last_failure_at(),
             state.last_attempt_at(),
             state.next_planned_at(),
+            state.auto_stopped_at(),
             state.effective_state() as FlowProcessEffectiveState,
+            state.auto_stopped_reason() as Option<FlowProcessAutoStopReason>,
             state.updated_at(),
             state.last_applied_event_id().into_inner(),
             state.flow_binding().flow_type,
@@ -173,11 +177,13 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                         last_failure_at,
                         last_attempt_at,
                         next_planned_at,
+                        auto_stopped_at,
                         effective_state,
+                        auto_stopped_reason,
                         updated_at,
                         last_applied_flow_system_event_id
                     )
-                    VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                    VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                     ON CONFLICT (flow_type, scope_data) DO NOTHING
                     "#,
                     scope_data_json,
@@ -190,7 +196,9 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                     process_state.last_failure_at(),
                     process_state.last_attempt_at(),
                     process_state.next_planned_at(),
+                    process_state.auto_stopped_at(),
                     process_state.effective_state() as FlowProcessEffectiveState,
+                    process_state.auto_stopped_reason() as Option<FlowProcessAutoStopReason>,
                     process_state.updated_at(),
                     process_state.last_applied_event_id().into_inner(),
                 )
