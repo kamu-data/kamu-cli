@@ -1563,7 +1563,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: Utc::now(),
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                     flow_id,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1588,6 +1588,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 FlowEventAborted {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                 }
                 .into(),
             ],
@@ -1604,6 +1605,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 FlowEventAborted {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                 }
                 .into(),
             ],
@@ -1620,6 +1622,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 FlowEventAborted {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding,
                 }
                 .into(),
             ],
@@ -1649,7 +1652,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                     flow_id,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1675,6 +1678,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventStartConditionUpdated {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment,
@@ -1704,6 +1708,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventScheduledForActivation {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment,
                 }
@@ -1730,6 +1735,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventTaskScheduled {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: activation_moment + Duration::milliseconds(100),
                     task_id: TaskID::new(1),
                 }
@@ -1756,6 +1762,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventTaskRunning {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: activation_moment + Duration::milliseconds(500),
                     task_id: TaskID::new(1),
                 }
@@ -1782,6 +1789,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventTaskFinished {
                     flow_id,
+                    flow_binding,
                     event_time: activation_moment + Duration::milliseconds(1500),
                     task_id: TaskID::new(1),
                     task_outcome: TaskOutcome::Success(TaskResult::empty()),
@@ -1814,7 +1822,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                     flow_id,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1827,6 +1835,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment,
@@ -1836,6 +1845,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment,
                 }
@@ -1863,6 +1873,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                 FlowEventAborted {
                     event_time: abortion_moment,
                     flow_id,
+                    flow_binding,
                 }
                 .into(),
             ],
@@ -1909,7 +1920,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding: flow_binding_foo,
+                    flow_binding: flow_binding_foo.clone(),
                     flow_id: flow_id_foo,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1922,6 +1933,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id: flow_id_foo,
+                    flow_binding: flow_binding_foo.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_1,
@@ -1931,6 +1943,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id: flow_id_foo,
+                    flow_binding: flow_binding_foo,
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment_1,
                 }
@@ -1947,7 +1960,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding: flow_binding_bar,
+                    flow_binding: flow_binding_bar.clone(),
                     flow_id: flow_id_bar,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1960,6 +1973,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id: flow_id_bar,
+                    flow_binding: flow_binding_bar.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_1,
@@ -1969,6 +1983,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id: flow_id_bar,
+                    flow_binding: flow_binding_bar,
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment_1,
                 }
@@ -1985,7 +2000,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding: flow_binding_baz,
+                    flow_binding: flow_binding_baz.clone(),
                     flow_id: flow_id_baz,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1998,6 +2013,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id: flow_id_baz,
+                    flow_binding: flow_binding_baz.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_2,
@@ -2007,6 +2023,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id: flow_id_baz,
+                    flow_binding: flow_binding_baz,
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment_2,
                 }

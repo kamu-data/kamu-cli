@@ -127,9 +127,6 @@ impl FlowAgentImpl {
     ) -> Result<(), InternalError> {
         // Extract necessary dependencies
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let flow_process_state_query = target_catalog
-            .get_one::<dyn FlowProcessStateQuery>()
-            .unwrap();
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
         // How many waiting flows do we have?
@@ -164,19 +161,10 @@ impl FlowAgentImpl {
             while let Some(flow) = state_stream.try_next().await? {
                 // We need to re-evaluate reactive conditions only
                 if let Some(FlowStartCondition::Reactive(b)) = &flow.start_condition {
-                    // Query previous runs stats to determine activation time
-                    let maybe_flow_process_state = flow_process_state_query
-                        .try_get_process_state(&flow.flow_binding)
-                        .await?;
-                    let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
-                        .as_ref()
-                        .and_then(FlowProcessState::last_attempt_at);
-
                     scheduling_helper
                         .trigger_flow_common(
                             start_time,
                             &flow.flow_binding,
-                            maybe_last_attempt_time,
                             Some(FlowTriggerRule::Reactive(b.active_rule)),
                             vec![FlowActivationCause::AutoPolling(
                                 FlowActivationCauseAutoPolling {
@@ -527,9 +515,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         .int_err()?;
                         flow.save(flow_event_store.as_ref()).await.int_err()?;
 
-                        let scheduling_helper =
-                            target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
-
                         let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
 
                         // The outcome might not be final in case of retrying flows.
@@ -563,17 +548,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                         "Flow has reached a failed state after unrecoverable failure"
                                     );
                                 }
-
-                                // Trigger should make a decision about auto-stopping
-                                let flow_trigger_service =
-                                    target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
-                                flow_trigger_service
-                                    .evaluate_trigger_on_failure(
-                                        message.event_time,
-                                        &flow.flow_binding,
-                                        !recoverable,
-                                    )
-                                    .await?;
                             }
 
                             // In case of success: propagate success and dispatch sensitive events
@@ -590,25 +564,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     .await
                                     .int_err()?;
                             }
-
-                            // In case of success:
-                            //  - schedule next flow immediately, if we had any late activation
-                            //    cause
-                            if message.outcome.is_success() {
-                                scheduling_helper
-                                    .try_schedule_late_flow_activations(message.event_time, &flow)
-                                    .await?;
-                            }
-
-                            // Try to schedule auto-polling flow, if applicable.
-                            // We don't care whether we failed or succeeded,
-                            // that is determined with the stop policy in the trigger.
-                            scheduling_helper
-                                .try_schedule_auto_polling_flow_continuation_if_enabled(
-                                    message.event_time,
-                                    &flow,
-                                )
-                                .await?;
                         } else {
                             // Notify about scheduled retry
                             outbox

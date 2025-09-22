@@ -218,8 +218,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 next_planned_at,
                 effective_state,
                 updated_at,
-                last_applied_trigger_event_id,
-                last_applied_flow_event_id
+                last_applied_flow_system_event_id
             FROM flow_process_states
                 WHERE
                     ({list_scope_conditions}) AND
