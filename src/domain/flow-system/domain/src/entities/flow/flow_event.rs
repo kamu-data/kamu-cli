@@ -72,6 +72,7 @@ pub struct FlowEventInitiated {
 pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub start_condition: FlowStartCondition,
     pub last_activation_cause_index: usize,
 }
@@ -82,6 +83,7 @@ pub struct FlowEventStartConditionUpdated {
 pub struct FlowEventActivationCauseAdded {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub activation_cause: FlowActivationCause,
 }
 
@@ -91,6 +93,7 @@ pub struct FlowEventActivationCauseAdded {
 pub struct FlowConfigSnapshotModified {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub config_snapshot: FlowConfigurationRule,
 }
 
@@ -100,6 +103,7 @@ pub struct FlowConfigSnapshotModified {
 pub struct FlowEventScheduledForActivation {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub scheduled_for_activation_at: DateTime<Utc>,
 }
 
@@ -109,6 +113,7 @@ pub struct FlowEventScheduledForActivation {
 pub struct FlowEventTaskScheduled {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub task_id: TaskID,
 }
 
@@ -118,6 +123,7 @@ pub struct FlowEventTaskScheduled {
 pub struct FlowEventTaskRunning {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub task_id: TaskID,
 }
 
@@ -127,6 +133,7 @@ pub struct FlowEventTaskRunning {
 pub struct FlowEventTaskFinished {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub task_id: TaskID,
     pub task_outcome: TaskOutcome,
     #[serde(default)]
@@ -139,6 +146,7 @@ pub struct FlowEventTaskFinished {
 pub struct FlowEventAborted {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,6 +166,19 @@ impl FlowEvent {
         }
     }
 
+    pub fn flow_binding(&self) -> &FlowBinding {
+        match self {
+            FlowEvent::Initiated(e) => &e.flow_binding,
+            FlowEvent::StartConditionUpdated(e) => &e.flow_binding,
+            FlowEvent::ConfigSnapshotModified(e) => &e.flow_binding,
+            FlowEvent::ActivationCauseAdded(e) => &e.flow_binding,
+            FlowEvent::ScheduledForActivation(e) => &e.flow_binding,
+            FlowEvent::TaskScheduled(e) => &e.flow_binding,
+            FlowEvent::TaskRunning(e) => &e.flow_binding,
+            FlowEvent::TaskFinished(e) => &e.flow_binding,
+            FlowEvent::Aborted(e) => &e.flow_binding,
+        }
+    }
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             FlowEvent::Initiated(e) => e.event_time,

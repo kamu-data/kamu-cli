@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            flow_type,\n            scope_data,\n            paused_manual,\n            stop_policy_kind as \"stop_policy_kind: PostgresFlowStopPolicyKind\",\n            stop_policy_data,\n            consecutive_failures,\n            last_success_at,\n            last_failure_at,\n            last_attempt_at,\n            next_planned_at,\n            effective_state as \"effective_state: FlowProcessEffectiveState\",\n            updated_at,\n            last_applied_trigger_event_id,\n            last_applied_flow_event_id\n        FROM flow_process_states\n        WHERE\n            flow_type = $1 AND scope_data = $2\n        ",
+  "query": "\n        SELECT\n            flow_type,\n            scope_data,\n            paused_manual,\n            stop_policy_kind as \"stop_policy_kind: PostgresFlowStopPolicyKind\",\n            stop_policy_data,\n            consecutive_failures,\n            last_success_at,\n            last_failure_at,\n            last_attempt_at,\n            next_planned_at,\n            effective_state as \"effective_state: FlowProcessEffectiveState\",\n            updated_at,\n            last_applied_flow_system_event_id\n        FROM flow_process_states\n        WHERE\n            flow_type = $1 AND scope_data = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -87,12 +87,7 @@
       },
       {
         "ordinal": 12,
-        "name": "last_applied_trigger_event_id",
-        "type_info": "Int8"
-      },
-      {
-        "ordinal": 13,
-        "name": "last_applied_flow_event_id",
+        "name": "last_applied_flow_system_event_id",
         "type_info": "Int8"
       }
     ],
@@ -115,9 +110,8 @@
       true,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "8383b5ff0e91de1358b5ed4097d6ce52f4672b916ff75d1d95f7a949f3a26b9d"
+  "hash": "301d8227b1554ff77ec9469afba2fdca261ffa1765ebc2512743b25a48416999"
 }

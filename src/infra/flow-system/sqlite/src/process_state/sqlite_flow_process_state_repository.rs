@@ -41,8 +41,7 @@ impl SqliteFlowProcessStateRepository {
     async fn save_process_state(
         &self,
         state: &FlowProcessState,
-        expected_last_trigger_event_id: EventID,
-        expected_last_flow_event_id: EventID,
+        expected_last_event_id: EventID,
     ) -> Result<(), FlowProcessSaveError> {
         let scope_json = serde_json::to_value(&state.flow_binding().scope).int_err()?;
         let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
@@ -59,11 +58,9 @@ impl SqliteFlowProcessStateRepository {
         let last_attempt_at = state.last_attempt_at();
         let next_planned_at = state.next_planned_at();
         let updated_at = state.updated_at();
-        let last_applied_trigger_event_id = state.last_applied_trigger_event_id().into_inner();
-        let last_applied_flow_event_id = state.last_applied_flow_event_id().into_inner();
+        let last_applied_flow_system_event_id = state.last_applied_event_id().into_inner();
         let flow_type = &state.flow_binding().flow_type;
-        let expected_trigger_id = expected_last_trigger_event_id.into_inner();
-        let expected_flow_id = expected_last_flow_event_id.into_inner();
+        let expected_event_id = expected_last_event_id.into_inner();
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -81,12 +78,10 @@ impl SqliteFlowProcessStateRepository {
                     next_planned_at = $8,
                     effective_state = $9,
                     updated_at = $10,
-                    last_applied_trigger_event_id = $11,
-                    last_applied_flow_event_id = $12
+                    last_applied_flow_system_event_id = $11
                 WHERE
-                    flow_type = $13 AND scope_data = $14 AND
-                    last_applied_trigger_event_id = $15 AND
-                    last_applied_flow_event_id = $16
+                    flow_type = $12 AND scope_data = $13 AND
+                    last_applied_flow_system_event_id = $14
             "#,
             paused_manual,
             stop_policy_kind,
@@ -98,12 +93,10 @@ impl SqliteFlowProcessStateRepository {
             next_planned_at,
             effective_state_str,
             updated_at,
-            last_applied_trigger_event_id,
-            last_applied_flow_event_id,
+            last_applied_flow_system_event_id,
             flow_type,
             scope_data_json,
-            expected_trigger_id,
-            expected_flow_id,
+            expected_event_id,
         )
         .execute(connection_mut)
         .await
@@ -136,9 +129,8 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         match self.load_process_state(&flow_binding).await {
             // Got existing row => update it
             Ok(mut process_state) => {
-                // Backup current event IDs for concurrency check
-                let current_trigger_event_id = process_state.last_applied_trigger_event_id();
-                let current_flow_event_id = process_state.last_applied_flow_event_id();
+                // Backup current event ID for concurrency check
+                let current_event_id = process_state.last_applied_event_id();
 
                 // Apply updates in memory
                 process_state
@@ -152,11 +144,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
                 // Try saving back
                 match self
-                    .save_process_state(
-                        &process_state,
-                        current_trigger_event_id,
-                        current_flow_event_id,
-                    )
+                    .save_process_state(&process_state, current_event_id)
                     .await
                 {
                     Ok(()) => Ok(()),
@@ -171,7 +159,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
             // No existing row, create new
             Err(FlowProcessLoadError::NotFound(_)) => {
-                let state = FlowProcessState::new(
+                let process_state = FlowProcessState::new(
                     trigger_event_id,
                     self.time_source.now(),
                     flow_binding,
@@ -179,26 +167,28 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                     stop_policy,
                 );
 
-                let scope_json = serde_json::to_value(&state.flow_binding().scope).int_err()?;
+                let scope_json =
+                    serde_json::to_value(&process_state.flow_binding().scope).int_err()?;
                 let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
 
-                let stop_policy_kind = state.stop_policy().kind_to_string();
-                let stop_policy_json = serde_json::to_value(state.stop_policy()).int_err()?;
+                let stop_policy_kind = process_state.stop_policy().kind_to_string();
+                let stop_policy_json =
+                    serde_json::to_value(process_state.stop_policy()).int_err()?;
                 let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
 
-                let effective_state_str = state.effective_state().to_string();
+                let effective_state_str = process_state.effective_state().to_string();
 
-                let flow_type = &state.flow_binding().flow_type;
-                let paused_manual_int = i32::from(state.paused_manual());
-                let consecutive_failures = i32::try_from(state.consecutive_failures()).unwrap();
-                let last_success_at = state.last_success_at();
-                let last_failure_at = state.last_failure_at();
-                let last_attempt_at = state.last_attempt_at();
-                let next_planned_at = state.next_planned_at();
-                let updated_at = state.updated_at();
-                let last_applied_trigger_event_id =
-                    state.last_applied_trigger_event_id().into_inner();
-                let last_applied_flow_event_id = state.last_applied_flow_event_id().into_inner();
+                let flow_type = &process_state.flow_binding().flow_type;
+                let paused_manual_int = i32::from(process_state.paused_manual());
+                let consecutive_failures =
+                    i32::try_from(process_state.consecutive_failures()).unwrap();
+                let last_success_at = process_state.last_success_at();
+                let last_failure_at = process_state.last_failure_at();
+                let last_attempt_at = process_state.last_attempt_at();
+                let next_planned_at = process_state.next_planned_at();
+                let updated_at = process_state.updated_at();
+                let last_applied_flow_system_event_id =
+                    process_state.last_applied_event_id().into_inner();
 
                 let mut tr = self.transaction.lock().await;
                 let connection_mut = tr.connection_mut().await?;
@@ -218,10 +208,9 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                         next_planned_at,
                         effective_state,
                         updated_at,
-                        last_applied_trigger_event_id,
-                        last_applied_flow_event_id
+                        last_applied_flow_system_event_id
                     )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                     ON CONFLICT (flow_type, scope_data) DO NOTHING
                     "#,
                     scope_data_json,
@@ -236,8 +225,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                     next_planned_at,
                     effective_state_str,
                     updated_at,
-                    last_applied_trigger_event_id,
-                    last_applied_flow_event_id,
+                    last_applied_flow_system_event_id,
                 )
                 .execute(connection_mut)
                 .await
@@ -246,7 +234,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                 if result.rows_affected() == 0 {
                     return Err(FlowProcessUpsertError::ConcurrentModification(
                         FlowProcessConcurrentModificationError {
-                            flow_binding: state.flow_binding().clone(),
+                            flow_binding: process_state.flow_binding().clone(),
                         },
                     ));
                 }
@@ -277,9 +265,8 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             }
         };
 
-        // Backup current event IDs for concurrency check
-        let current_trigger_event_id = process_state.last_applied_trigger_event_id();
-        let current_flow_event_id = process_state.last_applied_flow_event_id();
+        // Backup current event ID for concurrency check
+        let current_event_id = process_state.last_applied_event_id();
 
         // Apply updates in memory
         if success {
@@ -294,11 +281,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
         // Try saving back
         match self
-            .save_process_state(
-                &process_state,
-                current_trigger_event_id,
-                current_flow_event_id,
-            )
+            .save_process_state(&process_state, current_event_id)
             .await
         {
             Ok(()) => Ok(()),
@@ -326,9 +309,8 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             }
         };
 
-        // Backup current event IDs for concurrency check
-        let current_trigger_event_id = process_state.last_applied_trigger_event_id();
-        let current_flow_event_id = process_state.last_applied_flow_event_id();
+        // Backup current event ID for concurrency check
+        let current_event_id = process_state.last_applied_event_id();
 
         // Apply flow scheduling
         process_state
@@ -337,11 +319,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
         // Try saving back
         match self
-            .save_process_state(
-                &process_state,
-                current_trigger_event_id,
-                current_flow_event_id,
-            )
+            .save_process_state(&process_state, current_event_id)
             .await
         {
             Ok(()) => Ok(()),

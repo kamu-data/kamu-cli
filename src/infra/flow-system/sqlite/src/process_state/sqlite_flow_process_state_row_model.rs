@@ -33,8 +33,7 @@ pub(crate) struct SqliteFlowProcessStateRowModel {
     pub next_planned_at: Option<DateTime<Utc>>,
     pub effective_state: String,
     pub updated_at: DateTime<Utc>,
-    pub last_applied_trigger_event_id: i64,
-    pub last_applied_flow_event_id: i64,
+    pub last_applied_flow_system_event_id: i64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,8 +77,7 @@ impl TryFrom<SqliteFlowProcessStateRowModel> for FlowProcessState {
             row.next_planned_at,
             effective_state,
             row.updated_at,
-            EventID::new(row.last_applied_trigger_event_id),
-            EventID::new(row.last_applied_flow_event_id),
+            EventID::new(row.last_applied_flow_system_event_id),
         )
     }
 }

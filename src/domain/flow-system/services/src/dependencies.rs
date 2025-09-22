@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use dill::CatalogBuilder;
-use kamu_flow_system::FlowSystemEventProjectorDummy;
 
 use crate::*;
 
@@ -25,9 +24,6 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowSchedulingHelper>();
 
     catalog_builder.add::<FlowProcessStateProjector>();
-    catalog_builder.add::<FlowProcessStateIndexer>();
-
-    catalog_builder.add::<FlowSystemEventProjectorDummy>();
 
     catalog_builder.add::<FlowAgentImpl>();
     catalog_builder.add::<FlowSystemEventAgentImpl>();
