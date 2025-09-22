@@ -186,10 +186,10 @@ impl AxumServerPullProtocolInstance {
                 }
                 Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
                     tracing::debug!("Sending invalid interval error: {:?}", e);
-                    DatasetPullResponse::Err(DatasetPullRequestError::InvalidInterval(
+                    Err(DatasetPullRequestError::InvalidInterval(
                         DatasetPullInvalidIntervalError {
-                            head: e.head.clone(),
-                            tail: e.tail.clone(),
+                            head: e.head,
+                            tail: e.tail,
                         },
                     ))
                 }
