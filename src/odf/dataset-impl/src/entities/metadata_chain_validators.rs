@@ -359,6 +359,7 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
+        // TODO: Support source evolution
         if self.is_push_source_appended {
             MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_POLLING_SOURCE)
         } else {
@@ -420,6 +421,7 @@ impl MetadataChainVisitor for ValidateSetPollingSourceVisitor {
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
         if self.is_set_polling_source_appended {
+            // TODO: Support source evolution
             MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::ADD_PUSH_SOURCE)
         } else {
             MetadataVisitorDecision::Stop
