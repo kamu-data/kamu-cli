@@ -37,8 +37,7 @@ pub(crate) async fn load_process_state(
                 next_planned_at as "next_planned_at: _",
                 effective_state,
                 updated_at as "updated_at: _",
-                last_applied_trigger_event_id,
-                last_applied_flow_event_id
+                last_applied_flow_system_event_id
             FROM flow_process_states
             WHERE
                 flow_type = $1 AND scope_data = $2

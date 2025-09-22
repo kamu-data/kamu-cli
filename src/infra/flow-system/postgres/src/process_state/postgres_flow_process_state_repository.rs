@@ -41,8 +41,7 @@ impl PostgresFlowProcessStateRepository {
     async fn save_process_state(
         &self,
         state: &FlowProcessState,
-        expected_last_trigger_event_id: EventID,
-        expected_last_flow_event_id: EventID,
+        expected_last_event_id: EventID,
     ) -> Result<(), FlowProcessSaveError> {
         let scope_data_json = serde_json::to_value(&state.flow_binding().scope).int_err()?;
 
@@ -62,12 +61,10 @@ impl PostgresFlowProcessStateRepository {
                     next_planned_at = $8,
                     effective_state = $9,
                     updated_at = $10,
-                    last_applied_trigger_event_id = $11,
-                    last_applied_flow_event_id = $12
+                    last_applied_flow_system_event_id = $11
                 WHERE
-                    flow_type = $13 AND scope_data = $14 AND
-                    last_applied_trigger_event_id = $15 AND
-                    last_applied_flow_event_id = $16
+                    flow_type = $12 AND scope_data = $13 AND
+                    last_applied_flow_system_event_id = $14
             "#,
             state.paused_manual(),
             state.stop_policy().kind_to_string() as &str,
@@ -79,12 +76,10 @@ impl PostgresFlowProcessStateRepository {
             state.next_planned_at(),
             state.effective_state() as FlowProcessEffectiveState,
             state.updated_at(),
-            state.last_applied_trigger_event_id().into_inner(),
-            state.last_applied_flow_event_id().into_inner(),
+            state.last_applied_event_id().into_inner(),
             state.flow_binding().flow_type,
             scope_data_json,
-            expected_last_trigger_event_id.into_inner(),
-            expected_last_flow_event_id.into_inner(),
+            expected_last_event_id.into_inner(),
         )
         .execute(connection_mut)
         .await
@@ -117,9 +112,8 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
         match self.load_process_state(&flow_binding).await {
             // Got existing row => update it
             Ok(mut process_state) => {
-                // Backup current event IDs for concurrency check
-                let current_trigger_event_id = process_state.last_applied_trigger_event_id();
-                let current_flow_event_id = process_state.last_applied_flow_event_id();
+                // Backup current event ID for concurrency check
+                let current_event_id = process_state.last_applied_event_id();
 
                 // Apply updates in memory
                 process_state
@@ -133,11 +127,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
                 // Try saving back
                 match self
-                    .save_process_state(
-                        &process_state,
-                        current_trigger_event_id,
-                        current_flow_event_id,
-                    )
+                    .save_process_state(&process_state, current_event_id)
                     .await
                 {
                     Ok(()) => Ok(()),
@@ -152,7 +142,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
             // No existing row, create new
             Err(FlowProcessLoadError::NotFound(_)) => {
-                let state = FlowProcessState::new(
+                let process_state = FlowProcessState::new(
                     trigger_event_id,
                     self.time_source.now(),
                     flow_binding,
@@ -161,10 +151,11 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                 );
 
                 let scope_data_json =
-                    serde_json::to_value(&state.flow_binding().scope).int_err()?;
+                    serde_json::to_value(&process_state.flow_binding().scope).int_err()?;
 
-                let stop_policy_kind = state.stop_policy().kind_to_string();
-                let stop_policy_data = serde_json::to_value(state.stop_policy()).int_err()?;
+                let stop_policy_kind = process_state.stop_policy().kind_to_string();
+                let stop_policy_data =
+                    serde_json::to_value(process_state.stop_policy()).int_err()?;
 
                 let mut tr = self.transaction.lock().await;
                 let connection_mut = tr.connection_mut().await?;
@@ -184,26 +175,24 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                         next_planned_at,
                         effective_state,
                         updated_at,
-                        last_applied_trigger_event_id,
-                        last_applied_flow_event_id
+                        last_applied_flow_system_event_id
                     )
-                    VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                     ON CONFLICT (flow_type, scope_data) DO NOTHING
                     "#,
                     scope_data_json,
-                    state.flow_binding().flow_type,
-                    state.paused_manual(),
+                    process_state.flow_binding().flow_type,
+                    process_state.paused_manual(),
                     stop_policy_kind as &str,
                     stop_policy_data,
-                    i32::try_from(state.consecutive_failures()).unwrap(),
-                    state.last_success_at(),
-                    state.last_failure_at(),
-                    state.last_attempt_at(),
-                    state.next_planned_at(),
-                    state.effective_state() as FlowProcessEffectiveState,
-                    state.updated_at(),
-                    state.last_applied_trigger_event_id().into_inner(),
-                    state.last_applied_flow_event_id().into_inner(),
+                    i32::try_from(process_state.consecutive_failures()).unwrap(),
+                    process_state.last_success_at(),
+                    process_state.last_failure_at(),
+                    process_state.last_attempt_at(),
+                    process_state.next_planned_at(),
+                    process_state.effective_state() as FlowProcessEffectiveState,
+                    process_state.updated_at(),
+                    process_state.last_applied_event_id().into_inner(),
                 )
                 .execute(connection_mut)
                 .await
@@ -212,7 +201,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
                 if result.rows_affected() == 0 {
                     return Err(FlowProcessUpsertError::ConcurrentModification(
                         FlowProcessConcurrentModificationError {
-                            flow_binding: state.flow_binding().clone(),
+                            flow_binding: process_state.flow_binding().clone(),
                         },
                     ));
                 }
@@ -243,9 +232,8 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
             }
         };
 
-        // Backup current event IDs for concurrency check
-        let current_trigger_event_id = process_state.last_applied_trigger_event_id();
-        let current_flow_event_id = process_state.last_applied_flow_event_id();
+        // Backup current event ID for concurrency check
+        let current_event_id = process_state.last_applied_event_id();
 
         // Apply updates in memory
         if success {
@@ -260,11 +248,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
         // Try saving back
         match self
-            .save_process_state(
-                &process_state,
-                current_trigger_event_id,
-                current_flow_event_id,
-            )
+            .save_process_state(&process_state, current_event_id)
             .await
         {
             Ok(()) => Ok(()),
@@ -292,9 +276,8 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
             }
         };
 
-        // Backup current event IDs for concurrency check
-        let current_trigger_event_id = process_state.last_applied_trigger_event_id();
-        let current_flow_event_id = process_state.last_applied_flow_event_id();
+        // Backup current event ID for concurrency check
+        let current_event_id = process_state.last_applied_event_id();
 
         // Apply flow scheduling
         process_state
@@ -303,11 +286,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
         // Try saving back
         match self
-            .save_process_state(
-                &process_state,
-                current_trigger_event_id,
-                current_flow_event_id,
-            )
+            .save_process_state(&process_state, current_event_id)
             .await
         {
             Ok(()) => Ok(()),

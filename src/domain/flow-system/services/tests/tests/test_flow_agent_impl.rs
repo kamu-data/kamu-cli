@@ -250,6 +250,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                 FlowEventStartConditionUpdated {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding: foo_ingest_binding.clone(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: start_time + Duration::milliseconds(100),
                     }),
@@ -259,6 +260,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                 FlowEventScheduledForActivation {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding: foo_ingest_binding.clone(),
                     scheduled_for_activation_at: start_time + Duration::milliseconds(100),
                 }
                 .into(),
@@ -7737,6 +7739,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 FlowEventStartConditionUpdated {
                     event_time: start_time - Duration::milliseconds(200),
                     flow_id: flow_id_bar,
+                    flow_binding: bar_transform_binding.clone(),
                     start_condition: FlowStartCondition::Reactive(FlowStartConditionReactive {
                         active_rule: ReactiveRule::new(
                             BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
@@ -7751,6 +7754,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 FlowEventScheduledForActivation {
                     event_time: start_time - Duration::milliseconds(200),
                     flow_id: flow_id_bar,
+                    flow_binding: bar_transform_binding.clone(),
                     scheduled_for_activation_at: start_time + Duration::milliseconds(100),
                 }
                 .into(),
@@ -7795,6 +7799,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 FlowEventStartConditionUpdated {
                     event_time: start_time - Duration::milliseconds(400),
                     flow_id: flow_id_baz,
+                    flow_binding: baz_transform_binding.clone(),
                     start_condition: FlowStartCondition::Reactive(FlowStartConditionReactive {
                         active_rule: ReactiveRule::new(
                           BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
@@ -7809,6 +7814,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
                 FlowEventScheduledForActivation {
                     event_time: start_time - Duration::milliseconds(400),
                     flow_id: flow_id_baz,
+                    flow_binding: baz_transform_binding.clone(),
                     scheduled_for_activation_at: start_time - Duration::milliseconds(100), // in the past
                 }
                 .into(),

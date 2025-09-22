@@ -35,8 +35,7 @@ CREATE TABLE flow_process_states (
     effective_state  flow_process_effective_state NOT NULL,
 
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_applied_trigger_event_id BIGINT NOT NULL DEFAULT 0,
-    last_applied_flow_event_id    BIGINT NOT NULL DEFAULT 0,
+    last_applied_flow_system_event_id BIGINT NOT NULL DEFAULT 0,
 
     CONSTRAINT flow_process_state_pkey PRIMARY KEY (scope_data, flow_type)
 );

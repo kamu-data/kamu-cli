@@ -87,11 +87,7 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
     assert!(single_state.last_failure_at().is_none());
     assert!(single_state.last_attempt_at().is_none());
     assert!(single_state.next_planned_at().is_none());
-    assert_eq!(
-        single_state.last_applied_trigger_event_id(),
-        EventID::new(1)
-    );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(0));
+    assert_eq!(single_state.last_applied_event_id(), EventID::new(1));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -140,14 +136,14 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     let success_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     flow_process_repository
-        .apply_flow_result(EventID::new(1), &flow_binding, true, success_time)
+        .apply_flow_result(EventID::new(2), &flow_binding, true, success_time)
         .await
         .unwrap();
 
     // Schedule flow after success
     flow_process_repository
         .on_flow_scheduled(
-            EventID::new(2),
+            EventID::new(3),
             &flow_binding,
             success_time + Duration::hours(1),
         )
@@ -156,7 +152,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     let failure_time = success_time + Duration::hours(1);
     flow_process_repository
-        .apply_flow_result(EventID::new(3), &flow_binding, false, failure_time)
+        .apply_flow_result(EventID::new(4), &flow_binding, false, failure_time)
         .await
         .unwrap();
 
@@ -178,11 +174,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
     assert_eq!(single_state.last_failure_at(), Some(failure_time));
     assert_eq!(single_state.last_attempt_at(), Some(failure_time));
     assert!(single_state.next_planned_at().is_none());
-    assert_eq!(
-        single_state.last_applied_trigger_event_id(),
-        EventID::new(1)
-    );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(3));
+    assert_eq!(single_state.last_applied_event_id(), EventID::new(4));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -296,11 +288,7 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
     assert_eq!(single_state.last_failure_at(), Some(second_failure_time));
     assert_eq!(single_state.last_attempt_at(), Some(second_failure_time));
     assert_eq!(single_state.next_planned_at(), next_run_time);
-    assert_eq!(
-        single_state.last_applied_trigger_event_id(),
-        EventID::new(1)
-    );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(7));
+    assert_eq!(single_state.last_applied_event_id(), EventID::new(7));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -434,11 +422,7 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
         single_state.next_planned_at(),
         Some(recovery_time + Duration::hours(1))
     );
-    assert_eq!(
-        single_state.last_applied_trigger_event_id(),
-        EventID::new(1)
-    );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(9));
+    assert_eq!(single_state.last_applied_event_id(), EventID::new(9));
 
     let listing = flow_process_state_query
         .list_processes(
@@ -529,11 +513,7 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
     assert_eq!(single_state.last_failure_at(), None);
     assert_eq!(single_state.last_attempt_at(), Some(success_time));
     assert_eq!(single_state.next_planned_at(), None); // Cleared when paused
-    assert_eq!(
-        single_state.last_applied_trigger_event_id(),
-        EventID::new(4) // Updated to match new event ID sequence
-    );
-    assert_eq!(single_state.last_applied_flow_event_id(), EventID::new(3));
+    assert_eq!(single_state.last_applied_event_id(), EventID::new(4)); // Updated to match new event ID sequence
 
     let listing = flow_process_state_query
         .list_processes(
@@ -877,7 +857,7 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     // Update trigger state
     flow_process_repository
         .upsert_process_state_on_trigger_event(
-            EventID::new(3),
+            EventID::new(6),
             flow_binding.clone(),
             true,
             FlowTriggerStopPolicy::default(),

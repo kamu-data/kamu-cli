@@ -54,6 +54,7 @@ impl Flow {
             let event = FlowEventStartConditionUpdated {
                 event_time: now,
                 flow_id: self.flow_id,
+                flow_binding: self.flow_binding.clone(),
                 start_condition,
                 last_activation_cause_index: self.activation_causes.len(),
             };
@@ -72,6 +73,7 @@ impl Flow {
         let event = FlowConfigSnapshotModified {
             event_time: now,
             flow_id: self.flow_id,
+            flow_binding: self.flow_binding.clone(),
             config_snapshot,
         };
         self.apply(event)
@@ -89,6 +91,7 @@ impl Flow {
             let event = FlowEventActivationCauseAdded {
                 event_time: now,
                 flow_id: self.flow_id,
+                flow_binding: self.flow_binding.clone(),
                 activation_cause,
             };
             self.apply(event)?;
@@ -107,6 +110,7 @@ impl Flow {
         let event = FlowEventScheduledForActivation {
             event_time: now,
             flow_id: self.flow_id,
+            flow_binding: self.flow_binding.clone(),
             scheduled_for_activation_at,
         };
         self.apply(event)?;
@@ -122,6 +126,7 @@ impl Flow {
         let event = FlowEventTaskScheduled {
             event_time: now,
             flow_id: self.flow_id,
+            flow_binding: self.flow_binding.clone(),
             task_id,
         };
         self.apply(event)
@@ -136,6 +141,7 @@ impl Flow {
         let event = FlowEventTaskRunning {
             event_time: now,
             flow_id: self.flow_id,
+            flow_binding: self.flow_binding.clone(),
             task_id,
         };
         self.apply(event)
@@ -160,6 +166,7 @@ impl Flow {
         let event = FlowEventTaskFinished {
             event_time: now,
             flow_id: self.flow_id,
+            flow_binding: self.flow_binding.clone(),
             task_id,
             task_outcome,
             next_attempt_at,
@@ -177,6 +184,7 @@ impl Flow {
             let event = FlowEventAborted {
                 event_time: now,
                 flow_id: self.flow_id,
+                flow_binding: self.flow_binding.clone(),
             };
             self.apply(event)
         } else {

@@ -10,6 +10,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
@@ -119,23 +120,67 @@ impl FlowSystemEventStore for SqliteFlowSystemEventStore {
         let rows = sqlx::query!(
             r#"
             WITH next AS (
-                SELECT e.event_id
-                FROM flow_system_events e
-                LEFT JOIN flow_system_projected_events a
-                    ON a.projector = $1 AND a.event_id = e.event_id
-                WHERE a.event_id IS NULL AND e.event_id <= $2
-                ORDER BY e.event_id
+                SELECT fse.event_id
+                FROM flow_system_events fse
+                LEFT JOIN flow_system_projected_events pe
+                    ON pe.projector = $1 AND pe.event_id = fse.event_id
+                WHERE pe.event_id IS NULL AND fse.event_id <= $2
+                ORDER BY fse.event_id
                 LIMIT $3
-            )
+            ),
+            merged as (
                 SELECT
-                    e.event_id,
-                    e.source_stream as "source_stream: String",
-                    e.source_event_id,
-                    e.occurred_at as "occurred_at: chrono::DateTime<chrono::Utc>",
-                    e.inserted_at as "inserted_at: chrono::DateTime<chrono::Utc>"
-                FROM flow_system_events e
-                JOIN next n ON n.event_id = e.event_id
-                ORDER BY e.event_id
+                    fse.event_id,
+                    fse.source_stream,
+                    fse.source_event_id,
+                    fse.occurred_at,
+                    fse.inserted_at,
+                    fe.event_payload
+                FROM flow_system_events fse
+                JOIN next n
+                    ON n.event_id = fse.event_id
+                JOIN flow_events fe
+                    ON fse.source_stream = 'flows' AND fe.event_id = fse.source_event_id
+
+                UNION ALL
+
+                SELECT
+                    fse.event_id,
+                    fse.source_stream,
+                    fse.source_event_id,
+                    fse.occurred_at,
+                    fse.inserted_at,
+                    fte.event_payload
+                FROM flow_system_events fse
+                JOIN next n
+                    ON n.event_id = fse.event_id
+                JOIN flow_trigger_events fte
+                    ON fse.source_stream = 'triggers' AND fte.event_id = fse.source_event_id
+
+                UNION ALL
+
+                SELECT
+                    fse.event_id,
+                    fse.source_stream,
+                    fse.source_event_id,
+                    fse.occurred_at,
+                    fse.inserted_at,
+                    fce.event_payload
+                FROM flow_system_events fse
+                JOIN next n
+                    ON n.event_id = fse.event_id
+                JOIN flow_configuration_events fce
+                    ON fse.source_stream = 'configurations' AND fce.event_id = fse.source_event_id
+            )
+            SELECT
+                event_id as "event_id!",
+                source_stream as "source_stream!: String",
+                source_event_id as "source_event_id!",
+                occurred_at as "occurred_at!: DateTime<Utc>",
+                inserted_at as "inserted_at!: DateTime<Utc>",
+                event_payload as "event_payload!: serde_json::Value"
+            FROM merged
+            ORDER BY event_id
                 "#,
             projector_name,
             upper_bound,
@@ -157,6 +202,7 @@ impl FlowSystemEventStore for SqliteFlowSystemEventStore {
                 source_event_id: EventID::new(r.source_event_id),
                 occurred_at: r.occurred_at,
                 inserted_at: r.inserted_at,
+                payload: r.event_payload,
             })
             .collect();
 

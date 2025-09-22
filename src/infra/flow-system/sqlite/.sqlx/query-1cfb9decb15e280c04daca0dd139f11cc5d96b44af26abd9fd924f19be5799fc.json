@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                paused_manual,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                effective_state,\n                updated_at as \"updated_at: _\",\n                last_applied_trigger_event_id,\n                last_applied_flow_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                paused_manual,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                effective_state,\n                updated_at as \"updated_at: _\",\n                last_applied_flow_system_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -64,13 +64,8 @@
         "type_info": "Null"
       },
       {
-        "name": "last_applied_trigger_event_id",
+        "name": "last_applied_flow_system_event_id",
         "ordinal": 12,
-        "type_info": "Integer"
-      },
-      {
-        "name": "last_applied_flow_event_id",
-        "ordinal": 13,
         "type_info": "Integer"
       }
     ],
@@ -90,9 +85,8 @@
       true,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "2165ca2a3454e1aae9e29323ef4e80335012e2a98ef807f4a89890c40fad71c0"
+  "hash": "1cfb9decb15e280c04daca0dd139f11cc5d96b44af26abd9fd924f19be5799fc"
 }

@@ -22,9 +22,10 @@ impl FlowEventDataHelper {
         events: &[T],
         maybe_prev_stored_event_id: Option<EventID>,
         event_time_extractor: F,
-    ) -> Vec<(EventID, DateTime<Utc>)>
+    ) -> Vec<(EventID, DateTime<Utc>, serde_json::Value)>
     where
         F: Fn(&T) -> DateTime<Utc>,
+        T: serde::Serialize,
     {
         let prev_event_id = maybe_prev_stored_event_id
             .map(|id| usize::try_from(id.into_inner()).unwrap())
@@ -37,6 +38,7 @@ impl FlowEventDataHelper {
                 (
                     EventID::new(i64::try_from(prev_event_id + 1 + i).unwrap()),
                     event_time_extractor(event),
+                    serde_json::to_value(event).unwrap(),
                 )
             })
             .collect()

@@ -57,16 +57,13 @@ impl FlowSystemEventAgentImpl {
             return Ok(());
         }
 
-        // Optional: prefilter in memory to avoid useless writes
-        let ids: Vec<EventID> = batch.iter().map(|e| e.event_id).collect();
-
+        // Apply events to build projections
         for e in &batch {
-            if projector.interested(e) {
-                projector.apply(&transaction_catalog, e).await?;
-            }
+            projector.apply(&transaction_catalog, e).await?;
         }
 
         // Mark projection progress
+        let ids: Vec<EventID> = batch.iter().map(|e| e.event_id).collect();
         self.flow_system_event_store
             .mark_applied(&transaction_catalog, projector.name(), &ids)
             .await?;
@@ -85,21 +82,16 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
         // On startup, immediately sync all projectors to catch up with existing events
-        println!(
-            "Initial sync at startup, current time {}",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-        );
-
+        tracing::info!("Initial projectors sync at startup");
         for projector in &self.projectors {
             self.apply_batch_to_projector(projector.as_ref(), None)
                 .await?;
         }
 
+        tracing::info!("Starting main event listening loop");
+
         loop {
-            println!(
-                "Starting iteration, current time {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-            );
+            tracing::debug!("Starting iteration");
 
             // 1) Wait for push or timeout - let the store handle the backoff strategy
             let hint = self
@@ -109,10 +101,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
                     self.agent_config.min_debounce_interval,
                 )
                 .await?;
-            println!(
-                "Woke up at {}, hint: {hint:?}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-            );
+            tracing::debug!("Woke up, hint: {hint:?}");
 
             // 2) For each projector, drain until no work.
             let maybe_upper_event_id_bound = match hint {

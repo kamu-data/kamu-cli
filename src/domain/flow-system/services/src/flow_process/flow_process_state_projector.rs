@@ -7,186 +7,181 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use chrono::{DateTime, Utc};
 use kamu_flow_system::*;
-use messaging_outbox::*;
+use kamu_task_system::TaskOutcome;
+
+use crate::FlowSchedulingHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component]
-#[dill::interface(dyn MessageConsumer)]
-#[dill::interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
-#[dill::interface(dyn MessageConsumerT<FlowProgressMessage>)]
-#[dill::interface(dyn FlowScopeRemovalHandler)]
-#[dill::meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
-    feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-    ],
-    delivery: MessageDeliveryMechanism::Transactional,
-    initial_consumer_boundary: InitialConsumerBoundary::Latest,
-})]
-
-pub struct FlowProcessStateProjector {
-    flow_process_state_repository: Arc<dyn FlowProcessStateRepository>,
-}
+#[dill::component(pub)]
+#[dill::interface(dyn FlowSystemEventProjector)]
+pub struct FlowProcessStateProjector {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowProcessStateProjector {
-    pub async fn handle_trigger_updated(
+    async fn process_flow_trigger_event(
         &self,
-        trigger_event_id: EventID,
-        flow_binding: &FlowBinding,
-        trigger_status: FlowTriggerStatus,
-        stop_policy: FlowTriggerStopPolicy,
+        transaction_catalog: &dill::Catalog,
+        event_id: EventID,
+        trigger_event: FlowTriggerEvent,
     ) -> Result<(), InternalError> {
-        let paused_manual = trigger_status == FlowTriggerStatus::PausedByUser;
+        let flow_process_state_repository = transaction_catalog
+            .get_one::<dyn FlowProcessStateRepository>()
+            .unwrap();
 
-        self.flow_process_state_repository
-            .upsert_process_state_on_trigger_event(
-                trigger_event_id,
-                flow_binding.clone(),
-                paused_manual,
-                stop_policy,
-            )
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = ?e,
-                    error_msg = %e,
-                    "Failed to insert new flow process"
-                );
-                e.int_err()
-            })?;
-
-        Ok(())
-    }
-
-    pub async fn handle_flow_scheduled(
-        &self,
-        flow_event_id: EventID,
-        flow_binding: &FlowBinding,
-        scheduled_for_activation_at: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
-        self.flow_process_state_repository
-            .on_flow_scheduled(flow_event_id, flow_binding, scheduled_for_activation_at)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = ?e,
-                    error_msg = %e,
-                    "Failed to handle flow scheduled"
-                );
-                e.int_err()
-            })?;
-
-        Ok(())
-    }
-
-    pub async fn handle_flow_finished(
-        &self,
-        flow_event_id: EventID,
-        flow_binding: &FlowBinding,
-        flow_outcome: &FlowOutcome,
-        finished_at: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
-        let is_success = match flow_outcome {
-            FlowOutcome::Success(_) => true,
-            FlowOutcome::Failed => false,
-            FlowOutcome::Aborted => return Ok(()), // Ignore aborted flows
-        };
-
-        self.flow_process_state_repository
-            .apply_flow_result(flow_event_id, flow_binding, is_success, finished_at)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = ?e,
-                    error_msg = %e,
-                    "Failed to apply flow result"
-                );
-                e.int_err()
-            })?;
-
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MessageConsumer for FlowProcessStateProjector {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowProcessStateProjector {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowProcessStateProjector[FlowTriggerUpdatedMessage]"
-    )]
-    async fn consume_message(
-        &self,
-        _: &dill::Catalog,
-        message: &FlowTriggerUpdatedMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received flow trigger message");
-
-        self.handle_trigger_updated(
-            message.event_id,
-            &message.flow_binding,
-            message.trigger_status,
-            message.stop_policy,
-        )
-        .await?;
-
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowProcessStateProjector[FlowProgressMessage]"
-    )]
-    async fn consume_message(
-        &self,
-        _: &dill::Catalog,
-        message: &FlowProgressMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received flow progress message");
-
-        match message {
-            FlowProgressMessage::Scheduled(scheduled_message) => {
-                self.handle_flow_scheduled(
-                    scheduled_message.event_id,
-                    message.flow_binding(),
-                    scheduled_message.scheduled_for_activation_at,
-                )
-                .await?;
-            }
-            FlowProgressMessage::Finished(finished_message) => {
-                self.handle_flow_finished(
-                    finished_message.event_id,
-                    message.flow_binding(),
-                    &finished_message.outcome,
-                    finished_message.event_time,
-                )
-                .await?;
+        match trigger_event {
+            FlowTriggerEvent::Created(e) => {
+                flow_process_state_repository
+                    .upsert_process_state_on_trigger_event(
+                        event_id,
+                        e.flow_binding,
+                        e.paused,
+                        e.stop_policy,
+                    )
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(
+                            error = ?e,
+                            error_msg = %e,
+                            "Failed to insert new flow process"
+                        );
+                        e.int_err()
+                    })?;
             }
 
-            FlowProgressMessage::RetryScheduled(_)
-            | FlowProgressMessage::Running(_)
-            | FlowProgressMessage::Cancelled(_) => {
-                // Ignore
+            FlowTriggerEvent::Modified(e) => {
+                flow_process_state_repository
+                    .upsert_process_state_on_trigger_event(
+                        event_id,
+                        e.flow_binding,
+                        e.paused,
+                        e.stop_policy,
+                    )
+                    .await
+                    .int_err()?;
+            }
+
+            FlowTriggerEvent::AutoStopped(_) => {
+                // Ignored, computed by projection similarly
+            }
+
+            FlowTriggerEvent::ScopeRemoved(e) => {
+                flow_process_state_repository
+                    .delete_process_states_by_scope(&e.flow_binding.scope)
+                    .await
+                    .int_err()?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn process_flow_event(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        event_id: EventID,
+        flow_event: FlowEvent,
+    ) -> Result<(), InternalError> {
+        match &flow_event {
+            FlowEvent::ScheduledForActivation(e) => {
+                let flow_process_state_repository = transaction_catalog
+                    .get_one::<dyn FlowProcessStateRepository>()
+                    .unwrap();
+
+                flow_process_state_repository
+                    .on_flow_scheduled(
+                        event_id,
+                        flow_event.flow_binding(),
+                        e.scheduled_for_activation_at,
+                    )
+                    .await
+                    .int_err()?;
+            }
+
+            FlowEvent::TaskFinished(e) => {
+                let last_task_in_flow = match e.task_outcome {
+                    TaskOutcome::Success(_) | TaskOutcome::Cancelled => true,
+                    TaskOutcome::Failed(_) => e.next_attempt_at.is_none(),
+                };
+
+                if last_task_in_flow {
+                    let is_success = match e.task_outcome {
+                        TaskOutcome::Success(_) => true,
+                        TaskOutcome::Failed(_) => false,
+                        TaskOutcome::Cancelled => return Ok(()), // Ignore cancelled flows
+                    };
+
+                    let flow_process_state_repository = transaction_catalog
+                        .get_one::<dyn FlowProcessStateRepository>()
+                        .unwrap();
+
+                    flow_process_state_repository
+                        .apply_flow_result(
+                            event_id,
+                            flow_event.flow_binding(),
+                            is_success,
+                            flow_event.event_time(),
+                        )
+                        .await
+                        .int_err()?;
+
+                    let flow_trigger_service = transaction_catalog
+                        .get_one::<dyn FlowTriggerService>()
+                        .unwrap();
+
+                    // In case of a failure, trigger should make a decision about auto-stopping
+                    if !is_success {
+                        flow_trigger_service
+                            .evaluate_trigger_on_failure(
+                                flow_event.event_time(),
+                                flow_event.flow_binding(),
+                                !e.task_outcome.is_recoverable_failure(),
+                            )
+                            .await?;
+                    }
+
+                    // Recover the flow to check if we need to schedule next activation
+                    let flow_event_store =
+                        transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+                    let flow = Flow::load(flow_event.flow_id(), flow_event_store.as_ref())
+                        .await
+                        .int_err()?;
+
+                    let scheduling_helper = transaction_catalog
+                        .get_one::<FlowSchedulingHelper>()
+                        .unwrap();
+
+                    // In case of success:
+                    //  - schedule next flow immediately, if we had any late activation cause
+                    if is_success {
+                        scheduling_helper
+                            .try_schedule_late_flow_activations(flow_event.event_time(), &flow)
+                            .await?;
+                    }
+
+                    // Try to schedule auto-polling flow, if applicable.
+                    // We don't care whether we failed or succeeded,
+                    // that is determined with the stop policy in the trigger.
+                    scheduling_helper
+                        .try_schedule_auto_polling_flow_continuation_if_enabled(
+                            flow_event.event_time(),
+                            &flow,
+                        )
+                        .await?;
+                }
+            }
+
+            FlowEvent::Initiated(_)
+            | FlowEvent::Aborted(_)
+            | FlowEvent::ActivationCauseAdded(_)
+            | FlowEvent::ConfigSnapshotModified(_)
+            | FlowEvent::StartConditionUpdated(_)
+            | FlowEvent::TaskScheduled(_)
+            | FlowEvent::TaskRunning(_) => {
+                // Ignored
             }
         }
 
@@ -197,26 +192,33 @@ impl MessageConsumerT<FlowProgressMessage> for FlowProcessStateProjector {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowScopeRemovalHandler for FlowProcessStateProjector {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowProcessStateProjector[FlowScopeRemovalHandler]"
-    )]
-    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
-        tracing::debug!(flow_scope = ?flow_scope, "Handling flow scope removal");
+impl FlowSystemEventProjector for FlowProcessStateProjector {
+    fn name(&self) -> &'static str {
+        "dev.kamu.domain.flow-system.FlowProcessStateProjector"
+    }
 
-        self.flow_process_state_repository
-            .delete_process_states_by_scope(flow_scope)
-            .await
-            .map_err(|e| {
-                tracing::error!(
-                    error = ?e,
-                    error_msg = %e,
-                    "Failed to delete flow processes by flow scope"
-                );
-                e.int_err()
-            })?;
+    async fn apply(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        event: &FlowSystemEvent,
+    ) -> Result<(), InternalError> {
+        match event.source_type {
+            FlowSystemEventSourceType::FlowConfiguration => { /* ignored */ }
+
+            FlowSystemEventSourceType::FlowTrigger => {
+                let trigger_event: FlowTriggerEvent =
+                    serde_json::from_value(event.payload.clone()).int_err()?;
+                self.process_flow_trigger_event(transaction_catalog, event.event_id, trigger_event)
+                    .await?;
+            }
+
+            FlowSystemEventSourceType::Flow => {
+                let flow_event: FlowEvent =
+                    serde_json::from_value(event.payload.clone()).int_err()?;
+                self.process_flow_event(transaction_catalog, event.event_id, flow_event)
+                    .await?;
+            }
+        }
 
         Ok(())
     }

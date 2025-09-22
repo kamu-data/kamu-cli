@@ -381,7 +381,7 @@ impl FlowProcessStateQuery for InMemoryFlowProcessState {
 impl FlowProcessStateRepository for InMemoryFlowProcessState {
     async fn upsert_process_state_on_trigger_event(
         &self,
-        trigger_event_id: EventID,
+        event_id: EventID,
         flow_binding: FlowBinding,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
@@ -389,25 +389,20 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         let mut state = self.state.write().unwrap();
         if let Some(existing) = state.process_state_by_binding.get_mut(&flow_binding) {
             existing
-                .update_trigger_state(
-                    trigger_event_id,
-                    self.time_source.now(),
-                    paused_manual,
-                    stop_policy,
-                )
+                .update_trigger_state(event_id, self.time_source.now(), paused_manual, stop_policy)
                 .int_err()
                 .map_err(FlowProcessUpsertError::Internal)?;
         } else {
-            state.process_state_by_binding.insert(
+            let new_state = FlowProcessState::new(
+                event_id,
+                self.time_source.now(),
                 flow_binding.clone(),
-                FlowProcessState::new(
-                    trigger_event_id,
-                    self.time_source.now(),
-                    flow_binding,
-                    paused_manual,
-                    stop_policy,
-                ),
+                paused_manual,
+                stop_policy,
             );
+            state
+                .process_state_by_binding
+                .insert(flow_binding, new_state);
         }
 
         Ok(())
@@ -415,7 +410,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
 
     async fn apply_flow_result(
         &self,
-        flow_event_id: EventID,
+        event_id: EventID,
         flow_binding: &FlowBinding,
         success: bool,
         event_time: DateTime<Utc>,
@@ -431,11 +426,11 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
 
         if success {
             process_state
-                .on_success(flow_event_id, self.time_source.now(), event_time)
+                .on_success(event_id, self.time_source.now(), event_time)
                 .int_err()?;
         } else {
             process_state
-                .on_failure(flow_event_id, self.time_source.now(), event_time)
+                .on_failure(event_id, self.time_source.now(), event_time)
                 .int_err()?;
         }
 
@@ -444,7 +439,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
 
     async fn on_flow_scheduled(
         &self,
-        flow_event_id: EventID,
+        event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
     ) -> Result<(), FlowProcessFlowEventError> {
@@ -458,7 +453,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             });
 
         process_state
-            .on_scheduled(flow_event_id, self.time_source.now(), planned_at)
+            .on_scheduled(event_id, self.time_source.now(), planned_at)
             .int_err()?;
 
         Ok(())
