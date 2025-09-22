@@ -43,7 +43,8 @@ impl MetadataVisitorDecision {
         let mut merged_flags = MetadataEventTypeFlags::empty();
         for decision in decisions {
             match *decision {
-                // Single Next is enough to dominate
+                // Single Next is enough to dominate: if any visitor requested the next block,
+                // this cannot be beaten
                 MetadataVisitorDecision::Next => return MetadataVisitorDecision::Next,
 
                 // Stop can be ignored
@@ -54,17 +55,13 @@ impl MetadataVisitorDecision {
                     merged_flags |= flags;
                 }
             }
-            if *decision == MetadataVisitorDecision::Next {
-                // If any visitor requested the next block, this cannot be beaten
-                return MetadataVisitorDecision::Next;
-            }
         }
 
         if merged_flags.is_empty() {
             // No flags requested, so we are satisfied
             MetadataVisitorDecision::Stop
         } else {
-            // We have a request for specific set of flags
+            // We have a request for a specific set of flags
             MetadataVisitorDecision::NextOfType(merged_flags)
         }
     }
