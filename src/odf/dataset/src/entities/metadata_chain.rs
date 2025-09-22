@@ -855,8 +855,9 @@ impl From<SetChainRefError> for AppendError {
 // Individual Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: The interval is guaranteed to include the head, but not the tail.
 #[derive(Error, Debug)]
-#[error("Invalid block interval [{head}, {tail})")]
+#[error("Invalid block interval: {head} (inclusive), {tail}")]
 pub struct InvalidIntervalError {
     pub head: Multihash,
     pub tail: Multihash,
