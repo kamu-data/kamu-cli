@@ -160,51 +160,58 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
     head: &odf::Multihash,
     tail: Option<&odf::Multihash>,
 ) -> Result<CollectKeyBlockResponse, InternalError> {
-    use odf::dataset::{
-        AcceptByIntervalOptions,
-        AcceptVisitorError,
-        IterBlocksError,
-        MetadataChainExt,
-    };
+    use futures::stream::TryStreamExt;
+    use odf::dataset::MetadataChainExt;
 
-    // Ignore non-key events, such as `AddData` and `ExecuteTransform`
-    let mut key_blocks_visitor = odf::dataset::SearchKeyBlocksVisitor::new();
-    let accept_res = target
+    // Resulting blocks and event flags
+    let mut key_blocks = Vec::new();
+    let mut key_event_flags = odf::metadata::MetadataEventTypeFlags::empty();
+
+    // Iterate over blocks in the dataset in the specified range.
+    // Note: don't ignore missing tail, we want to detect InvalidInterval error.
+    //       Therefore, we need to iterate through all blocks, not only key ones.
+    let mut blocks_stream = target
         .as_metadata_chain()
-        .accept_by_interval_ext(
-            &mut [&mut key_blocks_visitor],
-            Some(head),
-            tail,
-            AcceptByIntervalOptions {
-                // Note: don't ignore the missing tail, we want to detect InvalidInterval error.
-                ignore_missing_tail: false,
-                // We are indexing, so we cannot use hints.
-                ignore_hints_when_getting_preceding_block: true,
-                ..Default::default()
-            },
-        )
-        .await;
+        .iter_blocks_interval(head, tail, false);
 
-    let divergence_detected = match accept_res {
-        Ok(_) => false,
-        // Invalid interval: return so far collected result with divergence marker
-        Err(AcceptVisitorError::Traversal(IterBlocksError::InvalidInterval(_))) => true,
+    loop {
+        // Try reading next stream element
+        let try_next_result = match blocks_stream.try_next().await {
+            // Normal stream element
+            Ok(maybe_hashed_block) => maybe_hashed_block,
 
-        // Other errors are internal
-        Err(e) => return Err(e.int_err()),
-    };
+            // Invalid interval: return so far collected result with divergence marker
+            Err(odf::dataset::IterBlocksError::InvalidInterval(_)) => {
+                return Ok(CollectKeyBlockResponse {
+                    key_blocks,
+                    key_event_flags,
+                    divergence_detected: true,
+                });
+            }
 
-    let key_event_flags = key_blocks_visitor.key_event_flags();
-    let key_blocks = key_blocks_visitor
-        .into_hashed_key_blocks()
-        .into_iter()
-        .map(|(hash, block)| make_key_block(hash, &block))
-        .collect::<_>();
+            // Other errors are internal
+            Err(odf::IterBlocksError::Internal(e)) => return Err(e),
+            Err(e) => return Err(e.int_err()),
+        };
+
+        // Check if we've reached the end of stream
+        let Some((block_hash, block)) = try_next_result else {
+            break;
+        };
+
+        // Ignore non-key events, such as `AddData` and `ExecuteTransform`
+        let event_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
+        if !event_flags.has_data_flags() {
+            // Create a key block entity
+            key_blocks.push(make_key_block(block_hash, &block));
+            key_event_flags |= event_flags;
+        }
+    }
 
     Ok(CollectKeyBlockResponse {
         key_blocks,
         key_event_flags,
-        divergence_detected,
+        divergence_detected: false,
     })
 }
 
