@@ -153,10 +153,10 @@ pub trait MetadataChainExt: MetadataChain {
                 current = next;
             }
 
-            if !ignore_missing_tail && current.is_none() && tail_hash.is_some() {
+            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
                 Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
                     head: head_hash.clone(),
-                    tail: tail_hash.cloned().unwrap(),
+                    tail: tail_hash.clone(),
                 }))?;
             }
         })
@@ -223,10 +223,10 @@ pub trait MetadataChainExt: MetadataChain {
                 current = next;
             }
 
-            if current.is_none() && tail_hash.is_some() {
+            if current.is_none() && let Some(tail_hash) = tail_hash {
                 Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
                     head: head_hash,
-                    tail: tail_hash.unwrap()
+                    tail: tail_hash
                 }))?;
             }
         })
