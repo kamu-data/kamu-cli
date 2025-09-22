@@ -12,7 +12,7 @@ use event_sourcing::EventID;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{FlowBinding, FlowScope, FlowTriggerStopPolicy};
+use crate::{FlowBinding, FlowOutcome, FlowScope, FlowTriggerStopPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,12 +27,12 @@ pub trait FlowProcessStateRepository: Send + Sync {
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), FlowProcessUpsertError>;
 
-    /// Apply a flow result (success or failure).
+    /// Apply a flow result.
     async fn apply_flow_result(
         &self,
         flow_event_id: EventID,
         flow_binding: &FlowBinding,
-        success: bool,
+        flow_outcome: &FlowOutcome,
         event_time: DateTime<Utc>,
     ) -> Result<(), FlowProcessFlowEventError>;
 

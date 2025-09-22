@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use {kamu_flow_system as fs, kamu_task_system as ts};
+use kamu_flow_system as fs;
 
 use crate::prelude::*;
 use crate::queries::TaskFailureReason;
@@ -37,24 +37,17 @@ pub(crate) struct FlowAbortedResult {
 }
 
 impl FlowOutcome {
-    pub async fn from_flow_and_task_outcomes(
+    pub async fn from_flow_outcome(
         ctx: &Context<'_>,
         flow_outcome: &fs::FlowOutcome,
-        maybe_task_outcome: Option<&ts::TaskOutcome>,
     ) -> Result<Self, InternalError> {
         let result = match flow_outcome {
             fs::FlowOutcome::Success(_) => Self::Success(FlowSuccessResult {
                 message: "SUCCESS".to_owned(),
             }),
-            fs::FlowOutcome::Failed => {
-                if let Some(ts::TaskOutcome::Failed(e)) = maybe_task_outcome {
-                    Self::Failed(FlowFailedError {
-                        reason: TaskFailureReason::from_task_error(ctx, e).await?,
-                    })
-                } else {
-                    unreachable!("Flow outcome is failed, but task outcome is not failed");
-                }
-            }
+            fs::FlowOutcome::Failed(error) => Self::Failed(FlowFailedError {
+                reason: TaskFailureReason::from_task_error(ctx, error).await?,
+            }),
             fs::FlowOutcome::Aborted => Self::Aborted(FlowAbortedResult {
                 message: "ABORTED".to_owned(),
             }),

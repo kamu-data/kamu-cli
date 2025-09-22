@@ -12,7 +12,7 @@ use event_sourcing::EventID;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{FlowBinding, FlowProcessEffectiveState, FlowTriggerStopPolicy};
+use crate::{FlowBinding, FlowOutcome, FlowProcessEffectiveState, FlowTriggerStopPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -198,38 +198,31 @@ impl FlowProcessState {
         Ok(())
     }
 
-    pub fn on_success(
+    pub fn on_flow_outcome(
         &mut self,
         event_id: EventID,
         current_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
+        flow_outcome: &FlowOutcome,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_event_order(event_id)?;
 
-        self.consecutive_failures = 0;
-        self.last_success_at = Some(event_time);
-        self.last_attempt_at = Some(event_time);
-
-        self.handle_next_planned_at_update(event_time);
-        self.actualize_effective_state();
-
-        self.last_applied_event_id = event_id;
-        self.updated_at = current_time;
-
-        Ok(())
-    }
-
-    pub fn on_failure(
-        &mut self,
-        event_id: EventID,
-        current_time: DateTime<Utc>,
-        event_time: DateTime<Utc>,
-    ) -> Result<(), FlowProcessStateError> {
-        self.validate_event_order(event_id)?;
-
-        self.consecutive_failures += 1;
-        self.last_failure_at = Some(event_time);
-        self.last_attempt_at = Some(event_time);
+        match flow_outcome {
+            FlowOutcome::Success(_) => {
+                self.consecutive_failures = 0;
+                self.last_success_at = Some(event_time);
+                self.last_attempt_at = Some(event_time);
+            }
+            FlowOutcome::Failed(_) => {
+                self.consecutive_failures += 1;
+                self.last_failure_at = Some(event_time);
+                self.last_attempt_at = Some(event_time);
+            }
+            FlowOutcome::Aborted => {
+                // Unexpected, we don't track aborted flows in this projection
+                unreachable!()
+            }
+        }
 
         self.handle_next_planned_at_update(event_time);
         self.actualize_effective_state();
@@ -365,6 +358,7 @@ pub enum FlowProcessStateError {
 #[cfg(test)]
 mod tests {
     use chrono::{Duration, Utc};
+    use kamu_task_system::{TaskError, TaskResult};
 
     use super::*;
     use crate::{ConsecutiveFailuresCount, FlowBinding, FlowScope, FlowTriggerStopPolicy};
@@ -485,7 +479,12 @@ mod tests {
 
         // Test failure increments failures count
         state
-            .on_failure(EventID::new(2), current_time, event_time)
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time,
+                event_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
             .unwrap();
 
         assert_eq!(state.consecutive_failures, 1);
@@ -495,10 +494,11 @@ mod tests {
 
         // Test success resets failures count
         state
-            .on_success(
+            .on_flow_outcome(
                 EventID::new(3),
                 current_time + Duration::minutes(1),
                 event_time + Duration::minutes(1),
+                &FlowOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
 
@@ -514,10 +514,11 @@ mod tests {
         state.effective_state = FlowProcessEffectiveState::Failing;
 
         state
-            .on_failure(
+            .on_flow_outcome(
                 EventID::new(4),
                 current_time + Duration::minutes(2),
                 event_time + Duration::minutes(2),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
             )
             .unwrap();
 
@@ -544,7 +545,12 @@ mod tests {
         // With Never policy, failures should keep state as Failing
         for i in 1u32..=5u32 {
             state
-                .on_failure(EventID::new(1 + i64::from(i)), current_time, event_time)
+                .on_flow_outcome(
+                    EventID::new(1 + i64::from(i)),
+                    current_time,
+                    event_time,
+                    &FlowOutcome::Failed(TaskError::empty_recoverable()),
+                )
                 .unwrap();
             assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
             assert_eq!(state.consecutive_failures, i);
@@ -648,18 +654,33 @@ mod tests {
         let event_time = Utc::now();
 
         // Valid flow event
-        let result = state.on_success(EventID::new(200), current_time, event_time);
+        let result = state.on_flow_outcome(
+            EventID::new(200),
+            current_time,
+            event_time,
+            &FlowOutcome::Success(TaskResult::empty()),
+        );
         assert!(result.is_ok());
 
         // Duplicate flow event error
-        let result = state.on_success(EventID::new(200), current_time, event_time);
+        let result = state.on_flow_outcome(
+            EventID::new(200),
+            current_time,
+            event_time,
+            &FlowOutcome::Success(TaskResult::empty()),
+        );
         assert!(matches!(
             result.unwrap_err(),
             FlowProcessStateError::DuplicateEvent { .. }
         ));
 
         // Out-of-order flow event error
-        let result = state.on_failure(EventID::new(100), current_time, event_time);
+        let result = state.on_flow_outcome(
+            EventID::new(100),
+            current_time,
+            event_time,
+            &FlowOutcome::Failed(TaskError::empty_recoverable()),
+        );
         assert!(matches!(
             result.unwrap_err(),
             FlowProcessStateError::OutOfOrderEvent { .. }
@@ -693,10 +714,11 @@ mod tests {
         // Test that past planned times are cleared on execution events
         state.next_planned_at = Some(base_time + Duration::minutes(30));
         state
-            .on_success(
+            .on_flow_outcome(
                 EventID::new(3),
                 base_time + Duration::hours(2),
                 base_time + Duration::hours(2),
+                &FlowOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
         assert_eq!(state.next_planned_at, None); // Cleared because it was in the past
@@ -705,10 +727,11 @@ mod tests {
         let future_time = base_time + Duration::hours(3);
         state.next_planned_at = Some(future_time);
         state
-            .on_success(
+            .on_flow_outcome(
                 EventID::new(4),
                 base_time + Duration::hours(1),
                 base_time + Duration::hours(1),
+                &FlowOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
         assert_eq!(state.next_planned_at, Some(future_time)); // Preserved because it's in the future
@@ -742,10 +765,11 @@ mod tests {
 
         // 1. Success -> Active state
         state
-            .on_success(
+            .on_flow_outcome(
                 EventID::new(2),
                 base_time + Duration::minutes(1),
                 base_time + Duration::minutes(1),
+                &FlowOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
@@ -766,10 +790,11 @@ mod tests {
 
         // 3. Failure while paused -> stays PausedManual
         state
-            .on_failure(
+            .on_flow_outcome(
                 EventID::new(4),
                 base_time + Duration::minutes(3),
                 base_time + Duration::minutes(3),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
             )
             .unwrap();
         assert_eq!(
@@ -802,17 +827,19 @@ mod tests {
 
         // 6. Add more failures -> stays Failing with Never policy
         state
-            .on_failure(
+            .on_flow_outcome(
                 EventID::new(7),
                 base_time + Duration::minutes(6),
                 base_time + Duration::minutes(6),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
             )
             .unwrap();
         state
-            .on_failure(
+            .on_flow_outcome(
                 EventID::new(8),
                 base_time + Duration::minutes(7),
                 base_time + Duration::minutes(7),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 3);
@@ -820,10 +847,11 @@ mod tests {
 
         // 7. Success resets everything -> Active
         state
-            .on_success(
+            .on_flow_outcome(
                 EventID::new(9),
                 base_time + Duration::minutes(8),
                 base_time + Duration::minutes(8),
+                &FlowOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
         assert_eq!(state.consecutive_failures, 0);
@@ -844,10 +872,20 @@ mod tests {
 
         // Generate enough failures to trigger auto-stop
         state
-            .on_failure(EventID::new(2), base_time, base_time)
+            .on_flow_outcome(
+                EventID::new(2),
+                base_time,
+                base_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
             .unwrap();
         state
-            .on_failure(EventID::new(3), base_time, base_time)
+            .on_flow_outcome(
+                EventID::new(3),
+                base_time,
+                base_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
             .unwrap();
         assert_eq!(state.consecutive_failures, 2);
         assert_eq!(
@@ -869,7 +907,12 @@ mod tests {
 
         // Normal pause/unpause should NOT reset failures
         state
-            .on_failure(EventID::new(5), base_time, base_time)
+            .on_flow_outcome(
+                EventID::new(5),
+                base_time,
+                base_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
             .unwrap();
         assert_eq!(state.consecutive_failures, 1);
 
