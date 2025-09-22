@@ -50,9 +50,6 @@ impl DataWriterMetadataState {
         source_name: Option<&str>,
         head: Option<odf::Multihash>,
     ) -> Result<Self, ScanMetadataError> {
-        // TODO: PERF: Full metadata scan below - this is expensive and should be
-        //       improved using skip lists.
-
         use odf::dataset::MetadataChainVisitorExtInfallible;
 
         let head = if let Some(head) = head {
