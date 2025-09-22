@@ -102,7 +102,8 @@ macro_rules! typed_kind_based_search_single_typed_block_visitor_impl {
 
 typed_search_single_typed_block_visitor_impl!(SearchSetVocabVisitor, SetVocab, Flag::SET_VOCAB);
 typed_search_single_typed_block_visitor_impl!(SearchSeedVisitor, Seed, Flag::SEED);
-typed_search_single_typed_block_visitor_impl!(
+typed_kind_based_search_single_typed_block_visitor_impl!(
+    DatasetKind::Derivative,
     SearchSetTransformVisitor,
     SetTransform,
     Flag::SET_TRANSFORM
@@ -290,17 +291,6 @@ where
 
     fn finish(&self) -> Result<(), Self::Error> {
         self.visitor.finish()
-    }
-}
-
-impl<V, E> std::ops::Deref for DatasetKindBasedVisitor<V, E>
-where
-    V: MetadataChainVisitor<Error = E>,
-{
-    type Target = V;
-
-    fn deref(&self) -> &Self::Target {
-        &self.visitor
     }
 }
 

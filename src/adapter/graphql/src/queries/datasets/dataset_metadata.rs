@@ -358,7 +358,7 @@ impl<'a> DatasetMetadata<'a> {
             .then(|| odf::dataset::SearchActivePollingSourceVisitor::new(dataset_kind));
         let mut transform_visitor = event_types
             .contains(&MetadataEventType::SetTransform)
-            .then(odf::dataset::SearchSetTransformVisitor::new);
+            .then(|| odf::dataset::SearchSetTransformVisitor::new(dataset_kind));
         let mut active_push_sources_visitor = event_types
             .contains(&MetadataEventType::AddPushSource)
             .then(|| odf::dataset::SearchActivePushSourcesVisitor::new(dataset_kind));
@@ -416,7 +416,7 @@ impl<'a> DatasetMetadata<'a> {
                 .and_then(odf::dataset::SearchActivePollingSourceVisitor::into_hashed_block)
                 .map(|(h, b)| (h, b.into())),
             transform_visitor
-                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .and_then(|v| v.into_inner().into_hashed_block())
                 .map(|(h, b)| (h, b.into())),
         ];
         maybe_hashed_blocks.extend(

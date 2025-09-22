@@ -68,7 +68,8 @@ pub(crate) async fn extract_modified_dependencies_in_interval(
     //   event itself,
     // - For Seed we only need to know its presence: we search only if we don't
     //   initially know if it exists.
-    let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new();
+    let mut set_transform_visitor =
+        odf::dataset::SearchSetTransformVisitor::new(odf::DatasetKind::Derivative);
     let mut seed_presence = match maybe_hint_flags {
         Some(flags) => {
             let present = flags.contains(Flag::SEED);
@@ -98,10 +99,10 @@ pub(crate) async fn extract_modified_dependencies_in_interval(
         .await
         .int_err()?;
 
-    if let Some(event) = set_transform_visitor.into_event() {
-        for new_input in &event.inputs {
-            if let Some(id) = new_input.dataset_ref.id() {
-                new_upstream_ids.insert(id.clone());
+    if let Some(event) = set_transform_visitor.into_inner().into_event() {
+        for new_input in event.inputs {
+            if let Some(id) = new_input.dataset_ref.into_id() {
+                new_upstream_ids.insert(id);
             }
         }
     }

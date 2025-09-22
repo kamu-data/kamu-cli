@@ -38,10 +38,10 @@ impl TransformRequestPlannerImpl {
         &self,
         target: ResolvedDataset,
     ) -> Result<TransformPreliminaryPlan, TransformPlanError> {
-        // Build prelmiinary request
+        // Build preliminary request
         let preliminary_request = build_preliminary_request_ext(target.clone()).await?;
 
-        // Pre-fill datasets that is used in the operation
+        // Pre-fill datasets that are used in the operation
         let mut datasets_map = ResolvedDatasetsMap::default();
         datasets_map.register(target);
         for (input_decl, _) in &preliminary_request.input_states {
@@ -115,7 +115,8 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         let (source, set_vocab, schema, blocks, finished_range) = {
             // TODO: Support dataset evolution
             use odf::dataset::*;
-            let mut set_transform_visitor = SearchSetTransformVisitor::new();
+
+            let mut set_transform_visitor = SearchSetTransformVisitor::new(target.get_kind());
             let mut set_vocab_visitor = SearchSetVocabVisitor::new();
             let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new();
 
@@ -175,7 +176,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             } = execute_transform_collector_visitor.into_state();
 
             (
-                set_transform_visitor.into_event(),
+                set_transform_visitor.into_inner().into_event(),
                 set_vocab_visitor.into_event(),
                 set_data_schema_visitor
                     .into_event()

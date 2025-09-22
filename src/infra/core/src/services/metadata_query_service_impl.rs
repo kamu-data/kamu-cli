@@ -77,9 +77,12 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         use odf::dataset::MetadataChainExt;
         Ok(target
             .as_metadata_chain()
-            .accept_one(odf::dataset::SearchSetTransformVisitor::new())
+            .accept_one(odf::dataset::SearchSetTransformVisitor::new(
+                target.get_kind(),
+            ))
             .await
             .int_err()?
+            .into_inner()
             .into_hashed_block())
     }
 

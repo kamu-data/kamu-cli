@@ -70,6 +70,13 @@ impl DatasetRef {
         }
     }
 
+    pub fn into_id(self) -> Option<DatasetID> {
+        match self {
+            Self::ID(id) | Self::Handle(DatasetHandle { id, .. }) => Some(id),
+            Self::Alias(_) => None,
+        }
+    }
+
     pub fn alias(&self) -> Option<&DatasetAlias> {
         match self {
             Self::ID(_) => None,
