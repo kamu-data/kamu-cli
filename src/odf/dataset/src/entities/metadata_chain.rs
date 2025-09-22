@@ -342,9 +342,12 @@ pub trait MetadataChainExt: MetadataChain {
             None
         };
 
-        // Determine the sequence number of tail block
-        let tail_sequence_number = if merged_decision == MetadataVisitorDecision::Stop {
+        // Determine the sequence number of tail block (for hints).
+        let hint_tail_sequence_number = if merged_decision == MetadataVisitorDecision::Stop {
             // No need to iterate
+            None
+        } else if options.ignore_hints_when_getting_preceding_block {
+            // Hints will not be used
             None
         } else if let Some(tail_hash) = tail_hash {
             // Read from the tail block
@@ -371,7 +374,7 @@ pub trait MetadataChainExt: MetadataChain {
             tracing::trace!(
                 current_block_hash=%hash,
                 sequence_number=block.sequence_number,
-                tail_sequence_number,
+                hint_tail_sequence_number,
                 event_type=?MetadataEventTypeFlags::from(&block.event),
                 visitors_decision=?merged_decision,
                 "Traversing through block",
@@ -435,9 +438,13 @@ pub trait MetadataChainExt: MetadataChain {
                 }
             } else {
                 // Try to jump to the previous block with satisfaction hints taken into account
-                self.get_preceding_block_with_hint(block, tail_sequence_number, merged_decision)
-                    .await
-                    .map_err(IterBlocksError::from)?
+                self.get_preceding_block_with_hint(
+                    block,
+                    hint_tail_sequence_number,
+                    merged_decision,
+                )
+                .await
+                .map_err(IterBlocksError::from)?
             }
         }
 
