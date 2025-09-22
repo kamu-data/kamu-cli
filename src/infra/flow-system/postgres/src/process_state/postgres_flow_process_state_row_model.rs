@@ -12,6 +12,7 @@ use internal_error::InternalError;
 use kamu_flow_system::{
     EventID,
     FlowBinding,
+    FlowProcessAutoStopReason,
     FlowProcessEffectiveState,
     FlowProcessState,
     FlowTriggerStopPolicy,
@@ -31,7 +32,9 @@ pub(crate) struct PostgresFlowProcessStateRowModel {
     pub last_failure_at: Option<DateTime<Utc>>,
     pub last_attempt_at: Option<DateTime<Utc>>,
     pub next_planned_at: Option<DateTime<Utc>>,
+    pub auto_stopped_at: Option<DateTime<Utc>>,
     pub effective_state: FlowProcessEffectiveState,
+    pub auto_stopped_reason: Option<FlowProcessAutoStopReason>,
     pub updated_at: DateTime<Utc>,
     pub last_applied_flow_system_event_id: i64,
 }
@@ -78,7 +81,9 @@ impl TryFrom<PostgresFlowProcessStateRowModel> for FlowProcessState {
             row.last_failure_at,
             row.last_attempt_at,
             row.next_planned_at,
+            row.auto_stopped_at,
             row.effective_state,
+            row.auto_stopped_reason,
             row.updated_at,
             EventID::new(row.last_applied_flow_system_event_id),
         )

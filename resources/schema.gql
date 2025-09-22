@@ -2433,6 +2433,11 @@ type FlowProcess {
 	summary: FlowProcessSummary!
 }
 
+enum FlowProcessAutoStopReason {
+	STOP_POLICY
+	UNRECOVERABLE_FAILURE
+}
+
 enum FlowProcessEffectiveState {
 	ACTIVE
 	FAILING
@@ -2521,6 +2526,8 @@ type FlowProcessSummary {
 	lastAttemptAt: DateTime
 	lastFailureAt: DateTime
 	nextPlannedAt: DateTime
+	autoStoppedReason: FlowProcessAutoStopReason
+	autoStoppedAt: DateTime
 }
 
 input FlowProcessTypeFilterInput @oneOf {
