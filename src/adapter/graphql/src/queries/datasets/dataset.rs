@@ -156,7 +156,6 @@ impl Dataset {
         DatasetFlows::new(&self.dataset_request_state)
     }
 
-    // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     #[tracing::instrument(level = "info", name = Dataset_created_at, skip_all)]
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
