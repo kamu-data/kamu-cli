@@ -469,7 +469,7 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
             }
             _ => true,
         },
-        cli::Command::Ui(_) | cli::Command::Login(_) => false,
+        cli::Command::Ui(_) | cli::Command::Login(_) | cli::Command::Pull(_) => false,
         _ => true,
     }
 }

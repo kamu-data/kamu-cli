@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::{
@@ -25,15 +26,10 @@ use kamu_core::*;
 #[component]
 #[interface(dyn PullDatasetUseCase)]
 pub struct PullDatasetUseCaseImpl {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    pull_request_planner: Arc<dyn PullRequestPlanner>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-    polling_ingest_svc: Arc<dyn PollingIngestService>,
     transform_elaboration_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
-    sync_svc: Arc<dyn SyncService>,
     tenancy_config: Arc<TenancyConfig>,
+    catalog: dill::Catalog,
 }
 
 impl PullDatasetUseCaseImpl {
@@ -64,33 +60,66 @@ impl PullDatasetUseCaseImpl {
             tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
 
             // Authorization checks for this iteration
-            let (iteration, write_errors) = self.make_authorization_write_checks(iteration).await?;
-            let (iteration, read_errors) = self.make_authorization_read_checks(iteration).await?;
+            let (iteration, write_errors, read_errors) =
+                DatabaseTransactionRunner::new(self.catalog.clone())
+                    .transactional_with(
+                        |dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>| async move {
+                            let (iteration, write_errors) = Self::make_authorization_write_checks(
+                                iteration,
+                                dataset_action_authorizer.clone(),
+                            )
+                            .await?;
+                            let (iteration, read_errors) = Self::make_authorization_read_checks(
+                                iteration,
+                                dataset_action_authorizer,
+                            )
+                            .await?;
+                            Ok((iteration, write_errors, read_errors))
+                        },
+                    )
+                    .await?;
+
             if !write_errors.is_empty() || !read_errors.is_empty() {
                 results.extend(write_errors);
                 results.extend(read_errors);
                 break;
             }
 
+            println!("qweqweqwe");
+
             // Run iteration jobs concurrently
             let mut tasks = tokio::task::JoinSet::new();
             for job in iteration.jobs {
+                let catalog = self.catalog.clone();
+
                 match job {
                     PullPlanIterationJob::Ingest(pii) => {
                         let maybe_listener = maybe_ingest_multi_listener
                             .as_ref()
                             .and_then(|l| l.begin_ingest(pii.target.get_handle()));
-                        tasks.spawn(Self::ingest(
-                            pii,
-                            options.ingest_options.clone(),
-                            self.polling_ingest_svc.clone(),
-                            maybe_listener,
-                        ))
+                        let ingest_options = options.ingest_options.clone();
+
+                        tasks.spawn(async move {
+                            DatabaseTransactionRunner::new(catalog)
+                                .transactional_with(
+                                    |polling_ingest_svc: Arc<dyn PollingIngestService>| async move {
+                                        Self::ingest(
+                                            pii,
+                                            ingest_options,
+                                            polling_ingest_svc.clone(),
+                                            maybe_listener,
+                                        )
+                                        .await
+                                    },
+                                )
+                                .await
+                        })
                     }
                     PullPlanIterationJob::Transform(pti) => {
                         let maybe_listener = maybe_transform_multi_listener
                             .as_ref()
                             .and_then(|l| l.begin_transform(pti.target.get_handle()));
+
                         tasks.spawn(Self::transform(
                             pti,
                             options.transform_options,
@@ -106,15 +135,34 @@ impl PullDatasetUseCaseImpl {
                                 &psi.sync_request.dst.as_user_friendly_any_ref(),
                             )
                         });
+                        let sync_options = options.clone();
 
-                        tasks.spawn(Self::sync(
-                            psi,
-                            options.clone(),
-                            self.sync_svc.clone(),
-                            self.dataset_registry.clone(),
-                            self.remote_alias_registry.clone(),
-                            maybe_listener,
-                        ))
+                        tasks.spawn(async move {
+                            DatabaseTransactionRunner::new(catalog)
+                                .transactional_with3(
+                                    |sync_svc: Arc<dyn SyncService>, dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>| async move {
+                                        Self::sync(
+                                            psi,
+                                            sync_options,
+                                            sync_svc.clone(),
+                                            dataset_registry.clone(),
+                                            remote_alias_registry.clone(),
+                                            maybe_listener,
+                                        )
+                                        .await
+                                    },
+                                )
+                                .await
+                        })
+
+                        // tasks.spawn(Self::sync(
+                        //     psi,
+                        //     options.clone(),
+                        //     self.sync_svc.get().unwrap().clone(),
+                        //     self.dataset_registry.get().unwrap().clone(),
+                        //     self.remote_alias_registry.get().unwrap().
+                        // clone(),     maybe_listener,
+                        // ))
                     }
                 };
             }
@@ -140,8 +188,8 @@ impl PullDatasetUseCaseImpl {
 
     #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::write_authorizations", skip_all, fields(?iteration))]
     async fn make_authorization_write_checks(
-        &self,
         iteration: PullPlanIteration,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
         let mut written_datasets = Vec::with_capacity(iteration.jobs.len());
         let mut written_jobs_by_handle = HashMap::with_capacity(iteration.jobs.len());
@@ -169,8 +217,7 @@ impl PullDatasetUseCaseImpl {
         let ClassifyByAllowanceResponse {
             authorized_handles,
             unauthorized_handles_with_errors,
-        } = self
-            .dataset_action_authorizer
+        } = dataset_action_authorizer
             .classify_dataset_handles_by_allowance(written_datasets, DatasetAction::Write)
             .await?;
 
@@ -215,10 +262,10 @@ impl PullDatasetUseCaseImpl {
         ))
     }
 
-    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::read_authoirzations", skip_all, fields(?iteration))]
+    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::read_authorizations", skip_all, fields(?iteration))]
     async fn make_authorization_read_checks(
-        &self,
         iteration: PullPlanIteration,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
         let mut read_datasets = Vec::new();
         let mut reading_jobs = Vec::with_capacity(iteration.jobs.len());
@@ -247,8 +294,7 @@ impl PullDatasetUseCaseImpl {
         let ClassifyByAllowanceResponse {
             authorized_handles: _,
             unauthorized_handles_with_errors,
-        } = self
-            .dataset_action_authorizer
+        } = dataset_action_authorizer
             .classify_dataset_handles_by_allowance(read_datasets, DatasetAction::Read)
             .await?;
 
@@ -537,10 +583,25 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?requests, ?options, "Performing pull");
 
-        let (plan, errors) = self
-            .pull_request_planner
-            .build_pull_multi_plan(&requests, &options, *self.tenancy_config)
-            .await;
+        let cloned_options = options.clone();
+        let (plan, errors) = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |pull_request_planner: Arc<dyn PullRequestPlanner>| async move {
+                    Ok::<
+                        (
+                            Vec<kamu_core::PullPlanIteration>,
+                            Vec<kamu_core::PullResponse>,
+                        ),
+                        InternalError,
+                    >(
+                        pull_request_planner
+                            .build_pull_multi_plan(&requests, &cloned_options, *self.tenancy_config)
+                            .await,
+                    )
+                },
+            )
+            .await
+            .unwrap();
 
         tracing::info!(
             num_steps = plan.len(),
@@ -567,9 +628,15 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?options, "Performing pull (all owned)");
 
-        let (plan, errors) = self
-            .pull_request_planner
-            .build_pull_plan_all_owner_datasets(&options, *self.tenancy_config)
+        let cloned_options = options.clone();
+        let (plan, errors) = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |pull_request_planner: Arc<dyn PullRequestPlanner>| async move {
+                    pull_request_planner
+                        .build_pull_plan_all_owner_datasets(&cloned_options, *self.tenancy_config)
+                        .await
+                },
+            )
             .await?;
 
         tracing::info!(

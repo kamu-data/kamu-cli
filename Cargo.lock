@@ -6587,6 +6587,7 @@ dependencies = [
  "curl",
  "curl-sys",
  "dashmap",
+ "database-common",
  "datafusion",
  "datafusion-ethers",
  "datafusion-functions-json",
