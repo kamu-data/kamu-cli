@@ -611,11 +611,19 @@ where
 
 pub struct SearchKeyBlocksVisitor {
     key_blocks: Vec<HashedMetadataBlock>,
+    key_event_flags: Flag,
 }
 
 impl SearchKeyBlocksVisitor {
     pub fn new() -> Self {
-        Self { key_blocks: vec![] }
+        Self {
+            key_blocks: vec![],
+            key_event_flags: Flag::empty(),
+        }
+    }
+
+    pub fn key_event_flags(&self) -> Flag {
+        self.key_event_flags
     }
 
     pub fn into_hashed_key_blocks(self) -> Vec<HashedMetadataBlock> {
@@ -634,6 +642,7 @@ impl MetadataChainVisitor for SearchKeyBlocksVisitor {
         let flag = Flag::from(&block.event);
 
         if Flag::KEY_BLOCK.contains(flag) {
+            self.key_event_flags |= flag;
             self.key_blocks.push((hash.clone(), block.clone()));
         }
 
