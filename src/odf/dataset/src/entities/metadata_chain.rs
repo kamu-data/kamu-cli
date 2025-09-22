@@ -109,12 +109,20 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// Convenience function to iterate blocks starting with the `head`
     /// reference
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks(&self) -> DynMetadataStream<'_> {
         self.iter_blocks_interval_ref(&BlockRef::Head, None)
     }
 
     /// Convenience function to iterate blocks starting with the specified
     /// reference
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(head, None)
     }
@@ -125,6 +133,10 @@ pub trait MetadataChainExt: MetadataChain {
     /// encountered the iteration will continue until first block followed by an
     /// error. If `ignore_missing_tail` argument is provided, the exception
     /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks_interval<'a>(
         &'a self,
         head_hash: &'a Multihash,
@@ -156,6 +168,10 @@ pub trait MetadataChainExt: MetadataChain {
     /// encountered the iteration will continue until first block followed by an
     /// error. If `ignore_missing_tail` argument is provided, the exception
     /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks_interval_inclusive<'a>(
         &'a self,
         head_hash: &'a Multihash,
