@@ -282,6 +282,7 @@ pub trait MetadataChainExt: MetadataChain {
             AcceptByIntervalOptions {
                 inclusive_tail: false,
                 ignore_missing_tail: true,
+                ignore_hints_when_getting_preceding_block: false,
             },
         )
         .await
@@ -399,11 +400,23 @@ pub trait MetadataChainExt: MetadataChain {
                 break;
             }
 
-            // Try to jump to the previous block with satisfaction hints taken into account
-            current_hashed_block = self
-                .get_preceding_block_with_hint(block, tail_sequence_number, merged_decision)
-                .await
-                .map_err(IterBlocksError::from)?;
+            current_hashed_block = if options.ignore_hints_when_getting_preceding_block {
+                // Simply trying to get the previous block
+                if let Some(prev_block_hash) = &block.prev_block_hash {
+                    let prev_block = self
+                        .get_block(prev_block_hash)
+                        .await
+                        .map_err(IterBlocksError::from)?;
+                    Some((prev_block_hash.clone(), prev_block))
+                } else {
+                    None
+                }
+            } else {
+                // Try to jump to the previous block with satisfaction hints taken into account
+                self.get_preceding_block_with_hint(block, tail_sequence_number, merged_decision)
+                    .await
+                    .map_err(IterBlocksError::from)?
+            }
         }
 
         // Finish all visitors
@@ -568,6 +581,17 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 pub struct AcceptByIntervalOptions {
     pub inclusive_tail: bool,
     pub ignore_missing_tail: bool,
+    pub ignore_hints_when_getting_preceding_block: bool,
+}
+
+impl Default for AcceptByIntervalOptions {
+    fn default() -> Self {
+        Self {
+            inclusive_tail: false,
+            ignore_missing_tail: true,
+            ignore_hints_when_getting_preceding_block: false,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

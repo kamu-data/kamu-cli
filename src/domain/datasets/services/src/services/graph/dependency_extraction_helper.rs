@@ -92,7 +92,7 @@ pub(crate) async fn extract_modified_dependencies_in_interval(
             maybe_tail,
             AcceptByIntervalOptions {
                 inclusive_tail: true,
-                ignore_missing_tail: true,
+                ..Default::default()
             },
         )
         .await

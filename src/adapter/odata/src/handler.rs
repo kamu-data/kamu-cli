@@ -237,7 +237,7 @@ pub async fn odata_collection_handler_common(
             }
         })?;
 
-    let ctx = ODataCollectionContext::new(catalog, addr, resolved_dataset);
+    let ctx = ODataCollectionContext::new(&catalog, addr, resolved_dataset);
     let response = datafusion_odata::handlers::odata_collection_handler(
         Extension(Arc::new(ctx)),
         query,

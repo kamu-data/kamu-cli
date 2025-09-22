@@ -178,7 +178,7 @@ pub(crate) async fn get_transform_input_from_query_input(
     let input_chain = resolved_input.as_metadata_chain();
 
     // Find schema
-    // TODO: Make single-pass via multi-visitor
+    // TODO: PERF: Make single-pass via multi-visitor
     use odf::dataset::MetadataChainExt;
     let schema = resolved_input
         .as_metadata_chain()
