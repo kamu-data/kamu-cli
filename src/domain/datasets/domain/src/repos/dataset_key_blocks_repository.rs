@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use odf::{BlockRef, DatasetID};
 use thiserror::Error;
 
 use crate::{DatasetKeyBlock, MetadataEventType};
@@ -19,34 +18,34 @@ use crate::{DatasetKeyBlock, MetadataEventType};
 pub trait DatasetKeyBlockRepository: Send + Sync {
     async fn has_blocks(
         &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
     ) -> Result<bool, InternalError>;
 
     async fn get_all_key_blocks(
         &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
     async fn match_datasets_having_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
-        block_ref: &BlockRef,
+        block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<(DatasetID, DatasetKeyBlock)>, InternalError>;
+    ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError>;
 
     async fn save_blocks_batch(
         &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
         blocks: &[DatasetKeyBlock],
     ) -> Result<(), DatasetKeyBlockSaveError>;
 
     async fn delete_all_for_ref(
         &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
     ) -> Result<(), InternalError>;
 }
 
