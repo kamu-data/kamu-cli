@@ -480,31 +480,35 @@ async fn test_multiple_metadata_block() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "metadataProjection": [{
-                            "__typename": "MetadataBlockExtended",
-                            "event": {
-                                "__typename": "Seed",
-                                "datasetId": create_result.dataset_handle.id.to_string(),
-                            }
-                        }, {
-                            "__typename": "MetadataBlockExtended",
-                            "event": {
-                                "__typename": "AddPushSource",
-                                "sourceName": "source2",
-                                "read": {
-                                    "__typename": "ReadStepNdJson",
+                        "metadataProjection": [
+                            {
+                                "__typename": "MetadataBlockExtended",
+                                "event": {
+                                    "__typename": "Seed",
+                                    "datasetId": create_result.dataset_handle.id.to_string(),
+                                }
+                            },
+                            {
+                                "__typename": "MetadataBlockExtended",
+                                "event": {
+                                    "__typename": "AddPushSource",
+                                    "sourceName": "source1",
+                                    "read": {
+                                        "__typename": "ReadStepCsv",
+                                    }
+                                }
+                            },
+                            {
+                                "__typename": "MetadataBlockExtended",
+                                "event": {
+                                    "__typename": "AddPushSource",
+                                    "sourceName": "source2",
+                                    "read": {
+                                        "__typename": "ReadStepNdJson",
+                                    }
                                 }
                             }
-                         }, {
-                            "__typename": "MetadataBlockExtended",
-                            "event": {
-                                "__typename": "AddPushSource",
-                                "sourceName": "source1",
-                                "read": {
-                                    "__typename": "ReadStepCsv",
-                                }
-                            }
-                        }]
+                        ]
                     }
                 }
             }
