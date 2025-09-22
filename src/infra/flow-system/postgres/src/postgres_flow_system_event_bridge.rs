@@ -16,8 +16,8 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     EventID,
     FlowSystemEvent,
+    FlowSystemEventBridge,
     FlowSystemEventSourceType,
-    FlowSystemEventStore,
     FlowSystemEventStoreWakeHint,
 };
 use sqlx::Postgres;
@@ -29,7 +29,7 @@ const NOTIFY_CHANNEL_NAME: &str = "flow_system_events_ready";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresFlowSystemEventStore {
+pub struct PostgresFlowSystemEventBridge {
     pool: Arc<sqlx::PgPool>,
     listener: tokio::sync::Mutex<Option<PgListener>>,
 }
@@ -37,8 +37,8 @@ pub struct PostgresFlowSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn FlowSystemEventStore)]
-impl PostgresFlowSystemEventStore {
+#[dill::interface(dyn FlowSystemEventBridge)]
+impl PostgresFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
         Self {
             pool,
@@ -129,7 +129,7 @@ impl PostgresFlowSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowSystemEventStore for PostgresFlowSystemEventStore {
+impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
     async fn wait_wake(
         &self,
         timeout: Duration,
