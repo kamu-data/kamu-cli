@@ -41,6 +41,7 @@ const KEY_COLUMN_ALIAS: &str = "__id__";
 
 pub(crate) struct ODataServiceContext {
     catalog: Catalog,
+    query_svc: Arc<dyn QueryService>,
     account_name: Option<odf::AccountName>,
     service_base_url: String,
 }
@@ -51,6 +52,7 @@ impl ODataServiceContext {
         let service_base_url = config.protocols.odata_base_url();
 
         Self {
+            query_svc: catalog.get_one().unwrap(),
             catalog,
             account_name,
             service_base_url,
@@ -86,7 +88,7 @@ impl ServiceContext for ODataServiceContext {
         {
             let resolved_dataset = registry.get_dataset_by_handle(&hdl).await;
             let context: Arc<dyn CollectionContext> = Arc::new(ODataCollectionContext {
-                catalog: self.catalog.clone(),
+                query_svc: self.query_svc.clone(),
                 addr: CollectionAddr {
                     name: hdl.alias.dataset_name.to_string(),
                     key: None,
@@ -109,7 +111,7 @@ impl ServiceContext for ODataServiceContext {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ODataCollectionContext {
-    catalog: Catalog,
+    query_svc: Arc<dyn QueryService>,
     addr: CollectionAddr,
     resolved_dataset: ResolvedDataset,
     service_base_url: String,
@@ -117,7 +119,7 @@ pub(crate) struct ODataCollectionContext {
 
 impl ODataCollectionContext {
     pub(crate) fn new(
-        catalog: Catalog,
+        catalog: &Catalog,
         addr: CollectionAddr,
         resolved_dataset: ResolvedDataset,
     ) -> Self {
@@ -125,7 +127,7 @@ impl ODataCollectionContext {
         let service_base_url = config.protocols.odata_base_url();
 
         Self {
-            catalog,
+            query_svc: catalog.get_one().unwrap(),
             addr,
             resolved_dataset,
             service_base_url,
@@ -176,33 +178,23 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     async fn schema(&self) -> Result<SchemaRef, ODataError> {
-        // TODO: Use QueryService after arrow schema is exposed
-        // See: https://github.com/kamu-data/kamu-cli/issues/306
-        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
-        use odf::metadata::EnumWithVariants;
+        let dataset_ref = self.resolved_dataset.get_handle().as_local_ref();
 
-        let set_data_schema = self
-            .resolved_dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<odf::metadata::SetDataSchema>())
-            .try_first()
+        let maybe_data_schema = self
+            .query_svc
+            .get_schema(&dataset_ref)
             .await
-            .map_err(|e| {
-                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
-                e
-            })
-            .int_err()
-            .unwrap();
+            .map_int_err(ODataError::internal)?;
 
-        if let Some(set_schema) = set_data_schema {
-            set_schema
-                .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
-                .map_err(ODataError::internal)
-                .map(Arc::new)
+        let arrow_schema = if let Some(data_schema) = maybe_data_schema {
+            data_schema
+                .to_arrow(&odf::metadata::ToArrowSettings::default())
+                .map_int_err(ODataError::internal)?
         } else {
-            Ok(Arc::new(Schema::empty()))
-        }
+            Schema::empty()
+        };
+
+        Ok(Arc::new(arrow_schema))
     }
 
     async fn query(&self, query: QueryParams) -> Result<DataFrame, ODataError> {
@@ -223,9 +215,8 @@ impl CollectionContext for ODataCollectionContext {
             .map(Into::into)
             .unwrap_or_default();
 
-        let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
-
-        let res = query_svc
+        let res = self
+            .query_svc
             .get_data(
                 &self.resolved_dataset.get_handle().as_local_ref(),
                 GetDataOptions::default(),
