@@ -74,17 +74,17 @@ impl InMemoryFlowSystemEventStore {
             after_event_id.into_inner()
         );
 
-        state.events.iter().skip(after_idx + 1).copied().collect()
+        state.events.iter().skip(after_idx + 1).cloned().collect()
     }
 
     pub(crate) fn save_events(
         &self,
         source_type: FlowSystemEventSourceType,
-        source_events: &[(EventID, DateTime<Utc>)],
+        source_events: &[(EventID, DateTime<Utc>, serde_json::Value)],
     ) {
         let mut state = self.state.lock().unwrap();
 
-        for (source_event_id, occurred_at) in source_events {
+        for (source_event_id, occurred_at, payload) in source_events {
             let event_id = state.events.len() + 1;
             let event = FlowSystemEvent {
                 event_id: EventID::new(i64::try_from(event_id).unwrap()),
@@ -92,6 +92,7 @@ impl InMemoryFlowSystemEventStore {
                 source_event_id: *source_event_id,
                 occurred_at: *occurred_at,
                 inserted_at: self.time_source.now(),
+                payload: payload.clone(),
             };
             state.events.push(event);
         }
@@ -171,7 +172,7 @@ impl FlowSystemEventStore for InMemoryFlowSystemEventStore {
             }
 
             if !applied.contains(&e.event_id) {
-                res.push(*e);
+                res.push(e.clone());
             }
             i += 1;
         }

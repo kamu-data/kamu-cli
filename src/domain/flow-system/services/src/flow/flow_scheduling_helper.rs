@@ -71,23 +71,10 @@ impl FlowSchedulingHelper {
                 "Scheduling late flow activations"
             );
 
-            // Make sure the latest success is accounted for
-            let maybe_flow_process_state = self
-                .query_adjusted_flow_process_state_after_recent_attempt(
-                    flow,
-                    flow_success_time,
-                    true,
-                )
-                .await?;
-            let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
-                .as_ref()
-                .and_then(FlowProcessState::last_attempt_at);
-
             // Schedule the next flow immediately
             self.trigger_flow_common(
                 flow_success_time,
                 &flow.flow_binding,
-                maybe_last_attempt_time,
                 None,
                 flow.late_activation_causes.clone(),
                 None,
@@ -96,42 +83,6 @@ impl FlowSchedulingHelper {
         }
 
         Ok(())
-    }
-
-    async fn query_adjusted_flow_process_state_after_recent_attempt(
-        &self,
-        flow: &Flow,
-        flow_finish_time: DateTime<Utc>,
-        flow_succeeded: bool,
-    ) -> Result<Option<FlowProcessState>, InternalError> {
-        // Query previous runs stats
-        let mut maybe_flow_process_state = self
-            .flow_process_state_query
-            .try_get_process_state(&flow.flow_binding)
-            .await?;
-
-        // Make sure the latest attempt is accounted for
-        if let Some(s) = maybe_flow_process_state.as_mut()
-            && s.last_attempt_at() < Some(flow_finish_time)
-        {
-            if flow_succeeded {
-                s.on_success(
-                    flow.last_stored_event_id().expect("Must be present"),
-                    flow_finish_time,
-                    flow_finish_time,
-                )
-                .int_err()?;
-            } else {
-                s.on_failure(
-                    flow.last_stored_event_id().expect("Must be present"),
-                    flow_finish_time,
-                    flow_finish_time,
-                )
-                .int_err()?;
-            }
-        }
-
-        Ok(maybe_flow_process_state)
     }
 
     pub(crate) async fn try_schedule_auto_polling_flow_continuation_if_enabled(
@@ -154,26 +105,10 @@ impl FlowSchedulingHelper {
                 "Scheduling flow continuation due to active schedule"
             );
 
-            // Make sure the latest success is accounted for
-            let maybe_flow_process_state = self
-                .query_adjusted_flow_process_state_after_recent_attempt(
-                    flow,
-                    flow_finish_time,
-                    flow.outcome
-                        .as_ref()
-                        .map(FlowOutcome::is_success)
-                        .unwrap_or(false),
-                )
-                .await?;
-            let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
-                .as_ref()
-                .and_then(FlowProcessState::last_attempt_at);
-
             // Schedule the next flow immediately
             self.trigger_flow_common(
                 flow_finish_time,
                 &flow.flow_binding,
-                maybe_last_attempt_time,
                 Some(FlowTriggerRule::Schedule(active_schedule.clone())),
                 vec![FlowActivationCause::AutoPolling(
                     FlowActivationCauseAutoPolling {
@@ -196,18 +131,9 @@ impl FlowSchedulingHelper {
     ) -> Result<FlowState, InternalError> {
         tracing::trace!(?flow_binding, ?schedule, "Enqueuing scheduled flow");
 
-        let maybe_flow_process_state = self
-            .flow_process_state_query
-            .try_get_process_state(flow_binding)
-            .await?;
-        let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
-            .as_ref()
-            .and_then(FlowProcessState::last_attempt_at);
-
         self.trigger_flow_common(
             start_time,
             flow_binding,
-            maybe_last_attempt_time,
             Some(FlowTriggerRule::Schedule(schedule.clone())),
             vec![FlowActivationCause::AutoPolling(
                 FlowActivationCauseAutoPolling {
@@ -223,7 +149,6 @@ impl FlowSchedulingHelper {
         &self,
         trigger_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
-        maybe_last_attempt_time: Option<DateTime<Utc>>,
         maybe_trigger_rule: Option<FlowTriggerRule>,
         activation_causes: Vec<FlowActivationCause>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
@@ -240,6 +165,15 @@ impl FlowSchedulingHelper {
             .as_ref()
             .unwrap()
             .activation_time();
+
+        // Query previous runs stats to determine last attempt time
+        let maybe_flow_process_state = self
+            .flow_process_state_query
+            .try_get_process_state(flow_binding)
+            .await?;
+        let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
+            .as_ref()
+            .and_then(FlowProcessState::last_attempt_at);
 
         let mut throttling_boundary_time = maybe_last_attempt_time.map_or(activation_time, |t| {
             t + self.agent_config.mandatory_throttling_period

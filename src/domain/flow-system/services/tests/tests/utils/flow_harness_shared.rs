@@ -59,7 +59,6 @@ pub(crate) struct FlowHarness {
     pub flow_agent: Arc<FlowAgentImpl>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
-    pub flow_process_state_indexer: Arc<FlowProcessStateIndexer>,
 }
 
 #[derive(Default)]
@@ -179,7 +178,6 @@ impl FlowHarness {
             flow_trigger_service: catalog.get_one().unwrap(),
             flow_trigger_event_store: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
-            flow_process_state_indexer: catalog.get_one().unwrap(),
 
             fake_system_time_source,
             catalog,
@@ -272,11 +270,6 @@ impl FlowHarness {
 
     pub async fn eager_initialization(&self) {
         use init_on_startup::InitOnStartup;
-
-        self.flow_process_state_indexer
-            .run_initialization()
-            .await
-            .unwrap();
 
         self.flow_agent.run_initialization().await.unwrap();
     }

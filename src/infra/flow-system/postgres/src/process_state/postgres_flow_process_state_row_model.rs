@@ -33,8 +33,7 @@ pub(crate) struct PostgresFlowProcessStateRowModel {
     pub next_planned_at: Option<DateTime<Utc>>,
     pub effective_state: FlowProcessEffectiveState,
     pub updated_at: DateTime<Utc>,
-    pub last_applied_trigger_event_id: i64,
-    pub last_applied_flow_event_id: i64,
+    pub last_applied_flow_system_event_id: i64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,8 +80,7 @@ impl TryFrom<PostgresFlowProcessStateRowModel> for FlowProcessState {
             row.next_planned_at,
             row.effective_state,
             row.updated_at,
-            EventID::new(row.last_applied_trigger_event_id),
-            EventID::new(row.last_applied_flow_event_id),
+            EventID::new(row.last_applied_flow_system_event_id),
         )
     }
 }

@@ -7970,6 +7970,8 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
+ "serde",
+ "serde_json",
  "strum 0.27.2",
  "test-group",
  "test-log",

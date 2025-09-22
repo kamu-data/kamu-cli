@@ -21,8 +21,7 @@ CREATE TABLE flow_process_states (
         CHECK (effective_state IN ('failing', 'stopped_auto', 'paused_manual', 'active')),
 
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT (CURRENT_TIMESTAMP),
-    last_applied_trigger_event_id INTEGER NOT NULL DEFAULT 0,
-    last_applied_flow_event_id    INTEGER NOT NULL DEFAULT 0,
+    last_applied_flow_system_event_id INTEGER NOT NULL DEFAULT 0,
 
     PRIMARY KEY (scope_data, flow_type)
 );
