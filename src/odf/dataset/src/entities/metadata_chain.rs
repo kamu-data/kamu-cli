@@ -360,9 +360,7 @@ pub trait MetadataChainExt: MetadataChain {
         };
 
         // Iterate over blocks until we satisfy all visitors or reach the tail
-        while let Some((hash, block)) = &current_hashed_block
-            && merged_decision != MetadataVisitorDecision::Stop
-        {
+        while let Some((hash, block)) = &current_hashed_block {
             if !options.inclusive_tail && tail_hash == Some(hash) {
                 break;
             }
