@@ -142,7 +142,20 @@ impl UpdateDatasetTaskRunner {
                 | PollingIngestError::TemplateError(_) => {
                     Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
                 }
-                _ => Ok(TaskOutcome::Failed(TaskError::empty_recoverable())),
+
+                PollingIngestError::CommitError(_)
+                | PollingIngestError::DataValidation(_)
+                | PollingIngestError::EngineError(_)
+                | PollingIngestError::EngineProvisioningError(_)
+                | PollingIngestError::ImagePull(_)
+                | PollingIngestError::Internal(_)
+                | PollingIngestError::MergeError(_)
+                | PollingIngestError::NotFound { .. }
+                | PollingIngestError::PipeError(_)
+                | PollingIngestError::ProcessError(_)
+                | PollingIngestError::Unreachable { .. } => {
+                    Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+                }
             },
         }
     }
@@ -179,7 +192,9 @@ impl UpdateDatasetTaskRunner {
                         return Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()));
                     }
 
-                    _ => return Ok(TaskOutcome::Failed(TaskError::empty_recoverable())),
+                    TransformElaborateError::Internal(_) => {
+                        return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
+                    }
                 }
             }
         }?;
@@ -217,7 +232,12 @@ impl UpdateDatasetTaskRunner {
                                 Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
                             }
 
-                            _ => Ok(TaskOutcome::Failed(TaskError::empty_recoverable())),
+                            TransformExecuteError::CommitError(_)
+                            | TransformExecuteError::EngineError(_)
+                            | TransformExecuteError::EngineProvisioningError(_)
+                            | TransformExecuteError::Internal(_) => {
+                                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+                            }
                         }
                     }
                 }

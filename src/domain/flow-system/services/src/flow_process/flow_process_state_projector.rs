@@ -104,11 +104,11 @@ impl FlowProcessStateProjector {
                 };
                 if last_task_in_flow {
                     // Now the flow is really finished, we can modify the projection
-                    let is_success = match e.task_outcome {
-                        TaskOutcome::Success(_) => true,
-                        TaskOutcome::Failed(_) => false,
-                        TaskOutcome::Cancelled => return Ok(()), // Ignore cancelled flows
-                    };
+                    let flow_outcome: FlowOutcome = e.task_outcome.clone().into();
+                    if matches!(flow_outcome, FlowOutcome::Aborted) {
+                        // Ignored, we don't track aborted flows in this projection
+                        return Ok(());
+                    }
 
                     // Update process state. Among other values, this computes the latest ones for
                     // "last_attempted_at" and "consecutive_failures"
@@ -116,14 +116,14 @@ impl FlowProcessStateProjector {
                         .apply_flow_result(
                             event_id,
                             flow_event.flow_binding(),
-                            is_success,
+                            &flow_outcome,
                             flow_event.event_time(),
                         )
                         .await
                         .int_err()?;
 
                     // In case of a failure, trigger should make a decision about auto-stopping
-                    if !is_success {
+                    if !flow_outcome.is_success() {
                         self.flow_trigger_service
                             .evaluate_trigger_on_failure(
                                 flow_event.event_time(),
@@ -140,7 +140,7 @@ impl FlowProcessStateProjector {
 
                     // In case of success:
                     //  - schedule next flow immediately, if we had any late activation cause
-                    if is_success {
+                    if flow_outcome.is_success() {
                         self.flow_scheduling_helper
                             .try_schedule_late_flow_activations(flow_event.event_time(), &flow)
                             .await?;

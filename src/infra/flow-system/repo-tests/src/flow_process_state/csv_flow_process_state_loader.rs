@@ -20,6 +20,7 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 use kamu_flow_system::*;
+use kamu_task_system::TaskResult;
 use kamu_webhooks::{WebhookEventTypeCatalog, WebhookSubscriptionID};
 use uuid::Uuid;
 
@@ -249,7 +250,12 @@ impl CsvFlowProcessStateLoader {
 
             // First apply the flow result
             self.flow_process_repository
-                .apply_flow_result(flow_event_id, flow_binding, success, event_time)
+                .apply_flow_result(
+                    flow_event_id,
+                    flow_binding,
+                    &FlowOutcome::Success(TaskResult::empty()),
+                    event_time,
+                )
                 .await
                 .expect("Failed to apply flow result");
 
