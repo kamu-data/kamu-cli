@@ -47,7 +47,7 @@ impl InMemoryFlowConfigurationEventStoreHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryFlowConfigurationEventStore>();
-        catalog_builder.add::<InMemoryFlowSystemEventStore>();
+        catalog_builder.add::<InMemoryFlowSystemEventBridge>();
         catalog_builder.add::<SystemTimeSourceDefault>();
 
         Self {

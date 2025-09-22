@@ -110,7 +110,7 @@ impl FlowHarness {
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
-            .add::<InMemoryFlowSystemEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
             .add::<InMemoryFlowProcessState>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()

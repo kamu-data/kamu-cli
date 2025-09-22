@@ -183,7 +183,7 @@ impl FlowControllerTransformHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerTransform>()
             .add::<InMemoryFlowEventStore>()
-            .add::<InMemoryFlowSystemEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
             .add_value(mock_dataset_increment_service)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
             .add_value(mock_flow_sensor_dispatcher)
