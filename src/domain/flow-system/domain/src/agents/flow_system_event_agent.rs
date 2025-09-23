@@ -10,11 +10,16 @@
 use std::time::Duration;
 
 use async_utils::BackgroundAgent;
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowSystemEventAgent: BackgroundAgent {}
+pub trait FlowSystemEventAgent: BackgroundAgent {
+    /// Handle any remaining events
+    /// Only use this for tests!
+    async fn catchup_remaining_events(&self) -> Result<(), InternalError>;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

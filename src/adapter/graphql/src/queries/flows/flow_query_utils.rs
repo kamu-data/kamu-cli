@@ -48,6 +48,7 @@ pub(crate) fn prepare_flows_filter_by_types(
                 .by_flow_types
                 .as_ref()
                 .map(|flow_types| {
+                    // TODO: empty list means "all_types"
                     flow_types
                         .iter()
                         .map(|flow_type| encode_dataset_flow_type(*flow_type).to_string())

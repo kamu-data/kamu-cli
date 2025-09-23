@@ -9,7 +9,6 @@
 
 use std::str::FromStr;
 
-use async_utils::BackgroundAgent;
 use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
@@ -86,48 +85,51 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             FlowTriggerStopPolicy::default(),
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 10ms, finish at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: start running at 10ms, finish at 20ms
-                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task0_handle = foo_task0_driver.run();
+            // Task 1: start running at 90ms, finish at 100ms
+            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(90),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task1_handle = foo_task1_driver.run();
 
-                // Task 1: start running at 90ms, finish at 100ms
-                let foo_task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task1_handle = foo_task1_driver.run();
-
-                let sim_handle = harness.advance_time(Duration::milliseconds(120));
-                tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            let sim_handle = harness.advance_time(Duration::milliseconds(150));
+            tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -248,7 +250,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
-                    event_time: Utc::now(),
+                    event_time: start_time,
                     flow_id,
                     flow_binding: foo_ingest_binding.clone(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
@@ -258,7 +260,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                 }
                 .into(),
                 FlowEventScheduledForActivation {
-                    event_time: Utc::now(),
+                    event_time: start_time,
                     flow_id,
                     flow_binding: foo_ingest_binding.clone(),
                     scheduled_for_activation_at: start_time + Duration::milliseconds(100),
@@ -269,35 +271,33 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
         .await
         .unwrap();
 
-    harness.eager_initialization().await;
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 110ms, finish at 120ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: start running at 110ms, finish at 120ms
-                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(110),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task0_handle = foo_task0_driver.run();
-
-                // Main simulation boundary - 130ms total
-                let sim_handle = harness.advance_time(Duration::milliseconds(130));
-                tokio::join!(foo_task0_handle, sim_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            // Main simulation boundary - 130ms total
+            let sim_handle = harness.advance_time(Duration::milliseconds(130));
+            tokio::join!(foo_task0_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -309,19 +309,23 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
               "foo" Ingest:
                 Flow ID = 0 Waiting AutoPolling Schedule(wakeup=100ms)
 
-            #1: +100ms:
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=100ms)
+
+            #2: +100ms:
               "foo" Ingest:
                 Flow ID = 0 Waiting AutoPolling Executor(task=0, since=100ms)
 
-            #2: +110ms:
+            #3: +110ms:
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
-            #3: +120ms:
+            #4: +120ms:
               "foo" Ingest:
                 Flow ID = 0 Finished Success
 
-            #4: +120ms:
+            #5: +120ms:
               "foo" Ingest:
                 Flow ID = 1 Waiting AutoPolling Schedule(wakeup=180ms)
                 Flow ID = 0 Finished Success
@@ -351,8 +355,6 @@ async fn test_cron_config() {
         })
         .await;
 
-    harness.eager_initialization().await;
-
     // Remember start time
     let _start_time = harness
         .now_datetime()
@@ -362,53 +364,57 @@ async fn test_cron_config() {
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 6s, finish at 7s
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::seconds(6),
+                finish_in_with: Some((
+                    Duration::seconds(1),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: start running at 6s, finish at 7s
-                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::seconds(6),
-                    finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false,
-                    }.into_logical_plan(),
-                });
-                let foo_task0_handle = foo_task0_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                // Wait 2 s
+                harness
+                    .advance_time_custom_alignment(Duration::seconds(1), Duration::seconds(2))
+                    .await;
 
-                // Main simulation script
-                let main_handle = async {
-                    // Wait 2 s
-                    harness.advance_time_custom_alignment(Duration::seconds(1), Duration::seconds(2)).await;
-
-                    // Enable CRON config (we are skipping moment 0s)
-                    harness
-                      .set_flow_trigger(
-                          harness.now_datetime(),
-                          ingest_dataset_binding(&foo_id),
-                          FlowTriggerRule::Schedule(Schedule::Cron(ScheduleCron {
+                // Enable CRON config (we are skipping moment 0s)
+                harness
+                    .set_flow_trigger(
+                        harness.now_datetime(),
+                        ingest_dataset_binding(&foo_id),
+                        FlowTriggerRule::Schedule(Schedule::Cron(ScheduleCron {
                             source_5component_cron_expression: String::from("<irrelevant>"),
                             cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
-                          })),
-                          FlowTriggerStopPolicy::default(),
-                        )
-                        .await;
+                        })),
+                        FlowTriggerStopPolicy::default(),
+                    )
+                    .await;
 
-                    // Main simulation boundary - 12s total: at 10s 2nd scheduling happens;
-                    harness.advance_time_custom_alignment(Duration::seconds(1), Duration::seconds(11)).await;
-                };
+                // Main simulation boundary - 12s total: at 10s 2nd scheduling happens;
+                harness
+                    .advance_time_custom_alignment(Duration::seconds(1), Duration::seconds(11))
+                    .await;
+            };
 
-                tokio::join!(foo_task0_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(foo_task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -479,90 +485,107 @@ async fn test_manual_trigger() {
             FlowTriggerStopPolicy::default(),
         )
         .await;
-    harness.eager_initialization().await;
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: "foo" start running at 10ms, finish at 20ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
+            // Task 1: "for" start running at 60ms, finish at 70ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-                // Task 1: "for" start running at 60ms, finish at 70ms
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(60),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
+            // Task 2: "bar" start running at 100ms, finish at 110ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(100),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: true,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-                // Task 2: "bar" start running at 100ms, finish at 110ms
-                let task2_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(2),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
-                    dataset_id: Some(bar_id.clone()),
-                    run_since_start: Duration::milliseconds(100),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: bar_id.clone(),
-                      fetch_uncacheable: true
-                    }.into_logical_plan(),
-                });
-                let task2_handle = task2_driver.run();
+            // Manual trigger for "foo" at 40ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(40),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "foo" at 40ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(40),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Manual trigger for "bar" at 80ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: bar_flow_binding,
+                run_since_start: Duration::milliseconds(80),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: Some(
+                    FlowConfigRuleIngest {
+                        fetch_uncacheable: true,
+                    }
+                    .into_flow_config(),
+                ),
+            });
+            let trigger1_handle = trigger1_driver.run();
 
-                // Manual trigger for "bar" at 80ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                  flow_binding: bar_flow_binding,
-                    run_since_start: Duration::milliseconds(80),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: Some(FlowConfigRuleIngest {
-                      fetch_uncacheable: true
-                    }.into_flow_config()),
-                });
-                let trigger1_handle = trigger1_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(180)).await;
+            };
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(180)).await;
-                };
-
-                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                trigger0_handle,
+                trigger1_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -699,88 +722,102 @@ async fn test_ingest_trigger_with_ingest_config() {
             FlowTriggerStopPolicy::default(),
         )
         .await;
-    harness.eager_initialization().await;
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: true,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: "foo" start running at 10ms, finish at 20ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: true
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
+            // Task 1: "for" start running at 60ms, finish at 70ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: true,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-                // Task 1: "for" start running at 60ms, finish at 70ms
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(60),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: true
-                    }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
+            // Task 2: "bar" start running at 100ms, finish at 110ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(100),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-                // Task 2: "bar" start running at 100ms, finish at 110ms
-                let task2_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(2),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
-                    dataset_id: Some(bar_id.clone()),
-                    run_since_start: Duration::milliseconds(100),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: bar_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task2_handle = task2_driver.run();
+            // Manual trigger for "foo" at 40ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(40),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "foo" at 40ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(40),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Manual trigger for "bar" at 80ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: bar_flow_binding,
+                run_since_start: Duration::milliseconds(80),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger1_handle = trigger1_driver.run();
 
-                // Manual trigger for "bar" at 80ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: bar_flow_binding,
-                    run_since_start: Duration::milliseconds(80),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger1_handle = trigger1_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(180)).await;
+            };
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(180)).await;
-                };
-
-                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                trigger0_handle,
+                trigger1_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -898,8 +935,6 @@ async fn test_manual_trigger_compaction() {
         })
         .await;
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
@@ -907,69 +942,79 @@ async fn test_manual_trigger_compaction() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                  // Task 0: "foo" start running at 10ms, finish at 20ms
-                  let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetHardCompact {
-                      dataset_id: foo_id.clone(),
-                      max_slice_size: None,
-                      max_slice_records: None,
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
-
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                  task_id: TaskID::new(1),
-                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                  dataset_id: Some(bar_id.clone()),
-                  run_since_start: Duration::milliseconds(60),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                  expected_logical_plan: LogicalPlanDatasetHardCompact {
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
-                  }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-                // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(10),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Manual trigger for "foo" at 10ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "bar" at 50ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: bar_flow_binding,
-                    run_since_start: Duration::milliseconds(50),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger1_handle = trigger1_driver.run();
+            // Manual trigger for "bar" at 50ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: bar_flow_binding,
+                run_since_start: Duration::milliseconds(50),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger1_handle = trigger1_driver.run();
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(100)).await;
-                };
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(100)).await;
+            };
 
-                tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                trigger0_handle,
+                trigger1_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1037,7 +1082,6 @@ async fn test_manual_trigger_reset() {
         })
         .await;
 
-    harness.eager_initialization().await;
     harness
         .set_dataset_flow_reset_rule(
             reset_dataset_binding(&foo_id),
@@ -1053,54 +1097,55 @@ async fn test_manual_trigger_reset() {
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 20ms, finish at 110ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((
+                    Duration::milliseconds(90),
+                    TaskOutcome::Success(
+                        TaskResultDatasetReset {
+                            reset_result: ResetResult {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetReset {
+                    dataset_id: foo_id.clone(),
+                    // By default, should reset to seed block
+                    new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                    old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                  // Task 0: "foo" start running at 20ms, finish at 110ms
-                  let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(20),
-                    finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
-                      TaskResultDatasetReset {
-                        reset_result: ResetResult {
-                          old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                          new_head: odf::Multihash::from_digest_sha3_256(b"new-slice")
-                        },
-                      }.into_task_result())
-                    )),
-                    expected_logical_plan: LogicalPlanDatasetReset {
-                      dataset_id: foo_id.clone(),
-                      // By default, should reset to seed block
-                      new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                      old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
+            // Manual trigger for "foo" at 10ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(10),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(250)).await;
+            };
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(250)).await;
-                };
-
-                tokio::join!(task0_handle, trigger0_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, trigger0_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1142,60 +1187,59 @@ async fn test_manual_trigger_reset_to_metadata() {
         })
         .await;
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 20ms, finish at 110ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((
+                    Duration::milliseconds(90),
+                    TaskOutcome::Success(
+                        TaskResultDatasetResetToMetadata {
+                            compaction_metadata_only_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                                new_num_blocks: 3,
+                                old_num_blocks: 7,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetResetToMetadata {
+                    dataset_id: foo_id.clone(),
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                  // Task 0: "foo" start running at 20ms, finish at 110ms
-                  let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(20),
-                    finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
-                      TaskResultDatasetResetToMetadata {
-                        compaction_metadata_only_result: CompactionResult::Success {
-                          old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
-                          new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                          new_num_blocks: 3,
-                          old_num_blocks: 7,
-                        },
-                      }.into_task_result())
-                    )),
-                    expected_logical_plan: LogicalPlanDatasetResetToMetadata {
-                      dataset_id: foo_id.clone(),
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
+            // Manual trigger for "foo" at 10ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(10),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(250)).await;
+            };
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(250)).await;
-                };
-
-                tokio::join!(task0_handle, trigger0_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, trigger0_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1314,8 +1358,6 @@ async fn test_reset_trigger_derivatives_reactively() {
 
     // Don't enable auto-updates on foo.qux
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = reset_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -1324,13 +1366,9 @@ async fn test_reset_trigger_derivatives_reactively() {
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
     test_flow_listener.define_dataset_display_name(foo_qux_id.clone(), "foo_qux".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(50),
@@ -1345,19 +1383,24 @@ async fn test_reset_trigger_derivatives_reactively() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(50),
-                finish_in_with: Some((Duration::milliseconds(40), TaskOutcome::Success(
-                  TaskResultDatasetReset {
-                    reset_result: ResetResult {
-                      old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice")
-                    }
-                  }.into_task_result()
-                ))),
+                finish_in_with: Some((
+                    Duration::milliseconds(40),
+                    TaskOutcome::Success(
+                        TaskResultDatasetReset {
+                            reset_result: ResetResult {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
                 expected_logical_plan: LogicalPlanDatasetReset {
-                  dataset_id: foo_id.clone(),
-                  new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                  old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                    old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -1367,22 +1410,24 @@ async fn test_reset_trigger_derivatives_reactively() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_bar_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                finish_in_with: Some(
-                  (
+                finish_in_with: Some((
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
-                      compaction_metadata_only_result: CompactionResult::Success {
-                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
-                        old_num_blocks: 5,
-                        new_num_blocks: 4,
-                      }
-                    }.into_task_result()
-                  )
+                    TaskOutcome::Success(
+                        TaskResultDatasetResetToMetadata {
+                            compaction_metadata_only_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
+                                old_num_blocks: 5,
+                                new_num_blocks: 4,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetResetToMetadata {
-                  dataset_id: foo_bar_id.clone(),
-                }.into_logical_plan(),
+                    dataset_id: foo_bar_id.clone(),
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -1391,10 +1436,10 @@ async fn test_reset_trigger_derivatives_reactively() {
                 harness.advance_time(Duration::milliseconds(400)).await;
             };
 
-            tokio::join!(trigger0_handle, task0_handle, task1_handle, main_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(trigger0_handle, task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1462,7 +1507,6 @@ async fn test_manual_trigger_compaction_with_config() {
         })
         .await;
 
-    harness.eager_initialization().await;
     harness
         .set_dataset_flow_compaction_rule(
             compaction_dataset_binding(&foo_id),
@@ -1475,45 +1519,45 @@ async fn test_manual_trigger_compaction_with_config() {
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 30ms, finish at 40ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_id.clone(),
+                    max_slice_size: Some(max_slice_size),
+                    max_slice_records: Some(max_slice_records),
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: "foo" start running at 30ms, finish at 40ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(30),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetHardCompact {
-                      dataset_id: foo_id.clone(),
-                      max_slice_size: Some(max_slice_size),
-                      max_slice_records: Some(max_slice_records),
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(20),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(80)).await;
+            };
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(80)).await;
-                };
-
-                tokio::join!(task0_handle, trigger0_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, trigger0_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1632,8 +1676,6 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
 
     // Don't enable auto-updates on foo.qux
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -1642,13 +1684,9 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
     test_flow_listener.define_dataset_display_name(foo_qux_id.clone(), "foo_qux".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(50),
@@ -1663,24 +1701,26 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(50),
-                finish_in_with: Some(
-                  (
+                finish_in_with: Some((
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResultDatasetHardCompact {
-                      compaction_result: CompactionResult::Success {
-                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        old_num_blocks: 5,
-                        new_num_blocks: 4,
-                      }
-                    }.into_task_result())
-                  )
-                ),
+                    TaskOutcome::Success(
+                        TaskResultDatasetHardCompact {
+                            compaction_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                                old_num_blocks: 5,
+                                new_num_blocks: 4,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
                 expected_logical_plan: LogicalPlanDatasetHardCompact {
-                  dataset_id: foo_id.clone(),
-                  max_slice_size: Some(max_slice_size),
-                  max_slice_records: Some(max_slice_records),
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    max_slice_size: Some(max_slice_size),
+                    max_slice_records: Some(max_slice_records),
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -1690,22 +1730,24 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_bar_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                finish_in_with: Some(
-                  (
+                finish_in_with: Some((
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
-                      compaction_metadata_only_result: CompactionResult::Success {
-                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
-                        old_num_blocks: 8,
-                        new_num_blocks: 3,
-                      }
-                    }.into_task_result()
-                  )
+                    TaskOutcome::Success(
+                        TaskResultDatasetResetToMetadata {
+                            compaction_metadata_only_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
+                                old_num_blocks: 8,
+                                new_num_blocks: 3,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetResetToMetadata {
-                  dataset_id: foo_bar_id.clone(),
-                }.into_logical_plan(),
+                    dataset_id: foo_bar_id.clone(),
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -1714,10 +1756,10 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
                 harness.advance_time(Duration::milliseconds(200)).await;
             };
 
-            tokio::join!(trigger0_handle, task0_handle, task1_handle, main_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(trigger0_handle, task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1837,8 +1879,6 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -1847,13 +1887,9 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
     test_flow_listener
         .define_dataset_display_name(foo_bar_baz_id.clone(), "foo_bar_baz".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(50),
@@ -1868,22 +1904,24 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(50),
-                finish_in_with: Some(
-                  (
+                finish_in_with: Some((
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
-                      compaction_metadata_only_result: CompactionResult::Success {
-                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        old_num_blocks: 5,
-                        new_num_blocks: 4,
-                      }
-                    }.into_task_result())
-                  )
-                ),
+                    TaskOutcome::Success(
+                        TaskResultDatasetResetToMetadata {
+                            compaction_metadata_only_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                                old_num_blocks: 5,
+                                new_num_blocks: 4,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
                 expected_logical_plan: LogicalPlanDatasetResetToMetadata {
-                  dataset_id: foo_id.clone(),
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -1893,22 +1931,24 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_bar_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                finish_in_with: Some(
-                  (
+                finish_in_with: Some((
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
-                      compaction_metadata_only_result: CompactionResult::Success {
-                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
-                        old_num_blocks: 5,
-                        new_num_blocks: 4,
-                      }
-                    }.into_task_result()
-                  )
+                    TaskOutcome::Success(
+                        TaskResultDatasetResetToMetadata {
+                            compaction_metadata_only_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
+                                old_num_blocks: 5,
+                                new_num_blocks: 4,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetResetToMetadata {
-                  dataset_id: foo_bar_id.clone(),
-                }.into_logical_plan(),
+                    dataset_id: foo_bar_id.clone(),
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -1918,22 +1958,24 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(foo_bar_baz_id.clone()),
                 run_since_start: Duration::milliseconds(200),
-                finish_in_with: Some(
-                  (
+                finish_in_with: Some((
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
-                      compaction_metadata_only_result: CompactionResult::Success {
-                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
-                        old_num_blocks: 8,
-                        new_num_blocks: 3,
-                      }
-                    }.into_task_result()
-                  )
+                    TaskOutcome::Success(
+                        TaskResultDatasetResetToMetadata {
+                            compaction_metadata_only_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
+                                old_num_blocks: 8,
+                                new_num_blocks: 3,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetResetToMetadata {
-                  dataset_id: foo_bar_baz_id.clone(),
-                }.into_logical_plan(),
+                    dataset_id: foo_bar_baz_id.clone(),
+                }
+                .into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -1942,10 +1984,16 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                 harness.advance_time(Duration::milliseconds(300)).await;
             };
 
-            tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                trigger0_handle,
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -2062,8 +2110,6 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -2072,13 +2118,9 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
     test_flow_listener
         .define_dataset_display_name(foo_bar_baz_id.clone(), "foo_bar_baz".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
@@ -2093,22 +2135,24 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some(
-                  (
+                finish_in_with: Some((
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResultDatasetResetToMetadata {
-                      compaction_metadata_only_result: CompactionResult::Success {
-                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        old_num_blocks: 5,
-                        new_num_blocks: 4,
-                      }
-                    }.into_task_result())
-                  )
-                ),
+                    TaskOutcome::Success(
+                        TaskResultDatasetResetToMetadata {
+                            compaction_metadata_only_result: CompactionResult::Success {
+                                old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                                old_num_blocks: 5,
+                                new_num_blocks: 4,
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
                 expected_logical_plan: LogicalPlanDatasetResetToMetadata {
-                  dataset_id: foo_id.clone(),
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2117,10 +2161,10 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
                 harness.advance_time(Duration::milliseconds(150)).await;
             };
 
-            tokio::join!(trigger0_handle, task0_handle, main_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(trigger0_handle, task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -2186,8 +2230,6 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
@@ -2198,24 +2240,24 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2225,43 +2267,63 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
             // Main simulation script
             let main_handle = async {
-                // 50ms: Pause both flow triggers in between completion 2 first tasks and queuing
+                // 50ms: Pause both flow triggers in between completion 2 first tasks and
+                // queuing
                 harness.advance_time(Duration::milliseconds(50)).await;
-                harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&foo_id)).await;
-                harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&bar_id)).await;
-
-                // 80ms: Wake up after initially planned "foo" scheduling but before planned "bar" scheduling
-                harness.advance_time(Duration::milliseconds(30)).await;
-                harness.resume_flow(start_time + Duration::milliseconds(80), &ingest_dataset_binding(&foo_id)).await;
-                harness.set_flow_trigger(
-                  start_time + Duration::milliseconds(80),
-                  ingest_dataset_binding(&bar_id),
-                  FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
-                  FlowTriggerStopPolicy::default(),
-                ).await;
-                test_flow_listener
-                    .make_a_snapshot(start_time + Duration::milliseconds(80))
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(50),
+                        &ingest_dataset_binding(&foo_id),
+                    )
                     .await;
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(50),
+                        &ingest_dataset_binding(&bar_id),
+                    )
+                    .await;
+
+                // 80ms: Wake up after initially planned "foo" scheduling but before planned
+                // "bar" scheduling
+                harness.advance_time(Duration::milliseconds(30)).await;
+                harness
+                    .resume_flow(
+                        start_time + Duration::milliseconds(80),
+                        &ingest_dataset_binding(&foo_id),
+                    )
+                    .await;
+                harness
+                    .set_flow_trigger(
+                        start_time + Duration::milliseconds(80),
+                        ingest_dataset_binding(&bar_id),
+                        FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
+                        FlowTriggerStopPolicy::default(),
+                    )
+                    .await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(80));
 
                 // 120ms: finish
                 harness.advance_time(Duration::milliseconds(40)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, main_handle)
-
-         } => Ok(()),
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -2428,7 +2490,6 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -2441,66 +2502,88 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
-
-      // Run simulation script and task drivers
-      _ = async {
-          // Task 0: "foo" start running at 10ms, finish at 20ms
-          let task0_driver = harness.task_driver(TaskDriverArgs {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task0_handle = task0_driver.run();
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-          // Task 1: "bar" start running at 20ms, finish at 30ms
-          let task1_driver = harness.task_driver(TaskDriverArgs {
+            // Task 1: "bar" start running at 20ms, finish at 30ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task1_handle = task1_driver.run();
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-          // Main simulation script
-          let main_handle = async {
-              // 50ms: Pause flow config before next flow runs
-              harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&foo_id)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&bar_id)).await;
+            // Main simulation script
+            let main_handle = async {
+                // 50ms: Pause flow config before next flow runs
+                harness.advance_time(Duration::milliseconds(50)).await;
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(50),
+                        &ingest_dataset_binding(&foo_id),
+                    )
+                    .await;
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(50),
+                        &ingest_dataset_binding(&bar_id),
+                    )
+                    .await;
 
-              // 100ms: Wake up after initially planned "bar" scheduling but before planned "foo" scheduling
-              harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), &ingest_dataset_binding(&foo_id)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), &ingest_dataset_binding(&bar_id)).await;
+                // 100ms: Wake up after initially planned "bar" scheduling but before planned
+                // "foo" scheduling
+                harness.advance_time(Duration::milliseconds(50)).await;
+                harness
+                    .resume_flow(
+                        start_time + Duration::milliseconds(100),
+                        &ingest_dataset_binding(&foo_id),
+                    )
+                    .await;
+                harness
+                    .resume_flow(
+                        start_time + Duration::milliseconds(100),
+                        &ingest_dataset_binding(&bar_id),
+                    )
+                    .await;
 
-              test_flow_listener
-                  .make_a_snapshot(start_time + Duration::milliseconds(100))
-                  .await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(100));
 
-              // 150ms: finish
-              harness.advance_time(Duration::milliseconds(50)).await;
-          };
+                // 150ms: finish
+                harness.advance_time(Duration::milliseconds(50)).await;
+            };
 
-          tokio::join!(task0_handle, task1_handle, main_handle)
-
-       } => Ok(()),
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -2666,30 +2749,28 @@ async fn test_dataset_deleted() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false,
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2699,11 +2780,15 @@ async fn test_dataset_deleted() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -2720,10 +2805,10 @@ async fn test_dataset_deleted() {
                 harness.advance_time(Duration::milliseconds(20)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, main_handle)
-         } => Ok(()),
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -2850,7 +2935,6 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     }
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -2858,24 +2942,24 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2885,11 +2969,15 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -2901,9 +2989,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 run_since_start: Duration::milliseconds(30),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Cancelled)),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: baz_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: baz_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -2914,17 +3003,21 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             });
             let abort0_handle = abort0_driver.run();
 
-
             // Main simulation script
             let main_handle = async {
                 harness.advance_time(Duration::milliseconds(80)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, task2_handle, abort0_handle, main_handle)
-
-         } => Ok(()),
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                abort0_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -3083,31 +3176,30 @@ async fn test_derived_dataset_triggered_after_input_change() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -3119,20 +3211,22 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
                 finish_in_with: Some((
-                  Duration::milliseconds(10),
-                  TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                      },
-                    }.into_task_result()
-                  )
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -3142,25 +3236,27 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
-
 
             // Main simulation script
             let main_handle = async {
                 harness.advance_time(Duration::milliseconds(220)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, task2_handle, main_handle)
-
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, task2_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -3326,31 +3422,30 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -3360,11 +3455,15 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(30),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -3376,20 +3475,22 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
                 finish_in_with: Some((
-                  Duration::milliseconds(10),
-                  TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                      },
-                    }.into_task_result()
-                  )
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -3399,25 +3500,33 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task3_handle = task3_driver.run();
-
 
             // Main simulation script
             let main_handle = async {
                 harness.advance_time(Duration::milliseconds(220)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, main_handle)
-
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                task3_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -3567,7 +3676,6 @@ async fn test_throttling_manual_triggers() {
     let foo_flow_binding = ingest_dataset_binding(&foo_id);
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -3579,67 +3687,71 @@ async fn test_throttling_manual_triggers() {
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding.clone(),
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-      // Run simulation script and task drivers
-      _ = async {
-        // Manual trigger for "foo" at 20ms
-        let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-            flow_binding: foo_flow_binding.clone(),
-            run_since_start: Duration::milliseconds(20),
-            initiator_id: None,
-            maybe_forced_flow_config_rule: None,
-        });
-        let trigger0_handle = trigger0_driver.run();
+            // Manual trigger for "foo" at 30ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding.clone(),
+                run_since_start: Duration::milliseconds(30),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger1_handle = trigger1_driver.run();
 
-        // Manual trigger for "foo" at 30ms
-        let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-            flow_binding: foo_flow_binding.clone(),
-            run_since_start: Duration::milliseconds(30),
-            initiator_id: None,
-            maybe_forced_flow_config_rule: None,
-        });
-        let trigger1_handle = trigger1_driver.run();
+            // Manual trigger for "foo" at 70ms
+            let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(70),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger2_handle = trigger2_driver.run();
 
-        // Manual trigger for "foo" at 70ms
-        let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-          flow_binding: foo_flow_binding,
-          run_since_start: Duration::milliseconds(70),
-          initiator_id: None,
-          maybe_forced_flow_config_rule: None,
-        });
-        let trigger2_handle = trigger2_driver.run();
+            // Task 0: "foo" start running at 40ms, finish at 50ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(40),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Task 0: "foo" start running at 40ms, finish at 50ms
-        let task0_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(0),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(40),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task0_handle = task0_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(100)).await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(100));
+                harness.advance_time(Duration::milliseconds(70)).await;
+            };
 
-        // Main simulation script
-        let main_handle = async {
-          harness.advance_time(Duration::milliseconds(100)).await;
-          test_flow_listener
-              .make_a_snapshot(start_time + Duration::milliseconds(100))
-              .await;
-          harness.advance_time(Duration::milliseconds(70)).await;
-        };
-
-        tokio::join!(trigger0_handle, trigger1_handle, trigger2_handle, task0_handle, main_handle)
-      } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                trigger0_handle,
+                trigger1_handle,
+                trigger2_handle,
+                task0_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -3762,7 +3874,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -3770,146 +3881,174 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-      // Run simulation script and task drivers
-      _ = async {
-        // Task 0: "foo" start running at 10ms, finish at 20ms
-        let task0_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(0),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task0_handle = task0_driver.run();
+            // Task 1: "bar" start running at 40, finish at 50ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(40),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-        // Task 1: "bar" start running at 40, finish at 50ms
-        let task1_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(1),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(40),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task1_handle = task1_driver.run();
+            // Task 2: "baz" start running at 60ms, finish at 80ms (simulate longer run)
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(baz_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: baz_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-        // Task 2: "baz" start running at 60ms, finish at 80ms (simulate longer run)
-        let task2_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(2),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-            dataset_id: Some(baz_id.clone()),
-            run_since_start: Duration::milliseconds(60),
-            finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: baz_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task2_handle = task2_driver.run();
+            // Task 3: "foo" start running at 130ms, finish at 140ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(130),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task3_handle = task3_driver.run();
 
-        // Task 3: "foo" start running at 130ms, finish at 140ms
-        let task3_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(3),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(130),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                      old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                      new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task3_handle = task3_driver.run();
+            // Task 4: "baz" start running at 220ms, finish at 230ms
+            let task4_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(4),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
+                dataset_id: Some(baz_id.clone()),
+                run_since_start: Duration::milliseconds(220),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: baz_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task4_handle = task4_driver.run();
 
-        // Task 4: "baz" start running at 220ms, finish at 230ms
-        let task4_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(4),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
-            dataset_id: Some(baz_id.clone()),
-            run_since_start: Duration::milliseconds(220),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: baz_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task4_handle = task4_driver.run();
+            // Task 5: "bar" start running at 250ms, finish at 260ms
+            let task5_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(5),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(250),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task5_handle = task5_driver.run();
 
-        // Task 5: "bar" start running at 250ms, finish at 260ms
-        let task5_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(5),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(250),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task5_handle = task5_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(500)).await;
+            };
 
-        // Main simulation script
-        let main_handle = async {
-          harness.advance_time(Duration::milliseconds(500)).await;
-        };
-
-        tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, task5_handle, main_handle)
-      } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                task3_handle,
+                task4_handle,
+                task5_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -4347,173 +4486,200 @@ async fn test_batching_condition_records_reached() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-      // Run simulation script and task drivers
-      _ = async {
-        // Task 0: "foo" start running at 10ms, finish at 20ms
-        let task0_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(0),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task0_handle = task0_driver.run();
+            // Task 1: "foo" start running at 80ms, finish at 90ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(80),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-        // Task 1: "foo" start running at 80ms, finish at 90ms
-        let task1_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(1),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(80),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task1_handle = task1_driver.run();
+            // Task 2: "bar" start running at 100ms, finish at 110ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(100),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-        // Task 2: "bar" start running at 100ms, finish at 110ms
-        let task2_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(2),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(100),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task2_handle = task2_driver.run();
+            // Task 3: "foo" start running at 150ms, finish at 160ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(150),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice-2",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task3_handle = task3_driver.run();
 
-        // Task 3: "foo" start running at 150ms, finish at 160ms
-        let task3_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(3),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(150),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task3_handle = task3_driver.run();
+            // Task 4: "foo" start running at 210ms, finish at 220ms
+            let task4_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(4),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(210),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice-2",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task4_handle = task4_driver.run();
 
-        // Task 4: "foo" start running at 210ms, finish at 220ms
-        let task4_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(4),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(210),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task4_handle = task4_driver.run();
+            // Task 5: "bar" start running at 230ms, finish at 240ms
+            let task5_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(5),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(230),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task5_handle = task5_driver.run();
 
-        // Task 5: "bar" start running at 230ms, finish at 240ms
-        let task5_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(5),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(230),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task5_handle = task5_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(260)).await;
+            };
 
-        // Main simulation script
-        let main_handle = async {
-          harness.advance_time(Duration::milliseconds(260)).await;
-        };
-
-        tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, task5_handle, main_handle)
-      } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                task3_handle,
+                task4_handle,
+                task5_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -4838,103 +5004,110 @@ async fn test_batching_condition_timeout() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-      // Run simulation script and task drivers
-      _ = async {
-        // Task 0: "foo" start running at 10ms, finish at 20ms
-        let task0_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(0),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task0_handle = task0_driver.run();
+            // Task 1: "foo" start running at 80ms, finish at 90ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(80),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-        // Task 1: "foo" start running at 80ms, finish at 90ms
-        let task1_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(1),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(80),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task1_handle = task1_driver.run();
+            // Task 2 is scheduled, but never runs
 
-        // Task 2 is scheduled, but never runs
+            // Task 3: "bar" start running at 180, finish at 190ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(180),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task3_handle = task3_driver.run();
 
-        // Task 3: "bar" start running at 180, finish at 190ms
-        let task3_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(3),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(180),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task3_handle = task3_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(250)).await;
+            };
 
-        // Main simulation script
-        let main_handle = async {
-          harness.advance_time(Duration::milliseconds(250)).await;
-        };
-
-        tokio::join!(task0_handle, task1_handle, task3_handle, main_handle)
-      } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, task3_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -5132,103 +5305,110 @@ async fn test_batching_condition_watermark() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-      // Run simulation script and task drivers
-      _ = async {
-        // Task 0: "foo" start running at 10ms, finish at 20ms
-        let task0_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(0),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task0_handle = task0_driver.run();
+            // Task 1: "foo" start running at 70ms, finish at 80ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(70),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-        // Task 1: "foo" start running at 70ms, finish at 80ms
-        let task1_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(1),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(70),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task1_handle = task1_driver.run();
+            // Task 2 is scheduled, but never runs
 
-        // Task 2 is scheduled, but never runs
+            // Task 3: "bar" start running at 230ms, finish at 240ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(230),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task3_handle = task3_driver.run();
 
-        // Task 3: "bar" start running at 230ms, finish at 240ms
-        let task3_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(3),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(230),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task3_handle = task3_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(300)).await;
+            };
 
-        // Main simulation script
-        let main_handle = async {
-          harness.advance_time(Duration::milliseconds(300)).await;
-        };
-
-        tokio::join!(task0_handle, task1_handle, task3_handle, main_handle)
-      } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, task3_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -5478,7 +5658,6 @@ async fn test_batching_condition_with_2_inputs() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -5486,166 +5665,194 @@ async fn test_batching_condition_with_2_inputs() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-      // Run simulation script and task drivers
-      _ = async {
-        // Task 0: "foo" start running at 10ms, finish at 20ms
-        let task0_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(0),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task0_handle = task0_driver.run();
+            // Task 1: "bar" start running at 20ms, finish at 30ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-        // Task 1: "bar" start running at 20ms, finish at 30ms
-        let task1_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(1),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(20),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task1_handle = task1_driver.run();
+            // Task 2: "foo" start running at 110ms, finish at 120ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-        // Task 2: "foo" start running at 110ms, finish at 120ms
-        let task2_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(2),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(110),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                  }
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task2_handle = task2_driver.run();
+            // Task 3: "bar" start running at 160ms, finish at 170ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(160),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task3_handle = task3_driver.run();
 
-        // Task 3: "bar" start running at 160ms, finish at 170ms
-        let task3_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(3),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
-            dataset_id: Some(bar_id.clone()),
-            run_since_start: Duration::milliseconds(160),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: bar_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task3_handle = task3_driver.run();
+            // Task 4: "foo" start running at 210ms, finish at 220ms
+            let task4_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(4),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(210),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task4_handle = task4_driver.run();
 
-        // Task 4: "foo" start running at 210ms, finish at 220ms
-        let task4_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(4),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(210),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task4_handle = task4_driver.run();
+            // Task 5: "baz" start running at 230ms, finish at 240ms
+            let task5_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(5),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(baz_id.clone()),
+                run_since_start: Duration::milliseconds(230),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"baz-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: baz_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task5_handle = task5_driver.run();
 
-        // Task 5: "baz" start running at 230ms, finish at 240ms
-        let task5_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(5),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-            dataset_id: Some(baz_id.clone()),
-            run_since_start: Duration::milliseconds(230),
-            finish_in_with: Some((
-              Duration::milliseconds(10),
-              TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
-                  },
-                }.into_task_result()
-              )
-            )),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: baz_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
-        let task5_handle = task5_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(400)).await;
+            };
 
-        // Main simulation script
-        let main_handle = async {
-          harness.advance_time(Duration::milliseconds(400)).await;
-        };
-
-        tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, task5_handle, main_handle)
-      } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                task3_handle,
+                task4_handle,
+                task5_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -5966,8 +6173,6 @@ async fn test_list_all_flow_initiators() {
         })
         .await;
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
@@ -5975,69 +6180,79 @@ async fn test_list_all_flow_initiators() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                  // Task 0: "foo" start running at 10ms, finish at 20ms
-                  let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetHardCompact {
-                      dataset_id: foo_id.clone(),
-                      max_slice_size: None,
-                      max_slice_records: None,
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
-
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                  task_id: TaskID::new(1),
-                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                  dataset_id: Some(bar_id.clone()),
-                  run_since_start: Duration::milliseconds(60),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                  expected_logical_plan: LogicalPlanDatasetHardCompact {
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
-                  }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-                // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(10),
-                    initiator_id: Some(foo_account_id.clone()),
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Manual trigger for "foo" at 10ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: Some(foo_account_id.clone()),
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "bar" at 50ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: bar_flow_binding,
-                    run_since_start: Duration::milliseconds(50),
-                    initiator_id: Some(bar_account_id.clone()),
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger1_handle = trigger1_driver.run();
+            // Manual trigger for "bar" at 50ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: bar_flow_binding,
+                run_since_start: Duration::milliseconds(50),
+                initiator_id: Some(bar_account_id.clone()),
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger1_handle = trigger1_driver.run();
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(100)).await;
-                };
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(100)).await;
+            };
 
-                tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                trigger0_handle,
+                trigger1_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     let foo_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -6103,8 +6318,6 @@ async fn test_list_all_datasets_with_flow() {
         })
         .await;
 
-    harness.eager_initialization().await;
-
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
@@ -6112,69 +6325,79 @@ async fn test_list_all_datasets_with_flow() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                  // Task 0: "foo" start running at 10ms, finish at 20ms
-                  let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetHardCompact {
-                      dataset_id: foo_id.clone(),
-                      max_slice_size: None,
-                      max_slice_records: None,
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
-
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                  task_id: TaskID::new(1),
-                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                  dataset_id: Some(bar_id.clone()),
-                  run_since_start: Duration::milliseconds(60),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                  expected_logical_plan: LogicalPlanDatasetHardCompact {
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
                     dataset_id: bar_id.clone(),
                     max_slice_size: None,
                     max_slice_records: None,
-                  }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-                // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(10),
-                    initiator_id: Some(foo_account_id.clone()),
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Manual trigger for "foo" at 10ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: Some(foo_account_id.clone()),
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-                // Manual trigger for "bar" at 50ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: bar_flow_binding,
-                    run_since_start: Duration::milliseconds(50),
-                    initiator_id: Some(bar_account_id.clone()),
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger1_handle = trigger1_driver.run();
+            // Manual trigger for "bar" at 50ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: bar_flow_binding,
+                run_since_start: Duration::milliseconds(50),
+                initiator_id: Some(bar_account_id.clone()),
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger1_handle = trigger1_driver.run();
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(100)).await;
-                };
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(100)).await;
+            };
 
-                tokio::join!(task0_handle, task1_handle, trigger0_handle, trigger1_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                trigger0_handle,
+                trigger1_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     let foo_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -6267,26 +6490,25 @@ async fn test_abort_flow_before_scheduling_tasks() {
             FlowTriggerStopPolicy::default(),
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual aborts script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: start running at 10ms, finish at 20ms
             let foo_task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6298,10 +6520,10 @@ async fn test_abort_flow_before_scheduling_tasks() {
             let abort0_handle = abort0_driver.run();
 
             let sim_handle = harness.advance_time(Duration::milliseconds(150));
-            tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(foo_task0_handle, abort0_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -6363,26 +6585,25 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
             FlowTriggerStopPolicy::default(),
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: start running at 10ms, finish at 20ms
             let foo_task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6394,10 +6615,10 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
             let abort0_handle = abort0_driver.run();
 
             let sim_handle = harness.advance_time(Duration::milliseconds(150));
-            tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(foo_task0_handle, abort0_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -6464,26 +6685,25 @@ async fn test_abort_flow_after_task_running_has_started() {
             FlowTriggerStopPolicy::default(),
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: start running at 10ms, finish at 110ms
             let foo_task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(100), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(100),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6495,10 +6715,10 @@ async fn test_abort_flow_after_task_running_has_started() {
             let abort0_handle = abort0_driver.run();
 
             let sim_handle = harness.advance_time(Duration::milliseconds(150));
-            tokio::join!(foo_task0_handle, abort0_handle, sim_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(foo_task0_handle, abort0_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -6612,32 +6832,34 @@ async fn test_abort_flow_after_task_finishes() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let foo_task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                      },
-                    }.into_task_result()
-                  ))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6647,16 +6869,20 @@ async fn test_abort_flow_after_task_finishes() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(30),
-                finish_in_with: Some((Duration::milliseconds(40), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(40),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let bar_task1_handle = bar_task1_driver.run();
 
-            // Manual abort for "foo" at 50ms, which is after flow 0 has finished, and before flow 1 has started
-            // This should stop the trigger of "foo"
+            // Manual abort for "foo" at 50ms, which is after flow 0 has finished, and
+            // before flow 1 has started This should stop the trigger of "foo"
             let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
                 flow_id: FlowID::new(2),
                 abort_since_start: Duration::milliseconds(50),
@@ -6670,7 +6896,6 @@ async fn test_abort_flow_after_task_finishes() {
                 abort_since_start: Duration::milliseconds(50),
             });
             let abort1_handle = abort1_driver.run();
-
 
             // Manual launch of "foo" at 130ms
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
@@ -6687,26 +6912,41 @@ async fn test_abort_flow_after_task_finishes() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(140),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
-                      },
-                    }.into_task_result()
-                  ))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let foo_task2_handle = foo_task2_driver.run();
 
-
             let sim_handle = harness.advance_time(Duration::milliseconds(250));
-            tokio::join!(foo_task0_handle, bar_task1_handle, abort0_handle, abort1_handle, trigger0_handle, foo_task2_handle, sim_handle)
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                foo_task0_handle,
+                bar_task1_handle,
+                abort0_handle,
+                abort1_handle,
+                trigger0_handle,
+                foo_task2_handle,
+                sim_handle
+            );
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -6851,7 +7091,6 @@ async fn test_respect_last_success_time_for_root_dataset_when_activate_configura
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -6863,49 +7102,56 @@ async fn test_respect_last_success_time_for_root_dataset_when_activate_configura
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
-
-      // Run simulation script and task drivers
-      _ = async {
-          // Task 0: "foo" start running at 10ms, finish at 20ms
-          let task0_driver = harness.task_driver(TaskDriverArgs {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task0_handle = task0_driver.run();
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-          // Main simulation script
-          let main_handle = async {
-              // 50ms: Pause flow config before next flow runs
-              harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), &ingest_dataset_binding(&foo_id)).await;
+            // Main simulation script
+            let main_handle = async {
+                // 50ms: Pause flow config before next flow runs
+                harness.advance_time(Duration::milliseconds(50)).await;
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(50),
+                        &ingest_dataset_binding(&foo_id),
+                    )
+                    .await;
 
-              // 100ms: Wake up before planned "foo" scheduling
-              harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), &ingest_dataset_binding(&foo_id)).await;
-              test_flow_listener
-                  .make_a_snapshot(start_time + Duration::milliseconds(100))
-                  .await;
+                // 100ms: Wake up before planned "foo" scheduling
+                harness.advance_time(Duration::milliseconds(50)).await;
+                harness
+                    .resume_flow(
+                        start_time + Duration::milliseconds(100),
+                        &ingest_dataset_binding(&foo_id),
+                    )
+                    .await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(100));
 
-              // 150ms: finish
-              harness.advance_time(Duration::milliseconds(50)).await;
-          };
+                // 150ms: finish
+                harness.advance_time(Duration::milliseconds(50)).await;
+            };
 
-          tokio::join!(task0_handle, main_handle)
-
-       } => Ok(()),
-    }
-    .unwrap();
+            tokio::join!(task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -7051,7 +7297,6 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -7064,106 +7309,136 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
-
-      // Run simulation script and task drivers
-      _ = async {
-          // Task 0: "foo" start running at 10ms, finish at 20ms
-          let task0_driver = harness.task_driver(TaskDriverArgs {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(
-                  TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                      },
-                    }.into_task_result())
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task0_handle = task0_driver.run();
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-          // Task 1: "bar" start running at 30ms, finish at 40ms
-          let task1_driver = harness.task_driver(TaskDriverArgs {
+            // Task 1: "bar" start running at 30ms, finish at 40ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(30),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task1_handle = task1_driver.run();
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-          // Task 2: "foo" start running at 110ms, finish at 120ms
-          let task2_driver = harness.task_driver(TaskDriverArgs {
+            // Task 2: "foo" start running at 110ms, finish at 120ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(2),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                      },
-                    }.into_task_result())
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-new-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task2_handle = task2_driver.run();
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-          // Task 3: "bar" start running at 180ms, finish at 190ms
-          let task3_driver = harness.task_driver(TaskDriverArgs {
+            // Task 3: "bar" start running at 180ms, finish at 190ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(3),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(180),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task3_handle = task3_driver.run();
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task3_handle = task3_driver.run();
 
+            // Main simulation script
+            let main_handle = async {
+                // 60ms: Pause flow config before next "foo" runs
+                harness.advance_time(Duration::milliseconds(60)).await;
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(60),
+                        &transform_dataset_binding(&bar_id),
+                    )
+                    .await;
 
-          // Main simulation script
-          let main_handle = async {
-              // 60ms: Pause flow config before next "foo" runs
-              harness.advance_time(Duration::milliseconds(60)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(60), &transform_dataset_binding(&bar_id)).await;
+                // 170ms: Wake up after planned "foo" run
+                harness.advance_time(Duration::milliseconds(110)).await;
+                harness
+                    .resume_flow(
+                        start_time + Duration::milliseconds(170),
+                        &transform_dataset_binding(&bar_id),
+                    )
+                    .await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(170));
 
-              // 170ms: Wake up after planned "foo" run
-              harness.advance_time(Duration::milliseconds(110)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(170), &transform_dataset_binding(&bar_id)).await;
-              test_flow_listener
-                  .make_a_snapshot(start_time + Duration::milliseconds(170))
-                  .await;
+                // 270ms: finish
+                harness.advance_time(Duration::milliseconds(100)).await;
+            };
 
-              // 270ms: finish
-              harness.advance_time(Duration::milliseconds(100)).await;
-          };
-
-          tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, main_handle)
-
-       } => Ok(()),
-    }
-    .unwrap();
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                task3_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -7409,7 +7684,6 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -7422,89 +7696,113 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
-
-      // Run simulation script and task drivers
-      _ = async {
-          // Task 0: "foo" start running at 10ms, finish at 20ms
-          let task0_driver = harness.task_driver(TaskDriverArgs {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(
-                  TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                      },
-                    }.into_task_result())
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"foo-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task0_handle = task0_driver.run();
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-          // Task 1: "bar" start running at 180ms, finish at 190ms
-          let task1_driver = harness.task_driver(TaskDriverArgs {
+            // Task 1: "bar" start running at 180ms, finish at 190ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(180),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(
-                  TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                      },
-                    }.into_task_result())
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"bar-old-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
-          });
-          let task1_handle = task1_driver.run();
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
+            // Main simulation script
+            let main_handle = async {
+                // 50ms: Pause "bar" flow config before next "foo" runs
+                harness.advance_time(Duration::milliseconds(50)).await;
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(50),
+                        &transform_dataset_binding(&bar_id),
+                    )
+                    .await;
 
-          // Main simulation script
-          let main_handle = async {
-              // 50ms: Pause "bar" flow config before next "foo" runs
-              harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), &transform_dataset_binding(&bar_id)).await;
+                // 80ms: Wake up "bar"
+                harness.advance_time(Duration::milliseconds(80)).await;
+                harness
+                    .resume_flow(
+                        start_time + Duration::milliseconds(80),
+                        &transform_dataset_binding(&bar_id),
+                    )
+                    .await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(80));
 
-              // 80ms: Wake up "bar"
-              harness.advance_time(Duration::milliseconds(80)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(80), &transform_dataset_binding(&bar_id)).await;
-              test_flow_listener
-                  .make_a_snapshot(start_time + Duration::milliseconds(80))
-                  .await;
+                // 120ms: Pause "bar" again
+                harness.advance_time(Duration::milliseconds(40)).await;
+                harness
+                    .pause_flow(
+                        start_time + Duration::milliseconds(120),
+                        &transform_dataset_binding(&bar_id),
+                    )
+                    .await;
 
-              // 120ms: Pause "bar" again
-              harness.advance_time(Duration::milliseconds(40)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(120), &transform_dataset_binding(&bar_id)).await;
+                // 170ms: Resume "bar"
+                harness.advance_time(Duration::milliseconds(50)).await;
+                harness
+                    .resume_flow(
+                        start_time + Duration::milliseconds(170),
+                        &transform_dataset_binding(&bar_id),
+                    )
+                    .await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(170));
 
-              // 170ms: Resume "bar"
-              harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(170), &transform_dataset_binding(&bar_id)).await;
-              test_flow_listener
-                  .make_a_snapshot(start_time + Duration::milliseconds(170))
-                  .await;
+                // 400ms: finish
+                harness.advance_time(Duration::milliseconds(230)).await;
+            };
 
-              // 400ms: finish
-              harness.advance_time(Duration::milliseconds(230)).await;
-          };
-
-          tokio::join!(task0_handle, task1_handle, main_handle)
-
-       } => Ok(()),
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -7823,49 +8121,57 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
         .await
         .unwrap();
 
-    harness.eager_initialization().await;
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // "baz" Task 0: start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(
+                    METADATA_TASK_FLOW_ID,
+                    flow_id_baz.to_string(),
+                )]),
+                dataset_id: Some(baz_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: baz_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+            // "bar" Task 1: start running at 110ms, finish at 120ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(
+                    METADATA_TASK_FLOW_ID,
+                    flow_id_bar.to_string(),
+                )]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // "baz" Task 0: start running at 10ms, finish at 20ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id_baz.to_string())]),
-                    dataset_id: Some(baz_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: baz_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
-
-                // "bar" Task 1: start running at 110ms, finish at 120ms
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id_bar.to_string())]),
-                    dataset_id: Some(bar_id.clone()),
-                    run_since_start: Duration::milliseconds(110),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: bar_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
-
-                // Main simulation boundary - 130ms total
-                let sim_handle = harness.advance_time(Duration::milliseconds(150));
-                tokio::join!(task0_handle, task1_handle, sim_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            // Main simulation boundary - 130ms total
+            let sim_handle = harness.advance_time(Duration::milliseconds(150));
+            tokio::join!(task0_handle, task1_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -7957,48 +8263,51 @@ async fn test_disable_trigger_on_flow_fail_default() {
             FlowTriggerStopPolicy::default(), // Default policy is to pause on first failure
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 10ms, finish at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: start running at 10ms, finish at 20ms
-                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task0_handle = foo_task0_driver.run();
+            // Task 1: start running at 90ms, finish at 100ms
+            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(90),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task1_handle = foo_task1_driver.run();
 
-                // Task 1: start running at 90ms, finish at 100ms
-                let foo_task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task1_handle = foo_task1_driver.run();
-
-                let sim_handle = harness.advance_time(Duration::milliseconds(200));
-                tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            let sim_handle = harness.advance_time(Duration::milliseconds(200));
+            tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -8092,76 +8401,93 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
             },
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 10ms, finish at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: start running at 10ms, finish at 20ms
-                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task0_handle = foo_task0_driver.run();
+            // Task 1: start running at 90ms, finish at 100ms
+            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(90),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task1_handle = foo_task1_driver.run();
 
-                // Task 1: start running at 90ms, finish at 100ms
-                let foo_task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task1_handle = foo_task1_driver.run();
+            // Task 2: start running at 160ms, finish at 170ms
+            let foo_task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(160),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task2_handle = foo_task2_driver.run();
 
-                // Task 2: start running at 160ms, finish at 170ms
-                let foo_task2_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(2),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(160),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task2_handle = foo_task2_driver.run();
+            // Task 3: start running at 240ms, finish at 250ms
+            let foo_task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(240),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task3_handle = foo_task3_driver.run();
 
-                // Task 3: start running at 240ms, finish at 250ms
-                let foo_task3_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(3),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(240),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task3_handle = foo_task3_driver.run();
-
-                let sim_handle = harness.advance_time(Duration::milliseconds(300));
-                tokio::join!(foo_task0_handle, foo_task1_handle, foo_task2_handle, foo_task3_handle, sim_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            let sim_handle = harness.advance_time(Duration::milliseconds(300));
+            tokio::join!(
+                foo_task0_handle,
+                foo_task1_handle,
+                foo_task2_handle,
+                foo_task3_handle,
+                sim_handle
+            );
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -8305,76 +8631,93 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
             FlowTriggerStopPolicy::Never,
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 10ms, finish at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: start running at 10ms, finish at 20ms
-                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task0_handle = foo_task0_driver.run();
+            // Task 1: start running at 90ms, finish at 100ms
+            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(90),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task1_handle = foo_task1_driver.run();
 
-                // Task 1: start running at 90ms, finish at 100ms
-                let foo_task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task1_handle = foo_task1_driver.run();
+            // Task 2: start running at 170, finish at 180ms
+            let foo_task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(170),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task2_handle = foo_task2_driver.run();
 
-                // Task 2: start running at 170, finish at 180ms
-                let foo_task2_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(2),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(170),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task2_handle = foo_task2_driver.run();
+            // Task 3: start running at 250ms, finish at 260ms
+            let foo_task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(250),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task3_handle = foo_task3_driver.run();
 
-                // Task 3: start running at 250ms, finish at 260ms
-                let foo_task3_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(3),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(250),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task3_handle = foo_task3_driver.run();
-
-                let sim_handle = harness.advance_time(Duration::milliseconds(300));
-                tokio::join!(foo_task0_handle, foo_task1_handle, foo_task2_handle, foo_task3_handle, sim_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            let sim_handle = harness.advance_time(Duration::milliseconds(300));
+            tokio::join!(
+                foo_task0_handle,
+                foo_task1_handle,
+                foo_task2_handle,
+                foo_task3_handle,
+                sim_handle
+            );
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -8525,49 +8868,52 @@ async fn test_disable_trigger_on_flow_fail_ignores_stop_policy_for_unrecoverable
             },
         )
         .await;
-    harness.eager_initialization().await;
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 10ms, finish at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Task 0: start running at 10ms, finish at 20ms
-                let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task0_handle = foo_task0_driver.run();
+            // Task 1: start running at 90ms, finish at 100ms
+            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(90),
+                // Important: unrecoverable error in the result
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task1_handle = foo_task1_driver.run();
 
-                // Task 1: start running at 90ms, finish at 100ms
-                let foo_task1_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(1),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(90),
-                    // Important: unrecoverable error in the result
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_unrecoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let foo_task1_handle = foo_task1_driver.run();
-
-                let sim_handle = harness.advance_time(Duration::milliseconds(300));
-                tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            let sim_handle = harness.advance_time(Duration::milliseconds(300));
+            tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle);
+        })
+        .await
+        .unwrap();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -8646,7 +8992,6 @@ async fn test_trigger_enable_during_flow_throttling() {
     let foo_flow_binding = ingest_dataset_binding(&foo_id);
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -8658,107 +9003,119 @@ async fn test_trigger_enable_during_flow_throttling() {
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding.clone(),
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-      // Run simulation script and task drivers
-      _ = async {
-        // Manual trigger for "foo" at 20ms
-        let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-            flow_binding: foo_flow_binding.clone(),
-            run_since_start: Duration::milliseconds(20),
-            initiator_id: None,
-            maybe_forced_flow_config_rule: None,
-        });
-        let trigger0_handle = trigger0_driver.run();
+            // Manual trigger for "foo" at 30ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding.clone(),
+                run_since_start: Duration::milliseconds(30),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger1_handle = trigger1_driver.run();
 
-        // Manual trigger for "foo" at 30ms
-        let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-            flow_binding: foo_flow_binding.clone(),
-            run_since_start: Duration::milliseconds(30),
-            initiator_id: None,
-            maybe_forced_flow_config_rule: None,
-        });
-        let trigger1_handle = trigger1_driver.run();
+            // Manual trigger for "foo" at 70ms
+            let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(70),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger2_handle = trigger2_driver.run();
 
-        // Manual trigger for "foo" at 70ms
-        let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-          flow_binding: foo_flow_binding,
-          run_since_start: Duration::milliseconds(70),
-          initiator_id: None,
-          maybe_forced_flow_config_rule: None,
-        });
-        let trigger2_handle = trigger2_driver.run();
+            // Task 0: "foo" start running at 40ms, finish at 50ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(40),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
 
-        // Task 0: "foo" start running at 40ms, finish at 50ms
-        let task0_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(0),
-          task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::milliseconds(40),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-          expected_logical_plan: LogicalPlanDatasetUpdate {
-            dataset_id: foo_id.clone(),
-            fetch_uncacheable: false
-          }.into_logical_plan(),
-        });
+            // Task 1: "foo" start running at 250ms, finish at 260ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(250),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
 
-        // Task 1: "foo" start running at 250ms, finish at 260ms
-        let task1_driver = harness.task_driver(TaskDriverArgs {
-            task_id: TaskID::new(1),
-            task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-            dataset_id: Some(foo_id.clone()),
-            run_since_start: Duration::milliseconds(250),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }.into_logical_plan(),
-        });
+            // Task 2: "foo" start running at 260ms, finish at 160ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(520),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
 
-        // Task 2: "foo" start running at 260ms, finish at 160ms
-        let task2_driver = harness.task_driver(TaskDriverArgs {
-          task_id: TaskID::new(2),
-          task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-          dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::milliseconds(520),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-          expected_logical_plan: LogicalPlanDatasetUpdate {
-            dataset_id: foo_id.clone(),
-            fetch_uncacheable: false
-          }.into_logical_plan(),
-      });
+            let task0_handle = task0_driver.run();
+            let task1_handle = task1_driver.run();
+            let task2_handle = task2_driver.run();
 
-        let task0_handle = task0_driver.run();
-        let task1_handle = task1_driver.run();
-        let task2_handle = task2_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(100)).await;
+                test_flow_listener.make_a_snapshot(start_time + Duration::milliseconds(100));
+                harness
+                    .set_flow_trigger(
+                        harness.now_datetime(),
+                        ingest_dataset_binding(&foo_id),
+                        FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
+                        FlowTriggerStopPolicy::default(),
+                    )
+                    .await;
 
-        // Main simulation script
-        let main_handle = async {
-          harness.advance_time(Duration::milliseconds(100)).await;
-          test_flow_listener
-              .make_a_snapshot(start_time + Duration::milliseconds(100))
-              .await;
-          harness
-            .set_flow_trigger(
-                harness.now_datetime(),
-                ingest_dataset_binding(&foo_id),
-                FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
-                FlowTriggerStopPolicy::default(),
-            )
-            .await;
+                harness.advance_time(Duration::milliseconds(1000)).await;
+            };
 
-          harness.advance_time(Duration::milliseconds(1000)).await;
-        };
-
-        tokio::join!(
-          trigger0_handle, trigger1_handle, trigger2_handle, task0_handle, task1_handle, task2_handle, main_handle
-        )
-      } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(
+                trigger0_handle,
+                trigger1_handle,
+                trigger2_handle,
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -8909,31 +9266,30 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
         .await;
 
     // Enforce dependency graph initialization
-    harness.eager_initialization().await;
 
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
-
-        // Run simulation script and task drivers
-        _ = async {
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -8945,20 +9301,22 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
                 finish_in_with: Some((
-                  Duration::milliseconds(10),
-                  TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                      pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                      },
-                    }.into_task_result()
-                  )
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            },
+                        }
+                        .into_task_result(),
+                    ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: foo_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -8968,25 +9326,27 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
-                  dataset_id: bar_id.clone(),
-                  fetch_uncacheable: false
-                }.into_logical_plan(),
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
-
 
             // Main simulation script
             let main_handle = async {
                 harness.advance_time(Duration::milliseconds(220)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, task2_handle, main_handle)
-
-        } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, task1_handle, task2_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -9108,78 +9468,90 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Manual trigger for "foo" at 20ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(20),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
-
-                // Task 0: "foo" start running at 30ms, fail at 40ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(30),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
-
-                // Task 1: "foo" start running at 1040ms, fail at 1050ms
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                  task_id: TaskID::new(1),
-                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                  dataset_id: Some(foo_id.clone()),
-                  run_since_start: Duration::milliseconds(1040),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                  expected_logical_plan: LogicalPlanDatasetUpdate {
+            // Task 0: "foo" start running at 30ms, fail at 40ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-                // Task 2: "foo" start running at 2050ms, success at 2070ms
-                let task2_driver = harness.task_driver(TaskDriverArgs {
-                  task_id: TaskID::new(2),
-                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                  dataset_id: Some(foo_id.clone()),
-                  run_since_start: Duration::milliseconds(2050),
-                  finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                  expected_logical_plan: LogicalPlanDatasetUpdate {
+            // Task 1: "foo" start running at 1040ms, fail at 1050ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(1040),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }.into_logical_plan(),
-                });
-                let task2_handle = task2_driver.run();
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(2100)).await;
-                };
+            // Task 2: "foo" start running at 2050ms, success at 2070ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(2050),
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(2100)).await;
+            };
+
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                trigger0_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -9260,78 +9632,90 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Manual trigger for "foo" at 20ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(20),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
-
-                // Task 0: "foo" start running at 30ms, fail at 40ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(30),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
-
-                // Task 1: "foo" start running at 1040ms, fail at 1050ms
-                let task1_driver = harness.task_driver(TaskDriverArgs {
-                  task_id: TaskID::new(1),
-                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                  dataset_id: Some(foo_id.clone()),
-                  run_since_start: Duration::milliseconds(1040),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                  expected_logical_plan: LogicalPlanDatasetUpdate {
+            // Task 0: "foo" start running at 30ms, fail at 40ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }.into_logical_plan(),
-                });
-                let task1_handle = task1_driver.run();
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-                // Task 2: "foo" start running at 2050ms, fail at 2060ms
-                let task2_driver = harness.task_driver(TaskDriverArgs {
-                  task_id: TaskID::new(2),
-                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                  dataset_id: Some(foo_id.clone()),
-                  run_since_start: Duration::milliseconds(2050),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_recoverable()))),
-                  expected_logical_plan: LogicalPlanDatasetUpdate {
+            // Task 1: "foo" start running at 1040ms, fail at 1050ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(1040),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }.into_logical_plan(),
-                });
-                let task2_handle = task2_driver.run();
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(2100)).await;
-                };
+            // Task 2: "foo" start running at 2050ms, fail at 2060ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(2050),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(2100)).await;
+            };
+
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                trigger0_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -9412,51 +9796,49 @@ async fn test_manual_ingest_with_retry_policy_ignored_on_unrecoverable_error() {
         )
         .await;
 
-    harness.eager_initialization().await;
-
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
-    // Run scheduler concurrently with manual triggers script
-    tokio::select! {
-        // Run API service
-        res = harness.flow_agent.run() => res.int_err(),
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-        // Run simulation script and task drivers
-        _ = async {
-                // Manual trigger for "foo" at 20ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-                    flow_binding: foo_flow_binding,
-                    run_since_start: Duration::milliseconds(20),
-                    initiator_id: None,
-                    maybe_forced_flow_config_rule: None,
-                });
-                let trigger0_handle = trigger0_driver.run();
+            // Task 0: "foo" start running at 30ms, fail at 40ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                // IMPORTANT: unrecoverable error in the results
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-                // Task 0: "foo" start running at 30ms, fail at 40ms
-                let task0_driver = harness.task_driver(TaskDriverArgs {
-                    task_id: TaskID::new(0),
-                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(foo_id.clone()),
-                    run_since_start: Duration::milliseconds(30),
-                    // IMPORTANT: unrecoverable error in the results
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty_unrecoverable()))),
-                    expected_logical_plan: LogicalPlanDatasetUpdate {
-                      dataset_id: foo_id.clone(),
-                      fetch_uncacheable: false
-                    }.into_logical_plan(),
-                });
-                let task0_handle = task0_driver.run();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(200)).await;
+            };
 
-                // Main simulation script
-                let main_handle = async {
-                    harness.advance_time(Duration::milliseconds(200)).await;
-                };
-
-                tokio::join!(task0_handle, trigger0_handle, main_handle)
-            } => Ok(())
-    }
-    .unwrap();
+            tokio::join!(task0_handle, trigger0_handle, main_handle);
+        })
+        .await
+        .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(

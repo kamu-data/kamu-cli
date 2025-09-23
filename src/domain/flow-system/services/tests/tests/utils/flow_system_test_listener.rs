@@ -12,7 +12,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
 use kamu_adapter_flow_dataset::{
@@ -40,7 +39,6 @@ use time_source::FakeSystemTimeSource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct FlowSystemTestListener {
-    flow_query_service: Arc<dyn FlowQueryService>,
     fake_time_source: Arc<FakeSystemTimeSource>,
     state: Arc<Mutex<FlowSystemTestListenerState>>,
 }
@@ -50,6 +48,7 @@ type FlowSnapshot = HashMap<FlowBinding, Vec<FlowState>>;
 #[derive(Default)]
 struct FlowSystemTestListenerState {
     loaded: bool,
+    latest_flow_aggregates: HashMap<FlowID, Flow>,
     snapshots: BTreeMap<DateTime<Utc>, Vec<FlowSnapshot>>,
     dataset_display_names: HashMap<odf::DatasetID, String>,
 }
@@ -58,52 +57,69 @@ struct FlowSystemTestListenerState {
 #[scope(Singleton)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<FlowAgentUpdatedMessage>)]
-#[interface(dyn MessageConsumerT<FlowProgressMessage>)]
+#[interface(dyn FlowSystemEventProjector)]
 #[meta(MessageConsumerMeta {
     consumer_name: "FlowSystemTestListener",
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_AGENT, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_AGENT],
     delivery: MessageDeliveryMechanism::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowSystemTestListener {
-    pub(crate) fn new(
-        flow_query_service: Arc<dyn FlowQueryService>,
-        fake_time_source: Arc<FakeSystemTimeSource>,
-    ) -> Self {
+    pub(crate) fn new(fake_time_source: Arc<FakeSystemTimeSource>) -> Self {
         Self {
-            flow_query_service,
             fake_time_source,
             state: Arc::new(Mutex::new(FlowSystemTestListenerState::default())),
         }
     }
 
-    pub(crate) async fn make_a_snapshot(&self, update_time: DateTime<Utc>) {
-        use futures::TryStreamExt;
-        let flows: Vec<_> = self
-            .flow_query_service
-            .list_all_flows(PaginationOpts {
-                limit: 100,
-                offset: 0,
+    pub(crate) fn apply_flow_event(&self, e: FlowEvent) {
+        let mut state = self.state.lock().unwrap();
+
+        state
+            .latest_flow_aggregates
+            .entry(e.flow_id())
+            .and_modify(|existing| {
+                existing.apply(e.clone()).unwrap();
             })
-            .await
-            .unwrap()
-            .matched_stream
-            .try_collect()
-            .await
-            .unwrap();
+            .or_insert_with(|| {
+                let FlowEvent::Initiated(initiated_event) = e else {
+                    panic!("First event for a flow must be Initiated");
+                };
+                Flow::new(
+                    initiated_event.event_time,
+                    initiated_event.flow_id,
+                    initiated_event.flow_binding,
+                    initiated_event.activation_cause,
+                    initiated_event.config_snapshot,
+                    initiated_event.retry_policy,
+                )
+            });
+    }
+
+    pub(crate) fn make_a_snapshot(&self, event_time: DateTime<Utc>) {
+        let mut state = self.state.lock().unwrap();
 
         let mut flow_states_map: HashMap<FlowBinding, Vec<FlowState>> = HashMap::new();
-        for flow in flows {
+
+        let mut flow_ids = state
+            .latest_flow_aggregates
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
+
+        flow_ids.sort_by(|a, b| b.cmp(a));
+
+        for flow_id in flow_ids {
+            let flow = state.latest_flow_aggregates.get(&flow_id).unwrap();
             flow_states_map
                 .entry(flow.flow_binding.clone())
-                .and_modify(|flows| flows.push(flow.clone()))
-                .or_insert(vec![flow]);
+                .and_modify(|flows| flows.push(flow.as_ref().clone()))
+                .or_insert(vec![flow.as_ref().clone()]);
         }
 
-        let mut state = self.state.lock().unwrap();
         state
             .snapshots
-            .entry(update_time)
+            .entry(event_time)
             .and_modify(|snapshots| snapshots.push(flow_states_map.clone()))
             .or_insert(vec![flow_states_map]);
     }
@@ -365,26 +381,56 @@ impl MessageConsumerT<FlowAgentUpdatedMessage> for FlowSystemTestListener {
             state.loaded = true;
         }
 
-        self.make_a_snapshot(message.update_time).await;
         Ok(())
     }
 }
 
 #[async_trait::async_trait]
-impl MessageConsumerT<FlowProgressMessage> for FlowSystemTestListener {
-    async fn consume_message(
-        &self,
-        _: &Catalog,
-        message: &FlowProgressMessage,
-    ) -> Result<(), InternalError> {
-        {
-            let state = self.state.lock().unwrap();
-            if !state.loaded {
-                return Ok(()); // Ignore until loaded
+impl FlowSystemEventProjector for FlowSystemTestListener {
+    fn name(&self) -> &'static str {
+        "FlowSystemTestListener"
+    }
+
+    /// Apply a *single* event using the open transaction.
+    /// Must be idempotent: safe to re-run for the same event id.
+    async fn apply(&self, e: &FlowSystemEvent) -> Result<(), InternalError> {
+        // We are only interested in flow events
+        match e.source_type {
+            FlowSystemEventSourceType::Flow => {
+                // Apply all flow events to reconstruct Flow aggregates
+                let flow_event: FlowEvent = serde_json::from_value(e.payload.clone()).unwrap();
+                self.apply_flow_event(flow_event.clone());
+
+                // Skip snapshots until we have received the Loaded message
+                {
+                    let state = self.state.lock().unwrap();
+                    if !state.loaded {
+                        return Ok(());
+                    }
+                }
+
+                // During live phase, we only take snapshots on certain events
+                match flow_event {
+                    FlowEvent::StartConditionUpdated(_)
+                    | FlowEvent::Aborted(_)
+                    | FlowEvent::TaskRunning(_)
+                    | FlowEvent::TaskFinished(_) => {
+                        self.make_a_snapshot(flow_event.event_time());
+                    }
+
+                    FlowEvent::ActivationCauseAdded(_)
+                    | FlowEvent::ConfigSnapshotModified(_)
+                    | FlowEvent::ScheduledForActivation(_)
+                    | FlowEvent::Completed(_)
+                    | FlowEvent::Initiated(_)
+                    | FlowEvent::TaskScheduled(_) => { /* Ignore */ }
+                }
             }
+
+            FlowSystemEventSourceType::FlowConfiguration
+            | FlowSystemEventSourceType::FlowTrigger => { /* Ignore */ }
         }
 
-        self.make_a_snapshot(message.event_time()).await;
         Ok(())
     }
 }

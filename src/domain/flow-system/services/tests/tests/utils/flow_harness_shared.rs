@@ -10,9 +10,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use async_utils::BackgroundAgent;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
+use internal_error::InternalError;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_adapter_flow_dataset::*;
 use kamu_datasets::*;
@@ -57,6 +59,7 @@ pub(crate) struct FlowHarness {
     pub flow_trigger_service: Arc<dyn FlowTriggerService>,
     pub flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
     pub flow_agent: Arc<FlowAgentImpl>,
+    pub flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
 }
@@ -107,6 +110,11 @@ impl FlowHarness {
                 mandatory_throttling_period,
                 HashMap::new(),
             ))
+            .add_value(FlowSystemEventAgentConfig {
+                min_debounce_interval: awaiting_step.to_std().unwrap(),
+                max_listening_timeout: (awaiting_step * 5).to_std().unwrap(),
+                batch_size: 10,
+            })
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
@@ -159,10 +167,6 @@ impl FlowHarness {
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
             );
-            register_message_dispatcher::<FlowProgressMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-            );
 
             b.build()
         };
@@ -173,6 +177,7 @@ impl FlowHarness {
             dataset_entry_service: catalog.get_one().unwrap(),
 
             flow_agent: catalog.get_one().unwrap(),
+            flow_system_event_agent: catalog.get_one().unwrap(),
             flow_query_service: catalog.get_one().unwrap(),
             flow_configuration_service: catalog.get_one().unwrap(),
             flow_trigger_service: catalog.get_one().unwrap(),
@@ -266,12 +271,6 @@ impl FlowHarness {
             .unwrap();
 
         dataset_id
-    }
-
-    pub async fn eager_initialization(&self) {
-        use init_on_startup::InitOnStartup;
-
-        self.flow_agent.run_initialization().await.unwrap();
     }
 
     pub async fn issue_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
@@ -403,9 +402,80 @@ impl FlowHarness {
         );
 
         for _ in 0..time_increments_count {
+            // Yield multiple times to ensure all tasks get execution time
             yield_now().await;
-            self.fake_system_time_source.advance(alignment);
+            yield_now().await;
+
+            let woken_callers = self.fake_system_time_source.advance(alignment);
+
+            // If we woke up any callers, give them extra time to process
+            if !woken_callers.is_empty() {
+                yield_now().await;
+            }
         }
+
+        // Final yield to ensure any remaining tasks can complete
+        yield_now().await;
+    }
+
+    /// Simulates a complete flow scenario by running flow agents concurrently
+    /// with a user-provided simulation script. Handles initial snapshot
+    /// creation and final event catchup automatically.
+    ///
+    /// # Arguments
+    /// * `simulation_script` - An async closure/future that contains the test
+    ///   scenario logic (task drivers, manual triggers, time advancement, etc.)
+    ///
+    /// # Example
+    /// ```rust
+    /// harness.simulate_flow_scenario(async {
+    ///     let task_driver = harness.task_driver(TaskDriverArgs { ... });
+    ///     let task_handle = task_driver.run();
+    ///
+    ///     let sim_handle = harness.advance_time(Duration::milliseconds(150));
+    ///     tokio::join!(task_handle, sim_handle)
+    /// }).await.unwrap();
+    /// ```
+    pub async fn simulate_flow_scenario<F, Fut>(
+        &self,
+        simulation_script: F,
+    ) -> Result<(), InternalError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        // Ensure flow agent is initialized
+        use init_on_startup::InitOnStartup;
+        self.flow_agent.run_initialization().await.unwrap();
+
+        // Ensure flow system event agent is caught up with initial events
+        self.flow_system_event_agent
+            .catchup_remaining_events()
+            .await
+            .unwrap();
+
+        // Create initial snapshot - the state at moment 0 after flow agent loaded
+        let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
+        test_flow_listener.make_a_snapshot(self.now_datetime());
+
+        // Run scheduler concurrently with the provided simulation script
+        tokio::select! {
+            // Run flow agent
+            res = self.flow_agent.run() => res.int_err(),
+
+            // Run flow system event agent
+            _  = self.flow_system_event_agent.run() => Ok(()),
+
+            // Run the user-provided simulation script
+            _ = simulation_script() => Ok(())
+        }?;
+
+        // Catchup remaining events
+        self.flow_system_event_agent
+            .catchup_remaining_events()
+            .await?;
+
+        Ok(())
     }
 }
 

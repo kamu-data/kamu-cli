@@ -40,9 +40,6 @@ impl Message for FlowAgentUpdatedMessage {
 pub enum FlowAgentUpdateDetails {
     /// Indicates that the agent has been loaded
     Loaded,
-
-    /// Indicates that the agent has executed a timeslot
-    ExecutedTimeslot,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
