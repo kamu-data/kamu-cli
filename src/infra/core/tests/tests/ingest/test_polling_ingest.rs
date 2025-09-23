@@ -14,6 +14,7 @@ use chrono::{TimeZone, Utc};
 use container_runtime::*;
 use datafusion::prelude::*;
 use indoc::indoc;
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -1324,6 +1325,24 @@ impl IngestTestHarness {
                 None,
             )
             .await;
+
+        if let Ok(PollingIngestResult::Updated {
+            old_head, new_head, ..
+        }) = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
 
         ingest_result
     }

@@ -121,7 +121,7 @@ impl PullTransformItem {
         dataset_registry: &dyn DatasetRegistry,
     ) -> Result<(), InternalError> {
         self.target = dataset_registry
-            .get_dataset_by_handle(&self.target.get_handle())
+            .get_dataset_by_handle(self.target.get_handle())
             .await;
         self.plan
             .datasets_map

@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::DatabaseTransactionRunner;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -39,13 +38,12 @@ pub struct PollingIngestServiceImpl {
     run_info_dir: Arc<RunInfoDir>,
     cache_dir: Arc<CacheDir>,
     time_source: Arc<dyn SystemTimeSource>,
-    catalog: dill::Catalog,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PollingIngestServiceImpl {
-    async fn ingest_loop(
+    async fn ingest_inner(
         &self,
         target: ResolvedDataset,
         metadata_state: Box<DataWriterMetadataState>,
@@ -74,89 +72,37 @@ impl PollingIngestServiceImpl {
             return Ok(result);
         };
 
-        let mut iteration = 0;
-        let mut combined_result = None;
-        loop {
-            iteration += 1;
-            let operation_id = get_random_name(None, 10);
+        let operation_id = get_random_name(None, 10);
 
-            let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
-            std::fs::create_dir_all(&operation_dir).int_err()?;
+        let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
+        std::fs::create_dir_all(&operation_dir).int_err()?;
 
-            let new_ctx = ingest_common::new_session_context(
-                &self.engine_config,
-                self.object_store_registry.clone(),
-            );
-            data_writer.set_session_context(new_ctx.clone());
+        let new_ctx = ingest_common::new_session_context(
+            &self.engine_config,
+            self.object_store_registry.clone(),
+        );
+        data_writer.set_session_context(new_ctx.clone());
 
-            let dataset_handle = target.get_handle().clone();
+        // TODO: Avoid excessive cloning
+        let iteration_args = IngestIterationArgs {
+            dataset_handle: target.get_handle().clone(),
+            operation_id,
+            operation_dir,
+            system_time: self.time_source.now(),
+            options,
+            polling_source,
+            listener,
+            ctx: new_ctx,
+            data_writer: &mut data_writer,
+        };
 
-            // TODO: Avoid excessive cloning
-            let iteration_args = IngestIterationArgs {
-                dataset_handle: dataset_handle.clone(),
-                iteration,
-                operation_id,
-                operation_dir,
-                system_time: self.time_source.now(),
-                options: options.clone(),
-                polling_source: polling_source.clone(),
-                listener: listener.clone(),
-                ctx: new_ctx,
-                data_writer: &mut data_writer,
-            };
-
-            let iteration_result = DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                    match self.ingest_iteration(iteration_args).await {
-                        Ok(res) => {
-                            let transactional_target = dataset_registry
-                                .get_dataset_by_handle(&dataset_handle)
-                                .await;
-
-                            if let PollingIngestResult::Updated {
-                                old_head, new_head, ..
-                            } = &res
-                            {
-                                transactional_target
-                                    .as_metadata_chain()
-                                    .set_ref(
-                                        &odf::BlockRef::Head,
-                                        new_head,
-                                        odf::dataset::SetRefOpts {
-                                            validate_block_present: true,
-                                            check_ref_is: Some(Some(old_head)),
-                                        },
-                                    )
-                                    .await
-                                    .int_err()?;
-                            };
-                            Ok(res)
-                        }
-                        Err(e) => return Err(e),
-                    }
-                })
-                .await?;
-
-            combined_result = Some(Self::merge_results(combined_result, iteration_result));
-
-            let has_more = match combined_result {
-                Some(PollingIngestResult::UpToDate { .. }) => false,
-                Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
-                None => unreachable!(),
-            };
-
-            if !has_more || !options.exhaust_sources {
-                break;
-            }
-        }
-        Ok(combined_result.unwrap())
+        self.ingest_iteration(iteration_args).await
     }
 
     #[tracing::instrument(
         level = "info",
         skip_all,
         fields(
-            iteration = %args.iteration,
             operation_id = %args.operation_id,
         )
     )]
@@ -548,44 +494,6 @@ impl PollingIngestServiceImpl {
 
         Ok(Some(df))
     }
-
-    // TODO: Introduce intermediate structs to avoid full unpacking
-    fn merge_results(
-        combined_result: Option<PollingIngestResult>,
-        new_result: PollingIngestResult,
-    ) -> PollingIngestResult {
-        match (combined_result, new_result) {
-            (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
-            (
-                Some(PollingIngestResult::Updated {
-                    old_head, new_head, ..
-                }),
-                PollingIngestResult::UpToDate { uncacheable, .. },
-            ) => PollingIngestResult::Updated {
-                old_head,
-                new_head,
-                has_more: false,
-                uncacheable,
-            },
-            (
-                Some(PollingIngestResult::Updated {
-                    old_head: prev_old_head,
-                    ..
-                }),
-                PollingIngestResult::Updated {
-                    new_head,
-                    has_more,
-                    uncacheable,
-                    ..
-                },
-            ) => PollingIngestResult::Updated {
-                old_head: prev_old_head,
-                new_head,
-                has_more,
-                uncacheable,
-            },
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -602,7 +510,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPollingIngestListener));
 
-        self.ingest_loop(target, metadata_state, options, listener)
+        self.ingest_inner(target, metadata_state, options, listener)
             .await
     }
 }
@@ -622,7 +530,6 @@ pub(crate) struct PrepStepResult {
 
 struct IngestIterationArgs<'a> {
     dataset_handle: odf::DatasetHandle,
-    iteration: usize,
     operation_id: String,
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,

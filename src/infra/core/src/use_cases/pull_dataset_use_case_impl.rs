@@ -26,7 +26,6 @@ use kamu_core::*;
 #[component]
 #[interface(dyn PullDatasetUseCase)]
 pub struct PullDatasetUseCaseImpl {
-    polling_ingest_svc: Arc<dyn PollingIngestService>,
     transform_elaboration_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
     tenancy_config: Arc<TenancyConfig>,
@@ -101,7 +100,7 @@ impl PullDatasetUseCaseImpl {
                         tasks.spawn(Self::ingest(
                             pii,
                             ingest_options,
-                            self.polling_ingest_svc.clone(),
+                            self.catalog.clone(),
                             maybe_listener,
                         ))
                     }
@@ -345,24 +344,125 @@ impl PullDatasetUseCaseImpl {
         ))
     }
 
+    async fn ingest_iteration(
+        target_handle: &odf::DatasetHandle,
+        metadata_state_maybe: Option<Box<DataWriterMetadataState>>,
+        ingest_options: PollingIngestOptions,
+        catalog: dill::Catalog,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
+        DatabaseTransactionRunner::new(catalog.clone())
+            .transactional_with2(
+                |dataset_registry: Arc<dyn DatasetRegistry>,
+                 polling_ingest_svc: Arc<dyn PollingIngestService>| async move {
+                    let transactional_target =
+                        dataset_registry.get_dataset_by_handle(target_handle).await;
+
+                    let metadata_state = if let Some(metadata_state) = metadata_state_maybe {
+                        metadata_state
+                    } else {
+                        Box::new(
+                            DataWriterMetadataState::build(
+                                transactional_target.clone(),
+                                &odf::BlockRef::Head,
+                                None,
+                                None,
+                            )
+                            .await
+                            .int_err()?,
+                        )
+                    };
+
+                    match polling_ingest_svc
+                        .ingest(
+                            transactional_target.clone(),
+                            metadata_state,
+                            ingest_options,
+                            maybe_listener,
+                        )
+                        .await
+                    {
+                        Ok(res) => {
+                            if let PollingIngestResult::Updated {
+                                old_head, new_head, ..
+                            } = &res
+                            {
+                                transactional_target
+                                    .as_metadata_chain()
+                                    .set_ref(
+                                        &odf::BlockRef::Head,
+                                        new_head,
+                                        odf::dataset::SetRefOpts {
+                                            validate_block_present: true,
+                                            check_ref_is: Some(Some(old_head)),
+                                        },
+                                    )
+                                    .await
+                                    .int_err()?;
+                            }
+                            Ok(res)
+                        }
+                        Err(e) => Err(e),
+                    }
+                },
+            )
+            .await
+    }
+
+    async fn ingest_loop(
+        pii: PullIngestItem,
+        ingest_options: PollingIngestOptions,
+        catalog: dill::Catalog,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
+        let mut combined_result = None;
+        let mut metadata_state = Some(pii.metadata_state.clone());
+
+        loop {
+            match Self::ingest_iteration(
+                pii.target.get_handle(),
+                metadata_state,
+                ingest_options.clone(),
+                catalog.clone(),
+                maybe_listener.clone(),
+            )
+            .await
+            {
+                Ok(ingest_res) => {
+                    combined_result = Some(Self::merge_results(combined_result, ingest_res));
+
+                    let has_more = match combined_result {
+                        Some(PollingIngestResult::UpToDate { .. }) => false,
+                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
+                        None => unreachable!(),
+                    };
+
+                    if !has_more || !ingest_options.exhaust_sources {
+                        break;
+                    }
+                    metadata_state = None;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(combined_result.unwrap())
+    }
+
     async fn ingest(
         pii: PullIngestItem,
         ingest_options: PollingIngestOptions,
-        polling_ingest_svc: Arc<dyn PollingIngestService>,
+        catalog: dill::Catalog,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let ingest_response = polling_ingest_svc
-            .ingest(
-                pii.target.clone(),
-                pii.metadata_state,
-                ingest_options,
-                maybe_listener,
-            )
-            .await;
+        let local_target = pii.target.get_handle().as_local_ref();
+        let original_request = pii.maybe_original_request.clone();
+
+        let ingest_response = Self::ingest_loop(pii, ingest_options, catalog, maybe_listener).await;
 
         Ok(PullResponse {
-            maybe_original_request: pii.maybe_original_request,
-            maybe_local_ref: Some(pii.target.get_handle().as_local_ref()),
+            maybe_original_request: original_request,
+            maybe_local_ref: Some(local_target),
             maybe_remote_ref: None,
             result: match ingest_response {
                 Ok(r) => Ok(r.into()),
@@ -524,6 +624,44 @@ impl PullDatasetUseCaseImpl {
                 Err(e) => Err(e.into()),
             },
         })
+    }
+
+    // TODO: Introduce intermediate structs to avoid full unpacking
+    fn merge_results(
+        combined_result: Option<PollingIngestResult>,
+        new_result: PollingIngestResult,
+    ) -> PollingIngestResult {
+        match (combined_result, new_result) {
+            (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
+            (
+                Some(PollingIngestResult::Updated {
+                    old_head, new_head, ..
+                }),
+                PollingIngestResult::UpToDate { uncacheable, .. },
+            ) => PollingIngestResult::Updated {
+                old_head,
+                new_head,
+                has_more: false,
+                uncacheable,
+            },
+            (
+                Some(PollingIngestResult::Updated {
+                    old_head: prev_old_head,
+                    ..
+                }),
+                PollingIngestResult::Updated {
+                    new_head,
+                    has_more,
+                    uncacheable,
+                    ..
+                },
+            ) => PollingIngestResult::Updated {
+                old_head: prev_old_head,
+                new_head,
+                has_more,
+                uncacheable,
+            },
+        }
     }
 }
 

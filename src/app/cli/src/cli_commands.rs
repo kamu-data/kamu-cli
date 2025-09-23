@@ -469,13 +469,8 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
             }
             _ => true,
         },
-        cli::Command::Pull(c) => {
-            if c.set_watermark.is_some() {
-                true
-            } else {
-                false
-            }
-        }
+        // False for set_watermark option
+        cli::Command::Pull(c) => c.set_watermark.is_some(),
         cli::Command::Ui(_) | cli::Command::Login(_) => false,
         _ => true,
     }

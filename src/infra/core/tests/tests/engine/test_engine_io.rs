@@ -35,7 +35,6 @@ async fn test_engine_io_common<
     run_info_dir: &Path,
     cache_dir: &Path,
     transform: odf::metadata::Transform,
-    catalog: dill::Catalog,
 ) {
     let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
     let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
@@ -73,7 +72,6 @@ async fn test_engine_io_common<
         run_info_dir.clone(),
         cache_dir,
         time_source.clone(),
-        catalog,
     );
 
     let transform_helper = TransformTestHelper::build(
@@ -317,7 +315,6 @@ async fn test_engine_io_local_file_mount() {
                 "SELECT event_time, city, cast(population * 10 as int) as population_x10 FROM root",
             )
             .build(),
-        catalog.clone(),
     )
     .await;
 }
@@ -372,7 +369,6 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
                 "SELECT event_time, city, cast(population * 10 as int) as population_x10 FROM root",
             )
             .build(),
-        catalog.clone(),
     )
     .await;
 }
