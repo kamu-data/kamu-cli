@@ -50,8 +50,10 @@ pub struct FlowTimingRecords {
     pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
     pub running_since: Option<DateTime<Utc>>,
-    /// Finish time (success or cancel/abort)
+    /// Finish time of the last attempt
     pub last_attempt_finished_at: Option<DateTime<Utc>>,
+    /// Flow completion time
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
 impl FlowState {
@@ -138,6 +140,7 @@ impl Projection for FlowState {
                         awaiting_executor_since: None,
                         running_since: None,
                         last_attempt_finished_at: None,
+                        completed_at: None,
                     },
                     task_ids: vec![],
                     config_snapshot,
@@ -148,7 +151,8 @@ impl Projection for FlowState {
             },
 
             (Some(s), event) => {
-                assert_eq!(s.flow_id, event.flow_id());
+                debug_assert_eq!(s.flow_id, event.flow_id());
+                debug_assert_eq!(s.flow_binding, *event.flow_binding());
 
                 match event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
@@ -218,6 +222,7 @@ impl Projection for FlowState {
                                     awaiting_executor_since: None,
                                     running_since: None,
                                     last_attempt_finished_at: None,
+                                    completed_at: None,
                                 },
                                 ..s
                             })
@@ -314,6 +319,8 @@ impl Projection for FlowState {
                                                     .last_attempt_finished_at,
                                                 // The scheduling time is defined via retry policy
                                                 scheduled_for_activation_at: Some(next_attempt_at),
+                                                // Definitely not completed yet
+                                                completed_at: None,
                                             },
                                             ..s
                                         })
@@ -326,6 +333,22 @@ impl Projection for FlowState {
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    E::Completed(FlowEventCompleted { event_time, .. }) => {
+                        if let Some(outcome) = &s.outcome {
+                            if let FlowOutcome::Aborted = outcome {
+                                Err(ProjectionError::new(Some(s), event))
+                            } else {
+                                let timing = FlowTimingRecords {
+                                    completed_at: Some(event_time),
+                                    ..s.timing
+                                };
+                                Ok(FlowState { timing, ..s })
+                            }
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
                         }
                     }
 
