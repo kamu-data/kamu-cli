@@ -139,6 +139,7 @@ impl Flow {
             awaiting_executor_since: self.flow_state.timing.awaiting_executor_since,
             running_since: self.flow_state.timing.running_since,
             last_attempt_finished_at: self.flow_state.timing.last_attempt_finished_at,
+            completed_at: self.flow_state.timing.completed_at,
         }
     }
 

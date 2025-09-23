@@ -33,6 +33,18 @@ impl FlowOutcome {
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Success(_))
     }
+
+    pub fn is_failure(&self) -> bool {
+        matches!(self, Self::Failed(_))
+    }
+
+    pub fn is_aborted(&self) -> bool {
+        matches!(self, Self::Aborted)
+    }
+
+    pub fn is_unrecoverable_failure(&self) -> bool {
+        matches!(self, Self::Failed(err) if !err.recoverable)
+    }
 }
 
 impl From<ts::TaskOutcome> for FlowOutcome {
