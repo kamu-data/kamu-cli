@@ -13,7 +13,19 @@ use strum::{Display, EnumCount, EnumString};
 
 /// Represents the reason why a flow process was automatically stopped
 #[derive(
-    Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, EnumCount, Display, EnumString,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Hash,
+    Ord,
+    PartialOrd,
+    EnumCount,
+    Display,
+    EnumString,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 #[cfg_attr(
     feature = "sqlx",
