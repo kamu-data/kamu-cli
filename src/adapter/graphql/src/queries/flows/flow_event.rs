@@ -35,6 +35,8 @@ pub enum FlowEvent {
     ActivationCauseAdded(FlowEventActivationCauseAdded),
     /// Associated task has changed status
     TaskChanged(FlowEventTaskChanged),
+    /// Completed flow
+    Completed(FlowEventCompleted),
     /// Aborted flow (user cancellation or system factor, such as ds delete)
     Aborted(FlowEventAborted),
 }
@@ -93,6 +95,7 @@ impl FlowEvent {
                 TaskStatus::Finished,
                 e.next_attempt_at,
             )),
+            fs::FlowEvent::Completed(e) => Self::Completed(FlowEventCompleted::new(event_id, &e)),
             fs::FlowEvent::Aborted(e) => Self::Aborted(FlowEventAborted::new(event_id, &e)),
         })
     }
@@ -246,6 +249,23 @@ impl FlowEventTaskChanged {
     async fn task(&self, ctx: &Context<'_>) -> Result<Task> {
         let task_state = utils::get_task(ctx, self.task_id.into()).await?;
         Ok(Task::new(task_state))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct FlowEventCompleted {
+    event_id: EventID,
+    event_time: DateTime<Utc>,
+}
+
+impl FlowEventCompleted {
+    fn new(event_id: evs::EventID, event: &fs::FlowEventCompleted) -> Self {
+        Self {
+            event_id: event_id.into(),
+            event_time: event.event_time,
+        }
     }
 }
 

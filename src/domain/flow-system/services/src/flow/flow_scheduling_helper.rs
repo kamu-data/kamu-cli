@@ -58,29 +58,27 @@ impl FlowSchedulingHelper {
         Ok(())
     }
 
-    pub(crate) async fn try_schedule_late_flow_activations(
+    pub(crate) async fn schedule_late_flow_activations(
         &self,
         flow_success_time: DateTime<Utc>,
-        flow: &Flow,
+        flow_binding: &FlowBinding,
+        late_activation_causes: &[FlowActivationCause],
     ) -> Result<(), InternalError> {
-        // If there are late activation causes, schedule them immediately
-        if !flow.late_activation_causes.is_empty() {
-            tracing::info!(
-                ?flow.flow_binding,
-                late_activation_causes = flow.late_activation_causes.len(),
-                "Scheduling late flow activations"
-            );
+        tracing::info!(
+            ?flow_binding,
+            late_activation_causes = late_activation_causes.len(),
+            "Scheduling late flow activations"
+        );
 
-            // Schedule the next flow immediately
-            self.trigger_flow_common(
-                flow_success_time,
-                &flow.flow_binding,
-                None,
-                flow.late_activation_causes.clone(),
-                None,
-            )
-            .await?;
-        }
+        // Schedule the next flow immediately
+        self.trigger_flow_common(
+            flow_success_time,
+            flow_binding,
+            None,
+            late_activation_causes.to_vec(),
+            None,
+        )
+        .await?;
 
         Ok(())
     }
@@ -88,27 +86,26 @@ impl FlowSchedulingHelper {
     pub(crate) async fn try_schedule_auto_polling_flow_continuation_if_enabled(
         &self,
         flow_finish_time: DateTime<Utc>,
-        flow: &Flow,
+        flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
         // Try locating an active schedule for this flow
         let maybe_active_schedule = self
             .flow_trigger_service
-            .try_take_flow_active_schedule_rule(&flow.flow_binding)
+            .try_take_flow_active_schedule_rule(flow_binding)
             .await
             .int_err()?;
 
         // If there is an active schedule, schedule the next run immediately
         if let Some(active_schedule) = maybe_active_schedule {
             tracing::info!(
-                ?flow.flow_binding,
-                late_activation_causes = flow.late_activation_causes.len(),
+                ?flow_binding,
                 "Scheduling flow continuation due to active schedule"
             );
 
             // Schedule the next flow immediately
             self.trigger_flow_common(
                 flow_finish_time,
-                &flow.flow_binding,
+                flow_binding,
                 Some(FlowTriggerRule::Schedule(active_schedule.clone())),
                 vec![FlowActivationCause::AutoPolling(
                     FlowActivationCauseAutoPolling {
