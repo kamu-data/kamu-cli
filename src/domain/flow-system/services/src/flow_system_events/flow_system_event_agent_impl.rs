@@ -37,9 +37,9 @@ pub struct FlowSystemEventAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowSystemEventAgentImpl {
-    /// Runs initial catch-up phase for all projectors
+    /// Runs catch-up phase for all projectors
     #[tracing::instrument(level = "info", skip_all)]
-    async fn initial_catch_up_phase(&self) {
+    async fn run_catch_up_phase(&self) {
         // For each projector, apply all existing unprocessed events
         let projector_builders = self
             .catalog
@@ -193,7 +193,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
         // On startup, immediately sync all projectors to catch up with existing events
-        self.initial_catch_up_phase().await;
+        self.run_catch_up_phase().await;
 
         // Then enter the infinite main loop
         loop {
@@ -214,6 +214,12 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl FlowSystemEventAgent for FlowSystemEventAgentImpl {}
+#[async_trait::async_trait]
+impl FlowSystemEventAgent for FlowSystemEventAgentImpl {
+    async fn catchup_remaining_events(&self) -> Result<(), InternalError> {
+        self.run_catch_up_phase().await;
+        Ok(())
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

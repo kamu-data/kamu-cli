@@ -2682,6 +2682,12 @@ fn drive_flow_to_status(flow: &mut Flow, expected_status: FlowStatus) {
         let flow_id: u64 = flow.flow_id.into();
         let task_id = TaskID::new(flow_id * 2 + 1);
 
+        flow.set_relevant_start_condition(
+            start_moment + Duration::minutes(5),
+            FlowStartCondition::Executor(FlowStartConditionExecutor { task_id }),
+        )
+        .unwrap();
+
         flow.on_task_scheduled(start_moment + Duration::minutes(5), task_id)
             .unwrap();
         flow.on_task_running(start_moment + Duration::minutes(7), task_id)
