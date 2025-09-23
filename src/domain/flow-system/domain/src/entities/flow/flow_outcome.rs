@@ -45,6 +45,10 @@ impl FlowOutcome {
     pub fn is_unrecoverable_failure(&self) -> bool {
         matches!(self, Self::Failed(err) if !err.recoverable)
     }
+
+    pub fn is_recoverable_failure(&self) -> bool {
+        matches!(self, Self::Failed(err) if err.recoverable)
+    }
 }
 
 impl From<ts::TaskOutcome> for FlowOutcome {

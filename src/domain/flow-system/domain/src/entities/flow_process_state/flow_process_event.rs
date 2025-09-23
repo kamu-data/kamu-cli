@@ -27,7 +27,6 @@ pub enum FlowProcessEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowProcessEventEffectiveStateChanged {
     pub event_time: DateTime<Utc>,
-    pub flow_binding: FlowBinding,
     pub old_state: FlowProcessEffectiveState,
     pub new_state: FlowProcessEffectiveState,
 }
@@ -37,7 +36,6 @@ pub struct FlowProcessEventEffectiveStateChanged {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowProcessEventAutoStopped {
     pub event_time: DateTime<Utc>,
-    pub flow_binding: FlowBinding,
     pub reason: FlowProcessAutoStopReason,
 }
 
@@ -46,7 +44,6 @@ pub struct FlowProcessEventAutoStopped {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowProcessEventResumedFromAutoStop {
     pub event_time: DateTime<Utc>,
-    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,14 +54,6 @@ impl FlowProcessEvent {
             Self::EffectiveStateChanged(_) => "FlowProcessEventEffectiveStateChanged",
             Self::AutoStopped(_) => "FlowProcessEventAutoStopped",
             Self::ResumedFromAutoStop(_) => "FlowProcessEventResumedFromAutoStop",
-        }
-    }
-
-    pub fn flow_binding(&self) -> &FlowBinding {
-        match self {
-            Self::EffectiveStateChanged(e) => &e.flow_binding,
-            Self::AutoStopped(e) => &e.flow_binding,
-            Self::ResumedFromAutoStop(e) => &e.flow_binding,
         }
     }
 
