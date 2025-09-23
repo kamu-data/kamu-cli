@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use cheap_clone::CheapClone;
 use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
 use dill::{component, interface};
@@ -88,7 +89,7 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
         } else {
             Err(DatasetStatisticsNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
+                block_ref: block_ref.cheap_clone(),
             }
             .into())
         }

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use cheap_clone::CheapClone;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
@@ -139,7 +140,7 @@ impl DataWriterMetadataState {
             .map(|e| e.schema);
 
         Ok(Self {
-            block_ref: block_ref.clone(),
+            block_ref: block_ref.cheap_clone(),
             head,
             schema,
             source_event,

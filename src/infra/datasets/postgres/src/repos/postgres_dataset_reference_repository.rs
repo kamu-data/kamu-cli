@@ -9,6 +9,7 @@
 
 use std::str::FromStr;
 
+use cheap_clone::CheapClone;
 use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -72,7 +73,7 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
         } else {
             Err(DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
+                block_ref: block_ref.cheap_clone(),
             }
             .into())
         }
@@ -189,7 +190,7 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
             Err(RemoveDatasetReferenceError::NotFound(
                 DatasetReferenceNotFoundError {
                     dataset_id: dataset_id.clone(),
-                    block_ref: block_ref.clone(),
+                    block_ref: block_ref.cheap_clone(),
                 },
             ))
         } else {

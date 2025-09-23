@@ -2691,6 +2691,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "cheap-clone"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93986fd5fbf634f6bdf3882ef4c9159b073de6227012c9883ceaad409c527797"
+dependencies = [
+ "paste",
+ "seq-macro",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7687,6 +7697,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bytes",
+ "cheap-clone",
  "chrono",
  "container-runtime",
  "datafusion",
@@ -7739,6 +7750,7 @@ version = "0.248.1"
 dependencies = [
  "async-trait",
  "bytes",
+ "cheap-clone",
  "chrono",
  "crypto-utils",
  "database-common",
@@ -7766,6 +7778,7 @@ name = "kamu-datasets-inmem"
 version = "0.248.1"
 dependencies = [
  "async-trait",
+ "cheap-clone",
  "database-common",
  "database-common-macros",
  "dill",
@@ -7789,6 +7802,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
+ "cheap-clone",
  "database-common",
  "database-common-macros",
  "dill",
@@ -7829,6 +7843,7 @@ version = "0.248.1"
 dependencies = [
  "async-trait",
  "bytes",
+ "cheap-clone",
  "chrono",
  "common-macros",
  "database-common",
@@ -7880,6 +7895,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
+ "cheap-clone",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -9701,6 +9717,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
+ "cheap-clone",
  "chrono",
  "dill",
  "file-utils",
@@ -9727,6 +9744,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
+ "cheap-clone",
  "chrono",
  "common-macros",
  "dill",

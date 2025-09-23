@@ -27,6 +27,7 @@ Recommendation: for ease of reading, use the following order:
   Ability to disable hints during iteration.
 - (#1384) `SearchActivePushSourcesVisitor`, `SearchActivePollingSourceVisitor`: accounting for the evolution of data 
   sources.
+- (#1366): Experiment: beginning of `cheap_clone()` integration.
 
 ## [0.248.1] - 2025-09-11
 ### Fixed

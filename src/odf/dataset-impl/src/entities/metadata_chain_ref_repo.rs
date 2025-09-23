@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use cheap_clone::CheapClone;
 use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
@@ -79,7 +80,7 @@ where
             }?;
             if prev_expected != prev_actual.as_ref() {
                 return Err(RefCASError {
-                    reference: r.clone(),
+                    reference: r.cheap_clone(),
                     expected: prev_expected.cloned(),
                     actual: prev_actual,
                 }
