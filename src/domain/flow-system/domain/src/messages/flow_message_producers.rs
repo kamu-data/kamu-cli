@@ -17,7 +17,4 @@ pub const MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE: &str =
 
 pub const MESSAGE_PRODUCER_KAMU_FLOW_AGENT: &str = "dev.kamu.domain.flow-system.FlowAgent";
 
-pub const MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE: &str =
-    "dev.kamu.domain.flow-system.FlowProgressService";
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,7 +13,6 @@ use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
 use kamu_flow_system::*;
-use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +21,6 @@ pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
-    outbox: Arc<dyn Outbox>,
     agent_config: Arc<FlowAgentConfig>,
 }
 
@@ -346,20 +344,6 @@ impl FlowSchedulingHelper {
             flow.schedule_for_activation(trigger_time, next_activation_time)
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-
-            // Notify about scheduling
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                    FlowProgressMessage::scheduled(
-                        trigger_time,
-                        flow.last_stored_event_id().expect("Must have event ID"),
-                        flow.flow_id,
-                        flow.flow_binding.clone(),
-                        next_activation_time,
-                    ),
-                )
-                .await?;
         } else {
             // Save flow state, even if not scheduled
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;

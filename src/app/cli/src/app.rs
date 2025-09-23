@@ -27,7 +27,6 @@ use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
 use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
@@ -652,10 +651,6 @@ pub fn configure_server_catalog(
 
     b.add::<UploadServiceLocal>();
 
-    register_message_dispatcher::<kamu_flow_system::FlowProgressMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-    );
     register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,

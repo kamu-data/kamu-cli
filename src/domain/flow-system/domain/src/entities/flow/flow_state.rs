@@ -158,14 +158,25 @@ impl Projection for FlowState {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
 
                     E::StartConditionUpdated(FlowEventStartConditionUpdated {
+                        event_time,
                         start_condition,
                         ..
                     }) => {
                         if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
+                            let timing = if let FlowStartCondition::Executor(_) = &start_condition {
+                                FlowTimingRecords {
+                                    awaiting_executor_since: Some(event_time),
+                                    ..s.timing
+                                }
+                            } else {
+                                s.timing
+                            };
+
                             Ok(FlowState {
                                 start_condition: Some(start_condition),
+                                timing,
                                 ..s
                             })
                         }
@@ -229,24 +240,13 @@ impl Projection for FlowState {
                         }
                     }
 
-                    E::TaskScheduled(FlowEventTaskScheduled {
-                        event_time,
-                        task_id,
-                        ..
-                    }) => {
+                    E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
                         if s.outcome.is_some() || s.timing.scheduled_for_activation_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-                            Ok(FlowState {
-                                task_ids,
-                                timing: FlowTimingRecords {
-                                    awaiting_executor_since: Some(event_time),
-                                    ..s.timing
-                                },
-                                ..s
-                            })
+                            Ok(FlowState { task_ids, ..s })
                         }
                     }
 
