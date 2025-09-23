@@ -78,13 +78,12 @@ pub trait FlowTriggerService: Sync + Send {
         scopes: &[FlowScope],
     ) -> Result<bool, InternalError>;
 
-    /// Evaluates trigger stop policy after a failure
-    async fn evaluate_trigger_on_failure(
+    /// Automatically stops trigger
+    async fn apply_trigger_auto_stop_decision(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
-        unrecoverable: bool,
-    ) -> Result<(), InternalError>;
+    ) -> Result<Option<FlowTriggerState>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

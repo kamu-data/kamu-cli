@@ -21,7 +21,6 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
-    flow_trigger_service: Arc<dyn FlowTriggerService>,
     flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
     outbox: Arc<dyn Outbox>,
     agent_config: Arc<FlowAgentConfig>,
@@ -87,13 +86,14 @@ impl FlowSchedulingHelper {
         &self,
         flow_finish_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
+        trigger_state: &FlowTriggerState,
     ) -> Result<(), InternalError> {
         // Try locating an active schedule for this flow
-        let maybe_active_schedule = self
-            .flow_trigger_service
-            .try_take_flow_active_schedule_rule(flow_binding)
-            .await
-            .int_err()?;
+        let maybe_active_schedule = if trigger_state.is_active() {
+            trigger_state.try_get_schedule_rule()
+        } else {
+            None
+        };
 
         // If there is an active schedule, schedule the next run immediately
         if let Some(active_schedule) = maybe_active_schedule {
