@@ -7,14 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use strum::{Display, EnumCount, EnumString};
-
 use crate::FlowTriggerStopPolicy;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(
-    Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, EnumCount, Display, EnumString,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Hash,
+    Ord,
+    PartialOrd,
+    strum::EnumCount,
+    strum::Display,
+    strum::EnumString,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 #[cfg_attr(
     feature = "sqlx",

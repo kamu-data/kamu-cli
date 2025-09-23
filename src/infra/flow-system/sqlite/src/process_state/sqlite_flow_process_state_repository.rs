@@ -130,7 +130,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         flow_binding: FlowBinding,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessUpsertError> {
+    ) -> Result<FlowProcessState, FlowProcessUpsertError> {
         // Load current state
         match self.load_process_state(&flow_binding).await {
             // Got existing row => update it
@@ -153,7 +153,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                     .save_process_state(&process_state, current_event_id)
                     .await
                 {
-                    Ok(()) => Ok(()),
+                    Ok(()) => Ok(process_state),
                     Err(FlowProcessSaveError::ConcurrentModification(e)) => {
                         Err(FlowProcessUpsertError::ConcurrentModification(e))
                     }
@@ -252,7 +252,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                     ));
                 }
 
-                Ok(())
+                Ok(process_state)
             }
 
             // Bad error
@@ -266,7 +266,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         flow_binding: &FlowBinding,
         flow_outcome: &FlowOutcome,
         event_time: DateTime<Utc>,
-    ) -> Result<(), FlowProcessFlowEventError> {
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
         // Load current state
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
@@ -291,7 +291,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             .save_process_state(&process_state, current_event_id)
             .await
         {
-            Ok(()) => Ok(()),
+            Ok(()) => Ok(process_state),
             Err(FlowProcessSaveError::ConcurrentModification(e)) => {
                 Err(FlowProcessFlowEventError::ConcurrentModification(e))
             }
@@ -304,7 +304,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-    ) -> Result<(), FlowProcessFlowEventError> {
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
         // Load current state
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
@@ -329,7 +329,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             .save_process_state(&process_state, current_event_id)
             .await
         {
-            Ok(()) => Ok(()),
+            Ok(()) => Ok(process_state),
             Err(FlowProcessSaveError::ConcurrentModification(e)) => {
                 Err(FlowProcessFlowEventError::ConcurrentModification(e))
             }

@@ -12,7 +12,7 @@ use event_sourcing::EventID;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{FlowBinding, FlowOutcome, FlowScope, FlowTriggerStopPolicy};
+use crate::{FlowBinding, FlowOutcome, FlowProcessState, FlowScope, FlowTriggerStopPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +25,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
         flow_binding: FlowBinding,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessUpsertError>;
+    ) -> Result<FlowProcessState, FlowProcessUpsertError>;
 
     /// Apply a flow result.
     async fn apply_flow_result(
@@ -34,7 +34,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
         flow_binding: &FlowBinding,
         flow_outcome: &FlowOutcome,
         event_time: DateTime<Utc>,
-    ) -> Result<(), FlowProcessFlowEventError>;
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError>;
 
     /// React to flow being scheduled.
     async fn on_flow_scheduled(
@@ -42,7 +42,7 @@ pub trait FlowProcessStateRepository: Send + Sync {
         flow_event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-    ) -> Result<(), FlowProcessFlowEventError>;
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError>;
 
     /// Remove all rows for the given scope.
     async fn delete_process_states_by_scope(
