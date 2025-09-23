@@ -26,6 +26,7 @@ use kamu_core::*;
 #[component]
 #[interface(dyn PullDatasetUseCase)]
 pub struct PullDatasetUseCaseImpl {
+    polling_ingest_svc: Arc<dyn PollingIngestService>,
     transform_elaboration_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
     tenancy_config: Arc<TenancyConfig>,
@@ -85,8 +86,6 @@ impl PullDatasetUseCaseImpl {
                 break;
             }
 
-            println!("qweqweqwe");
-
             // Run iteration jobs concurrently
             let mut tasks = tokio::task::JoinSet::new();
             for job in iteration.jobs {
@@ -99,21 +98,12 @@ impl PullDatasetUseCaseImpl {
                             .and_then(|l| l.begin_ingest(pii.target.get_handle()));
                         let ingest_options = options.ingest_options.clone();
 
-                        tasks.spawn(async move {
-                            DatabaseTransactionRunner::new(catalog)
-                                .transactional_with(
-                                    |polling_ingest_svc: Arc<dyn PollingIngestService>| async move {
-                                        Self::ingest(
-                                            pii,
-                                            ingest_options,
-                                            polling_ingest_svc.clone(),
-                                            maybe_listener,
-                                        )
-                                        .await
-                                    },
-                                )
-                                .await
-                        })
+                        tasks.spawn(Self::ingest(
+                            pii,
+                            ingest_options,
+                            self.polling_ingest_svc.clone(),
+                            maybe_listener,
+                        ))
                     }
                     PullPlanIterationJob::Transform(pti) => {
                         let maybe_listener = maybe_transform_multi_listener
@@ -125,6 +115,7 @@ impl PullDatasetUseCaseImpl {
                             options.transform_options,
                             self.transform_elaboration_svc.clone(),
                             self.transform_executor.clone(),
+                            self.catalog.clone(),
                             maybe_listener,
                         ))
                     }
@@ -154,15 +145,6 @@ impl PullDatasetUseCaseImpl {
                                 )
                                 .await
                         })
-
-                        // tasks.spawn(Self::sync(
-                        //     psi,
-                        //     options.clone(),
-                        //     self.sync_svc.get().unwrap().clone(),
-                        //     self.dataset_registry.get().unwrap().clone(),
-                        //     self.remote_alias_registry.get().unwrap().
-                        // clone(),     maybe_listener,
-                        // ))
                     }
                 };
             }
@@ -378,24 +360,6 @@ impl PullDatasetUseCaseImpl {
             )
             .await;
 
-        if let Ok(PollingIngestResult::Updated {
-            old_head, new_head, ..
-        }) = &ingest_response
-        {
-            pii.target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    new_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
-
         Ok(PullResponse {
             maybe_original_request: pii.maybe_original_request,
             maybe_local_ref: Some(pii.target.get_handle().as_local_ref()),
@@ -412,6 +376,7 @@ impl PullDatasetUseCaseImpl {
         transform_options: TransformOptions,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         transform_executor: Arc<dyn TransformExecutor>,
+        catalog: dill::Catalog,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
         // Remember original request
@@ -422,7 +387,8 @@ impl PullDatasetUseCaseImpl {
 
         // Main transform run
         async fn run_transform(
-            pti: PullTransformItem,
+            target: ResolvedDataset,
+            plan: TransformPreliminaryPlan,
             transform_elaboration_svc: Arc<dyn TransformElaborationService>,
             transform_executor: Arc<dyn TransformExecutor>,
             transform_options: TransformOptions,
@@ -431,8 +397,8 @@ impl PullDatasetUseCaseImpl {
             // Elaborate phase
             match transform_elaboration_svc
                 .elaborate_transform(
-                    pti.target.clone(),
-                    pti.plan,
+                    target.clone(),
+                    plan,
                     transform_options,
                     maybe_listener.clone(),
                 )
@@ -442,7 +408,7 @@ impl PullDatasetUseCaseImpl {
                 Ok(TransformElaboration::Elaborated(plan)) => {
                     // Execute phase
                     let (target, result) = transform_executor
-                        .execute_transform(pti.target, plan, maybe_listener)
+                        .execute_transform(target, plan, maybe_listener)
                         .await;
                     (
                         target,
@@ -450,53 +416,64 @@ impl PullDatasetUseCaseImpl {
                     )
                 }
                 // Already up-to-date
-                Ok(TransformElaboration::UpToDate) => (pti.target, Ok(TransformResult::UpToDate)),
+                Ok(TransformElaboration::UpToDate) => (target, Ok(TransformResult::UpToDate)),
                 // Elaborate error
                 Err(e) => (
-                    pti.target,
+                    target,
                     Err(PullError::TransformError(TransformError::Elaborate(e))),
                 ),
             }
         }
 
-        let transform_result = run_transform(
-            pti,
-            transform_elaboration_svc,
-            transform_executor,
-            transform_options,
-            maybe_listener,
-        )
-        .await;
+        let transform_result = DatabaseTransactionRunner::new(catalog)
+            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                let transactional_target = dataset_registry
+                    .get_dataset_by_handle(&pti.target.get_handle())
+                    .await;
 
-        if let Ok(TransformResult::Updated {
-            old_head, new_head, ..
-        }) = &transform_result.1
-        {
-            pti_target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    new_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
-                    },
+                let (target, transform_result) = run_transform(
+                    transactional_target,
+                    pti.plan,
+                    transform_elaboration_svc,
+                    transform_executor,
+                    transform_options,
+                    maybe_listener,
                 )
-                .await
-                .int_err()?;
-        }
+                .await;
+
+                if let Ok(TransformResult::Updated {
+                    old_head, new_head, ..
+                }) = &transform_result
+                {
+                    target
+                        .as_metadata_chain()
+                        .set_ref(
+                            &odf::BlockRef::Head,
+                            new_head,
+                            odf::dataset::SetRefOpts {
+                                validate_block_present: true,
+                                check_ref_is: Some(Some(old_head)),
+                            },
+                        )
+                        .await
+                        .int_err()?;
+                }
+
+                Ok(transform_result)
+            })
+            .await?;
 
         // Prepare response
         Ok(PullResponse {
             maybe_original_request,
-            maybe_local_ref: Some(transform_result.0.get_handle().as_local_ref()),
+            maybe_local_ref: Some(pti_target.get_handle().as_local_ref()),
             maybe_remote_ref: None,
-            result: transform_result.1.map(Into::into),
+            result: transform_result.map(Into::into),
         })
     }
 
     async fn sync(
-        psi: PullSyncItem,
+        mut psi: PullSyncItem,
         options: PullOptions,
         sync_svc: Arc<dyn SyncService>,
         dataset_registry: Arc<dyn DatasetRegistry>,
@@ -504,6 +481,15 @@ impl PullDatasetUseCaseImpl {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
         // Run sync action
+        psi.sync_request
+            .src
+            .refresh_dataset_from_registry(&*dataset_registry)
+            .await;
+        psi.sync_request
+            .dst
+            .refresh_dataset_from_registry(&*dataset_registry)
+            .await;
+
         let mut sync_result = sync_svc
             .sync(*psi.sync_request, options.sync_options, listener)
             .await;
@@ -587,17 +573,22 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         let (plan, errors) = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
                 |pull_request_planner: Arc<dyn PullRequestPlanner>| async move {
+                    let res = pull_request_planner
+                        .build_pull_multi_plan(&requests, &cloned_options, *self.tenancy_config)
+                        .await;
+
+                    for iteration in &res.0 {
+                        for job in &iteration.jobs {
+                            job.detach_from_transaction();
+                        }
+                    }
                     Ok::<
                         (
                             Vec<kamu_core::PullPlanIteration>,
                             Vec<kamu_core::PullResponse>,
                         ),
                         InternalError,
-                    >(
-                        pull_request_planner
-                            .build_pull_multi_plan(&requests, &cloned_options, *self.tenancy_config)
-                            .await,
-                    )
+                    >(res)
                 },
             )
             .await
@@ -632,9 +623,17 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         let (plan, errors) = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
                 |pull_request_planner: Arc<dyn PullRequestPlanner>| async move {
-                    pull_request_planner
+                    let res = pull_request_planner
                         .build_pull_plan_all_owner_datasets(&cloned_options, *self.tenancy_config)
-                        .await
+                        .await?;
+
+                    for iteration in &res.0 {
+                        for job in &iteration.jobs {
+                            job.detach_from_transaction();
+                        }
+                    }
+
+                    Ok(res)
                 },
             )
             .await?;

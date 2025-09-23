@@ -14,7 +14,6 @@ use chrono::{TimeZone, Utc};
 use container_runtime::*;
 use datafusion::prelude::*;
 use indoc::indoc;
-use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -678,6 +677,7 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
     .unwrap();
 
     let res = harness.ingest(target).await;
+    println!("{:?}", res);
     assert_matches!(res, Err(PollingIngestError::BadInputSchema(_)));
 }
 
@@ -1250,8 +1250,9 @@ impl IngestTestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<DidGeneratorDefault>()
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add_value(ContainerRuntimeConfig::default())
@@ -1275,8 +1276,10 @@ impl IngestTestHarness {
             .add::<FetchService>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PollingIngestServiceImpl>()
-            .add::<DatasetKeyValueServiceSysEnv>()
-            .build();
+            .add::<DatasetKeyValueServiceSysEnv>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let catalog = b.build();
 
         Self {
             temp_dir,
@@ -1322,24 +1325,6 @@ impl IngestTestHarness {
                 None,
             )
             .await;
-
-        if let Ok(PollingIngestResult::Updated {
-            old_head, new_head, ..
-        }) = &ingest_result
-        {
-            target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    new_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
 
         ingest_result
     }
