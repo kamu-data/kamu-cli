@@ -305,18 +305,6 @@ impl FlowAgentImpl {
                 );
             });
 
-        // Publish progress event
-        let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
-        outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-                FlowAgentUpdatedMessage {
-                    update_time: activation_moment,
-                    update_details: FlowAgentUpdateDetails::ExecutedTimeslot,
-                },
-            )
-            .await?;
-
         Ok(())
     }
 
@@ -475,19 +463,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         flow.on_task_running(message.event_time, message.task_id)
                             .int_err()?;
                         flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                        outbox
-                            .post_message(
-                                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                FlowProgressMessage::running(
-                                    message.event_time,
-                                    flow.last_stored_event_id().expect("Must have event ID"),
-                                    flow_id,
-                                    flow.flow_binding.clone(),
-                                ),
-                            )
-                            .await?;
                     } else {
                         tracing::info!(
                             flow_id = %flow.flow_id,
@@ -515,25 +490,9 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         .int_err()?;
                         flow.save(flow_event_store.as_ref()).await.int_err()?;
 
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
-                        if let Some(flow_outcome) = flow.outcome.as_ref() {
-                            // Notify about finished flow
-                            outbox
-                                .post_message(
-                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                    FlowProgressMessage::finished(
-                                        message.event_time,
-                                        flow.last_stored_event_id().expect("Must have event ID"),
-                                        flow_id,
-                                        flow.flow_binding.clone(),
-                                        flow_outcome.clone(),
-                                    ),
-                                )
-                                .await?;
-
+                        if flow.outcome.is_some() {
                             // Handle flow failure if it reached a terminal state
                             if message.outcome.is_failure() {
                                 let recoverable = message.outcome.is_recoverable_failure();
@@ -564,22 +523,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     .await
                                     .int_err()?;
                             }
-                        } else {
-                            // Notify about scheduled retry
-                            outbox
-                                .post_message(
-                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                    FlowProgressMessage::retry_scheduled(
-                                        message.event_time,
-                                        flow.last_stored_event_id().expect("Must have event ID"),
-                                        flow_id,
-                                        flow.flow_binding.clone(),
-                                        flow.timing
-                                            .scheduled_for_activation_at
-                                            .expect("Flow must have scheduled activation time"),
-                                    ),
-                                )
-                                .await?;
                         }
                     } else {
                         tracing::info!(

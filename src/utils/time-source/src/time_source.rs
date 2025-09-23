@@ -144,30 +144,41 @@ impl FakeSystemTimeSource {
     }
 
     pub fn advance(&self, time_quantum: Duration) -> Vec<AwaitingCallerId> {
-        let mut state = self.state.lock().unwrap();
+        let ready_callers = {
+            let mut state = self.state.lock().unwrap();
 
-        state.t += time_quantum;
+            let new_time = state.t + time_quantum;
+            let mut ready_callers = vec![];
 
-        let mut ready_callers = vec![];
+            // First, collect all ready callers without advancing time yet
+            while let Some(awaiting_caller) = state.awaiting_callers.peek() {
+                if awaiting_caller.0.wake_up_time > new_time {
+                    break;
+                }
 
-        while let Some(awaiting_caller) = state.awaiting_callers.peek() {
-            if awaiting_caller.0.wake_up_time > state.t {
-                break;
+                ready_callers.push(state.awaiting_callers.pop().unwrap().0);
             }
 
-            ready_callers.push(state.awaiting_callers.pop().unwrap().0);
-        }
+            // Only advance time after collecting ready callers
+            state.t = new_time;
 
-        for ready_caller in &mut ready_callers {
-            let tx = ready_caller.waker_tx.take().unwrap();
+            ready_callers
+        }; // Release lock before sending wakeup signals
 
-            tx.send(()).unwrap();
-        }
-
-        ready_callers
+        // Send wakeup signals outside of the lock to prevent deadlocks
+        let caller_ids: Vec<AwaitingCallerId> = ready_callers
             .into_iter()
-            .map(|ready_caller| ready_caller.id)
-            .collect()
+            .map(|mut ready_caller| {
+                let caller_id = ready_caller.id;
+                if let Some(tx) = ready_caller.waker_tx.take() {
+                    // Don't panic if receiver is dropped - this can happen during test cleanup
+                    let _ = tx.send(());
+                }
+                caller_id
+            })
+            .collect();
+
+        caller_ids
     }
 }
 
@@ -180,6 +191,11 @@ impl SystemTimeSource for FakeSystemTimeSource {
     }
 
     async fn sleep(&self, duration: Duration) {
+        // Handle zero or negative duration immediately
+        if duration <= Duration::zero() {
+            return;
+        }
+
         let (tx, rx) = oneshot::channel();
 
         {
@@ -195,7 +211,8 @@ impl SystemTimeSource for FakeSystemTimeSource {
             state.next_caller_id += 1;
         }
 
-        rx.await.unwrap();
+        // Handle the case where receiver might be dropped during test cleanup
+        let _ = rx.await;
     }
 }
 

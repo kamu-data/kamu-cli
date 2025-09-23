@@ -13,7 +13,6 @@ use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::*;
 use kamu_task_system::TaskScheduler;
-use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +25,6 @@ pub(crate) struct FlowAbortHelper {
     flow_sensor_dispatcher: Arc<dyn FlowSensorDispatcher>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,19 +42,6 @@ impl FlowAbortHelper {
                 for task_id in &flow.task_ids {
                     self.task_scheduler.cancel_task(*task_id).await.int_err()?;
                 }
-
-                // Notify the flow has been aborted
-                self.outbox
-                    .post_message(
-                        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                        FlowProgressMessage::cancelled(
-                            self.time_source.now(),
-                            flow.last_stored_event_id().expect("Must have event ID"),
-                            flow.flow_id,
-                            flow.flow_binding.clone(),
-                        ),
-                    )
-                    .await?;
             }
             FlowStatus::Finished => {
                 /* Skip, idempotence */
