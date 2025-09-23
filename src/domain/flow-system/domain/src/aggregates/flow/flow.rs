@@ -163,15 +163,29 @@ impl Flow {
             None
         };
 
-        let event = FlowEventTaskFinished {
+        self.apply(FlowEventTaskFinished {
             event_time: now,
             flow_id: self.flow_id,
             flow_binding: self.flow_binding.clone(),
             task_id,
             task_outcome,
             next_attempt_at,
-        };
-        self.apply(event)
+        })?;
+
+        // Auto-submit Completed event if the outcome is final and not Aborted
+        if let Some(outcome) = self.outcome.as_ref()
+            && !outcome.is_aborted()
+        {
+            self.apply(FlowEventCompleted {
+                event_time: now,
+                flow_id: self.flow_id,
+                flow_binding: self.flow_binding.clone(),
+                outcome: outcome.clone(),
+                late_activation_causes: self.late_activation_causes.clone(),
+            })?;
+        }
+
+        Ok(())
     }
 
     /// Abort flow

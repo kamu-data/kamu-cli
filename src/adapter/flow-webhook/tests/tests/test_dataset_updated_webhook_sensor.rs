@@ -302,6 +302,7 @@ impl DatasetUpdatedWebhookSensorHarness {
                         running_since: None,
                         awaiting_executor_since: None,
                         last_attempt_finished_at: None,
+                        completed_at: None,
                     },
                     config_snapshot: None,
                     retry_policy: None,

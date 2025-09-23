@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu_flow_system::*;
-use kamu_task_system::TaskOutcome;
 
 use crate::FlowSchedulingHelper;
 
@@ -21,7 +20,6 @@ use crate::FlowSchedulingHelper;
 pub struct FlowProcessStateProjector {
     flow_process_state_repository: Arc<dyn FlowProcessStateRepository>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
-    flow_event_store: Arc<dyn FlowEventStore>,
     flow_scheduling_helper: Arc<FlowSchedulingHelper>,
 }
 
@@ -94,68 +92,55 @@ impl FlowProcessStateProjector {
                     .int_err()?;
             }
 
-            // Tracking completed tasks
-            FlowEvent::TaskFinished(e) => {
-                // This must be the last task in the flow to consider the flow finished.
-                // Make sure we ignore intermediate task completions that will be retried.
-                let last_task_in_flow = match e.task_outcome {
-                    TaskOutcome::Success(_) | TaskOutcome::Cancelled => true,
-                    TaskOutcome::Failed(_) => e.next_attempt_at.is_none(),
-                };
-                if last_task_in_flow {
-                    // Now the flow is really finished, we can modify the projection
-                    let flow_outcome: FlowOutcome = e.task_outcome.clone().into();
-                    if matches!(flow_outcome, FlowOutcome::Aborted) {
-                        // Ignored, we don't track aborted flows in this projection
-                        return Ok(());
-                    }
+            // Tracking completed flows
+            FlowEvent::Completed(e) => {
+                // Now the flow is really finished, we can modify the projection
+                assert_ne!(e.outcome, FlowOutcome::Aborted); // Aborted flows should not generate this event
 
-                    // Update process state. Among other values, this computes the latest ones for
-                    // "last_attempted_at" and "consecutive_failures"
-                    self.flow_process_state_repository
-                        .apply_flow_result(
-                            event_id,
+                // Update process state. Among other values, this computes the latest ones for
+                // "last_attempted_at" and "consecutive_failures"
+                self.flow_process_state_repository
+                    .apply_flow_result(
+                        event_id,
+                        flow_event.flow_binding(),
+                        &e.outcome,
+                        flow_event.event_time(),
+                    )
+                    .await
+                    .int_err()?;
+
+                // In case of a failure, trigger should make a decision about auto-stopping
+                if e.outcome.is_failure() {
+                    self.flow_trigger_service
+                        .evaluate_trigger_on_failure(
+                            flow_event.event_time(),
                             flow_event.flow_binding(),
-                            &flow_outcome,
-                            flow_event.event_time(),
-                        )
-                        .await
-                        .int_err()?;
-
-                    // In case of a failure, trigger should make a decision about auto-stopping
-                    if !flow_outcome.is_success() {
-                        self.flow_trigger_service
-                            .evaluate_trigger_on_failure(
-                                flow_event.event_time(),
-                                flow_event.flow_binding(),
-                                !e.task_outcome.is_recoverable_failure(),
-                            )
-                            .await?;
-                    }
-
-                    // Recover the flow to check if we need to schedule next activation
-                    let flow = Flow::load(flow_event.flow_id(), self.flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
-
-                    // In case of success:
-                    //  - schedule next flow immediately, if we had any late activation cause
-                    if flow_outcome.is_success() {
-                        self.flow_scheduling_helper
-                            .try_schedule_late_flow_activations(flow_event.event_time(), &flow)
-                            .await?;
-                    }
-
-                    // Try to schedule auto-polling flow, if applicable.
-                    // We don't care whether we failed or succeeded,
-                    // that is determined with the stop policy in the trigger.
-                    self.flow_scheduling_helper
-                        .try_schedule_auto_polling_flow_continuation_if_enabled(
-                            flow_event.event_time(),
-                            &flow,
+                            e.outcome.is_unrecoverable_failure(),
                         )
                         .await?;
                 }
+
+                // In case of success:
+                //  - schedule next flow immediately, if we had any late activation cause
+                if e.outcome.is_success() && !e.late_activation_causes.is_empty() {
+                    self.flow_scheduling_helper
+                        .schedule_late_flow_activations(
+                            flow_event.event_time(),
+                            flow_event.flow_binding(),
+                            &e.late_activation_causes,
+                        )
+                        .await?;
+                }
+
+                // Try to schedule auto-polling flow, if applicable.
+                // We don't care whether we failed or succeeded,
+                // that is determined with the stop policy in the trigger.
+                self.flow_scheduling_helper
+                    .try_schedule_auto_polling_flow_continuation_if_enabled(
+                        flow_event.event_time(),
+                        flow_event.flow_binding(),
+                    )
+                    .await?;
             }
 
             FlowEvent::Initiated(_)
@@ -164,7 +149,8 @@ impl FlowProcessStateProjector {
             | FlowEvent::ConfigSnapshotModified(_)
             | FlowEvent::StartConditionUpdated(_)
             | FlowEvent::TaskScheduled(_)
-            | FlowEvent::TaskRunning(_) => {
+            | FlowEvent::TaskRunning(_)
+            | FlowEvent::TaskFinished(_) => {
                 // Ignored
             }
         }
