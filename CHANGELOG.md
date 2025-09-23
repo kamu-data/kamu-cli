@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.249.0] - 2025-09-23
 ### Changed
 - (#1372): GQL: Performance improvement via query vectorization for APIs:
   - `Dataset::by_ids()`;
