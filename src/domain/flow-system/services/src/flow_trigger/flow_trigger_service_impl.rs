@@ -22,7 +22,6 @@ use time_source::SystemTimeSource;
 #[interface(dyn FlowScopeRemovalHandler)]
 pub struct FlowTriggerServiceImpl {
     flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
-    flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
@@ -122,21 +121,6 @@ impl FlowTriggerServiceImpl {
         }
 
         Ok(())
-    }
-
-    async fn get_current_consecutive_flow_failures_count(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<u32, InternalError> {
-        let process_state = self
-            .flow_process_state_query
-            .try_get_process_state(flow_binding)
-            .await?;
-
-        Ok(process_state
-            .as_ref()
-            .map(FlowProcessState::consecutive_failures)
-            .unwrap_or(0))
     }
 }
 
@@ -347,71 +331,30 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(?flow_binding, %unrecoverable))]
-    async fn evaluate_trigger_on_failure(
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
+    async fn apply_trigger_auto_stop_decision(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
-        unrecoverable: bool,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Option<FlowTriggerState>, InternalError> {
         // Find an active trigger
         let maybe_active_trigger =
             FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
                 .await
                 .int_err()?;
 
-        if let Some(active_trigger) = maybe_active_trigger {
-            // We got the trigger.
-            // The failure is either:
-            //  - unrecoverable => no sense to continue attempts until user fixes the issue
-            //  - recoverable   => evaluate stop policy
-            if unrecoverable {
-                tracing::warn!(
-                    flow_binding = ?flow_binding,
-                    "Auto-stopping flow trigger after unrecoverable failure",
-                );
-                self.stop_given_trigger(request_time, active_trigger)
-                    .await
-                    .int_err()?;
-            } else {
-                match active_trigger.stop_policy {
-                    FlowTriggerStopPolicy::AfterConsecutiveFailures { failures_count } => {
-                        // Determine actual number of consecutive failures.
-                        // Note, if policy is set to 1, we can skip the query,
-                        // we know the flow has just failed.
-                        let failures_count_value = failures_count.into();
-                        let actual_failures_count = if failures_count_value > 1 {
-                            self.get_current_consecutive_flow_failures_count(flow_binding)
-                                .await?
-                        } else {
-                            1 /* this one */
-                        };
-                        if actual_failures_count >= failures_count_value {
-                            tracing::warn!(
-                                flow_binding = ?flow_binding,
-                                %actual_failures_count,
-                                "Auto-stopping flow trigger after crossing consecutive failures threshold",
-                            );
-                            self.stop_given_trigger(request_time, active_trigger)
-                                .await
-                                .int_err()?;
-                        } else {
-                            tracing::info!(
-                                flow_binding = ?flow_binding,
-                                %actual_failures_count,
-                                %failures_count_value,
-                                "Flow has consecutive failures, but auto-stop threshold is not crossed yet",
-                            );
-                        }
-                    }
-                    FlowTriggerStopPolicy::Never => {
-                        // Do nothing
-                    }
-                }
-            }
-        }
+        // If found, stop it
+        let maybe_new_trigger_state = if let Some(active_trigger) = maybe_active_trigger {
+            let new_trigger_state = self
+                .stop_given_trigger(request_time, active_trigger)
+                .await?;
+            Some(new_trigger_state)
+        } else {
+            None
+        };
 
-        Ok(())
+        // Return the updated state
+        Ok(maybe_new_trigger_state)
     }
 }
 
