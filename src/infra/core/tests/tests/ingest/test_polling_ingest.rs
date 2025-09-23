@@ -677,7 +677,6 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
     .unwrap();
 
     let res = harness.ingest(target).await;
-    println!("{:?}", res);
     assert_matches!(res, Err(PollingIngestError::BadInputSchema(_)));
 }
 

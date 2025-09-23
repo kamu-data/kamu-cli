@@ -372,7 +372,7 @@ impl PullDatasetUseCaseImpl {
     }
 
     async fn transform(
-        pti: PullTransformItem,
+        mut pti: PullTransformItem,
         transform_options: TransformOptions,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         transform_executor: Arc<dyn TransformExecutor>,
@@ -387,8 +387,7 @@ impl PullDatasetUseCaseImpl {
 
         // Main transform run
         async fn run_transform(
-            target: ResolvedDataset,
-            plan: TransformPreliminaryPlan,
+            pti: PullTransformItem,
             transform_elaboration_svc: Arc<dyn TransformElaborationService>,
             transform_executor: Arc<dyn TransformExecutor>,
             transform_options: TransformOptions,
@@ -397,8 +396,8 @@ impl PullDatasetUseCaseImpl {
             // Elaborate phase
             match transform_elaboration_svc
                 .elaborate_transform(
-                    target.clone(),
-                    plan,
+                    pti.target.clone(),
+                    pti.plan,
                     transform_options,
                     maybe_listener.clone(),
                 )
@@ -408,7 +407,7 @@ impl PullDatasetUseCaseImpl {
                 Ok(TransformElaboration::Elaborated(plan)) => {
                     // Execute phase
                     let (target, result) = transform_executor
-                        .execute_transform(target, plan, maybe_listener)
+                        .execute_transform(pti.target, plan, maybe_listener)
                         .await;
                     (
                         target,
@@ -416,10 +415,10 @@ impl PullDatasetUseCaseImpl {
                     )
                 }
                 // Already up-to-date
-                Ok(TransformElaboration::UpToDate) => (target, Ok(TransformResult::UpToDate)),
+                Ok(TransformElaboration::UpToDate) => (pti.target, Ok(TransformResult::UpToDate)),
                 // Elaborate error
                 Err(e) => (
-                    target,
+                    pti.target,
                     Err(PullError::TransformError(TransformError::Elaborate(e))),
                 ),
             }
@@ -427,13 +426,11 @@ impl PullDatasetUseCaseImpl {
 
         let transform_result = DatabaseTransactionRunner::new(catalog)
             .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                let transactional_target = dataset_registry
-                    .get_dataset_by_handle(&pti.target.get_handle())
-                    .await;
+                pti.refresh_from_dataset_registry(dataset_registry.as_ref())
+                    .await?;
 
                 let (target, transform_result) = run_transform(
-                    transactional_target,
-                    pti.plan,
+                    pti,
                     transform_elaboration_svc,
                     transform_executor,
                     transform_options,
@@ -577,6 +574,8 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                         .build_pull_multi_plan(&requests, &cloned_options, *self.tenancy_config)
                         .await;
 
+                    // Detach plan entities from current transaction
+                    // to be able to commit it and manage them in iterations separately
                     for iteration in &res.0 {
                         for job in &iteration.jobs {
                             job.detach_from_transaction();

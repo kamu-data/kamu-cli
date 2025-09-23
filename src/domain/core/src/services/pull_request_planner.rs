@@ -115,6 +115,22 @@ pub struct PullTransformItem {
     pub plan: TransformPreliminaryPlan,
 }
 
+impl PullTransformItem {
+    pub async fn refresh_from_dataset_registry(
+        &mut self,
+        dataset_registry: &dyn DatasetRegistry,
+    ) -> Result<(), InternalError> {
+        self.target = dataset_registry
+            .get_dataset_by_handle(&self.target.get_handle())
+            .await;
+        self.plan
+            .datasets_map
+            .refresh_dataset_from_registry(dataset_registry)
+            .await;
+        Ok(())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]

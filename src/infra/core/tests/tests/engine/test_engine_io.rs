@@ -295,8 +295,7 @@ async fn test_engine_io_local_file_mount() {
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ))
-        .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .build();
+        .add::<odf::dataset::DatasetLfsBuilderDefault>();
 
     database_common::NoOpDatabasePlugin::init_database_components(&mut b);
     let catalog = b.build();
@@ -346,8 +345,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
             s3_context.clone(),
         ))
-        .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
-        .build();
+        .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None));
 
     database_common::NoOpDatabasePlugin::init_database_components(&mut b);
     let catalog = b.build();
