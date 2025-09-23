@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use cheap_clone::CheapClone;
 use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -68,7 +69,7 @@ impl DatasetStatisticsRepository for PostgresDatasetStatisticsRepository {
         } else {
             Err(DatasetStatisticsNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: *block_ref,
+                block_ref: block_ref.cheap_clone(),
             }
             .into())
         }

@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use cheap_clone::CheapClone;
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
@@ -70,7 +71,7 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
         Err(GetDatasetStatisticsError::NotFound(
             DatasetStatisticsNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: *block_ref,
+                block_ref: block_ref.cheap_clone(),
             },
         ))
     }
@@ -86,7 +87,7 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
             .statistics
             .entry(dataset_id.clone())
             .or_default()
-            .insert(*block_ref, statistics);
+            .insert(block_ref.cheap_clone(), statistics);
 
         Ok(())
     }

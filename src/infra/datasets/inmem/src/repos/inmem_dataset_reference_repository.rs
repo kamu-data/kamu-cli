@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use cheap_clone::CheapClone;
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
@@ -71,7 +72,7 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         Err(GetDatasetReferenceError::NotFound(
             DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: *block_ref,
+                block_ref: block_ref.cheap_clone(),
             },
         ))
     }
@@ -84,7 +85,7 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         if let Some(dataset_references) = guard.references.get(dataset_id) {
             Ok(dataset_references
                 .iter()
-                .map(|(block_ref, block_hash)| (*block_ref, block_hash.clone()))
+                .map(|(block_ref, block_hash)| (block_ref.cheap_clone(), block_hash.clone()))
                 .collect())
         } else {
             Ok(vec![])
@@ -136,7 +137,7 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
                     .into());
                 }
 
-                dataset_references.insert(*block_ref, block_hash.clone());
+                dataset_references.insert(block_ref.cheap_clone(), block_hash.clone());
             }
         } else {
             if maybe_prev_block_hash.is_some() {
@@ -151,7 +152,7 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
 
             guard.references.insert(
                 dataset_id.clone(),
-                HashMap::from_iter([(*block_ref, block_hash.clone())]),
+                HashMap::from_iter([(block_ref.cheap_clone(), block_hash.clone())]),
             );
         }
 
@@ -173,7 +174,7 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         Err(RemoveDatasetReferenceError::NotFound(
             DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: *block_ref,
+                block_ref: block_ref.cheap_clone(),
             },
         ))
     }

@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use cheap_clone::CheapClone;
 use kamu_datasets::{DatasetReferenceService, GetDatasetReferenceError, SetDatasetReferenceError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +94,7 @@ where
             let mut write_guard = self.state.write().unwrap();
             write_guard
                 .cached_references
-                .insert(*r, resolved_ref.clone());
+                .insert(r.cheap_clone(), resolved_ref.clone());
 
             tracing::debug!(dataset_id=%self.dataset_id, %r, %resolved_ref, "Updated reference cache");
 
