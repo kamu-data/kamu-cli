@@ -27,11 +27,13 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         &self,
         target: &ResolvedDataset,
     ) -> Result<Option<PollingSourceBlockInfo>, InternalError> {
-        // TODO: Support source evolution
         use odf::dataset::MetadataChainExt;
+
         Ok(target
             .as_metadata_chain()
-            .accept_one(odf::dataset::SearchSetPollingSourceVisitor::new())
+            .accept_one(odf::dataset::SearchActivePollingSourceVisitor::new(
+                target.get_kind(),
+            ))
             .await
             .int_err()?
             .into_hashed_block())
@@ -48,17 +50,16 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         )>,
         InternalError,
     > {
-        use futures::TryStreamExt;
-        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
-        use odf::metadata::AsTypedBlock;
+        use odf::dataset::MetadataChainExt;
 
-        // TODO: Support source disabling and evolution
-        let stream = target
+        Ok(target
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(h, b)| b.into_typed().map(|b| (h, b)));
-
-        Ok(stream.try_collect().await.int_err()?)
+            .accept_one(odf::dataset::SearchActivePushSourcesVisitor::new(
+                target.get_kind(),
+            ))
+            .await
+            .int_err()?
+            .into_hashed_blocks())
     }
 
     /// Returns an active transform, if any
@@ -76,9 +77,12 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         use odf::dataset::MetadataChainExt;
         Ok(target
             .as_metadata_chain()
-            .accept_one(odf::dataset::SearchSetTransformVisitor::new())
+            .accept_one(odf::dataset::SearchSetTransformVisitor::new(
+                target.get_kind(),
+            ))
             .await
             .int_err()?
+            .into_inner()
             .into_hashed_block())
     }
 
@@ -89,15 +93,19 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         resolved_dataset: &ResolvedDataset,
     ) -> Result<Option<DateTime<Utc>>, InternalError> {
         use odf::dataset::MetadataChainExt;
-        let mut add_data_visitor = odf::dataset::SearchAddDataVisitor::new();
 
-        resolved_dataset
+        let visitor = resolved_dataset
             .as_metadata_chain()
-            .accept(&mut [&mut add_data_visitor])
+            .accept_one(odf::dataset::SearchAddDataVisitor::new(
+                resolved_dataset.get_kind(),
+            ))
             .await
             .int_err()?;
 
-        let current_watermark = add_data_visitor.into_event().and_then(|e| e.new_watermark);
+        let current_watermark = visitor
+            .into_inner()
+            .into_event()
+            .and_then(|e| e.new_watermark);
 
         Ok(current_watermark)
     }

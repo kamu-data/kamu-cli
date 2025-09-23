@@ -25,7 +25,6 @@ use datafusion::dataframe::DataFrame;
 use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use datafusion_odata::error::{CollectionNotFound, ODataError};
-use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
@@ -40,13 +39,13 @@ const KEY_COLUMN_ALIAS: &str = "__id__";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ODataServiceContext {
-    catalog: Catalog,
+    catalog: dill::Catalog,
     account_name: Option<odf::AccountName>,
     service_base_url: String,
 }
 
 impl ODataServiceContext {
-    pub(crate) fn new(catalog: Catalog, account_name: Option<odf::AccountName>) -> Self {
+    pub(crate) fn new(catalog: dill::Catalog, account_name: Option<odf::AccountName>) -> Self {
         let config = catalog.get_one::<ServerUrlConfig>().unwrap();
         let service_base_url = config.protocols.odata_base_url();
 
@@ -109,7 +108,7 @@ impl ServiceContext for ODataServiceContext {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ODataCollectionContext {
-    catalog: Catalog,
+    catalog: dill::Catalog,
     addr: CollectionAddr,
     resolved_dataset: ResolvedDataset,
     service_base_url: String,
@@ -117,7 +116,7 @@ pub(crate) struct ODataCollectionContext {
 
 impl ODataCollectionContext {
     pub(crate) fn new(
-        catalog: Catalog,
+        catalog: dill::Catalog,
         addr: CollectionAddr,
         resolved_dataset: ResolvedDataset,
     ) -> Self {
@@ -176,33 +175,24 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     async fn schema(&self) -> Result<SchemaRef, ODataError> {
-        // TODO: Use QueryService after arrow schema is exposed
-        // See: https://github.com/kamu-data/kamu-cli/issues/306
-        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
-        use odf::metadata::EnumWithVariants;
+        let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
 
-        let set_data_schema = self
-            .resolved_dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<odf::metadata::SetDataSchema>())
-            .try_first()
+        let dataset_ref = self.resolved_dataset.get_handle().as_local_ref();
+
+        let maybe_data_schema = query_svc
+            .get_schema(&dataset_ref)
             .await
-            .map_err(|e| {
-                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
-                e
-            })
-            .int_err()
-            .unwrap();
+            .map_int_err(ODataError::internal)?;
 
-        if let Some(set_schema) = set_data_schema {
-            set_schema
-                .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
-                .map_err(ODataError::internal)
-                .map(Arc::new)
+        let arrow_schema = if let Some(data_schema) = maybe_data_schema {
+            data_schema
+                .to_arrow(&odf::metadata::ToArrowSettings::default())
+                .map_int_err(ODataError::internal)?
         } else {
-            Ok(Arc::new(Schema::empty()))
-        }
+            Schema::empty()
+        };
+
+        Ok(Arc::new(arrow_schema))
     }
 
     async fn query(&self, query: QueryParams) -> Result<DataFrame, ODataError> {

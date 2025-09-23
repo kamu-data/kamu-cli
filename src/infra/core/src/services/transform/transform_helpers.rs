@@ -30,6 +30,11 @@ use thiserror::Error;
 pub async fn build_preliminary_request_ext(
     target: ResolvedDataset,
 ) -> Result<TransformPreliminaryRequestExt, BuildPreliminaryTransformRequestError> {
+    let dataset_kind = target.get_kind();
+    if dataset_kind != odf::DatasetKind::Derivative {
+        return Err(TransformNotDefinedError {}.into());
+    }
+
     let output_chain = target.as_metadata_chain();
 
     // TODO: externalize
@@ -39,10 +44,11 @@ pub async fn build_preliminary_request_ext(
     // TODO: PERF: Search for source, vocab, and data schema result in full scan
     let (source, schema, set_vocab, prev_query) = {
         // TODO: Support transform evolution
-        let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new();
+        let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new(dataset_kind);
         let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
         let mut set_data_schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
-        let mut execute_transform_visitor = odf::dataset::SearchExecuteTransformVisitor::new();
+        let mut execute_transform_visitor =
+            odf::dataset::SearchExecuteTransformVisitor::new(dataset_kind);
 
         use odf::dataset::MetadataChainExt;
         target
@@ -60,7 +66,7 @@ pub async fn build_preliminary_request_ext(
             .int_err()?;
 
         (
-            set_transform_visitor.into_event(),
+            set_transform_visitor.into_inner().into_event(),
             set_data_schema_visitor
                 .into_event()
                 .as_ref()
@@ -69,7 +75,7 @@ pub async fn build_preliminary_request_ext(
                 .int_err()?
                 .map(Arc::new),
             set_vocab_visitor.into_event(),
-            execute_transform_visitor.into_event(),
+            execute_transform_visitor.into_inner().into_event(),
         )
     };
 
@@ -178,7 +184,7 @@ pub(crate) async fn get_transform_input_from_query_input(
     let input_chain = resolved_input.as_metadata_chain();
 
     // Find schema
-    // TODO: Make single-pass via multi-visitor
+    // TODO: PERF: Make single-pass via multi-visitor
     use odf::dataset::MetadataChainExt;
     let schema = resolved_input
         .as_metadata_chain()

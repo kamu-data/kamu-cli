@@ -333,6 +333,7 @@ impl<'a> DatasetMetadata<'a> {
             Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
                 .await?
                 .expect("Account must exist");
+        let dataset_kind = self.dataset_request_state.dataset_handle().kind;
 
         let mut attachments_visitor = event_types
             .contains(&MetadataEventType::SetAttachments)
@@ -352,15 +353,15 @@ impl<'a> DatasetMetadata<'a> {
         let mut vocab_visitor = event_types
             .contains(&MetadataEventType::SetVocab)
             .then(odf::dataset::SearchSetVocabVisitor::new);
-        let mut polling_source_visitor = event_types
+        let mut active_polling_source_visitor = event_types
             .contains(&MetadataEventType::SetPollingSource)
-            .then(odf::dataset::SearchSetPollingSourceVisitor::new);
+            .then(|| odf::dataset::SearchActivePollingSourceVisitor::new(dataset_kind));
         let mut transform_visitor = event_types
             .contains(&MetadataEventType::SetTransform)
-            .then(odf::dataset::SearchSetTransformVisitor::new);
-        let mut push_sources_visitor = event_types
+            .then(|| odf::dataset::SearchSetTransformVisitor::new(dataset_kind));
+        let mut active_push_sources_visitor = event_types
             .contains(&MetadataEventType::AddPushSource)
-            .then(odf::dataset::SearchActivePushSourcesVisitor::new);
+            .then(|| odf::dataset::SearchActivePushSourcesVisitor::new(dataset_kind));
 
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
@@ -372,9 +373,9 @@ impl<'a> DatasetMetadata<'a> {
             &mut schema_visitor,
             &mut seed_visitor,
             &mut vocab_visitor,
-            &mut polling_source_visitor,
+            &mut active_polling_source_visitor,
             &mut transform_visitor,
-            &mut push_sources_visitor,
+            &mut active_push_sources_visitor,
         ];
 
         let head_hash = match head {
@@ -411,15 +412,15 @@ impl<'a> DatasetMetadata<'a> {
             vocab_visitor
                 .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
                 .map(|(h, b)| (h, b.into())),
-            polling_source_visitor
-                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+            active_polling_source_visitor
+                .and_then(odf::dataset::SearchActivePollingSourceVisitor::into_hashed_block)
                 .map(|(h, b)| (h, b.into())),
             transform_visitor
-                .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_hashed_block)
+                .and_then(|v| v.into_inner().into_hashed_block())
                 .map(|(h, b)| (h, b.into())),
         ];
         maybe_hashed_blocks.extend(
-            push_sources_visitor
+            active_push_sources_visitor
                 .map(odf::dataset::SearchActivePushSourcesVisitor::into_hashed_blocks)
                 .into_iter()
                 .flatten()
