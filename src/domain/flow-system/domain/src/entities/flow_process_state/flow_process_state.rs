@@ -220,11 +220,6 @@ impl FlowProcessState {
         std::mem::take(&mut self.pending_events)
     }
 
-    /// Check if there are any pending events
-    pub fn has_pending_events(&self) -> bool {
-        !self.pending_events.is_empty()
-    }
-
     pub fn update_trigger_state(
         &mut self,
         event_id: EventID,
@@ -255,7 +250,6 @@ impl FlowProcessState {
                 .push(FlowProcessEvent::ResumedFromAutoStop(
                     FlowProcessEventResumedFromAutoStop {
                         event_time: current_time,
-                        flow_binding: self.flow_binding.clone(),
                     },
                 ));
         }
@@ -278,7 +272,6 @@ impl FlowProcessState {
             self.pending_events
                 .push(FlowProcessEvent::EffectiveStateChanged(
                     FlowProcessEventEffectiveStateChanged {
-                        flow_binding: self.flow_binding.clone(),
                         old_state,
                         new_state: self.effective_state,
                         event_time: current_time,
@@ -342,7 +335,6 @@ impl FlowProcessState {
             self.pending_events
                 .push(FlowProcessEvent::EffectiveStateChanged(
                     FlowProcessEventEffectiveStateChanged {
-                        flow_binding: self.flow_binding.clone(),
                         old_state,
                         new_state: self.effective_state,
                         event_time,
@@ -354,7 +346,6 @@ impl FlowProcessState {
         if !old_auto_stopped && self.auto_stopped_reason.is_some() {
             self.pending_events
                 .push(FlowProcessEvent::AutoStopped(FlowProcessEventAutoStopped {
-                    flow_binding: self.flow_binding.clone(),
                     reason: self.auto_stopped_reason.unwrap(),
                     event_time,
                 }));
@@ -364,10 +355,7 @@ impl FlowProcessState {
         if old_auto_stopped && self.auto_stopped_reason.is_none() {
             self.pending_events
                 .push(FlowProcessEvent::ResumedFromAutoStop(
-                    FlowProcessEventResumedFromAutoStop {
-                        flow_binding: self.flow_binding.clone(),
-                        event_time,
-                    },
+                    FlowProcessEventResumedFromAutoStop { event_time },
                 ));
         }
 

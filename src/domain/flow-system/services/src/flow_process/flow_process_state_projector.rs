@@ -31,35 +31,36 @@ impl FlowProcessStateProjector {
         event_id: EventID,
         trigger_event: FlowTriggerEvent,
     ) -> Result<(), InternalError> {
-        match trigger_event {
-            FlowTriggerEvent::Created(e) => {
+        let maybe_new_process_state = match &trigger_event {
+            FlowTriggerEvent::Created(e) => Some(
                 self.flow_process_state_repository
                     .upsert_process_state_on_trigger_event(
                         event_id,
-                        e.flow_binding,
+                        e.flow_binding.clone(),
                         e.paused,
                         e.stop_policy,
                     )
                     .await
-                    .int_err()?;
-            }
+                    .int_err()?,
+            ),
 
-            FlowTriggerEvent::Modified(e) => {
+            FlowTriggerEvent::Modified(e) => Some(
                 self.flow_process_state_repository
                     .upsert_process_state_on_trigger_event(
                         event_id,
-                        e.flow_binding,
+                        e.flow_binding.clone(),
                         e.paused,
                         e.stop_policy,
                     )
                     .await
-                    .int_err()?;
-            }
+                    .int_err()?,
+            ),
 
             FlowTriggerEvent::AutoStopped(_) => {
                 // Ignored, brings no new information to this projection,
                 // since it's the one that initiates this event in the first
                 // place.
+                None
             }
 
             FlowTriggerEvent::ScopeRemoved(e) => {
@@ -68,7 +69,17 @@ impl FlowProcessStateProjector {
                     .delete_process_states_by_scope(&e.flow_binding.scope)
                     .await
                     .int_err()?;
+                None
             }
+        };
+
+        // Apply any pending events that were generated as part of the state update
+        if let Some(mut new_process_state) = maybe_new_process_state {
+            self.apply_flow_process_events(
+                trigger_event.flow_binding(),
+                new_process_state.take_pending_events(),
+            )
+            .await?;
         }
 
         Ok(())
@@ -82,7 +93,8 @@ impl FlowProcessStateProjector {
         match &flow_event {
             // Tracking "next activation" time for scheduled flows
             FlowEvent::ScheduledForActivation(e) => {
-                self.flow_process_state_repository
+                let mut new_process_state = self
+                    .flow_process_state_repository
                     .on_flow_scheduled(
                         event_id,
                         flow_event.flow_binding(),
@@ -90,6 +102,13 @@ impl FlowProcessStateProjector {
                     )
                     .await
                     .int_err()?;
+
+                // Apply any pending events that were generated as part of the state update
+                self.apply_flow_process_events(
+                    flow_event.flow_binding(),
+                    new_process_state.take_pending_events(),
+                )
+                .await?;
             }
 
             // Tracking completed flows
@@ -99,7 +118,8 @@ impl FlowProcessStateProjector {
 
                 // Update process state. Among other values, this computes the latest ones for
                 // "last_attempted_at" and "consecutive_failures"
-                self.flow_process_state_repository
+                let mut new_process_state = self
+                    .flow_process_state_repository
                     .apply_flow_result(
                         event_id,
                         flow_event.flow_binding(),
@@ -109,38 +129,46 @@ impl FlowProcessStateProjector {
                     .await
                     .int_err()?;
 
-                // In case of a failure, trigger should make a decision about auto-stopping
-                if e.outcome.is_failure() {
-                    self.flow_trigger_service
-                        .evaluate_trigger_on_failure(
-                            flow_event.event_time(),
-                            flow_event.flow_binding(),
-                            e.outcome.is_unrecoverable_failure(),
-                        )
-                        .await?;
-                }
-
-                // In case of success:
-                //  - schedule next flow immediately, if we had any late activation cause
-                if e.outcome.is_success() && !e.late_activation_causes.is_empty() {
-                    self.flow_scheduling_helper
-                        .schedule_late_flow_activations(
-                            flow_event.event_time(),
-                            flow_event.flow_binding(),
-                            &e.late_activation_causes,
-                        )
-                        .await?;
-                }
-
-                // Try to schedule auto-polling flow, if applicable.
-                // We don't care whether we failed or succeeded,
-                // that is determined with the stop policy in the trigger.
-                self.flow_scheduling_helper
-                    .try_schedule_auto_polling_flow_continuation_if_enabled(
-                        flow_event.event_time(),
+                // Apply any pending events that were generated as part of the state update
+                let impact = self
+                    .apply_flow_process_events(
                         flow_event.flow_binding(),
+                        new_process_state.take_pending_events(),
                     )
                     .await?;
+
+                // There might be late flow activations.
+                // Consider scheduling new flow to handle those, if:
+                // - the last flow attempt succeeded (event if it was originally manually
+                //   launched)
+                // - the trigger is still active after processing the latest events
+                if e.outcome.is_success()
+                    || (e.outcome.is_recoverable_failure() && impact.is_trigger_still_active())
+                {
+                    // Schedule next flow immediately, if we had any late activation cause
+                    if !e.late_activation_causes.is_empty() {
+                        self.flow_scheduling_helper
+                            .schedule_late_flow_activations(
+                                flow_event.event_time(),
+                                flow_event.flow_binding(),
+                                &e.late_activation_causes,
+                            )
+                            .await?;
+                    }
+                }
+
+                // Try to schedule next auto-polling flow, if applicable.
+                if let Some(trigger_state) = &impact.maybe_latest_trigger_state {
+                    // We don't care whether we failed or succeeded,
+                    // as long as the trigger is still active.
+                    self.flow_scheduling_helper
+                        .try_schedule_auto_polling_flow_continuation_if_enabled(
+                            flow_event.event_time(),
+                            flow_event.flow_binding(),
+                            trigger_state,
+                        )
+                        .await?;
+                }
             }
 
             FlowEvent::Initiated(_)
@@ -157,6 +185,67 @@ impl FlowProcessStateProjector {
 
         Ok(())
     }
+
+    async fn apply_flow_process_events(
+        &self,
+        flow_binding: &FlowBinding,
+        events: Vec<FlowProcessEvent>,
+    ) -> Result<FlowProcessEventsImpact, InternalError> {
+        let mut maybe_new_trigger_state: Option<FlowTriggerState> = None;
+
+        for event in events {
+            tracing::debug!(
+                flow_binding = ?flow_binding,
+                event = ?event,
+                "Applying flow process event"
+            );
+
+            match event {
+                // For now only AutoStopped has side effects
+                FlowProcessEvent::AutoStopped(e) => {
+                    // Apply auto-stop decision to the trigger
+                    let new_trigger_state = self
+                        .flow_trigger_service
+                        .apply_trigger_auto_stop_decision(e.event_time, flow_binding)
+                        .await?;
+
+                    // Merge new state with any previous state change in this batch of events
+                    maybe_new_trigger_state = match (maybe_new_trigger_state, new_trigger_state) {
+                        (None, None) => None,
+                        (Some(x), None) => Some(x),
+                        (_, Some(y)) => Some(y),
+                    };
+                }
+
+                FlowProcessEvent::EffectiveStateChanged(_)
+                | FlowProcessEvent::ResumedFromAutoStop(_) => {
+                    // No side effects for now
+                }
+            }
+        }
+
+        // Deliver latest state of the trigger
+        let maybe_latest_trigger_state = match maybe_new_trigger_state {
+            Some(s) => {
+                tracing::info!(
+                    new_state = ?s,
+                    "Flow trigger state updated as a result of flow process event"
+                );
+                Some(s)
+            }
+            None => {
+                // No state change, but still load the trigger in the current state
+                self.flow_trigger_service
+                    .find_trigger(flow_binding)
+                    .await
+                    .int_err()?
+            }
+        };
+
+        Ok(FlowProcessEventsImpact {
+            maybe_latest_trigger_state,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -167,11 +256,13 @@ impl FlowSystemEventProjector for FlowProcessStateProjector {
         "dev.kamu.domain.flow-system.FlowProcessStateProjector"
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(event_id=%event.event_id))]
     async fn apply(&self, event: &FlowSystemEvent) -> Result<(), InternalError> {
         tracing::debug!(
             event_id = %event.event_id,
             source_type = ?event.source_type,
             source_event_id = %event.source_event_id,
+            payload = ?event.payload,
             "Applying flow system event"
         );
 
@@ -193,6 +284,21 @@ impl FlowSystemEventProjector for FlowProcessStateProjector {
         }
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct FlowProcessEventsImpact {
+    maybe_latest_trigger_state: Option<FlowTriggerState>,
+}
+
+impl FlowProcessEventsImpact {
+    fn is_trigger_still_active(&self) -> bool {
+        self.maybe_latest_trigger_state
+            .as_ref()
+            .map(FlowTriggerState::is_active)
+            .unwrap_or(false)
     }
 }
 
