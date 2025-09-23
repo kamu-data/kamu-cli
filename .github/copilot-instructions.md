@@ -22,4 +22,12 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 - Run tests with `cargo nextest run` when making changes that could affect functionality
 - Ensure all tests pass before considering changes complete
 
+## Event Modeling Style
+- Prefer using enums for event types to ensure type safety and clarity.
+- Use descriptive names for events to convey their purpose clearly.
+- Implement serialization and deserialization traits for all event enums to facilitate data interchange.
+- Keep event structures simple and focused on the data they need to carry.
+- Document each event type with comments explaining its usage and context.
+- Prefer using separate structs for event data rather than inline data in the enum to enhance clarity and maintainability.
+
 Remember: **Always run `make clippy` as part of your validation process when working with this codebase.**

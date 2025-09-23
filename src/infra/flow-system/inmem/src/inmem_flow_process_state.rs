@@ -385,13 +385,13 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         flow_binding: FlowBinding,
         paused_manual: bool,
         stop_policy: FlowTriggerStopPolicy,
-    ) -> Result<(), FlowProcessUpsertError> {
+    ) -> Result<FlowProcessState, FlowProcessUpsertError> {
         let mut state = self.state.write().unwrap();
         if let Some(existing) = state.process_state_by_binding.get_mut(&flow_binding) {
             existing
                 .update_trigger_state(event_id, self.time_source.now(), paused_manual, stop_policy)
-                .int_err()
-                .map_err(FlowProcessUpsertError::Internal)?;
+                .int_err()?;
+            Ok(existing.clone())
         } else {
             let new_state = FlowProcessState::new(
                 event_id,
@@ -402,10 +402,9 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             );
             state
                 .process_state_by_binding
-                .insert(flow_binding, new_state);
+                .insert(flow_binding, new_state.clone());
+            Ok(new_state)
         }
-
-        Ok(())
     }
 
     async fn apply_flow_result(
@@ -414,7 +413,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         flow_binding: &FlowBinding,
         flow_outcome: &FlowOutcome,
         event_time: DateTime<Utc>,
-    ) -> Result<(), FlowProcessFlowEventError> {
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
 
         let process_state = state
@@ -428,7 +427,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             .on_flow_outcome(event_id, self.time_source.now(), event_time, flow_outcome)
             .int_err()?;
 
-        Ok(())
+        Ok(process_state.clone())
     }
 
     async fn on_flow_scheduled(
@@ -436,7 +435,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
         event_id: EventID,
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
-    ) -> Result<(), FlowProcessFlowEventError> {
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
 
         let process_state = state
@@ -450,7 +449,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             .on_scheduled(event_id, self.time_source.now(), planned_at)
             .int_err()?;
 
-        Ok(())
+        Ok(process_state.clone())
     }
 
     async fn delete_process_states_by_scope(
