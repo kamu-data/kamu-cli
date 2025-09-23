@@ -307,7 +307,8 @@ impl TestHarness {
         target: ResolvedDataset,
         metadata_state: Box<DataWriterMetadataState>,
     ) {
-        self.polling_ingest_svc
+        let ingest_result = self
+            .polling_ingest_svc
             .ingest(
                 target.clone(),
                 metadata_state,
@@ -316,6 +317,24 @@ impl TestHarness {
             )
             .await
             .unwrap();
+
+        if let PollingIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
     }
 
     async fn push_ingest(
