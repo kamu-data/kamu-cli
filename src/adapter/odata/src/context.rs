@@ -25,7 +25,6 @@ use datafusion::dataframe::DataFrame;
 use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use datafusion_odata::error::{CollectionNotFound, ODataError};
-use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
@@ -40,19 +39,17 @@ const KEY_COLUMN_ALIAS: &str = "__id__";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ODataServiceContext {
-    catalog: Catalog,
-    query_svc: Arc<dyn QueryService>,
+    catalog: dill::Catalog,
     account_name: Option<odf::AccountName>,
     service_base_url: String,
 }
 
 impl ODataServiceContext {
-    pub(crate) fn new(catalog: Catalog, account_name: Option<odf::AccountName>) -> Self {
+    pub(crate) fn new(catalog: dill::Catalog, account_name: Option<odf::AccountName>) -> Self {
         let config = catalog.get_one::<ServerUrlConfig>().unwrap();
         let service_base_url = config.protocols.odata_base_url();
 
         Self {
-            query_svc: catalog.get_one().unwrap(),
             catalog,
             account_name,
             service_base_url,
@@ -88,7 +85,7 @@ impl ServiceContext for ODataServiceContext {
         {
             let resolved_dataset = registry.get_dataset_by_handle(&hdl).await;
             let context: Arc<dyn CollectionContext> = Arc::new(ODataCollectionContext {
-                query_svc: self.query_svc.clone(),
+                catalog: self.catalog.clone(),
                 addr: CollectionAddr {
                     name: hdl.alias.dataset_name.to_string(),
                     key: None,
@@ -111,7 +108,7 @@ impl ServiceContext for ODataServiceContext {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ODataCollectionContext {
-    query_svc: Arc<dyn QueryService>,
+    catalog: dill::Catalog,
     addr: CollectionAddr,
     resolved_dataset: ResolvedDataset,
     service_base_url: String,
@@ -119,7 +116,7 @@ pub(crate) struct ODataCollectionContext {
 
 impl ODataCollectionContext {
     pub(crate) fn new(
-        catalog: &Catalog,
+        catalog: dill::Catalog,
         addr: CollectionAddr,
         resolved_dataset: ResolvedDataset,
     ) -> Self {
@@ -127,7 +124,7 @@ impl ODataCollectionContext {
         let service_base_url = config.protocols.odata_base_url();
 
         Self {
-            query_svc: catalog.get_one().unwrap(),
+            catalog,
             addr,
             resolved_dataset,
             service_base_url,
@@ -178,10 +175,11 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     async fn schema(&self) -> Result<SchemaRef, ODataError> {
+        let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
+
         let dataset_ref = self.resolved_dataset.get_handle().as_local_ref();
 
-        let maybe_data_schema = self
-            .query_svc
+        let maybe_data_schema = query_svc
             .get_schema(&dataset_ref)
             .await
             .map_int_err(ODataError::internal)?;
@@ -215,8 +213,9 @@ impl CollectionContext for ODataCollectionContext {
             .map(Into::into)
             .unwrap_or_default();
 
-        let res = self
-            .query_svc
+        let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
+
+        let res = query_svc
             .get_data(
                 &self.resolved_dataset.get_handle().as_local_ref(),
                 GetDataOptions::default(),
