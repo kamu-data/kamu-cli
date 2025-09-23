@@ -421,11 +421,11 @@ impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
             MetadataEvent::AddPushSource(add_push_source) => {
                 // Since we move backwards, we already know in advance whether a source is
                 // disabled.
-                let is_not_disabled = !self
+                let is_still_enabled = !self
                     .disabled_push_source_names
                     .contains(&add_push_source.source_name);
 
-                if is_not_disabled {
+                if is_still_enabled {
                     // SAFETY: block type verified
                     let typed_block = block.clone().into_typed().unwrap();
                     self.active_push_sources
