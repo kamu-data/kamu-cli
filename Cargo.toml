@@ -132,6 +132,13 @@ resolver = "2"
 # TODO: Updating aws-sdk version forces to update minio image version. 
 # Update it once we will modify our tests to be compatible with latest version
 aws-sdk-s3 = "=1.68.0"
+# TODO: Delete after fixing error in transitive dependency:
+#       "Cross" cross compiler fails in GitHub action building aws-lc-sys for aarch64-unknown-linux-gnu (ARMv8)
+#       https://github.com/aws/aws-lc-rs/issues/889
+#       - OR -
+#       Your compiler (cc) is not supported due to a memcmp related bug
+#       https://github.com/cross-rs/cross/issues/1686
+aws-lc-rs = "=1.13.3"
 
 # Apps
 kamu-cli = { version = "0.249.0", path = "src/app/cli", default-features = false }
@@ -355,6 +362,11 @@ debug = "line-tables-only"
 # Use this section to test or apply emergency overrides to dependencies
 # See: https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html
 [patch.crates-io]
+### TODO: Delete after fixing error in transitive dependency:
+###       "Cross" cross compiler fails in GitHub action building aws-lc-sys for aarch64-unknown-linux-gnu (ARMv8)
+###       https://github.com/aws/aws-lc-rs/issues/889
+#aws-lc-rs = { git = 'https://github.com/aws/aws-lc-rs', tag = 'v1.13.3' }
+#"aws-lc-rs" = { version = "1.13.3" }
 # datafusion = { git = 'https://github.com/apache/datafusion.git', branch = 'main' }
 # datafusion-common = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
 # datafusion-execution = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
@@ -364,3 +376,6 @@ debug = "line-tables-only"
 # object_store = { git = 'https://github.com/s373r/arrow-rs', branch = 'add-debug-logs', package = "object_store" }
 assert_cmd = { git = 'https://github.com/kamu-data/assert_cmd', branch = "deactivate-output-truncation" }
 # dill = { path = "../dill-rs/dill" }
+
+#[replace]
+#"aws-lc-rs:1.14.0" = { version = "1.13.3" }
