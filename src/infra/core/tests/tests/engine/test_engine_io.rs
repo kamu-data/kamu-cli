@@ -35,6 +35,7 @@ async fn test_engine_io_common<
     run_info_dir: &Path,
     cache_dir: &Path,
     transform: odf::metadata::Transform,
+    catalog: dill::Catalog,
 ) {
     let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
     let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
@@ -72,6 +73,7 @@ async fn test_engine_io_common<
         run_info_dir.clone(),
         cache_dir,
         time_source.clone(),
+        catalog,
     );
 
     let transform_helper = TransformTestHelper::build(
@@ -283,8 +285,8 @@ async fn test_engine_io_local_file_mount() {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DatasetKeyValueServiceSysEnv>()
@@ -295,6 +297,9 @@ async fn test_engine_io_local_file_mount() {
         ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
         .build();
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+    let catalog = b.build();
 
     let storage_unit = catalog
         .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
@@ -313,6 +318,7 @@ async fn test_engine_io_local_file_mount() {
                 "SELECT event_time, city, cast(population * 10 as int) as population_x10 FROM root",
             )
             .build(),
+        catalog.clone(),
     )
     .await;
 }
@@ -331,8 +337,8 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
 
     let s3_context = s3_utils::S3Context::from_url(&s3.url).await;
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
@@ -342,6 +348,9 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         ))
         .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
         .build();
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+    let catalog = b.build();
 
     let storage_unit = catalog
         .get_one::<odf::dataset::DatasetStorageUnitS3>()
@@ -365,6 +374,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
                 "SELECT event_time, city, cast(population * 10 as int) as population_x10 FROM root",
             )
             .build(),
+        catalog.clone(),
     )
     .await;
 }

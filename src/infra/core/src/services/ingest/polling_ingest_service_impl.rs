@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::DatabaseTransactionRunner;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -38,6 +39,7 @@ pub struct PollingIngestServiceImpl {
     run_info_dir: Arc<RunInfoDir>,
     cache_dir: Arc<CacheDir>,
     time_source: Arc<dyn SystemTimeSource>,
+    catalog: dill::Catalog,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,9 +89,11 @@ impl PollingIngestServiceImpl {
             );
             data_writer.set_session_context(new_ctx.clone());
 
+            let dataset_handle = target.get_handle().clone();
+
             // TODO: Avoid excessive cloning
             let iteration_args = IngestIterationArgs {
-                dataset_handle: target.get_handle().clone(),
+                dataset_handle: dataset_handle.clone(),
                 iteration,
                 operation_id,
                 operation_dir,
@@ -101,21 +105,48 @@ impl PollingIngestServiceImpl {
                 data_writer: &mut data_writer,
             };
 
-            match self.ingest_iteration(iteration_args).await {
-                Ok(res) => {
-                    combined_result = Some(Self::merge_results(combined_result, res));
+            let iteration_result = DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                    match self.ingest_iteration(iteration_args).await {
+                        Ok(res) => {
+                            let transactional_target = dataset_registry
+                                .get_dataset_by_handle(&dataset_handle)
+                                .await;
 
-                    let has_more = match combined_result {
-                        Some(PollingIngestResult::UpToDate { .. }) => false,
-                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
-                        None => unreachable!(),
-                    };
-
-                    if !has_more || !options.exhaust_sources {
-                        break;
+                            if let PollingIngestResult::Updated {
+                                old_head, new_head, ..
+                            } = &res
+                            {
+                                transactional_target
+                                    .as_metadata_chain()
+                                    .set_ref(
+                                        &odf::BlockRef::Head,
+                                        new_head,
+                                        odf::dataset::SetRefOpts {
+                                            validate_block_present: true,
+                                            check_ref_is: Some(Some(old_head)),
+                                        },
+                                    )
+                                    .await
+                                    .int_err()?;
+                            };
+                            Ok(res)
+                        }
+                        Err(e) => return Err(e),
                     }
-                }
-                Err(e) => return Err(e),
+                })
+                .await?;
+
+            combined_result = Some(Self::merge_results(combined_result, iteration_result));
+
+            let has_more = match combined_result {
+                Some(PollingIngestResult::UpToDate { .. }) => false,
+                Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
+                None => unreachable!(),
+            };
+
+            if !has_more || !options.exhaust_sources {
+                break;
             }
         }
         Ok(combined_result.unwrap())
