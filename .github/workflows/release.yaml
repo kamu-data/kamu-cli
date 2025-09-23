@@ -81,7 +81,9 @@ jobs:
         if: matrix.use-cross
         shell: bash
         run: |
-          cargo binstall cross -y
+          # TODO: Remove the workaround once https://github.com/aws/aws-lc-rs/issues/889 is resolved          
+          # cargo binstall cross -y
+          cargo install cross --git https://github.com/cross-rs/cross
           echo "CARGO=cross" >> $GITHUB_ENV
 
       - name: Fetch web UI artifacts
