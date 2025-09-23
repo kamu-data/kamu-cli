@@ -12,6 +12,12 @@ use event_sourcing::EventID;
 use internal_error::InternalError;
 use thiserror::Error;
 
+use super::flow_process_event::{
+    FlowProcessEvent,
+    FlowProcessEventAutoStopped,
+    FlowProcessEventEffectiveStateChanged,
+    FlowProcessEventResumedFromAutoStop,
+};
 use crate::{
     FlowBinding,
     FlowOutcome,
@@ -41,6 +47,8 @@ pub struct FlowProcessState {
 
     updated_at: DateTime<Utc>,
     last_applied_event_id: EventID,
+
+    pending_events: Vec<FlowProcessEvent>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +75,7 @@ impl FlowProcessState {
             auto_stopped_reason: None,
             updated_at: current_time,
             last_applied_event_id: event_id,
+            pending_events: Vec::new(),
         }
     }
 
@@ -136,6 +145,7 @@ impl FlowProcessState {
             auto_stopped_reason,
             updated_at,
             last_applied_event_id,
+            pending_events: Vec::new(),
         })
     }
 
@@ -205,6 +215,16 @@ impl FlowProcessState {
         self.last_applied_event_id
     }
 
+    /// Get and clear all pending domain events
+    pub fn take_pending_events(&mut self) -> Vec<FlowProcessEvent> {
+        std::mem::take(&mut self.pending_events)
+    }
+
+    /// Check if there are any pending events
+    pub fn has_pending_events(&self) -> bool {
+        !self.pending_events.is_empty()
+    }
+
     pub fn update_trigger_state(
         &mut self,
         event_id: EventID,
@@ -229,6 +249,15 @@ impl FlowProcessState {
             self.consecutive_failures = 0;
             self.auto_stopped_reason = None;
             self.auto_stopped_at = None;
+
+            // Emit resume event
+            self.pending_events
+                .push(FlowProcessEvent::ResumedFromAutoStop(
+                    FlowProcessEventResumedFromAutoStop {
+                        event_time: current_time,
+                        flow_binding: self.flow_binding.clone(),
+                    },
+                ));
         }
 
         // If we were auto-stopped but now manually changing the trigger state,
@@ -238,8 +267,24 @@ impl FlowProcessState {
             self.auto_stopped_at = None;
         }
 
+        // Capture old state before actualization
+        let old_state = self.effective_state;
+
         // Use simple actualize since this is trigger state update, not flow outcome
         self.actualize_effective_state_simple();
+
+        // Emit state change event if needed
+        if self.effective_state != old_state {
+            self.pending_events
+                .push(FlowProcessEvent::EffectiveStateChanged(
+                    FlowProcessEventEffectiveStateChanged {
+                        flow_binding: self.flow_binding.clone(),
+                        old_state,
+                        new_state: self.effective_state,
+                        event_time: current_time,
+                    },
+                ));
+        }
 
         self.updated_at = current_time;
         self.last_applied_event_id = event_id;
@@ -255,6 +300,10 @@ impl FlowProcessState {
         flow_outcome: &FlowOutcome,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_event_order(event_id)?;
+
+        // Capture old state for event emission
+        let old_state = self.effective_state;
+        let old_auto_stopped = self.auto_stopped_reason.is_some();
 
         match flow_outcome {
             FlowOutcome::Success(_) => {
@@ -287,6 +336,40 @@ impl FlowProcessState {
 
         self.handle_next_planned_at_update(event_time);
         self.actualize_effective_state_with_auto_stop_check(event_time);
+
+        // Emit events for state changes
+        if self.effective_state != old_state {
+            self.pending_events
+                .push(FlowProcessEvent::EffectiveStateChanged(
+                    FlowProcessEventEffectiveStateChanged {
+                        flow_binding: self.flow_binding.clone(),
+                        old_state,
+                        new_state: self.effective_state,
+                        event_time,
+                    },
+                ));
+        }
+
+        // Emit auto-stop event if just auto-stopped
+        if !old_auto_stopped && self.auto_stopped_reason.is_some() {
+            self.pending_events
+                .push(FlowProcessEvent::AutoStopped(FlowProcessEventAutoStopped {
+                    flow_binding: self.flow_binding.clone(),
+                    reason: self.auto_stopped_reason.unwrap(),
+                    event_time,
+                }));
+        }
+
+        // Emit resume event if auto-stop reason was cleared
+        if old_auto_stopped && self.auto_stopped_reason.is_none() {
+            self.pending_events
+                .push(FlowProcessEvent::ResumedFromAutoStop(
+                    FlowProcessEventResumedFromAutoStop {
+                        flow_binding: self.flow_binding.clone(),
+                        event_time,
+                    },
+                ));
+        }
 
         self.last_applied_event_id = event_id;
         self.updated_at = current_time;
@@ -1285,6 +1368,132 @@ mod tests {
         assert_eq!(state.auto_stopped_reason(), None);
         assert_eq!(state.auto_stopped_at(), None);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
+    }
+
+    #[test]
+    fn test_domain_events_effective_state_changed() {
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            Utc::now(),
+            make_test_flow_binding(),
+            false, // active
+            FlowTriggerStopPolicy::default(),
+        );
+
+        // Pause the trigger
+        let now = Utc::now();
+        state
+            .update_trigger_state(EventID::new(2), now, true, FlowTriggerStopPolicy::default())
+            .unwrap();
+
+        let events = state.take_pending_events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            FlowProcessEvent::EffectiveStateChanged(event) => {
+                assert_eq!(event.old_state, FlowProcessEffectiveState::Active);
+                assert_eq!(event.new_state, FlowProcessEffectiveState::PausedManual);
+            }
+            _ => panic!("Expected EffectiveStateChanged event"),
+        }
+    }
+
+    #[test]
+    fn test_domain_events_auto_stopped() {
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            Utc::now(),
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(1),
+        );
+
+        // Trigger auto-stop with failure
+        let now = Utc::now();
+        let outcome = FlowOutcome::Failed(TaskError::empty_recoverable());
+        state
+            .on_flow_outcome(EventID::new(2), now, now, &outcome)
+            .unwrap();
+
+        let events = state.take_pending_events();
+        assert_eq!(events.len(), 2); // EffectiveStateChanged + AutoStopped
+
+        let auto_stopped_event = events
+            .iter()
+            .find(|e| matches!(e, FlowProcessEvent::AutoStopped(_)));
+        assert!(auto_stopped_event.is_some());
+
+        match auto_stopped_event.unwrap() {
+            FlowProcessEvent::AutoStopped(event) => {
+                assert_eq!(event.reason, FlowProcessAutoStopReason::StopPolicy);
+            }
+            _ => panic!("Expected AutoStopped event"),
+        }
+    }
+
+    #[test]
+    fn test_domain_events_resumed_from_auto_stop() {
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            Utc::now(),
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(1),
+        );
+
+        // Trigger auto-stop
+        let outcome = FlowOutcome::Failed(TaskError::empty_recoverable());
+        state
+            .on_flow_outcome(EventID::new(2), Utc::now(), Utc::now(), &outcome)
+            .unwrap();
+        state.take_pending_events(); // Clear events
+
+        // Resume by unpausing
+        let now = Utc::now();
+        state
+            .update_trigger_state(
+                EventID::new(3),
+                now,
+                false,
+                FlowTriggerStopPolicy::default(),
+            )
+            .unwrap();
+
+        let events = state.take_pending_events();
+        let resume_event = events
+            .iter()
+            .find(|e| matches!(e, FlowProcessEvent::ResumedFromAutoStop { .. }));
+        assert!(resume_event.is_some());
+    }
+
+    #[test]
+    fn test_domain_events_success_clears_auto_stop() {
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            Utc::now(),
+            make_test_flow_binding(),
+            false,
+            make_test_stop_policy_with_failures(1),
+        );
+
+        // Auto-stop due to failure
+        let failure_outcome = FlowOutcome::Failed(TaskError::empty_recoverable());
+        state
+            .on_flow_outcome(EventID::new(2), Utc::now(), Utc::now(), &failure_outcome)
+            .unwrap();
+        state.take_pending_events(); // Clear events
+
+        // Success should clear auto-stop and emit resume event
+        let success_outcome = FlowOutcome::Success(TaskResult::empty());
+        let now = Utc::now();
+        state
+            .on_flow_outcome(EventID::new(3), now, now, &success_outcome)
+            .unwrap();
+
+        let events = state.take_pending_events();
+        let resume_event = events
+            .iter()
+            .find(|e| matches!(e, FlowProcessEvent::ResumedFromAutoStop { .. }));
+        assert!(resume_event.is_some());
     }
 }
 
