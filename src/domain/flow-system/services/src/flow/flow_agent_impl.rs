@@ -34,7 +34,15 @@ pub struct FlowAgentImpl {
     catalog: Catalog,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
-    agent_started: Arc<Mutex<bool>>,
+    state: Arc<Mutex<State>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct State {
+    agent_started: bool,
+    loop_synchronizer: Option<Arc<dyn FlowAgentLoopSynchronizer>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,18 +82,18 @@ impl FlowAgentImpl {
             catalog,
             time_source,
             agent_config,
-            agent_started: Arc::new(Mutex::new(false)),
+            state: Arc::new(Mutex::new(State::default())),
         }
     }
 
     fn has_agent_started(&self) -> bool {
-        let engine_started = self.agent_started.lock().unwrap();
-        *engine_started
+        let state = self.state.lock().unwrap();
+        state.agent_started
     }
 
     fn mark_engine_as_started(&self) {
-        let mut engine_started = self.agent_started.lock().unwrap();
-        *engine_started = true;
+        let mut state = self.state.lock().unwrap();
+        state.agent_started = true;
     }
 
     #[transactional_method]
@@ -236,6 +244,9 @@ impl FlowAgentImpl {
             return Ok(());
         }
 
+        // Synchronize with other agents if needed
+        self.synchronize_execution_loop().await?;
+
         self.run_flows_for_timeslot(
             nearest_flow_activation_moment,
             flow_event_store,
@@ -243,6 +254,16 @@ impl FlowAgentImpl {
         )
         .instrument(observability::tracing::root_span!("FlowAgent::activation"))
         .await
+    }
+
+    async fn synchronize_execution_loop(&self) -> Result<(), InternalError> {
+        if let Some(synchronizer) = {
+            let state = self.state.lock().unwrap();
+            state.loop_synchronizer.clone()
+        } {
+            synchronizer.synchronize_execution_loop().await?;
+        }
+        Ok(())
     }
 
     async fn run_flows_for_timeslot(
@@ -355,7 +376,22 @@ impl FlowAgentImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl FlowAgent for FlowAgentImpl {}
+#[async_trait::async_trait]
+impl InitOnStartup for FlowAgentImpl {
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        // Run recovery procedure
+        let start_time = self.agent_config.round_time(self.time_source.now())?;
+        self.recover_initial_flows_state(start_time).await?;
+
+        // Synchronize with other agents if needed
+        self.synchronize_execution_loop().await?;
+
+        // Mark the agent as started
+        self.mark_engine_as_started();
+
+        Ok(())
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -383,17 +419,7 @@ impl BackgroundAgent for FlowAgentImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-impl InitOnStartup for FlowAgentImpl {
-    async fn run_initialization(&self) -> Result<(), InternalError> {
-        let start_time = self.agent_config.round_time(self.time_source.now())?;
-        self.recover_initial_flows_state(start_time).await?;
-
-        self.mark_engine_as_started();
-
-        Ok(())
-    }
-}
+impl FlowAgent for FlowAgentImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -418,6 +444,15 @@ impl FlowAgentTestDriver for FlowAgentImpl {
             .await?;
 
         Ok(task_id)
+    }
+
+    async fn set_loop_synchronizer(
+        &self,
+        synchronizer: Arc<dyn FlowAgentLoopSynchronizer>,
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.lock().unwrap();
+        state.loop_synchronizer = Some(synchronizer);
+        Ok(())
     }
 }
 

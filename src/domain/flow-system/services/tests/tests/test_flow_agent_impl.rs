@@ -2327,9 +2327,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
             #5: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
             #6: +20ms:
@@ -2890,7 +2889,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             .set_flow_trigger(
                 harness.now(),
                 ingest_dataset_binding(dataset_id),
-                FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
+                FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
                 FlowTriggerStopPolicy::default(),
             )
             .await;
@@ -2925,12 +2924,12 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             });
             let task0_handle = task0_driver.run();
 
-            // Task 1: "bar" start running at 20ms, finish at 30ms with failure
+            // Task 1: "bar" start running at 30ms, finish at 40ms with failure
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::milliseconds(20),
+                run_since_start: Duration::milliseconds(30),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Failed(TaskError::empty_recoverable()),
@@ -2943,12 +2942,12 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             });
             let task1_handle = task1_driver.run();
 
-            // Task 1: "baz" start running at 30ms, finish at 50ms with cancellation
+            // Task 2: "baz" start running at 50ms, finish at 70ms with cancellation
             let task2_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(2),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(baz_id.clone()),
-                run_since_start: Duration::milliseconds(30),
+                run_since_start: Duration::milliseconds(50),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Cancelled)),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: baz_id.clone(),
@@ -2958,10 +2957,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             });
             let task2_handle = task2_driver.run();
 
-            // Manual abort for "baz" at 40ms
+            // Manual abort for "baz" at 60ms
             let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
                 flow_id: FlowID::new(2),
-                abort_since_start: Duration::milliseconds(40),
+                abort_since_start: Duration::milliseconds(60),
             });
             let abort0_handle = abort0_driver.run();
 
@@ -3038,52 +3037,52 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "baz" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=80ms)
                 Flow ID = 0 Finished Success
 
-            #7: +20ms:
+            #7: +30ms:
               "bar" Ingest:
                 Flow ID = 1 Running(task=1)
               "baz" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=80ms)
                 Flow ID = 0 Finished Success
 
-            #8: +30ms:
+            #8: +40ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=80ms)
                 Flow ID = 0 Finished Success
 
-            #9: +30ms:
+            #9: +50ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
                 Flow ID = 2 Running(task=2)
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=80ms)
                 Flow ID = 0 Finished Success
 
-            #10: +40ms:
+            #10: +60ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
                 Flow ID = 2 Finished Aborted
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=80ms)
                 Flow ID = 0 Finished Success
 
-            #11: +60ms:
+            #11: +80ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
                 Flow ID = 2 Finished Aborted
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Executor(task=3, since=60ms)
+                Flow ID = 3 Waiting AutoPolling Executor(task=3, since=80ms)
                 Flow ID = 0 Finished Success
 
             "#
@@ -4769,8 +4768,9 @@ async fn test_batching_condition_records_reached() {
 
             #12: +90ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Executor(task=2, since=90ms)
+                Flow ID = 1 Waiting Input(foo) Batching(12/10, until=140ms) Activating(at=90ms)
               "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=140ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -7110,8 +7110,9 @@ async fn test_abort_flow_after_task_finishes() {
 
             #6: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=20ms)
+                Flow ID = 1 Waiting Input(foo) Batching(5/0, until=20ms) Activating(at=20ms)
               "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
 
             #7: +20ms:
@@ -9533,8 +9534,9 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
 
             #10: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=120ms)
+                Flow ID = 2 Waiting Input(foo) Batching(0/0, until=120ms) Activating(at=120ms)
               "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=200ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
