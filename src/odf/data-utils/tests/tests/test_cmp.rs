@@ -6,140 +6,14 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
-
 use std::sync::Arc;
 
 use datafusion::arrow::array;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::common::DFSchema;
 use datafusion::prelude::*;
-use datafusion::sql::TableReference;
-use odf::utils::data::DataFrameExt;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn assert_dfs_equal(lhs: DataFrameExt, rhs: DataFrameExt) {
-    pretty_assertions::assert_eq!(lhs.schema(), rhs.schema());
-
-    let lhs_batches = lhs.collect().await.unwrap();
-    let rhs_batches = rhs.collect().await.unwrap();
-
-    let lhs_count: usize = lhs_batches.iter().map(RecordBatch::num_rows).sum();
-    let rhs_count: usize = rhs_batches.iter().map(RecordBatch::num_rows).sum();
-
-    // This is a workaround for the situation where collect returns an empty vec vs.
-    // a vec containing an empty batch
-    if lhs_count == 0 && rhs_count == 0 {
-        return;
-    }
-
-    let lhs_str = datafusion::arrow::util::pretty::pretty_format_batches(&lhs_batches)
-        .unwrap()
-        .to_string();
-
-    let rhs_str = datafusion::arrow::util::pretty::pretty_format_batches(&rhs_batches)
-        .unwrap()
-        .to_string();
-
-    pretty_assertions::assert_eq!(lhs_str, rhs_str);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Checks for equivalence ignoring the order of rows and nullability of columns
-pub async fn assert_dfs_equivalent(
-    lhs: DataFrameExt,
-    rhs: DataFrameExt,
-    ignore_order: bool,
-    ignore_nullability: bool,
-    ignore_qualifiers: bool,
-) {
-    let (lhs, rhs) = if !ignore_order {
-        (lhs, rhs)
-    } else {
-        let lhs_cols = lhs
-            .schema()
-            .fields()
-            .iter()
-            .map(|f| col(Column::from_name(f.name())).sort(false, true))
-            .collect();
-
-        let rhs_cols = rhs
-            .schema()
-            .fields()
-            .iter()
-            .map(|f| col(Column::from_name(f.name())).sort(false, true))
-            .collect();
-
-        (lhs.sort(lhs_cols).unwrap(), rhs.sort(rhs_cols).unwrap())
-    };
-
-    let map_field =
-        |(q, f): (Option<&TableReference>, &Arc<Field>)| -> (Option<TableReference>, Arc<Field>) {
-            let q = q.cloned();
-            let f = f.clone();
-            let (q, f) = if !ignore_qualifiers {
-                (q, f)
-            } else {
-                (None, f)
-            };
-            let f = if !ignore_nullability {
-                f
-            } else {
-                Arc::new(f.as_ref().clone().with_nullable(true))
-            };
-            (q, f)
-        };
-
-    let lhs_schema_stripped = datafusion::common::DFSchema::new_with_metadata(
-        qualified_fields(lhs.schema()).map(map_field).collect(),
-        Default::default(),
-    )
-    .unwrap();
-
-    let rhs_schema_stripped = datafusion::common::DFSchema::new_with_metadata(
-        qualified_fields(rhs.schema()).map(map_field).collect(),
-        Default::default(),
-    )
-    .unwrap();
-
-    pretty_assertions::assert_eq!(lhs_schema_stripped, rhs_schema_stripped);
-
-    let lhs_batches = lhs.collect().await.unwrap();
-    let rhs_batches = rhs.collect().await.unwrap();
-
-    let lhs_count: usize = lhs_batches.iter().map(RecordBatch::num_rows).sum();
-    let rhs_count: usize = rhs_batches.iter().map(RecordBatch::num_rows).sum();
-
-    // This is a workaround for the situation where collect returns an empty vec vs.
-    // a vec containing an empty batch
-    if lhs_count == 0 && rhs_count == 0 {
-        return;
-    }
-
-    let lhs_str = datafusion::arrow::util::pretty::pretty_format_batches(&lhs_batches)
-        .unwrap()
-        .to_string();
-
-    let rhs_str = datafusion::arrow::util::pretty::pretty_format_batches(&rhs_batches)
-        .unwrap()
-        .to_string();
-
-    pretty_assertions::assert_eq!(lhs_str, rhs_str);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn qualified_fields(
-    schema: &DFSchema,
-) -> impl Iterator<Item = (Option<&TableReference>, &Arc<Field>)> {
-    schema
-        .fields()
-        .iter()
-        .enumerate()
-        .map(|(i, f)| (schema.qualified_field(i).0, f))
-}
+use opendatafabric_data_utils::data::DataFrameExt;
+use opendatafabric_data_utils::testing::{assert_dfs_equal, assert_dfs_equivalent};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

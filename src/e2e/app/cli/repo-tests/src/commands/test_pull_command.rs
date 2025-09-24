@@ -213,7 +213,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
           OPTIONAL INT64 offset;
           REQUIRED INT32 op;
           REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-          OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
+          REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
           OPTIONAL INT64 place (INTEGER(64,false));
           OPTIONAL INT64 match_id;
           OPTIONAL BYTE_ARRAY player_id (STRING);

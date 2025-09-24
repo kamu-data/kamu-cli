@@ -9806,6 +9806,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha3",
+ "test-group",
  "test-log",
  "thiserror 2.0.17",
  "tokio",

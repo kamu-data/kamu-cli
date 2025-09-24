@@ -60,7 +60,7 @@ async fn test_data_writer_happy_path() {
                 C,3000
                 "#
             ),
-            "city STRING, population BIGINT",
+            "city STRING NOT NULL, population BIGINT NOT NULL",
         )
         .await
         .unwrap();
@@ -108,7 +108,7 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "city",
                 // Note that Datafusion 49+ defaults to View for all text types
@@ -116,14 +116,14 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -159,10 +159,10 @@ async fn test_data_writer_happy_path() {
             DataField::i64("offset"),
             DataField::i32("op"),
             DataField::timestamp_millis_utc("system_time"),
-            DataField::timestamp_millis_utc("event_time").optional(),
+            DataField::timestamp_millis_utc("event_time"),
             // NOTE: In SetDataSchema we strip the encoding information, leaving only logical types
-            DataField::string("city").optional(),
-            DataField::i64("population").optional(),
+            DataField::string("city"),
+            DataField::i64("population"),
         ]),
     );
 
@@ -210,7 +210,7 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "city",
                 // NOTE: Not Utf8View due to stripped encoding
@@ -218,14 +218,14 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -246,7 +246,7 @@ async fn test_data_writer_happy_path() {
                 D,4000
                 "#
             ),
-            "city STRING, population BIGINT",
+            "city STRING NOT NULL, population BIGINT NOT NULL",
         )
         .await
         .unwrap();
@@ -261,9 +261,9 @@ async fn test_data_writer_happy_path() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT64 population;
             }
             "#
         ),
@@ -387,7 +387,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -438,7 +438,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -519,7 +519,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -535,6 +535,217 @@ async fn test_data_writer_rejects_incompatible_schema() {
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 4      | 0  | 2010-01-03T12:00:00Z | 2000-01-03T12:00:00Z | E    | 5000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_nullability_required_to_optional_incompatible() {
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    // Round 1
+    harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2021-01-01,A,1000
+                2021-01-01,B,2000
+                2021-01-01,C,3000
+                "#
+            ),
+            "event_time TIMESTAMP NOT NULL, city STRING NOT NULL, population BIGINT NOT NULL",
+        )
+        .await
+        .unwrap();
+
+    assert_odf_schema_eq(
+        &harness.get_last_schema().await,
+        &DataSchema::new(vec![
+            DataField::i64("offset"),
+            DataField::i32("op"),
+            DataField::timestamp_millis_utc("system_time"),
+            DataField::timestamp_millis_utc("event_time"),
+            DataField::string("city"),
+            DataField::i64("population"),
+        ]),
+    );
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT64 population;
+            }
+            "#
+        ),
+    );
+
+    // Round 2 - input has optional column, but it gets coerced by reader
+    harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2022-01-01,D,4000
+                "#
+            ),
+            "event_time TIMESTAMP NOT NULL, city STRING NOT NULL, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    // Round 3 - error during coercion
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2022-01-01,E,
+                "#
+            ),
+            "event_time TIMESTAMP NOT NULL, city STRING NOT NULL, population BIGINT",
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(WriteDataError::ExecutionError(err))
+        if err.to_string().contains("Column population contains 1 null values while none were expected")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_nullability_optional_to_required_coerces() {
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategySnapshot {
+                primary_key: vec!["city".to_string()],
+                compare_columns: None,
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    // Round 1
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    assert_odf_schema_eq(
+        &harness.get_last_schema().await,
+        &DataSchema::new(vec![
+            DataField::i64("offset"),
+            DataField::i32("op"),
+            DataField::timestamp_millis_utc("system_time"),
+            DataField::timestamp_millis_utc("event_time"),
+            DataField::string("city"),
+            DataField::i64("population").optional(),
+        ]),
+    );
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    // Round 2 (coerces non-null column)
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
+    harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 2, 12, 0, 0).unwrap());
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                D,4000
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT NOT NULL",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 2  | 2010-01-02T12:00:00Z | 2000-01-01T12:00:00Z | C    |            |
+            | 4      | 3  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | C    | 3000       |
+            | 5      | 0  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
@@ -569,9 +780,8 @@ fn test_data_writer_offsets_are_sequential_partitioned() {
                     SortExec: expr=[event_time@1 ASC], preserve_partitioning=[true]
                       CoalesceBatchesExec: target_batch_size=8192
                         RepartitionExec: partitioning=Hash([1], 4), input_partitions=4
-                          ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
-                            ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
-                              DataSourceExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[event_time, city, population], file_type=json
+                          ProjectionExec: expr=[0 as op, coalesce(CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))), 946728000000) as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
+                            DataSourceExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[event_time, city, population], file_type=json
             "#
         ).trim(),
         plan
@@ -598,9 +808,8 @@ fn test_data_writer_offsets_are_sequential_serialized() {
               ProjectionExec: expr=[CAST(CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Decimal128(20, 0)) + Some(-1),20,0 AS Int64) as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
                 BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Field { name: "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {} }, frame: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW], mode=[Sorted]
                   SortExec: expr=[event_time@1 ASC], preserve_partitioning=[false]
-                    ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
-                      ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
-                        DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[event_time, city, population], file_type=json
+                    ProjectionExec: expr=[0 as op, coalesce(CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))), 946728000000) as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
+                      DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[event_time, city, population], file_type=json
             "#
         ).trim(),
         plan
@@ -762,7 +971,7 @@ async fn test_data_writer_ledger_orders_by_event_time() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT32 event_time (DATE);
+              REQUIRED INT32 event_time (DATE);
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -839,7 +1048,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -903,7 +1112,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -980,7 +1189,7 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -1112,7 +1321,7 @@ async fn test_data_writer_schema_evolution_from_inferred() {
             odf::schema::DataField::i64("offset"),
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
-            odf::schema::DataField::timestamp_millis_utc("event_time").optional(),
+            odf::schema::DataField::timestamp_millis_utc("event_time"),
             odf::schema::DataField::string("city").optional(),
             odf::schema::DataField::i64("population").optional(),
         ]),
@@ -1141,11 +1350,11 @@ async fn test_data_writer_schema_evolution_from_inferred() {
                 odf::schema::DataField::i64("offset"),
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
-                odf::schema::DataField::timestamp_millis_utc("event_time")
-                    .optional()
-                    .extra(odf::metadata::ext::AttrDescription::new(
+                odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                    odf::metadata::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
-                    )),
+                    ),
+                ),
                 odf::schema::DataField::string("city")
                     .optional()
                     .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
@@ -1181,11 +1390,11 @@ async fn test_data_writer_schema_evolution_from_inferred() {
             odf::schema::DataField::i64("offset"),
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
-            odf::schema::DataField::timestamp_millis_utc("event_time")
-                .optional()
-                .extra(odf::metadata::ext::AttrDescription::new(
+            odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                odf::metadata::ext::AttrDescription::new(
                     "Date the census was done rounded to a year mark",
-                )),
+                ),
+            ),
             odf::schema::DataField::string("city")
                 .optional()
                 .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),

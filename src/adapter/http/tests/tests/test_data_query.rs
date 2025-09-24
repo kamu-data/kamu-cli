@@ -284,7 +284,7 @@ async fn test_data_tail_handler() {
                         "dict_is_ordered": false,
                         "metadata": {},
                         "name": "event_time",
-                        "nullable": true,
+                        "nullable": false,
                     }, {
                         "data_type": "Utf8",
                         "dict_id": 0,
@@ -500,14 +500,14 @@ async fn test_data_query_handler_success() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620f230a79ac4e50c086d7f02ea670763bb91abbfa3902e386689d8be98c3ebee6e",
+                    "inputHash": "f16209d5150a1d78f6977af88388c87056fc16ed829fd9463f17ef840c1ebd77d70b0",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "ujLRAWAtSUyBN1xOoqyn3plkoy0CSQd_lZMJ76jH-hp8g8gyUrzzMY8qYxArjAyyml1RN5axC5-VJEh29kCuIDw",
+                    "proofValue": "u0R35mPWQwc8lCEIsQIZZRNV5-_bcCWj43fnILcSaQeyJnhctHrDV2o_pOU7esOuojHCbDE-vW95pWyvo1FSEBA",
                 }
             }),
             response
@@ -658,14 +658,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620a83cfca0b19a81550b1a60607be4d870b47b6aafb59757e16eb810d838d4dd65",
+                    "inputHash": "f162081b18ed61623301237cae3a33d4a3347d876f20358770a28db4c5724b3614b9d",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uFNfLp8HHhiS6dV1RCrFytGlZsRTN6kklfNZ6v3t3-cLoDiPpOcWr8ryRbWsicLNG6lQQQlLUBomExVaiMNT8DQ",
+                    "proofValue": "uFYYvS_C8ls6UkfP3O1ZXlbzBMzNFhnub6ojqiyPcR8Wl0GTKJ9CW82w2XXxgmVUCdXE-MOhuyNclYvoOx9vzBQ",
                 }
             }),
             response
@@ -1664,12 +1664,9 @@ async fn test_metadata_handler_schema_formats() {
                             {
                                 "name": "event_time",
                                 "type": {
-                                    "kind": "Option",
-                                    "inner": {
-                                        "kind": "Timestamp",
-                                        "unit": "Millisecond",
-                                        "timezone": "UTC",
-                                    },
+                                    "kind": "Timestamp",
+                                    "unit": "Millisecond",
+                                    "timezone": "UTC",
                                 },
                             },
                             {
@@ -1717,11 +1714,9 @@ async fn test_metadata_handler_schema_formats() {
                 timezone: UTC
             - name: event_time
               type:
-                kind: Option
-                inner:
-                  kind: Timestamp
-                  unit: Millisecond
-                  timezone: UTC
+                kind: Timestamp
+                unit: Millisecond
+                timezone: UTC
             - name: city
               type:
                 kind: String
@@ -1797,7 +1792,7 @@ async fn test_metadata_handler_schema_formats() {
                                 "dict_is_ordered": false,
                                 "metadata": {},
                                 "name": "event_time",
-                                "nullable": true
+                                "nullable": false
                             },
                             {
                                 "data_type": "Utf8",
@@ -1860,7 +1855,7 @@ async fn test_metadata_handler_schema_formats() {
                             {
                                 "logicalType": "TIMESTAMP(MILLIS,true)",
                                 "name": "event_time",
-                                "repetition": "OPTIONAL",
+                                "repetition": "REQUIRED",
                                 "type": "INT64"
                             },
                             {
@@ -1896,7 +1891,7 @@ async fn test_metadata_handler_schema_formats() {
             json!({
                 "output": {
                     "schemaFormat": "Parquet",
-                    "schema": "message arrow_schema {\n  REQUIRED INT64 offset;\n  REQUIRED INT32 op;\n  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));\n  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));\n  REQUIRED BYTE_ARRAY city (STRING);\n  REQUIRED INT64 population (INTEGER(64,false));\n}\n",
+                    "schema": "message arrow_schema {\n  REQUIRED INT64 offset;\n  REQUIRED INT32 op;\n  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));\n  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));\n  REQUIRED BYTE_ARRAY city (STRING);\n  REQUIRED INT64 population (INTEGER(64,false));\n}\n",
                 }
             }),
             res.json::<serde_json::Value>().await.unwrap()

@@ -111,10 +111,10 @@ impl TransformExecutorImpl {
             tracing::warn!("Engine did not produce a schema. In future this will become an error.");
         }
 
-        if let Some(prev_schema) = request.schema {
+        if let Some(orig_schema) = request.schema {
             // Validate schema
             if let Some(new_schema) = response.output_schema {
-                DataWriterDataFusion::validate_output_schema_equivalence(&prev_schema, &new_schema)
+                DataWriterDataFusion::validate_schema_compatible(&orig_schema, &new_schema)
                     .int_err()?;
             }
         } else {

@@ -12,5 +12,6 @@ pub mod dataframe_ext;
 pub mod format;
 pub mod hash;
 pub mod local_url;
+pub mod udf;
 
-pub use dataframe_ext::DataFrameExt;
+pub use dataframe_ext::{DataFrameExt, ExprExt};

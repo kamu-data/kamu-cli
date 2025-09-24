@@ -17,8 +17,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
 use odf::utils::data::DataFrameExt;
-
-use crate::utils::*;
+use odf::utils::testing;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -177,7 +176,8 @@ where
         .unwrap()
         .without_columns(&["offset"])
         .unwrap();
-    assert_dfs_equivalent(expected, actual, true, true, true).await;
+
+    testing::assert_dfs_equivalent(expected, actual, true, false, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -303,7 +303,7 @@ where
     // Sort events according to the strategy
     let actual = actual.sort(strat.sort_order()).unwrap();
 
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -449,5 +449,5 @@ async fn test_snapshot_merge_input_carries_event_time() {
     // Sort events according to the strategy
     let actual = actual.sort(strat.sort_order()).unwrap();
 
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 }

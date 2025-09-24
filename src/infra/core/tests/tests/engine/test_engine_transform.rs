@@ -897,7 +897,7 @@ async fn test_transform_empty_inputs() {
             odf::schema::DataField::i64("offset").optional(),
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
-            odf::schema::DataField::timestamp_millis_utc("event_time").optional(),
+            odf::schema::DataField::timestamp_millis_utc("event_time"),
             odf::schema::DataField::string("city").optional(),
             odf::schema::DataField::string("country"),
             odf::schema::DataField::i32("population").optional(),
@@ -941,7 +941,7 @@ async fn test_transform_empty_inputs() {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   REQUIRED BYTE_ARRAY country (STRING);
                   OPTIONAL INT32 population;

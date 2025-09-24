@@ -127,7 +127,7 @@ async fn test_ingest_polling_snapshot() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -305,7 +305,7 @@ async fn test_ingest_polling_ledger() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -589,7 +589,7 @@ async fn test_ingest_polling_event_time_as_date() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT32 date (DATE);
+                  REQUIRED INT32 date (DATE);
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -840,7 +840,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -936,7 +936,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY UPPER (STRING);
                   OPTIONAL INT64 lower;
                 }
@@ -1114,7 +1114,7 @@ async fn test_ingest_polling_preprocess_with_spark() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -1207,7 +1207,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }

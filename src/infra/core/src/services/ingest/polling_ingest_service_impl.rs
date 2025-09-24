@@ -274,6 +274,7 @@ impl PollingIngestServiceImpl {
             Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
             Err(StageDataError::IncompatibleSchema(e)) => Err(e.into()),
             Err(StageDataError::MergeError(e)) => Err(e.into()),
+            Err(StageDataError::ExecutionError(e)) => Err(e.into()),
             Err(StageDataError::DataValidation(e)) => Err(e.into()),
             Err(StageDataError::EmptyCommit(_)) => Ok(PollingIngestResponse {
                 result: PollingIngestResult::UpToDate {

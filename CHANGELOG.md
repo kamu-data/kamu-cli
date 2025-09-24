@@ -12,6 +12,10 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Improved handling of nullable / optional data types:
+  - Ingest merge strategies now preserve the optionality of columns
+  - Data writer will attempt to coerce column optionality, returning errors if input data contains nulls in a required field
 ### Fixed
 - Login method returns invalid credential error when login is invalid account name
 

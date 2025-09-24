@@ -125,7 +125,7 @@ async fn test_dataset_compact() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -381,7 +381,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -544,7 +544,7 @@ async fn test_dataset_compaction_limits() {
                       REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                      REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
@@ -698,7 +698,7 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -808,7 +808,7 @@ async fn test_large_dataset_compact() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -858,7 +858,7 @@ async fn test_large_dataset_compact() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
