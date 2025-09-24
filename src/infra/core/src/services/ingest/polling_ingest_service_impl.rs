@@ -83,7 +83,6 @@ impl PollingIngestServiceImpl {
         );
         data_writer.set_session_context(new_ctx.clone());
 
-        // TODO: Avoid excessive cloning
         let iteration_args = IngestIterationArgs {
             dataset_handle: target.get_handle().clone(),
             operation_id,

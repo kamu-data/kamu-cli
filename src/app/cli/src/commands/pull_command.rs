@@ -13,12 +13,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use database_common::DatabaseTransactionRunner;
+use database_common_macros::transactional_method2;
 use futures::TryStreamExt;
 use kamu::domain::auth::DatasetActionNotEnoughPermissionsError;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
+use odf::{DatasetRefAny, DatasetRefUnresolvedError};
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -115,26 +116,7 @@ impl PullCommand {
         listener: Option<Arc<dyn PullMultiListener>>,
         current_account_name: &odf::AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_any_refs = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with2(
-                |dataset_registry: Arc<dyn DatasetRegistry>,
-                 search_svc: Arc<dyn SearchServiceRemote>| async move {
-                    if !self.all {
-                        filter_datasets_by_any_pattern(
-                            dataset_registry.as_ref(),
-                            search_svc,
-                            self.refs.clone(),
-                            current_account_name,
-                            self.tenancy_config,
-                        )
-                        .try_collect()
-                        .await
-                    } else {
-                        Ok(vec![])
-                    }
-                },
-            )
-            .await?;
+        let dataset_any_refs = self.get_filtered_datasets(current_account_name).await?;
 
         let options = PullOptions {
             recursive: self.recursive,
@@ -211,6 +193,26 @@ impl PullCommand {
             (None, Some(remote_ref)) => format!("sync dataset from {remote_ref}"),
             (Some(local_ref), None) => format!("pull {local_ref}"),
             _ => "???".to_string(),
+        }
+    }
+
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, search_svc: Arc<dyn SearchServiceRemote>)]
+    async fn get_filtered_datasets(
+        &self,
+        current_account_name: &odf::AccountName,
+    ) -> Result<Vec<DatasetRefAny>, DatasetRefUnresolvedError> {
+        if !self.all {
+            filter_datasets_by_any_pattern(
+                dataset_registry.as_ref(),
+                search_svc,
+                self.refs.clone(),
+                current_account_name,
+                self.tenancy_config,
+            )
+            .try_collect()
+            .await
+        } else {
+            Ok(vec![])
         }
     }
 }
