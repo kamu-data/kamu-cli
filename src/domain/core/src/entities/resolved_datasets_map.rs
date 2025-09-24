@@ -68,7 +68,7 @@ impl ResolvedDatasetsMap {
         self.resolved_datasets_by_id.values().cloned().collect()
     }
 
-    pub async fn refresh_dataset_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
+    pub async fn refresh_datasets_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
         for resolved_dataset in self.get_all_values() {
             self.resolved_datasets_by_id.insert(
                 resolved_dataset.get_id().clone(),

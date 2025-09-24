@@ -125,7 +125,7 @@ impl PullTransformItem {
             .await;
         self.plan
             .datasets_map
-            .refresh_dataset_from_registry(dataset_registry)
+            .refresh_datasets_from_registry(dataset_registry)
             .await;
         Ok(())
     }
