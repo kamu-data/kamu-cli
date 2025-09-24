@@ -1250,8 +1250,9 @@ impl IngestTestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<DidGeneratorDefault>()
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add_value(ContainerRuntimeConfig::default())
@@ -1275,8 +1276,10 @@ impl IngestTestHarness {
             .add::<FetchService>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PollingIngestServiceImpl>()
-            .add::<DatasetKeyValueServiceSysEnv>()
-            .build();
+            .add::<DatasetKeyValueServiceSysEnv>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let catalog = b.build();
 
         Self {
             temp_dir,

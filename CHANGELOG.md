@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `kamu pull`: perform pulling each dataset in separate transaction and allow to interrupt run and some pulls will be saved. 
+  It also helps to keep ingest iterations progress saved even if some iteration failed
+
 ## [0.249.0] - 2025-09-23
 ### Changed
 - (#1372): GQL: Performance improvement via query vectorization for APIs:
