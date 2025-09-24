@@ -104,18 +104,6 @@ impl FlowAgentImpl {
         self.restore_auto_polling_flows_from_triggers(&transaction_catalog, start_time)
             .await?;
 
-        // Publish progress event
-        let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
-        outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-                FlowAgentUpdatedMessage {
-                    update_time: start_time,
-                    update_details: FlowAgentUpdateDetails::Loaded,
-                },
-            )
-            .await?;
-
         Ok(())
     }
 

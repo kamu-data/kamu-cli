@@ -163,10 +163,6 @@ impl FlowHarness {
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
             );
-            register_message_dispatcher::<FlowAgentUpdatedMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-            );
 
             b.build()
         };
@@ -201,7 +197,7 @@ impl FlowHarness {
         );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
-            created_at: self.fake_system_time_source.now(),
+            created_at: self.now(),
             id: dataset_id.clone(),
             owner_id: owner_id.clone(),
             owner_name,
@@ -241,7 +237,7 @@ impl FlowHarness {
         );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
-            created_at: self.fake_system_time_source.now(),
+            created_at: self.now(),
             id: dataset_id.clone(),
             owner_id: owner_id.clone(),
             owner_name,
@@ -375,7 +371,7 @@ impl FlowHarness {
         ManualFlowAbortDriver::new(self.catalog.clone(), self.catalog.get_one().unwrap(), args)
     }
 
-    pub fn now_datetime(&self) -> DateTime<Utc> {
+    pub fn now(&self) -> DateTime<Utc> {
         self.fake_system_time_source.now()
     }
 
@@ -456,7 +452,8 @@ impl FlowHarness {
 
         // Create initial snapshot - the state at moment 0 after flow agent loaded
         let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
-        test_flow_listener.make_a_snapshot(self.now_datetime());
+        test_flow_listener.mark_as_loaded();
+        test_flow_listener.make_a_snapshot(self.now());
 
         // Run scheduler concurrently with the provided simulation script
         tokio::select! {
