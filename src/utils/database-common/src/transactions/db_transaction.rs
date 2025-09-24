@@ -164,7 +164,7 @@ impl<'a, DB: sqlx::Database> TransactionGuard<'a, DB> {
 
     pub async fn connection_mut(&mut self) -> Result<&mut DB::Connection, InternalError> {
         if self.guard.is_none() {
-            tracing::warn!("Opening transaction");
+            tracing::debug!("Opening transaction");
             let transaction = self.state.connection_pool.begin().await.int_err()?;
             (*self.guard) = Some(transaction);
         }
