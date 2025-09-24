@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_webhooks::*;
@@ -16,20 +16,10 @@ use sqlx::types::uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn WebhookDeliveryRepository)]
 pub struct SqliteWebhookDeliveryRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[component(pub)]
-#[interface(dyn WebhookDeliveryRepository)]
-impl SqliteWebhookDeliveryRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

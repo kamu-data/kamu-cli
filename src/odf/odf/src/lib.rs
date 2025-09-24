@@ -76,5 +76,6 @@ pub mod serde {
 }
 
 pub mod utils {
+    #[cfg(feature = "datafusion")]
     pub use odf_data_utils::*;
 }

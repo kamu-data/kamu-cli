@@ -11,13 +11,16 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use database_common::{BatchLookup, BatchLookupCreateOptions};
 use dill::{Singleton, component, interface, scope};
+use internal_error::InternalError;
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntry,
     DatasetEntryNotFoundError,
     DatasetEntryService,
     DatasetEntryStream,
+    GetDatasetEntryByNameError,
     GetDatasetEntryError,
     GetMultipleDatasetEntriesError,
 };
@@ -121,6 +124,56 @@ impl DatasetEntryService for FakeDatasetEntryService {
         );
 
         Ok(res)
+    }
+
+    async fn get_dataset_entries_by_owner_and_name(
+        &self,
+        owner_id_dataset_name_pairs: &[&(odf::AccountID, odf::DatasetName)],
+    ) -> Result<
+        BatchLookup<DatasetEntry, (odf::AccountID, odf::DatasetName), GetDatasetEntryByNameError>,
+        InternalError,
+    > {
+        let guard = self.state.lock().unwrap();
+
+        let found_entries = owner_id_dataset_name_pairs
+            .iter()
+            .filter_map(|(owner_id, dataset_name)| {
+                guard
+                    .entries_by_owner
+                    .get(owner_id)
+                    .and_then(|entries| entries.iter().find(|e| &e.name == dataset_name))
+                    .cloned()
+            })
+            .collect::<Vec<_>>();
+
+        Ok(BatchLookup::from_found_items(
+            found_entries,
+            owner_id_dataset_name_pairs,
+            BatchLookupCreateOptions {
+                found_ids_fn: |entries| {
+                    entries
+                        .iter()
+                        .map(|entry| (entry.owner_id.clone(), entry.name.clone()))
+                        .collect()
+                },
+                not_found_err_fn: |(owner_id, dataset_name)| {
+                    kamu_datasets::DatasetEntryByNameNotFoundError::new(
+                        (*owner_id).clone(),
+                        (*dataset_name).clone(),
+                    )
+                    .into()
+                },
+                maybe_found_items_comparator: Some(|a: &DatasetEntry, b: &DatasetEntry| {
+                    use std::cmp::Ordering;
+
+                    match a.owner_name.cmp(&b.owner_name) {
+                        Ordering::Equal => a.name.cmp(&b.name),
+                        owner_id_cmp_res @ (Ordering::Greater | Ordering::Less) => owner_id_cmp_res,
+                    }
+                }),
+                _phantom: Default::default(),
+            },
+        ))
     }
 }
 

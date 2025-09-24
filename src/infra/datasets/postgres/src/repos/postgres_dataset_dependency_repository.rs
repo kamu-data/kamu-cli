@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -15,19 +15,11 @@ use sqlx::{Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresDatasetDependencyRepository {
-    transaction: TransactionRefT<sqlx::Postgres>,
-}
-
-#[component(pub)]
+#[component]
 #[interface(dyn DatasetDependencyRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
-impl PostgresDatasetDependencyRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
+pub struct PostgresDatasetDependencyRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

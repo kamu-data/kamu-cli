@@ -11,7 +11,7 @@ use std::borrow::Cow;
 
 use kamu_accounts::AccountService;
 use kamu_auth_rebac::RebacService;
-use kamu_datasets::{DatasetEntryService, DatasetResolution};
+use kamu_datasets::DatasetEntryService;
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -63,7 +63,7 @@ impl Auth {
             dyn DatasetEntryService
         );
 
-        let account_ids = account_ids.into_iter().map(Into::into).collect::<Vec<_>>();
+        let account_ids = account_ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         let accounts_map = account_service
             .get_account_map(&account_ids)
             .await
@@ -108,9 +108,10 @@ impl Auth {
                             eev.set("dataset_id", dataset_id.to_string());
                         },
                     ))
-                    .and_then(|dataset_resolution| match dataset_resolution {
-                        DatasetResolution::Resolved(dataset_entry) => Ok(dataset_entry),
-                        DatasetResolution::Unresolved => {
+                    .and_then(|dataset_resolution| {
+                        if let Some(dataset_entry) = dataset_resolution {
+                            Ok(dataset_entry)
+                        } else {
                             Err(GqlError::gql_extended("Dataset not resolved", |eev| {
                                 eev.set("dataset_id", dataset_id.to_string());
                             }))

@@ -247,14 +247,16 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         let guard = self.state.lock().unwrap();
 
-        let accounts: Vec<Account> = account_ids
+        let mut accounts: Vec<Account> = account_ids
             .iter()
             .filter_map(|account_id| guard.accounts_by_id.get(account_id).cloned())
             .collect();
+
+        accounts.sort_by(|a, b| a.account_name.cmp(&b.account_name));
 
         Ok(accounts)
     }
@@ -385,6 +387,22 @@ impl AccountRepository for InMemoryAccountRepository {
             ))
         }
     }
+
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError> {
+        let guard = self.state.lock().unwrap();
+
+        let mut accounts = account_names
+            .iter()
+            .filter_map(|name| guard.accounts_by_name.get(*name).cloned())
+            .collect::<Vec<_>>();
+
+        accounts.sort_by(|a, b| a.account_name.cmp(&b.account_name));
+
+        Ok(accounts)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,20 +418,25 @@ impl ExpensiveAccountRepository for InMemoryAccountRepository {
     }
 
     async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
-        let dataset_entries_page = {
+        let mut account_refs = {
             let readable_state = self.state.lock().unwrap();
 
             readable_state
                 .accounts_by_id
                 .values()
-                .skip(pagination.offset)
-                .take(pagination.limit)
                 .cloned()
-                .map(Ok)
                 .collect::<Vec<_>>()
         };
 
-        Box::pin(futures::stream::iter(dataset_entries_page))
+        account_refs.sort_by(|a, b| a.registered_at.cmp(&b.registered_at));
+
+        let accounts_page_it = account_refs
+            .into_iter()
+            .skip(pagination.offset)
+            .take(pagination.limit)
+            .map(Ok);
+
+        Box::pin(futures::stream::iter(accounts_page_it))
     }
 }
 

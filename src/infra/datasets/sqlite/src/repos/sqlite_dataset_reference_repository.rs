@@ -9,25 +9,18 @@
 
 use std::str::FromStr;
 
-use database_common::{TransactionRef, TransactionRefT};
+use cheap_clone::CheapClone;
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetReferenceRepository)]
 pub struct SqliteDatasetReferenceRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetReferenceRepository)]
-impl SqliteDatasetReferenceRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,7 +76,7 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         } else {
             Err(DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
+                block_ref: block_ref.cheap_clone(),
             }
             .into())
         }
@@ -217,7 +210,7 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
             Err(RemoveDatasetReferenceError::NotFound(
                 DatasetReferenceNotFoundError {
                     dataset_id: dataset_id.clone(),
-                    block_ref: block_ref.clone(),
+                    block_ref: block_ref.cheap_clone(),
                 },
             ))
         } else {

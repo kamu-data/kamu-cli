@@ -109,12 +109,20 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// Convenience function to iterate blocks starting with the `head`
     /// reference
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks(&self) -> DynMetadataStream<'_> {
         self.iter_blocks_interval_ref(&BlockRef::Head, None)
     }
 
     /// Convenience function to iterate blocks starting with the specified
     /// reference
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(head, None)
     }
@@ -125,6 +133,10 @@ pub trait MetadataChainExt: MetadataChain {
     /// encountered the iteration will continue until first block followed by an
     /// error. If `ignore_missing_tail` argument is provided, the exception
     /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks_interval<'a>(
         &'a self,
         head_hash: &'a Multihash,
@@ -141,10 +153,10 @@ pub trait MetadataChainExt: MetadataChain {
                 current = next;
             }
 
-            if !ignore_missing_tail && current.is_none() && tail_hash.is_some() {
+            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
                 Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
                     head: head_hash.clone(),
-                    tail: tail_hash.cloned().unwrap(),
+                    tail: tail_hash.clone(),
                 }))?;
             }
         })
@@ -156,6 +168,10 @@ pub trait MetadataChainExt: MetadataChain {
     /// encountered the iteration will continue until first block followed by an
     /// error. If `ignore_missing_tail` argument is provided, the exception
     /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
     fn iter_blocks_interval_inclusive<'a>(
         &'a self,
         head_hash: &'a Multihash,
@@ -207,10 +223,10 @@ pub trait MetadataChainExt: MetadataChain {
                 current = next;
             }
 
-            if current.is_none() && tail_hash.is_some() {
+            if current.is_none() && let Some(tail_hash) = tail_hash {
                 Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
                     head: head_hash,
-                    tail: tail_hash.unwrap()
+                    tail: tail_hash
                 }))?;
             }
         })
@@ -282,6 +298,7 @@ pub trait MetadataChainExt: MetadataChain {
             AcceptByIntervalOptions {
                 inclusive_tail: false,
                 ignore_missing_tail: true,
+                ignore_hints_when_getting_preceding_block: false,
             },
         )
         .await
@@ -325,9 +342,12 @@ pub trait MetadataChainExt: MetadataChain {
             None
         };
 
-        // Determine the sequence number of tail block
-        let tail_sequence_number = if merged_decision == MetadataVisitorDecision::Stop {
+        // Determine the sequence number of tail block (for hints).
+        let hint_tail_sequence_number = if merged_decision == MetadataVisitorDecision::Stop {
             // No need to iterate
+            None
+        } else if options.ignore_hints_when_getting_preceding_block {
+            // Hints will not be used
             None
         } else if let Some(tail_hash) = tail_hash {
             // Read from the tail block
@@ -343,10 +363,10 @@ pub trait MetadataChainExt: MetadataChain {
         };
 
         // Iterate over blocks until we satisfy all visitors or reach the tail
-        while let Some((hash, block)) = &current_hashed_block
-            && merged_decision != MetadataVisitorDecision::Stop
-        {
-            if !options.inclusive_tail && tail_hash == Some(hash) {
+        while let Some((hash, block)) = &current_hashed_block {
+            let is_tail = tail_hash == Some(hash);
+
+            if !options.inclusive_tail && is_tail {
                 break;
             }
 
@@ -354,7 +374,7 @@ pub trait MetadataChainExt: MetadataChain {
             tracing::trace!(
                 current_block_hash=%hash,
                 sequence_number=block.sequence_number,
-                tail_sequence_number,
+                hint_tail_sequence_number,
                 event_type=?MetadataEventTypeFlags::from(&block.event),
                 visitors_decision=?merged_decision,
                 "Traversing through block",
@@ -399,11 +419,33 @@ pub trait MetadataChainExt: MetadataChain {
                 break;
             }
 
-            // Try to jump to the previous block with satisfaction hints taken into account
-            current_hashed_block = self
-                .get_preceding_block_with_hint(block, tail_sequence_number, merged_decision)
+            // We have processed the inclusive tail block,
+            // not overwriting current_hashed_block for potential checks.
+            if is_tail {
+                break;
+            }
+
+            current_hashed_block = if options.ignore_hints_when_getting_preceding_block {
+                // Simply trying to get the previous block
+                if let Some(prev_block_hash) = &block.prev_block_hash {
+                    let prev_block = self
+                        .get_block(prev_block_hash)
+                        .await
+                        .map_err(IterBlocksError::from)?;
+                    Some((prev_block_hash.clone(), prev_block))
+                } else {
+                    None
+                }
+            } else {
+                // Try to jump to the previous block with satisfaction hints taken into account
+                self.get_preceding_block_with_hint(
+                    block,
+                    hint_tail_sequence_number,
+                    merged_decision,
+                )
                 .await
-                .map_err(IterBlocksError::from)?;
+                .map_err(IterBlocksError::from)?
+            }
         }
 
         // Finish all visitors
@@ -411,13 +453,16 @@ pub trait MetadataChainExt: MetadataChain {
             visitor.finish().map_err(AcceptVisitorError::Visitor)?;
         }
 
+        // Important: If there was no iteration (head is None), the interval correctness
+        //            check will not be performed.
         if !options.ignore_missing_tail
             && let Some((current_hash, _current_block)) = current_hashed_block
             && let Some(tail_hash) = tail_hash
             && current_hash != *tail_hash
+            && let Some(head_hash) = head_hash
         {
             Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                head: current_hash,
+                head: head_hash.clone(),
                 tail: tail_hash.clone(),
             }))?;
         }
@@ -486,8 +531,7 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<S, IterBlocksError>
     where
         S: Send,
-        F: Send,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> MetadataVisitorDecision + Send,
     {
         let mut visitor = GenericCallbackVisitor::new(state, initial_decision, callback);
 
@@ -510,9 +554,8 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<S, AcceptVisitorError<E>>
     where
         S: Send,
-        F: Send,
         E: Error + Send,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E> + Send,
     {
         let head_hash = self
             .resolve_ref(&BlockRef::Head)
@@ -534,9 +577,8 @@ pub trait MetadataChainExt: MetadataChain {
     ) -> Result<S, AcceptVisitorError<E>>
     where
         S: Send,
-        F: Send,
         E: Error + Send,
-        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E>,
+        F: Fn(&mut S, &Multihash, &MetadataBlock) -> Result<MetadataVisitorDecision, E> + Send,
     {
         let mut visitor = GenericFallibleCallbackVisitor::new(state, initial_decision, callback);
 
@@ -571,6 +613,17 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 pub struct AcceptByIntervalOptions {
     pub inclusive_tail: bool,
     pub ignore_missing_tail: bool,
+    pub ignore_hints_when_getting_preceding_block: bool,
+}
+
+impl Default for AcceptByIntervalOptions {
+    fn default() -> Self {
+        Self {
+            inclusive_tail: false,
+            ignore_missing_tail: true,
+            ignore_hints_when_getting_preceding_block: false,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -802,8 +855,9 @@ impl From<SetChainRefError> for AppendError {
 // Individual Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: The interval is guaranteed to include the head, but not the tail.
 #[derive(Error, Debug)]
-#[error("Invalid block interval [{head}, {tail})")]
+#[error("Invalid block interval: {head} (inclusive), {tail}")]
 pub struct InvalidIntervalError {
     pub head: Multihash,
     pub tail: Multihash,

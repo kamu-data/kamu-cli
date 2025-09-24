@@ -167,11 +167,10 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
     let mut key_blocks = Vec::new();
     let mut key_event_flags = odf::metadata::MetadataEventTypeFlags::empty();
 
-    // TODO: PERF: iterate only over key blocks (using visitors) from (!) storage
-    //             not all blocks.
-
     // Iterate over blocks in the dataset in the specified range.
-    // Note: don't ignore missing tail, we want to detect InvalidInterval error
+    // Note: don't ignore missing tail, we want to detect InvalidInterval error.
+    //       Therefore, we need to iterate through all blocks, not only key ones,
+    //       to perform an accurate tail check.
     let mut blocks_stream = target
         .as_metadata_chain()
         .iter_blocks_interval(head, tail, false);

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ANY($1)\n            ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ANY($1)\n            ORDER BY account_name\n            ",
   "describe": {
     "columns": [
       {
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "9e220229fb961c81e8dfa5f599ebda7e1440b638cb25247169d803e3029255ee"
+  "hash": "4e4accb99e123181af1402c3c423c48049384480631002c39b158f3dea7c09f8"
 }

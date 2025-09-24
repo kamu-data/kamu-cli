@@ -40,7 +40,7 @@ impl DatasetMut {
             .await?
             .expect("Account must exist");
 
-        // NOTE: Not reusing any cached state as it could've been altered by preceeding
+        // NOTE: Not reusing any cached state as it could've been altered by preceding
         // mutations
         Ok(Dataset::new_access_checked(
             owner,

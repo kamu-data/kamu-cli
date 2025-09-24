@@ -305,6 +305,14 @@ pub fn encoder_for<'a>(
         DataType::Float16 => Box::new(JsonNullableEncoder(c, Float16Encoder(c.as_primitive()))),
         DataType::Float32 => Box::new(JsonNullableEncoder(c, Float32Encoder(c.as_primitive()))),
         DataType::Float64 => Box::new(JsonNullableEncoder(c, Float64Encoder(c.as_primitive()))),
+        DataType::Decimal32(_, _) => Box::new(JsonNullableEncoder(
+            c,
+            JsonSafeStringEncoder(Decimal32Encoder(c.as_primitive())),
+        )),
+        DataType::Decimal64(_, _) => Box::new(JsonNullableEncoder(
+            c,
+            JsonSafeStringEncoder(Decimal64Encoder(c.as_primitive())),
+        )),
         DataType::Decimal128(_, _) => Box::new(JsonNullableEncoder(
             c,
             JsonSafeStringEncoder(Decimal128Encoder(c.as_primitive())),

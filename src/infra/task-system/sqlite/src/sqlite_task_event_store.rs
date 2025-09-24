@@ -10,12 +10,7 @@
 use std::num::NonZeroUsize;
 
 use chrono::Utc;
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
@@ -23,19 +18,13 @@ use sqlx::{FromRow, QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn TaskEventStore)]
 pub struct SqliteTaskEventStore {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
-#[component(pub)]
-#[interface(dyn TaskEventStore)]
 impl SqliteTaskEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     async fn register_task(
         &self,
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,

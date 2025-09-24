@@ -115,7 +115,7 @@ pub trait RebacService: Send + Sync {
 
     async fn get_authorized_datasets_by_account_ids(
         &self,
-        account_ids: &[odf::AccountID],
+        account_ids: &[&odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Vec<AuthorizedDataset>>, GetObjectEntityRelationsError>;
 
     async fn get_authorized_accounts(

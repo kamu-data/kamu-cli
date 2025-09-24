@@ -39,12 +39,14 @@ pub use super::dtos::{
     TimeUnit,
 };
 
+#[cfg(feature = "arrow")]
 mod arrow_conversions;
 mod arrow_encoding;
 pub mod ext;
 mod schema_cmp;
 mod schema_impl;
 
+#[cfg(feature = "arrow")]
 pub use arrow_conversions::*;
 pub use arrow_encoding::*;
 pub use schema_cmp::*;

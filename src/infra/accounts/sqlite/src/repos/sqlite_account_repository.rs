@@ -9,12 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -26,21 +21,15 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn AccountRepository)]
+#[interface(dyn ExpensiveAccountRepository)]
+#[interface(dyn PasswordHashRepository)]
 pub struct SqliteAccountRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
-#[component(pub)]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
 impl SqliteAccountRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
         let sqlite_error_message = e.message();
 
@@ -267,8 +256,8 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         if account_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -277,34 +266,35 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let query_str = format!(
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"
-                SELECT
-                    id,
-                    account_name,
-                    email,
-                    display_name,
-                    account_type,
-                    avatar_url,
-                    registered_at,
-                    provider,
-                    provider_identity_key
-                FROM accounts
-                WHERE id IN ({})
-                "#,
-            sqlite_generate_placeholders_list(account_ids.len(), NonZeroUsize::new(1).unwrap())
+            SELECT id,
+                   account_name,
+                   email,
+                   display_name,
+                   account_type,
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE id IN
+            "#,
         );
+        query_builder.push_tuples(account_ids, |mut b, account_id| {
+            b.push_bind(account_id.to_string());
+        });
+        query_builder.push("ORDER BY account_name");
 
-        // ToDo replace it by macro once sqlx will support it
-        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let mut query = sqlx::query(&query_str);
-        for account_id in account_ids {
-            query = query.bind(account_id.to_string());
-        }
+        let row_models = query_builder
+            .build_query_as::<AccountRowModel>()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
 
-        let account_rows = query.fetch_all(connection_mut).await.int_err()?;
+        let accounts = row_models.into_iter().map(Into::into).collect();
 
-        Ok(account_rows.iter().map(Self::map_account_row).collect())
+        Ok(accounts)
     }
 
     async fn get_account_by_name(
@@ -423,6 +413,49 @@ impl AccountRepository for SqliteAccountRepository {
         .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
+    }
+
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError> {
+        if account_names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            SELECT id,
+                   account_name,
+                   email,
+                   display_name,
+                   account_type,
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE account_name IN
+            "#,
+        );
+        query_builder.push_tuples(account_names, |mut b, account_name| {
+            b.push_bind(account_name.as_str());
+        });
+        query_builder.push("ORDER BY account_name");
+
+        let row_models = query_builder
+            .build_query_as::<AccountRowModel>()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
+
+        let accounts = row_models.into_iter().map(Into::into).collect();
+
+        Ok(accounts)
     }
 
     fn search_accounts_by_name_pattern<'a>(

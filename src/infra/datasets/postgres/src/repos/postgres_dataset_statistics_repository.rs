@@ -7,25 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use cheap_clone::CheapClone;
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetStatisticsRepository)]
 pub struct PostgresDatasetStatisticsRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetStatisticsRepository)]
-impl PostgresDatasetStatisticsRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +69,7 @@ impl DatasetStatisticsRepository for PostgresDatasetStatisticsRepository {
         } else {
             Err(DatasetStatisticsNotFoundError {
                 dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
+                block_ref: block_ref.cheap_clone(),
             }
             .into())
         }

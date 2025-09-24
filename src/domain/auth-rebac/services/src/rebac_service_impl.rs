@@ -394,7 +394,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn get_authorized_datasets_by_account_ids(
         &self,
-        account_ids: &[odf::AccountID],
+        account_ids: &[&odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Vec<AuthorizedDataset>>, GetObjectEntityRelationsError>
     {
         let account_entities = account_ids
@@ -404,7 +404,7 @@ impl RebacService for RebacServiceImpl {
 
         let entities_with_relations = self
             .rebac_repo
-            .get_subject_entities_relations(&account_entities[..])
+            .get_subject_entities_relations(&account_entities)
             .await
             .int_err()?;
 
@@ -475,7 +475,7 @@ impl RebacService for RebacServiceImpl {
 
         let entities_with_relations = self
             .rebac_repo
-            .get_object_entities_relations(&dataset_entities[..])
+            .get_object_entities_relations(&dataset_entities)
             .await
             .int_err()?;
 

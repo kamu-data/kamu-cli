@@ -21,6 +21,24 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `Search::query()`: case insensitive search.
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## [0.249.0] - 2025-09-23
+### Changed
+- (#1372): GQL: Performance improvement via query vectorization for APIs:
+  - `Dataset::by_ids()`;
+  - `DatasetMut::by_ids()`;
+  - `Account::by_ids()`;
+  - `AccountMut::by_ids()`.
+- Improved compatibility with EVM-based sources
+- Upgraded to `datafusion v50`
+- (#1384) `kamu inspect`: speed-up of iteration through the metadata chain.
+- (#1384) `GQL: Dataset::metadata().current_push_sources`: significant speed-up through iteration 
+  over key blocks stored in the database 
+- (#1384) General iteration optimizations based on the dataset type (root, derived). 
+  Ability to disable hints during iteration.
+- (#1384) `SearchActivePushSourcesVisitor`, `SearchActivePollingSourceVisitor`: accounting for the evolution of data 
+  sources.
+- (#1366): Experiment: beginning of `cheap_clone()` integration.
+
 ## [0.248.1] - 2025-09-11
 ### Fixed
 - Crash on writing datasets with `List` field type

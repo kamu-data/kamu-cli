@@ -116,7 +116,10 @@ impl KamuFlightSqlServiceWrapper {
         // In this approach transaction manager never gets a chance to COMMIT, and the
         // transaction will be automatically rolled back when it's dropped, but that's
         // OK because all these interactions are read-only.
-        let session_catalog = catalog.builder_chained().add_value(transaction_ref).build();
+        let mut b = catalog.builder_chained();
+        transaction_ref.register(&mut b);
+
+        let session_catalog = b.build();
 
         let inner: Arc<KamuFlightSqlService> = session_catalog.get_one().map_err(internal_error)?;
 

@@ -146,10 +146,11 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             let dataset_refs = points_with_dataset_ids
                 .iter()
                 .map(|(_point, id)| id.clone().into_local_ref())
-                .collect();
+                .collect::<Vec<_>>();
+            let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
             let resolve_res = self
                 .rebac_dataset_registry_facade
-                .classify_dataset_refs_by_allowance(dataset_refs, auth::DatasetAction::Read)
+                .classify_dataset_refs_by_allowance(&dataset_refs_refs, auth::DatasetAction::Read)
                 .await
                 .int_err()?;
 

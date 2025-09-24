@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
-use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_tuple_list_2};
+use database_common::{TransactionRefT, sqlite_generate_placeholders_tuple_list_2};
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::*;
@@ -19,19 +19,13 @@ use sqlx::{QueryBuilder, Row};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn RebacRepository)]
 pub struct SqliteRebacRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
-#[component(pub)]
-#[interface(dyn RebacRepository)]
 impl SqliteRebacRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn map_entity_row(row: &SqliteRow) -> Result<EntitiesWithRelation<'static>, InternalError> {
         let raw_entity = EntitiesWithRelationRowModel {
             subject_entity_type: row.get(0),
@@ -587,18 +581,16 @@ impl RebacRepository for SqliteRebacRepository {
             WHERE (subject_entity_type,
                    subject_entity_id,
                    object_entity_type,
-                   object_entity_id) IN (
+                   object_entity_id) IN
             "#,
         );
 
-        query_builder.push_values(operations, |mut b, op| {
+        query_builder.push_tuples(operations, |mut b, op| {
             b.push_bind(op.subject_entity.entity_type);
             b.push_bind(op.subject_entity.entity_id.as_ref());
             b.push_bind(op.object_entity.entity_type);
             b.push_bind(op.object_entity.entity_id.as_ref());
         });
-
-        query_builder.push(")");
 
         query_builder
             .build()

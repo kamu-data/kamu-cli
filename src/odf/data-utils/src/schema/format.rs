@@ -240,6 +240,9 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 LogicalType::Enum => "ENUM".to_string(),
                 LogicalType::List => "LIST".to_string(),
                 LogicalType::Map => "MAP".to_string(),
+                LogicalType::Variant => "VARIANT".to_string(),
+                LogicalType::Geography => "GEOGRAPHY".to_string(),
+                LogicalType::Geometry => "GEOMETRY".to_string(),
                 LogicalType::Unknown => "UNKNOWN".to_string(),
             },
             None => {

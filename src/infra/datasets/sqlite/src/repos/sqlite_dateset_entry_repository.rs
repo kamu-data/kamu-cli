@@ -12,12 +12,7 @@ use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use database_common::{
-    PaginationOpts,
-    TransactionRef,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -25,23 +20,11 @@ use sqlx::Row;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetEntryRepository)]
 pub struct SqliteDatasetEntryRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetEntryRepository)]
-impl SqliteDatasetEntryRepository {
-    pub fn new(
-        transaction: TransactionRef,
-        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-    ) -> Self {
-        Self {
-            transaction: transaction.into(),
-            removal_listeners,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -273,6 +256,50 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         } else {
             Err(DatasetEntryByNameNotFoundError::new(owner_id.clone(), name.clone()).into())
         }
+    }
+
+    async fn get_dataset_entries_by_owner_and_name<'a>(
+        &self,
+        owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
+    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
+        if owner_id_dataset_name_pairs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            SELECT dataset_id   as id,
+                   owner_id,
+                   owner_name,
+                   dataset_name as name,
+                   created_at,
+                   kind
+            FROM dataset_entries
+            WHERE (owner_id, dataset_name) IN
+            "#,
+        );
+        query_builder.push_tuples(
+            owner_id_dataset_name_pairs,
+            |mut b, (owner_id, dataset_name)| {
+                b.push_bind(owner_id.to_string());
+                b.push_bind(dataset_name.as_str());
+            },
+        );
+        query_builder.push("ORDER BY owner_name, dataset_name");
+
+        let model_rows = query_builder
+            .build_query_as::<DatasetEntryRowModel>()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
+
+        let entries = model_rows.into_iter().map(Into::into).collect();
+
+        Ok(entries)
     }
 
     async fn get_dataset_entries_by_owner_id<'a>(

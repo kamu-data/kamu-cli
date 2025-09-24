@@ -10,11 +10,7 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
-use database_common::{
-    TransactionRef,
-    TransactionRefT,
-    postgres_generate_placeholders_tuple_list_2,
-};
+use database_common::{TransactionRefT, postgres_generate_placeholders_tuple_list_2};
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::*;
@@ -23,19 +19,13 @@ use sqlx::postgres::PgRow;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn RebacRepository)]
 pub struct PostgresRebacRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
 
-#[component(pub)]
-#[interface(dyn RebacRepository)]
 impl PostgresRebacRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn map_entity_row(row: &PgRow) -> Result<EntitiesWithRelation<'static>, InternalError> {
         let raw_entity = EntitiesWithRelationRowModel {
             subject_entity_type: row.get(0),

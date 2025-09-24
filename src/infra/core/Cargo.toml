@@ -83,7 +83,7 @@ ringbuf = "0.4"
 zip = "3"
 
 # Data
-datafusion = { version = "49", default-features = false }
+datafusion = { version = "50", default-features = false }
 object_store = { version = "0.12", features = ["aws"] }
 sha3 = "0.10"
 
@@ -119,7 +119,12 @@ url = { version = "2", features = ["serde"] }
 # Optional dependencies
 kamu-auth-rebac-services = { optional = true, workspace = true }
 
-alloy = { optional = true, version = "1.0", default-features = false, features = ["std", "provider-http", "provider-ws"] }
+alloy = { optional = true, version = "1.0", default-features = false, features = [
+    "std",
+    "provider-http",
+    "provider-ws",
+    "reqwest-rustls-tls",
+] }
 bon = { optional = true, version = "3", default-features = false }
 # TODO: Using curl brings a lot of overhead including compiling and linking openssl
 # We should replace it with reqwest + a separate FTP client or drop FTP support in favor of container-based ingest.
@@ -129,8 +134,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "49" }
-datafusion-functions-json = { optional = true, version = "0.49" }
+datafusion-ethers = { optional = true, version = "50" }
+datafusion-functions-json = { optional = true, version = "0.50" }
 rumqttc = { optional = true, version = "0.24", default-features = false, features = [
 ] }
 mockall = { optional = true, version = "0.13", default-features = false }
@@ -158,7 +163,9 @@ test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.7", features = ["async_tokio"] }
-datafusion = { version = "49", default-features = false, features = ["parquet"] }
+datafusion = { version = "50", default-features = false, features = [
+    "parquet",
+] }
 filetime = "0.2"
 fs_extra = "1.3"
 indoc = "2"

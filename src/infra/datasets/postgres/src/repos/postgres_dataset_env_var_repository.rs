@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use uuid::Uuid;
@@ -16,18 +16,10 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn DatasetEnvVarRepository)]
 pub struct PostgresDatasetEnvVarRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
-}
-
-#[component(pub)]
-#[interface(dyn DatasetEnvVarRepository)]
-impl PostgresDatasetEnvVarRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 #[async_trait::async_trait]

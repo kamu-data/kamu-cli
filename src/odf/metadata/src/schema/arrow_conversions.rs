@@ -9,16 +9,13 @@
 
 use super::arrow_encoding::ArrowEncoding;
 use crate::dtos::*;
-#[cfg(feature = "arrow")]
-use crate::UnsupportedSchema;
-use crate::{ArrowBufferEncoding, ArrowDateEncoding};
+use crate::{ArrowBufferEncoding, ArrowDateEncoding, UnsupportedSchema};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSchema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataSchema {
-    #[cfg(feature = "arrow")]
     pub fn new_from_arrow(value: &arrow::datatypes::Schema) -> Result<Self, UnsupportedSchema> {
         let mut fields = Vec::with_capacity(value.fields.len());
         for field in &value.fields {
@@ -31,7 +28,6 @@ impl DataSchema {
         })
     }
 
-    #[cfg(feature = "arrow")]
     pub fn to_arrow(
         &self,
         settings: &ToArrowSettings,
@@ -80,7 +76,6 @@ pub struct ToArrowSettings {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataField {
-    #[cfg(feature = "arrow")]
     fn new_from_arrow(value: &arrow::datatypes::Field) -> Result<Self, UnsupportedSchema> {
         let (r#type, encoding) = DataType::new_from_arrow(value.data_type(), value.is_nullable())?;
 
@@ -96,7 +91,6 @@ impl DataField {
         })
     }
 
-    #[cfg(feature = "arrow")]
     pub fn to_arrow(
         &self,
         settings: &ToArrowSettings,
@@ -143,7 +137,6 @@ impl DataType {
     /// represents *logical* types - all information related to encoding and
     /// physical layout of data is pushed into `extra` attributes (see
     /// [`ArrowEncoding`]).
-    #[cfg(feature = "arrow")]
     fn new_from_arrow(
         value: &arrow::datatypes::DataType,
         nullable: bool,
@@ -369,6 +362,20 @@ impl DataType {
                     "Dictionary types are not yet supported in ODF schema",
                 ));
             }
+            ArrowDataType::Decimal32(precision, scale) => (
+                DataType::Decimal(DataTypeDecimal {
+                    precision: (*precision).into(),
+                    scale: (*scale).into(),
+                }),
+                Some(ArrowDecimalEncoding { bit_width: 32 }.into()),
+            ),
+            ArrowDataType::Decimal64(precision, scale) => (
+                DataType::Decimal(DataTypeDecimal {
+                    precision: (*precision).into(),
+                    scale: (*scale).into(),
+                }),
+                Some(ArrowDecimalEncoding { bit_width: 64 }.into()),
+            ),
             ArrowDataType::Decimal128(precision, scale) => (
                 DataType::Decimal(DataTypeDecimal {
                     precision: (*precision).into(),
@@ -468,7 +475,6 @@ impl DataType {
         }
     }
 
-    #[cfg(feature = "arrow")]
     pub fn to_arrow(
         &self,
         encoding: Option<&ArrowEncoding>,
@@ -690,6 +696,14 @@ impl DataType {
                 decimal: Some(ArrowDecimalEncoding { bit_width }),
             }) => match self {
                 DataType::Decimal(DataTypeDecimal { precision, scale }) => match bit_width {
+                    32 => ArrowDataType::Decimal32(
+                        u8::try_from(*precision).unwrap(),
+                        i8::try_from(*scale).unwrap(),
+                    ),
+                    64 => ArrowDataType::Decimal64(
+                        u8::try_from(*precision).unwrap(),
+                        i8::try_from(*scale).unwrap(),
+                    ),
                     128 => ArrowDataType::Decimal128(
                         u8::try_from(*precision).unwrap(),
                         i8::try_from(*scale).unwrap(),

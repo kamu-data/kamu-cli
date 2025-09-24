@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use sqlx::SqliteConnection;
@@ -18,19 +18,14 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn AccessTokenRepository)]
+
 pub struct SqliteAccessTokenRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
-#[component(pub)]
-#[interface(dyn AccessTokenRepository)]
 impl SqliteAccessTokenRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     async fn query_token_by_id(
         &self,
         token_id: &Uuid,

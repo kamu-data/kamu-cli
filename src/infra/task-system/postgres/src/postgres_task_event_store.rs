@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
@@ -15,19 +15,13 @@ use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn TaskEventStore)]
 pub struct PostgresTaskEventStore {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
 
-#[component(pub)]
-#[interface(dyn TaskEventStore)]
 impl PostgresTaskEventStore {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     async fn register_task(
         &self,
         tr: &mut database_common::TransactionGuard<'_, Postgres>,

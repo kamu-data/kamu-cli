@@ -114,10 +114,7 @@ impl WsSmartTransferProtocolClient {
                 head,
                 tail,
             })) => Err(PullClientError::InvalidInterval(
-                odf::dataset::InvalidIntervalError {
-                    head: head.clone(),
-                    tail: tail.clone(),
-                },
+                odf::dataset::InvalidIntervalError { head, tail },
             )),
         }
     }

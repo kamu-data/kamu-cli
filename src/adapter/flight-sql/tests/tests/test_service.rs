@@ -21,7 +21,6 @@ use kamu_adapter_flight_sql::*;
 use kamu_core::{MockQueryService, QueryService};
 use odf::utils::data::DataFrameExt;
 use tokio::net::TcpListener;
-use tonic::service::interceptor;
 use tonic::transport::{Channel, Server};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,10 +99,12 @@ async fn run_server() -> FlightServer {
     tracing::info!("Listening on {addr:?}");
 
     let service = Server::builder()
-        .layer(interceptor(move |mut req: tonic::Request<()>| {
-            req.extensions_mut().insert(catalog.clone());
-            Ok(req)
-        }))
+        .layer(tonic::service::interceptor::InterceptorLayer::new(
+            move |mut req: tonic::Request<()>| {
+                req.extensions_mut().insert(catalog.clone());
+                Ok(req)
+            },
+        ))
         .layer(AuthenticationLayer::new())
         .add_service(FlightServiceServer::new(KamuFlightSqlServiceWrapper))
         .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));

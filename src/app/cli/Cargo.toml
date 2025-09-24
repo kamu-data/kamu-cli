@@ -39,6 +39,10 @@ web-ui = ["rust-embed"]
 
 
 [dependencies]
+# Workaround: This declaration is needed to override a transitive dependency version.
+#             Please find more detailed information in root Cargo.toml
+aws-lc-rs = { workspace = true }
+
 # Kamu
 async-utils = { workspace = true }
 container-runtime = { workspace = true }
@@ -69,7 +73,7 @@ kamu-adapter-http = { workspace = true, features = [
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-odf = { workspace = true, features = ["http", "s3"] }
+odf = { workspace = true, features = ["datafusion", "http", "s3"] }
 random-strings = { workspace = true }
 
 kamu-flow-system = { workspace = true }
@@ -156,13 +160,13 @@ read_input = "0.8"                                                # Basic user i
 webbrowser = "1"                                                  # For opening URLs in default system browser
 
 # APIs
-arrow-flight = { version = "55", features = ["flight-sql-experimental"] }
+arrow-flight = { version = "56", features = ["flight-sql-experimental"] }
 async-graphql = { version = "7", default-features = false }
 async-graphql-axum = "7"
 axum = { version = "0.8", features = ["ws"] }
 http = "1"
 serde_json = "1"
-tonic = { version = "0.12", default-features = false }
+tonic = { version = "0.13", default-features = false }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "cors", "catch-panic"] }
 utoipa = { version = "5", default-features = true, features = ["macros"] }
@@ -201,7 +205,14 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "49", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
+datafusion = { version = "50", default-features = false, features = [
+    "crypto_expressions",
+    "encoding_expressions",
+    "parquet",
+    "regex_expressions",
+    "unicode_expressions",
+    "compression",
+] }
 dill = { version = "0.14", default-features = false }
 dirs = "6"
 fs_extra = "1.3"

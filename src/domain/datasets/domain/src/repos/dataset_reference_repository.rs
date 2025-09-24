@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use cheap_clone::CheapClone;
 use internal_error::InternalError;
 use thiserror::Error;
 
@@ -98,7 +99,7 @@ impl DatasetReferenceCASError {
     ) -> Self {
         Self {
             dataset_id: dataset_id.clone(),
-            block_ref: block_ref.clone(),
+            block_ref: block_ref.cheap_clone(),
             expected_prev_block_hash: expected_prev_block_hash.cloned(),
             actual_prev_block_hash: actual_prev_block_hash.cloned(),
         }

@@ -182,25 +182,23 @@ impl AxumServerPullProtocolInstance {
             match transfer_plan_result {
                 Ok(transfer_plan) => {
                     tracing::debug!("Sending size estimate: {:?}", transfer_plan);
-                    DatasetPullResponse::Ok(DatasetPullSuccessResponse { transfer_plan })
+                    Ok(DatasetPullSuccessResponse { transfer_plan })
                 }
                 Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
                     tracing::debug!("Sending invalid interval error: {:?}", e);
-                    DatasetPullResponse::Err(DatasetPullRequestError::InvalidInterval(
+                    Err(DatasetPullRequestError::InvalidInterval(
                         DatasetPullInvalidIntervalError {
-                            head: e.head.clone(),
-                            tail: e.tail.clone(),
+                            head: e.head,
+                            tail: e.tail,
                         },
                     ))
                 }
                 Err(PrepareDatasetTransferEstimateError::Internal(e)) => {
                     tracing::debug!("Sending internal error: {:?}", e);
-                    DatasetPullResponse::Err(DatasetPullRequestError::Internal(
-                        TransferInternalError {
-                            phase: TransferPhase::Pull(PullPhase::InitialRequest),
-                            error_message: e.to_string(),
-                        },
-                    ))
+                    Err(DatasetPullRequestError::Internal(TransferInternalError {
+                        phase: TransferPhase::Pull(PullPhase::InitialRequest),
+                        error_message: e.to_string(),
+                    }))
                 }
             },
         )

@@ -67,6 +67,24 @@ impl Encoder for Float64Encoder<'_> {
     }
 }
 
+pub struct Decimal32Encoder<'a>(pub &'a arrow::array::Decimal128Array);
+impl Encoder for Decimal32Encoder<'_> {
+    fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
+        // TODO: PERF: Avoid allocation
+        write!(buf, "{}", self.0.value_as_string(idx))?;
+        Ok(())
+    }
+}
+
+pub struct Decimal64Encoder<'a>(pub &'a arrow::array::Decimal128Array);
+impl Encoder for Decimal64Encoder<'_> {
+    fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
+        // TODO: PERF: Avoid allocation
+        write!(buf, "{}", self.0.value_as_string(idx))?;
+        Ok(())
+    }
+}
+
 pub struct Decimal128Encoder<'a>(pub &'a arrow::array::Decimal128Array);
 impl Encoder for Decimal128Encoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {

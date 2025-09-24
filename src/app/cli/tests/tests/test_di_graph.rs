@@ -178,8 +178,7 @@ fn register_repositories(b: &mut CatalogBuilder, repositories_config: Repositori
             b.add_value(pool.clone());
 
             let transaction_ref = TransactionRef::new(pool);
-
-            b.add_value(transaction_ref);
+            transaction_ref.register(b);
         }
     }
 }

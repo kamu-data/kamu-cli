@@ -57,6 +57,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = dataset_entry_repo::test_get_dataset_entries_by_owner_and_name,
+    harness = InMemoryDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = dataset_entry_repo::test_try_save_duplicate_dataset_entry,
     harness = InMemoryDatasetEntryRepositoryHarness
 );

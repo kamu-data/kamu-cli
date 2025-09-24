@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -17,21 +17,16 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn AccountRepository)]
+#[interface(dyn ExpensiveAccountRepository)]
+#[interface(dyn PasswordHashRepository)]
+
 pub struct PostgresAccountRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
 
-#[component(pub)]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
 impl PostgresAccountRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
-
     fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
         let account_field: AccountDuplicateField = match e.constraint() {
             Some("accounts_pkey") => AccountDuplicateField::Id,
@@ -232,8 +227,8 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: &[odf::AccountID],
-    ) -> Result<Vec<Account>, GetAccountByIdError> {
+        account_ids: &[&odf::AccountID],
+    ) -> Result<Vec<Account>, GetAccountsByIdsError> {
         if account_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -242,10 +237,7 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let accounts_search: Vec<_> = account_ids
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect();
+        let account_ids: Vec<_> = account_ids.iter().map(ToString::to_string).collect();
 
         let account_rows = sqlx::query_as!(
             AccountRowModel,
@@ -262,8 +254,9 @@ impl AccountRepository for PostgresAccountRepository {
                 provider_identity_key
             FROM accounts
             WHERE id = ANY($1)
+            ORDER BY account_name
             "#,
-            &accounts_search
+            &account_ids
         )
         .fetch_all(connection_mut)
         .await
@@ -468,6 +461,45 @@ impl AccountRepository for PostgresAccountRepository {
                 },
             ))
         }
+    }
+
+    async fn get_accounts_by_names(
+        &self,
+        account_names: &[&odf::AccountName],
+    ) -> Result<Vec<Account>, GetAccountsByNamesError> {
+        if account_names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_names: Vec<_> = account_names.iter().map(ToString::to_string).collect();
+
+        let account_rows = sqlx::query_as!(
+            AccountRowModel,
+            r#"
+            SELECT id           AS "id: _",
+                   account_name,
+                   email,
+                   display_name,
+                   account_type AS "account_type: AccountType",
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE account_name = ANY($1)
+            ORDER BY account_name
+            "#,
+            &account_names
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(account_rows.into_iter().map(Into::into).collect())
     }
 }
 

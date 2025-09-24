@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use cheap_clone::CheapClone;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
@@ -50,9 +51,6 @@ impl DataWriterMetadataState {
         source_name: Option<&str>,
         head: Option<odf::Multihash>,
     ) -> Result<Self, ScanMetadataError> {
-        // TODO: PERF: Full metadata scan below - this is expensive and should be
-        //       improved using skip lists.
-
         use odf::dataset::MetadataChainVisitorExtInfallible;
 
         let head = if let Some(head) = head {
@@ -64,13 +62,16 @@ impl DataWriterMetadataState {
                 .await
                 .int_err()?
         };
+        let dataset_kind = target.get_kind();
+
         let mut seed_visitor = odf::dataset::SearchSeedVisitor::new().adapt_err();
         let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new().adapt_err();
         let mut set_data_schema_visitor =
             odf::dataset::SearchSetDataSchemaVisitor::new().adapt_err();
         let mut prev_source_state_visitor =
             odf::dataset::SearchSourceStateVisitor::new(source_name).adapt_err();
-        let mut add_data_visitor = odf::dataset::SearchAddDataVisitor::new().adapt_err();
+        let mut add_data_visitor =
+            odf::dataset::SearchAddDataVisitor::new(dataset_kind).adapt_err();
         let mut add_data_collection_visitor = odf::dataset::GenericCallbackVisitor::new(
             Vec::new(),
             odf::dataset::MetadataVisitorDecision::NextOfType(
@@ -122,7 +123,7 @@ impl DataWriterMetadataState {
         let (source_event, merge_strategy) =
             source_event_visitor.get_source_event_and_merge_strategy()?;
         let (prev_offset, prev_watermark, prev_checkpoint) = {
-            match add_data_visitor.into_inner().into_event() {
+            match add_data_visitor.into_inner().into_inner().into_event() {
                 Some(e) => (
                     e.last_offset(),
                     e.new_watermark,
@@ -139,7 +140,7 @@ impl DataWriterMetadataState {
             .map(|e| e.schema);
 
         Ok(Self {
-            block_ref: block_ref.clone(),
+            block_ref: block_ref.cheap_clone(),
             head,
             schema,
             source_event,

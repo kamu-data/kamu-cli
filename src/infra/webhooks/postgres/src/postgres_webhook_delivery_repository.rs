@@ -7,27 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT};
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_webhooks::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn WebhookDeliveryRepository)]
 pub struct PostgresWebhookDeliveryRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[component(pub)]
-#[interface(dyn WebhookDeliveryRepository)]
-impl PostgresWebhookDeliveryRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
-        Self {
-            transaction: transaction.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

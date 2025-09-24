@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::{ResolvedDataset, auth};
 use thiserror::Error;
 
@@ -37,9 +37,15 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
 
     async fn classify_dataset_refs_by_allowance(
         &self,
-        dataset_refs: Vec<odf::DatasetRef>,
+        dataset_refs: &[&odf::DatasetRef],
         action: auth::DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
+
+    async fn classify_dataset_refs_by_access(
+        &self,
+        dataset_refs: &[&odf::DatasetRef],
+        action: auth::DatasetAction,
+    ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,6 +82,38 @@ impl ClassifyDatasetRefsByAllowanceResponse {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ClassifyDatasetRefsByAccessResponse {
+    pub forbidden: Vec<(odf::DatasetRef, RebacDatasetRefUnresolvedError)>,
+    pub insufficient: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub allowed: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+}
+
+impl ClassifyDatasetRefsByAccessResponse {
+    pub fn try_get_error_message(&self, skip_missing: bool) -> Option<String> {
+        let have_forbidden_to_report = !self.forbidden.is_empty() && !skip_missing;
+
+        if self.insufficient.is_empty() && !have_forbidden_to_report {
+            return None;
+        }
+
+        let error_msg = format!(
+            "Dataset access error: insufficient access level [{}]; unresolved: [{}].",
+            itertools::join(
+                self.insufficient
+                    .iter()
+                    .map(|(r, h)| format!("{r}({})", h.alias)),
+                ","
+            ),
+            itertools::join(self.forbidden.iter().map(|(r, _)| r), ",")
+        );
+
+        Some(error_msg)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,6 +135,32 @@ pub enum RebacDatasetRefUnresolvedError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl RebacDatasetRefUnresolvedError {
+    pub fn not_enough_permissions(
+        dataset_ref: odf::DatasetRef,
+        action: auth::DatasetAction,
+    ) -> Self {
+        Self::Access(odf::AccessError::Unauthorized(
+            auth::DatasetActionNotEnoughPermissionsError {
+                action,
+                dataset_ref,
+            }
+            .into(),
+        ))
+    }
+}
+
+impl From<odf::dataset::DatasetRefUnresolvedError> for RebacDatasetRefUnresolvedError {
+    fn from(e: odf::dataset::DatasetRefUnresolvedError) -> Self {
+        use odf::dataset::DatasetRefUnresolvedError as E;
+
+        match e {
+            E::NotFound(e) => Self::NotFound(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

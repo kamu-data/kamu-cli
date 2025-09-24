@@ -102,10 +102,12 @@ pub fn parse_ddl_to_odf_schema(
             | SqlDataType::Dec(_)
             | SqlDataType::TinyInt(_)
             | SqlDataType::TinyIntUnsigned(_)
+            | SqlDataType::UTinyInt
             | SqlDataType::Int2(_)
             | SqlDataType::Int2Unsigned(_)
             | SqlDataType::SmallInt(_)
             | SqlDataType::SmallIntUnsigned(_)
+            | SqlDataType::USmallInt
             | SqlDataType::MediumInt(_)
             | SqlDataType::MediumIntUnsigned(_)
             | SqlDataType::Int4(_)
@@ -152,7 +154,14 @@ pub fn parse_ddl_to_odf_schema(
             | SqlDataType::Unspecified
             | SqlDataType::Trigger
             | SqlDataType::AnyType
-            | SqlDataType::GeometricType(_) => {
+            | SqlDataType::GeometricType(_)
+            | SqlDataType::NamedTable { .. }
+            | SqlDataType::HugeInt
+            | SqlDataType::UHugeInt
+            | SqlDataType::UBigInt
+            | SqlDataType::TimestampNtz
+            | SqlDataType::TsVector
+            | SqlDataType::TsQuery => {
                 return Err(UnsupportedSchema::new(format!(
                     "Unsupported SQL type when converting to ODF schema: {}",
                     col.data_type

@@ -140,6 +140,12 @@ fn encoder_for<'a>(
         DataType::Float16 => Box::new(CsvNullableEncoder(c, Float16Encoder(c.as_primitive()))),
         DataType::Float32 => Box::new(CsvNullableEncoder(c, Float32Encoder(c.as_primitive()))),
         DataType::Float64 => Box::new(CsvNullableEncoder(c, Float64Encoder(c.as_primitive()))),
+        DataType::Decimal32(_, _) => {
+            Box::new(CsvNullableEncoder(c, Decimal32Encoder(c.as_primitive())))
+        }
+        DataType::Decimal64(_, _) => {
+            Box::new(CsvNullableEncoder(c, Decimal64Encoder(c.as_primitive())))
+        }
         DataType::Decimal128(_, _) => {
             Box::new(CsvNullableEncoder(c, Decimal128Encoder(c.as_primitive())))
         }

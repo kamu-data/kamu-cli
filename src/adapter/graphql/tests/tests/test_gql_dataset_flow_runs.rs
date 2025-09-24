@@ -3174,7 +3174,7 @@ async fn test_history_of_completed_transform_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_execute_transfrom_flow_error_after_compaction() {
+async fn test_execute_transform_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
@@ -4124,6 +4124,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(flaky)]
 #[test_log::test(tokio::test)]
 async fn test_trigger_flow_automatically_via_schedule() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
