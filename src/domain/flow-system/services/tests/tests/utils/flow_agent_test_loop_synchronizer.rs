@@ -7,24 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use dill::Catalog;
-use internal_error::InternalError;
-use kamu_task_system::TaskID;
+use std::sync::Arc;
 
-use crate::FlowID;
+use kamu_flow_system::{FlowAgentLoopSynchronizer, FlowSystemEventAgent};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+pub(crate) struct FlowAgentTestLoopSynchronizer {
+    flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowAgentTestDriver: Sync + Send {
-    /// Pretends it is time to schedule the given flow that was in Queued state
-    async fn mimic_flow_scheduled(
-        &self,
-        target_catalog: &Catalog,
-        flow_id: FlowID,
-        schedule_time: DateTime<Utc>,
-    ) -> Result<TaskID, InternalError>;
+impl FlowAgentLoopSynchronizer for FlowAgentTestLoopSynchronizer {
+    async fn synchronize_execution_loop(&self) -> Result<(), internal_error::InternalError> {
+        self.flow_system_event_agent
+            .catchup_remaining_events()
+            .await?;
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

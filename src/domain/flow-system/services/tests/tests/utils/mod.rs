@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod flow_agent_test_loop_synchronizer;
 mod flow_config_test_listener;
 mod flow_harness_shared;
 mod flow_system_test_listener;
@@ -15,6 +16,7 @@ mod manual_flow_abort_driver;
 mod manual_flow_activation_driver;
 mod task_driver;
 
+pub(crate) use flow_agent_test_loop_synchronizer::*;
 pub(crate) use flow_config_test_listener::*;
 pub(crate) use flow_harness_shared::*;
 pub(crate) use flow_system_test_listener::*;

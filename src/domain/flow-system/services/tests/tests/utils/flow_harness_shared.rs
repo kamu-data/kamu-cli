@@ -40,6 +40,7 @@ use super::{
     TaskDriver,
     TaskDriverArgs,
 };
+use crate::tests::FlowAgentTestLoopSynchronizer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,6 +63,7 @@ pub(crate) struct FlowHarness {
     pub flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
+    pub flow_agent_test_loop_synchronizer: Arc<FlowAgentTestLoopSynchronizer>,
 }
 
 #[derive(Default)]
@@ -105,6 +107,7 @@ impl FlowHarness {
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowSystemTestListener>()
+            .add::<FlowAgentTestLoopSynchronizer>()
             .add_value(FlowAgentConfig::new(
                 awaiting_step,
                 mandatory_throttling_period,
@@ -179,6 +182,7 @@ impl FlowHarness {
             flow_trigger_service: catalog.get_one().unwrap(),
             flow_trigger_event_store: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
+            flow_agent_test_loop_synchronizer: catalog.get_one().unwrap(),
 
             fake_system_time_source,
             catalog,
@@ -440,15 +444,15 @@ impl FlowHarness {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
+        // Setup test loop synchronizer
+        self.flow_agent
+            .set_loop_synchronizer(self.flow_agent_test_loop_synchronizer.clone())
+            .await
+            .unwrap();
+
         // Ensure flow agent is initialized
         use init_on_startup::InitOnStartup;
         self.flow_agent.run_initialization().await.unwrap();
-
-        // Ensure flow system event agent is caught up with initial events
-        self.flow_system_event_agent
-            .catchup_remaining_events()
-            .await
-            .unwrap();
 
         // Create initial snapshot - the state at moment 0 after flow agent loaded
         let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
