@@ -223,6 +223,14 @@ impl MergeStrategySnapshot {
         old: DataFrameExt,
         new: DataFrameExt,
     ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
+        let non_null_columns: std::collections::HashSet<String> = new
+            .schema()
+            .fields()
+            .iter()
+            .filter(|f| !f.is_nullable())
+            .map(|f| f.name().clone())
+            .collect();
+
         // TODO: Schema evolution
         let a_old = TableReference::bare("old");
         let a_new = TableReference::bare("new");
@@ -301,7 +309,12 @@ impl MergeStrategySnapshot {
 
         // Note: Final sorting will be done by the caller using `sort_order()`
         // expression.
-        Ok(DataFrame::new(session_state, plan).into())
+        let df: DataFrameExt = DataFrame::new(session_state, plan).into();
+
+        // Perform nullability correction, as all columns become nullable after join
+        let df = df.assert_collumns_not_null(|f| non_null_columns.contains(f.name()))?;
+
+        Ok(df)
     }
 }
 

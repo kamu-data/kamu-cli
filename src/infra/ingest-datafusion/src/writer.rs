@@ -307,8 +307,8 @@ impl DataWriterDataFusion {
                 &self.meta.vocab.event_time_column,
                 // TODO: Using `case` expression instead of `coalesce()` due to DataFusion bug
                 // See: https://github.com/apache/arrow-datafusion/issues/8790
-                when(
-                    col(Column::from_name(&self.meta.vocab.event_time_column)).is_null(),
+                datafusion::functions::core::coalesce().call(vec![
+                    col(Column::from_name(&self.meta.vocab.event_time_column)),
                     cast(
                         Expr::Literal(
                             ScalarValue::TimestampMillisecond(
@@ -319,9 +319,7 @@ impl DataWriterDataFusion {
                         ),
                         event_time_data_type,
                     ),
-                )
-                .otherwise(col(Column::from_name(&self.meta.vocab.event_time_column)))
-                .int_err()?,
+                ]),
             )
             .int_err()?;
 
@@ -374,8 +372,13 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
-    pub fn validate_output_schema_equivalence(
-        prev_schema: &SchemaRef,
+    // Rules:
+    // - New columns are allowed to be non-null if original types are nullable -
+    //   they will be coerced on read
+    // - Treat "large" variants equivalent to regular variants
+    // - Treat view types equivalent to regular types
+    pub fn validate_output_schema_compatible(
+        orig_schema: &SchemaRef,
         new_schema: &SchemaRef,
     ) -> Result<(), IncompatibleSchemaError> {
         if !Self::is_schema_equivalent(prev_schema.fields(), new_schema.fields()) {
@@ -389,7 +392,7 @@ impl DataWriterDataFusion {
         }
     }
 
-    fn is_schema_equivalent(lhs: &Fields, rhs: &Fields) -> bool {
+    fn is_schema_equivalent(orig: &Fields, new: &Fields) -> bool {
         lhs.len() == rhs.len()
             && lhs
                 .iter()
@@ -397,12 +400,11 @@ impl DataWriterDataFusion {
                 .all(|(l, r)| Self::is_schema_equivalent_rec(l, r))
     }
 
-    fn is_schema_equivalent_rec(lhs: &Field, rhs: &Field) -> bool {
-        // Rules:
-        // - Ignore nullability (temporarily until we regain control over it)
-        // - Treat "large" variants equivalent to regular variants
-        // - Treat view types equivalent to regular types
-        if lhs.name() != rhs.name() || lhs.metadata() != rhs.metadata() {
+    fn is_schema_equivalent_rec(orig: &Field, new: &Field) -> bool {
+        if lhs.name() != rhs.name()
+            || lhs.metadata() != rhs.metadata()
+            || lhs.is_nullable() != rhs.is_nullable()
+        {
             return false;
         }
 
@@ -528,6 +530,8 @@ impl DataWriterDataFusion {
             "Ouput file name must have an extension"
         );
 
+        // TODO: Handle plan execution errors, e.g. nulls in the input of non-null
+        // columns
         let res = df
             .write_parquet(
                 path.as_os_str().to_str().unwrap(),

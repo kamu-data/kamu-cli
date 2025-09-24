@@ -19,7 +19,7 @@ use crate::*;
 
 type Op = odf::metadata::OperationType;
 
-/// Ledger merge strategy.
+/// Upsert stream merge strategy.
 ///
 /// See [`odf_metadata::MergeStrategyUpsertStream`] for details.
 pub struct MergeStrategyUpsertStream {
@@ -352,6 +352,14 @@ impl MergeStrategyUpsertStream {
         old: DataFrameExt,
         new: DataFrameExt,
     ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
+        let non_null_columns: std::collections::HashSet<String> = new
+            .schema()
+            .fields()
+            .iter()
+            .filter(|f| !f.is_nullable())
+            .map(|f| f.name().clone())
+            .collect();
+
         let a_old = TableReference::bare("old");
         let a_new = TableReference::bare("new");
         let old_col = |name: &str| -> Expr { Expr::Column(Column::new(Some(a_old.clone()), name)) };
@@ -422,7 +430,12 @@ impl MergeStrategyUpsertStream {
 
         // Note: Final sorting will be done by the caller using `sort_order()`
         // expression.
-        Ok(DataFrame::new(session_state, plan).into())
+        let df: DataFrameExt = DataFrame::new(session_state, plan).into();
+
+        // Perform nullability correction, as all columns become nullable after join
+        let df = df.assert_collumns_not_null(|f| non_null_columns.contains(f.name()))?;
+
+        Ok(df)
     }
 
     fn normalize_input(&self, new: DataFrameExt) -> Result<DataFrameExt, MergeError> {

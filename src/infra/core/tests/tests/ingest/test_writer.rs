@@ -60,7 +60,7 @@ async fn test_data_writer_happy_path() {
                 C,3000
                 "#
             ),
-            "city STRING, population BIGINT",
+            "city STRING NOT NULL, population BIGINT NOT NULL",
         )
         .await
         .unwrap();
@@ -108,7 +108,7 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "city",
                 // Note that Datafusion 49+ defaults to View for all text types
@@ -116,14 +116,14 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -159,10 +159,10 @@ async fn test_data_writer_happy_path() {
             DataField::i64("offset"),
             DataField::i32("op"),
             DataField::timestamp_millis_utc("system_time"),
-            DataField::timestamp_millis_utc("event_time").optional(),
+            DataField::timestamp_millis_utc("event_time"),
             // NOTE: In SetDataSchema we strip the encoding information, leaving only logical types
-            DataField::string("city").optional(),
-            DataField::i64("population").optional(),
+            DataField::string("city"),
+            DataField::i64("population"),
         ]),
     );
 
@@ -210,7 +210,7 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "city",
                 // NOTE: Not Utf8View due to stripped encoding
@@ -218,14 +218,14 @@ async fn test_data_writer_happy_path() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -246,7 +246,7 @@ async fn test_data_writer_happy_path() {
                 D,4000
                 "#
             ),
-            "city STRING, population BIGINT",
+            "city STRING NOT NULL, population BIGINT NOT NULL",
         )
         .await
         .unwrap();
@@ -261,9 +261,9 @@ async fn test_data_writer_happy_path() {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT64 population;
             }
             "#
         ),
@@ -521,6 +521,199 @@ async fn test_data_writer_rejects_incompatible_schema() {
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 4      | 0  | 2010-01-03T12:00:00Z | 2000-01-03T12:00:00Z | E    | 5000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_nullability_required_to_optional_incompatible() {
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategySnapshot {
+                primary_key: vec!["city".to_string()],
+                compare_columns: None,
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    // Round 1
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT NOT NULL",
+        )
+        .await
+        .unwrap();
+
+    assert_odf_schema_eq(
+        &harness.get_last_schema().await,
+        &DataSchema::new(vec![
+            DataField::i64("offset"),
+            DataField::i32("op"),
+            DataField::timestamp_millis_utc("system_time"),
+            DataField::timestamp_millis_utc("event_time"),
+            DataField::string("city"),
+            DataField::i64("population"),
+        ]),
+    );
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT64 population;
+            }
+            "#
+        ),
+    );
+
+    // Round 2 (rejects due to nullability mismatch)
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                D,4000
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT",
+        )
+        .await;
+
+    assert_matches!(res, Err(WriteDataError::IncompatibleSchema(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_nullability_optional_to_required_coerces() {
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategySnapshot {
+                primary_key: vec!["city".to_string()],
+                compare_columns: None,
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    // Round 1
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    assert_odf_schema_eq(
+        &harness.get_last_schema().await,
+        &DataSchema::new(vec![
+            DataField::i64("offset"),
+            DataField::i32("op"),
+            DataField::timestamp_millis_utc("system_time"),
+            DataField::timestamp_millis_utc("event_time"),
+            DataField::string("city"),
+            DataField::i64("population").optional(),
+        ]),
+    );
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    // Round 2 (coerces non-null column)
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                D,4000
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT NOT NULL",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
             "#

@@ -15,8 +15,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
 use odf::utils::data::dataframe_ext::DataFrameExt;
-
-use crate::utils::*;
+use odf::utils::testing;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -146,7 +145,7 @@ where
     // Sort events according to the strategy
     let actual = actual.sort(strat.sort_order()).unwrap();
 
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

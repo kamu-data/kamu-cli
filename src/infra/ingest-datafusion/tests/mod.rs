@@ -10,4 +10,3 @@
 #![feature(assert_matches)]
 
 mod tests;
-pub mod utils;
