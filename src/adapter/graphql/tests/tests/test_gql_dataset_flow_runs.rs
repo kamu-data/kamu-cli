@@ -2962,6 +2962,10 @@ async fn test_history_of_completed_ingest_flow() {
                                                 "taskId": "0",
                                             },
                                             "nextAttemptAt": null,
+                                        },
+                                        {
+                                            "__typename": "FlowEventCompleted",
+                                            "eventId": "8",
                                         }
                                     ]
                                 }
@@ -3163,6 +3167,10 @@ async fn test_history_of_completed_transform_flow() {
                                                 "taskId": "0",
                                             },
                                             "nextAttemptAt": null,
+                                        },
+                                        {
+                                            "__typename": "FlowEventCompleted",
+                                            "eventId": "9",
                                         }
                                     ]
                                 }
@@ -4114,6 +4122,10 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                                 "taskId": "2"
                                             },
                                             "nextAttemptAt": null
+                                        },
+                                        {
+                                            "__typename": "FlowEventCompleted",
+                                            "eventId": "15",
                                         }
                                     ]
                                 }

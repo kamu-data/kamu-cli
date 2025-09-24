@@ -27,13 +27,6 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_adapter_flow_webhook::{FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION, FlowScopeSubscription};
 use kamu_flow_system::*;
-use messaging_outbox::{
-    InitialConsumerBoundary,
-    MessageConsumer,
-    MessageConsumerMeta,
-    MessageConsumerT,
-    MessageDeliveryMechanism,
-};
 use time_source::FakeSystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,15 +48,7 @@ struct FlowSystemTestListenerState {
 
 #[component(pub)]
 #[scope(Singleton)]
-#[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<FlowAgentUpdatedMessage>)]
 #[interface(dyn FlowSystemEventProjector)]
-#[meta(MessageConsumerMeta {
-    consumer_name: "FlowSystemTestListener",
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_AGENT],
-    delivery: MessageDeliveryMechanism::Immediate,
-    initial_consumer_boundary: InitialConsumerBoundary::Latest,
-})]
 impl FlowSystemTestListener {
     pub(crate) fn new(fake_time_source: Arc<FakeSystemTimeSource>) -> Self {
         Self {
@@ -72,7 +57,7 @@ impl FlowSystemTestListener {
         }
     }
 
-    pub(crate) fn apply_flow_event(&self, e: FlowEvent) {
+    fn apply_flow_event(&self, e: FlowEvent) {
         let mut state = self.state.lock().unwrap();
 
         state
@@ -94,6 +79,11 @@ impl FlowSystemTestListener {
                     initiated_event.retry_policy,
                 )
             });
+    }
+
+    pub(crate) fn mark_as_loaded(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.loaded = true;
     }
 
     pub(crate) fn make_a_snapshot(&self, event_time: DateTime<Utc>) {
@@ -302,13 +292,24 @@ impl std::fmt::Display for FlowSystemTestListener {
                                         (t.shifted_from - initial_time).num_milliseconds()
                                     )?;
                                 }
-                                FlowStartCondition::Reactive(b) => write!(
-                                    f,
-                                    " Batching({}/{}, until={}ms)",
-                                    self.get_accumulated_reactive_records(flow_state, &b),
-                                    b.active_rule.for_new_data.min_records_to_await(),
-                                    (b.batching_deadline - initial_time).num_milliseconds(),
-                                )?,
+                                FlowStartCondition::Reactive(r) => {
+                                    write!(
+                                        f,
+                                        " Batching({}/{}, until={}ms)",
+                                        self.get_accumulated_reactive_records(flow_state, &r),
+                                        r.active_rule.for_new_data.min_records_to_await(),
+                                        (r.batching_deadline - initial_time).num_milliseconds(),
+                                    )?;
+                                    if let Some(activation_time) =
+                                        flow_state.timing.scheduled_for_activation_at
+                                    {
+                                        write!(
+                                            f,
+                                            " Activating(at={}ms)",
+                                            (activation_time - initial_time).num_milliseconds()
+                                        )?;
+                                    }
+                                }
                                 FlowStartCondition::Executor(e) => {
                                     write!(
                                         f,
@@ -363,27 +364,7 @@ impl std::fmt::Display for FlowSystemTestListener {
     }
 }
 
-impl MessageConsumer for FlowSystemTestListener {}
-
-#[async_trait::async_trait]
-impl MessageConsumerT<FlowAgentUpdatedMessage> for FlowSystemTestListener {
-    async fn consume_message(
-        &self,
-        _: &Catalog,
-        message: &FlowAgentUpdatedMessage,
-    ) -> Result<(), InternalError> {
-        if message.update_details == FlowAgentUpdateDetails::Loaded {
-            let mut state = self.state.lock().unwrap();
-            debug_assert!(
-                !state.loaded,
-                "FlowAgentUpdatedMessage::Loaded received more than once"
-            );
-            state.loaded = true;
-        }
-
-        Ok(())
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl FlowSystemEventProjector for FlowSystemTestListener {
@@ -411,16 +392,27 @@ impl FlowSystemEventProjector for FlowSystemTestListener {
 
                 // During live phase, we only take snapshots on certain events
                 match flow_event {
-                    FlowEvent::StartConditionUpdated(_)
+                    FlowEvent::ScheduledForActivation(_)
                     | FlowEvent::Aborted(_)
                     | FlowEvent::TaskRunning(_)
                     | FlowEvent::TaskFinished(_) => {
                         self.make_a_snapshot(flow_event.event_time());
                     }
 
+                    FlowEvent::StartConditionUpdated(condition_updated) => {
+                        match condition_updated.start_condition {
+                            FlowStartCondition::Executor(_) | FlowStartCondition::Reactive(_) => {
+                                self.make_a_snapshot(condition_updated.event_time);
+                            }
+                            FlowStartCondition::Throttling(_) | FlowStartCondition::Schedule(_) => {
+                                // Ignore, the same info is in
+                                // ScheduledForActivation
+                            }
+                        }
+                    }
+
                     FlowEvent::ActivationCauseAdded(_)
                     | FlowEvent::ConfigSnapshotModified(_)
-                    | FlowEvent::ScheduledForActivation(_)
                     | FlowEvent::Completed(_)
                     | FlowEvent::Initiated(_)
                     | FlowEvent::TaskScheduled(_) => { /* Ignore */ }
