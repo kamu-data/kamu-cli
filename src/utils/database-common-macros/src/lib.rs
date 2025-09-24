@@ -474,7 +474,7 @@ pub fn transactional_static_method(_attr: TokenStream, item: TokenStream) -> Tok
 /// ```compile_fail
 /// // `service` request from a transactional Catalog
 /// #[transactional_static_method1(service1: Arc<dyn Service1>)]
-/// async fn set_system_flow_schedule() {
+/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
 ///     // `service1` are available inside the method body
 /// }
 /// ```
@@ -515,7 +515,7 @@ pub fn transactional_static_method1(attr: TokenStream, item: TokenStream) -> Tok
 /// ```compile_fail
 /// // `service` request from a transactional Catalog
 /// #[transactional_static_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>)]
-/// async fn set_system_flow_schedule() {
+/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
 ///     // `service1` and `service2` are available inside the method body
 /// }
 /// ```
@@ -558,7 +558,7 @@ pub fn transactional_static_method2(attr: TokenStream, item: TokenStream) -> Tok
 /// ```compile_fail
 /// // `service` request from a transactional Catalog
 /// #[transactional_static_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>, service3: Arc<dyn Service3>)]
-/// async fn set_system_flow_schedule() {
+/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
 ///     // `service1`, `service2` and `service3` are available inside the method body
 /// }
 /// ```
