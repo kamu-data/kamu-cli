@@ -48,6 +48,7 @@ common-macros = { workspace = true }
 container-runtime = { workspace = true }
 crypto-utils = { workspace = true }
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
