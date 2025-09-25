@@ -95,6 +95,17 @@ impl Default for EngineConfigDatafusionEmbeddedBatchQuery {
     }
 }
 
+/// Batch query configuration extensions
+#[derive(Debug, Clone, Default)]
+pub struct EngineConfigDatafusionEmbeddedBatchQueryExt {
+    /// Makes arrow batches use contiguous `Binary` and `Utf8` encodings instead
+    /// of more modern `BinaryView` and `Utf8View`. This is only needed for
+    /// compatibility with some older libraries that don't yet support them.
+    ///
+    /// See: [kamu-node#277](https://github.com/kamu-data/kamu-node/issues/277)
+    pub use_legacy_arrow_buffer_encoding: bool,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Injectable compaction configuration

@@ -297,6 +297,14 @@ pub struct EngineConfigDatafution {
 
     /// Compaction-specific overrides to the base config
     pub compaction: Option<BTreeMap<String, String>>,
+
+    // TODO: Integrate this parameter better with datafusion configuration
+    /// Makes arrow batches use contiguous `Binary` and `Utf8` encodings instead
+    /// of more modern `BinaryView` and `Utf8View`. This is only needed for
+    /// compatibility with some older libraries that don't yet support them.
+    ///
+    /// See: [kamu-node#277](https://github.com/kamu-data/kamu-node/issues/277)
+    pub use_legacy_arrow_buffer_encoding: Option<bool>,
 }
 
 impl EngineConfigDatafution {
@@ -319,6 +327,7 @@ impl EngineConfigDatafution {
             ingest: Some(BTreeMap::default()),
             batch_query: Some(BTreeMap::default()),
             compaction: Some(BTreeMap::default()),
+            use_legacy_arrow_buffer_encoding: Some(false),
         }
     }
 
@@ -342,8 +351,16 @@ impl EngineConfigDatafution {
         };
 
         let ingest_config = from_merged_with_base(self.ingest.unwrap_or_default())?;
-        let batch_query_config = from_merged_with_base(self.batch_query.unwrap_or_default())?;
+        let mut batch_query_config = from_merged_with_base(self.batch_query.unwrap_or_default())?;
         let compaction_config = from_merged_with_base(self.compaction.unwrap_or_default())?;
+
+        batch_query_config.set_extension(std::sync::Arc::new(
+            kamu::EngineConfigDatafusionEmbeddedBatchQueryExt {
+                use_legacy_arrow_buffer_encoding: self
+                    .use_legacy_arrow_buffer_encoding
+                    .unwrap_or_default(),
+            },
+        ));
 
         Ok((
             kamu::EngineConfigDatafusionEmbeddedIngest(ingest_config),
@@ -380,6 +397,7 @@ impl Default for EngineConfigDatafution {
                     .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
                     .collect(),
             ),
+            use_legacy_arrow_buffer_encoding: Some(false),
         }
     }
 }
