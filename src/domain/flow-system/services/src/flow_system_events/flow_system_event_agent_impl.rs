@@ -98,16 +98,16 @@ impl FlowSystemEventAgentImpl {
         tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
         // We might have a hint from the event bridge about upper bound of new events
-        let maybe_upper_event_id_bound = match hint {
+        let maybe_event_id_bounds_hint = match hint {
             FlowSystemEventStoreWakeHint::NewEvents {
+                lower_event_id_bound,
                 upper_event_id_bound,
-            } => Some(upper_event_id_bound),
+            } => Some((lower_event_id_bound, upper_event_id_bound)),
             FlowSystemEventStoreWakeHint::Timeout => None,
         };
 
-        // For each projector, apply a batch of new events, just 1 batch per iteration
-        // to ensure fairness. Each projector will run in a separate
-        // transaction.
+        // For each projector, apply a batch of new events, just 1 batch per iteration.
+        // Each projector will run in a separate transaction.
         let projector_builders = self
             .catalog
             .builders_for::<dyn FlowSystemEventProjector>()
@@ -115,7 +115,7 @@ impl FlowSystemEventAgentImpl {
 
         for builder in projector_builders {
             match self
-                .apply_batch_to_projector(&builder, maybe_upper_event_id_bound)
+                .apply_batch_to_projector(&builder, maybe_event_id_bounds_hint)
                 .await
             {
                 // Success
@@ -145,7 +145,7 @@ impl FlowSystemEventAgentImpl {
     async fn apply_batch_to_projector(
         &self,
         projector_builder: &dill::TypecastBuilder<'_, dyn FlowSystemEventProjector>,
-        maybe_upper_event_id_bound: Option<EventID>,
+        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<usize, InternalError> {
         // Construct projector instance
         let projector = projector_builder.get(&transaction_catalog).unwrap();
@@ -157,7 +157,8 @@ impl FlowSystemEventAgentImpl {
                 &transaction_catalog,
                 projector.name(),
                 self.agent_config.batch_size,
-                maybe_upper_event_id_bound,
+                self.agent_config.loopback_offset,
+                maybe_event_id_bounds_hint,
             )
             .await?;
         tracing::debug!(batch_size = batch.len(), "Fetched batch");
