@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO flow_system_projected_offsets(projector, last_event_id, updated_at)\n                VALUES ($1, $2, datetime('now'))\n                ON CONFLICT(projector) DO UPDATE\n                    SET\n                        last_event_id = MAX(last_event_id, excluded.last_event_id),\n                        updated_at    = excluded.updated_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "e42c05eb25bd2efbdf6a0599b4d598bdb35d8f67078e5fbb0f671e91169ae9c4"
+}

@@ -58,10 +58,10 @@ INSERT INTO flow_system_events (source_stream, source_event_id, occurred_at, ins
 
 /* ------------------------------ */
 
-CREATE TABLE flow_system_projected_events (
-  projector TEXT NOT NULL,
-  event_id  INTEGER NOT NULL,
-  PRIMARY KEY (projector, event_id)
+CREATE TABLE flow_system_projected_offsets (
+  projector TEXT PRIMARY KEY,
+  last_event_id BIGINT NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 /* ------------------------------ */
