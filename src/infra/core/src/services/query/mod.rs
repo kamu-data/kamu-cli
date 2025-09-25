@@ -28,6 +28,8 @@ use futures::stream::{self, StreamExt};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 
+use crate::EngineConfigDatafusionEmbeddedBatchQueryExt;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -243,7 +245,10 @@ impl KamuTable {
         skip_all,
         fields(dataset = ?self.resolved_dataset),
     )]
-    async fn init_table_schema(&self) -> Result<SchemaRef, InternalError> {
+    async fn init_table_schema(
+        &self,
+        cfg: &EngineConfigDatafusionEmbeddedBatchQueryExt,
+    ) -> Result<SchemaRef, InternalError> {
         use odf::dataset::MetadataChainExt;
 
         if self.hints.does_not_need_schema {
@@ -267,10 +272,10 @@ impl KamuTable {
             // It's unclear if Datafusion will fail on mismatch or will try to convert the
             // Parquet type to conform to the specified schema. We should consider carefully
             // what schema to use here.
-            let arrow_schema = odf_schema
-                .to_arrow(&odf::metadata::ToArrowSettings {
+            let settings = if !cfg.use_legacy_arrow_buffer_encoding {
+                odf::metadata::ToArrowSettings {
                     // NOTE: Using more efficient View encodings as default
-                    // TODO: Make configurable
+                    // TODO: Improve configurability
                     default_binary_encoding: Some(odf::metadata::ArrowBufferEncoding::View {
                         offset_bit_width: Some(32),
                     }),
@@ -278,8 +283,20 @@ impl KamuTable {
                         offset_bit_width: Some(32),
                     }),
                     ..Default::default()
-                })
-                .int_err()?;
+                }
+            } else {
+                odf::metadata::ToArrowSettings {
+                    default_binary_encoding: Some(odf::metadata::ArrowBufferEncoding::Contiguous {
+                        offset_bit_width: Some(32),
+                    }),
+                    default_string_encoding: Some(odf::metadata::ArrowBufferEncoding::Contiguous {
+                        offset_bit_width: Some(32),
+                    }),
+                    ..Default::default()
+                }
+            };
+
+            let arrow_schema = odf_schema.to_arrow(&settings).int_err()?;
 
             Ok(Arc::new(arrow_schema))
         } else {
@@ -295,7 +312,12 @@ impl KamuTable {
             }
         }
 
-        let schema = self.init_table_schema().await?;
+        let cfg = self
+            .session_config
+            .get_extension::<EngineConfigDatafusionEmbeddedBatchQueryExt>()
+            .unwrap_or_default();
+
+        let schema = self.init_table_schema(&cfg).await?;
 
         {
             let mut cache = self.cache.lock().unwrap();
