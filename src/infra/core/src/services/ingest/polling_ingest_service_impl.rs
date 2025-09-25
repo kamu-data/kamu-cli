@@ -43,7 +43,7 @@ pub struct PollingIngestServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PollingIngestServiceImpl {
-    async fn ingest_loop(
+    async fn ingest_inner(
         &self,
         target: ResolvedDataset,
         metadata_state: Box<DataWriterMetadataState>,
@@ -501,7 +501,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPollingIngestListener));
 
-        self.ingest_loop(target, metadata_state, options, listener)
+        self.ingest_inner(target, metadata_state, options, listener)
             .await
     }
 }

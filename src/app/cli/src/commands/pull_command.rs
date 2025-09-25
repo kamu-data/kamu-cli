@@ -142,7 +142,7 @@ impl PullCommand {
                 .map_err(CLIError::failure)
         } else {
             let requests = dataset_any_refs
-                .into_iter()
+                .iter()
                 .map(|r| {
                     PullRequest::from_any_ref(r, |_| {
                         self.tenancy_config == TenancyConfig::SingleTenant
@@ -288,39 +288,33 @@ impl PullCommand {
             });
             *combined_results = new_results;
         } else {
-            // Subsequent calls: update existing entries only
             for new_resp in new_results {
-                if let Some(local_ref) = &new_resp.maybe_local_ref {
-                    if let Some(existing) = combined_results
+                if let Some(local_ref) = &new_resp.maybe_local_ref
+                    && let Some(existing) = combined_results
                         .iter_mut()
                         .find(|r| r.maybe_local_ref.as_ref() == Some(local_ref))
-                    {
-                        match (&new_resp.result, &mut existing.result) {
-                            // Case: both are Updated → just update fields
-                            (
-                                Ok(PullResult::Updated {
-                                    new_head, has_more, ..
-                                }),
-                                Ok(PullResult::Updated {
-                                    new_head: existing_new_head,
-                                    has_more: existing_has_more,
-                                    ..
-                                }),
-                            ) => {
-                                *existing_new_head = new_head.clone();
-                                *existing_has_more = *has_more;
-                                if *has_more {
-                                    has_more_flag = true;
-                                }
+                {
+                    match (&new_resp.result, &mut existing.result) {
+                        (
+                            Ok(PullResult::Updated {
+                                new_head, has_more, ..
+                            }),
+                            Ok(PullResult::Updated {
+                                new_head: existing_new_head,
+                                has_more: existing_has_more,
+                                ..
+                            }),
+                        ) => {
+                            *existing_new_head = new_head.clone();
+                            *existing_has_more = *has_more;
+                            if *has_more {
+                                has_more_flag = true;
                             }
-                            // Case: new is Updated, old is something else → overwrite
-                            (Ok(PullResult::Updated { .. }), _old) => {
-                                unreachable!(
-                                    "Dataset has been changed during iteration ingest process"
-                                );
-                            }
-                            _ => {}
                         }
+                        (Ok(PullResult::Updated { .. }), _old) => {
+                            panic!("Dataset has been changed during iteration ingest process");
+                        }
+                        _ => {}
                     }
                 }
             }
