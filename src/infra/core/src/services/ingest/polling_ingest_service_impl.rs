@@ -105,15 +105,16 @@ impl PollingIngestServiceImpl {
                 Ok(res) => {
                     combined_result = Some(Self::merge_results(combined_result, res));
 
-                    let has_more = match combined_result {
-                        Some(PollingIngestResult::UpToDate { .. }) => false,
-                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
-                        None => unreachable!(),
-                    };
+                    // let has_more = match combined_result {
+                    //     Some(PollingIngestResult::UpToDate { .. }) => false,
+                    //     Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
+                    //     None => unreachable!(),
+                    // };
 
-                    if !has_more || !options.exhaust_sources {
-                        break;
-                    }
+                    // if !has_more || !options.exhaust_sources {
+                    //     break;
+                    // }
+                    break;
                 }
                 Err(e) => return Err(e),
             }

@@ -13,11 +13,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use database_common_macros::{transactional_method1, transactional_method2};
 use futures::TryStreamExt;
 use kamu::domain::auth::DatasetActionNotEnoughPermissionsError;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
+use odf::{DatasetRefAny, DatasetRefUnresolvedError};
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -30,11 +32,9 @@ use crate::output::OutputConfig;
 #[dill::interface(dyn Command)]
 pub struct PullCommand {
     output_config: Arc<OutputConfig>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    search_svc: Arc<dyn SearchServiceRemote>,
-    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     tenancy_config: TenancyConfig,
     current_account_subject: Arc<CurrentAccountSubject>,
+    catalog: dill::Catalog,
 
     #[dill::component(explicit)]
     refs: Vec<odf::DatasetRefAnyPattern>,
@@ -81,7 +81,90 @@ impl PullCommand {
             }
         };
 
-        self.pull_dataset_use_case
+        self.sync_iteration(remote_ref, local_name, listener).await
+    }
+
+    async fn pull_multi(
+        &self,
+        listener: Option<Arc<dyn PullMultiListener>>,
+        current_account_name: &odf::AccountName,
+    ) -> Result<Vec<PullResponse>, CLIError> {
+        let dataset_any_refs = self.get_filtered_datasets(current_account_name).await?;
+
+        let options = PullOptions {
+            recursive: self.recursive,
+            add_aliases: self.add_aliases,
+            ingest_options: PollingIngestOptions {
+                fetch_uncacheable: self.fetch_uncacheable,
+                exhaust_sources: true,
+                dataset_env_vars: HashMap::new(),
+                schema_inference: SchemaInferenceOpts::default(),
+            },
+            transform_options: TransformOptions {
+                reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
+            },
+            sync_options: SyncOptions {
+                force: self.force,
+                dataset_visibility: self.new_dataset_visibility,
+                ..SyncOptions::default()
+            },
+        };
+
+        let mut combined_results = vec![];
+        loop {
+            let pull_results = self
+                .pull_iteration(
+                    options.clone(),
+                    listener.clone(),
+                    dataset_any_refs.as_slice(),
+                )
+                .await?;
+
+            let has_more = Self::merge_results(&mut combined_results, pull_results);
+            if !has_more {
+                break;
+            }
+        }
+        Ok(combined_results)
+    }
+
+    #[transactional_method1(pull_dataset_use_case: Arc<dyn PullDatasetUseCase>)]
+    async fn pull_iteration(
+        &self,
+        options: PullOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
+        dataset_any_refs: &[odf::DatasetRefAny],
+    ) -> Result<Vec<PullResponse>, CLIError> {
+        if self.all {
+            pull_dataset_use_case
+                .execute_all_owned(options, listener)
+                .await
+                .map_err(CLIError::failure)
+        } else {
+            let requests = dataset_any_refs
+                .into_iter()
+                .map(|r| {
+                    PullRequest::from_any_ref(r, |_| {
+                        self.tenancy_config == TenancyConfig::SingleTenant
+                    })
+                })
+                .collect();
+
+            pull_dataset_use_case
+                .execute_multi(requests, options, listener)
+                .await
+                .map_err(CLIError::failure)
+        }
+    }
+
+    #[transactional_method1(pull_dataset_use_case: Arc<dyn PullDatasetUseCase>)]
+    async fn sync_iteration(
+        &self,
+        remote_ref: odf::DatasetRefRemote,
+        local_name: &odf::DatasetName,
+        listener: Option<Arc<dyn PullMultiListener>>,
+    ) -> Result<Vec<PullResponse>, CLIError> {
+        pull_dataset_use_case
             .execute_multi(
                 vec![PullRequest::remote(
                     remote_ref,
@@ -108,66 +191,6 @@ impl PullCommand {
             )
             .await
             .map_err(CLIError::failure)
-    }
-
-    async fn pull_multi(
-        &self,
-        listener: Option<Arc<dyn PullMultiListener>>,
-        current_account_name: &odf::AccountName,
-    ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_any_refs: Vec<_> = if !self.all {
-            filter_datasets_by_any_pattern(
-                self.dataset_registry.as_ref(),
-                self.search_svc.clone(),
-                self.refs.clone(),
-                current_account_name,
-                self.tenancy_config,
-            )
-            .try_collect()
-            .await?
-        } else {
-            vec![]
-        };
-
-        let options = PullOptions {
-            recursive: self.recursive,
-            add_aliases: self.add_aliases,
-            ingest_options: PollingIngestOptions {
-                fetch_uncacheable: self.fetch_uncacheable,
-                exhaust_sources: true,
-                dataset_env_vars: HashMap::new(),
-                schema_inference: SchemaInferenceOpts::default(),
-            },
-            transform_options: TransformOptions {
-                reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
-            },
-            sync_options: SyncOptions {
-                force: self.force,
-                dataset_visibility: self.new_dataset_visibility,
-                ..SyncOptions::default()
-            },
-        };
-
-        if self.all {
-            self.pull_dataset_use_case
-                .execute_all_owned(options, listener)
-                .await
-                .map_err(CLIError::failure)
-        } else {
-            let requests = dataset_any_refs
-                .into_iter()
-                .map(|r| {
-                    PullRequest::from_any_ref(&r, |_| {
-                        self.tenancy_config == TenancyConfig::SingleTenant
-                    })
-                })
-                .collect();
-
-            self.pull_dataset_use_case
-                .execute_multi(requests, options, listener)
-                .await
-                .map_err(CLIError::failure)
-        }
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
@@ -205,6 +228,105 @@ impl PullCommand {
             (Some(local_ref), None) => format!("pull {local_ref}"),
             _ => "???".to_string(),
         }
+    }
+
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, search_svc: Arc<dyn SearchServiceRemote>)]
+    async fn get_filtered_datasets(
+        &self,
+        current_account_name: &odf::AccountName,
+    ) -> Result<Vec<DatasetRefAny>, DatasetRefUnresolvedError> {
+        if !self.all {
+            filter_datasets_by_any_pattern(
+                dataset_registry.as_ref(),
+                search_svc,
+                self.refs.clone(),
+                current_account_name,
+                self.tenancy_config,
+            )
+            .try_collect()
+            .await
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    fn merge_results(
+        combined_results: &mut Vec<PullResponse>,
+        new_results: Vec<PullResponse>,
+    ) -> bool {
+        // ToDo:
+        // Should we handle the next cases:
+        // 1. We pull root dataset A and root dataset B
+        //   1.1 During first iteration we got an error for dataset A and we got success
+        // with has_more for dataset B. The second iteration will try to pull dataset A
+        // again, which is not optimal.
+
+        //   1.2  But during second iteration we may have success for dataset A and
+        // success with has_more for dataset B
+
+        // 2. We pull root dataset A and root dataset B
+        //   2.1 During first iteration we got UpToDate dataset A and we got success
+        // with has_more for dataset B. The second iteration will try to pull dataset A
+        // again, which is not optimal.
+
+        //   1.2  But during second iteration we may have success Updated for dataset A
+        // and success with has_more for dataset B
+
+        // Error displaying???:
+        // Logically if we got an error for dataset A during first iteration we will
+        // simply show an error for dataset A. But if we got an error for
+        // dataset A during next iteration we probably want to show success status ant
+        // we made some changes but also indicate an error
+
+        let mut has_more_flag = false;
+
+        if combined_results.is_empty() {
+            // First call: just take all new_results
+            has_more_flag = new_results.iter().any(|resp| match &resp.result {
+                Ok(PullResult::Updated { has_more, .. }) => *has_more,
+                _ => false,
+            });
+            *combined_results = new_results;
+        } else {
+            // Subsequent calls: update existing entries only
+            for new_resp in new_results {
+                if let Some(local_ref) = &new_resp.maybe_local_ref {
+                    if let Some(existing) = combined_results
+                        .iter_mut()
+                        .find(|r| r.maybe_local_ref.as_ref() == Some(local_ref))
+                    {
+                        match (&new_resp.result, &mut existing.result) {
+                            // Case: both are Updated → just update fields
+                            (
+                                Ok(PullResult::Updated {
+                                    new_head, has_more, ..
+                                }),
+                                Ok(PullResult::Updated {
+                                    new_head: existing_new_head,
+                                    has_more: existing_has_more,
+                                    ..
+                                }),
+                            ) => {
+                                *existing_new_head = new_head.clone();
+                                *existing_has_more = *has_more;
+                                if *has_more {
+                                    has_more_flag = true;
+                                }
+                            }
+                            // Case: new is Updated, old is something else → overwrite
+                            (Ok(PullResult::Updated { .. }), _old) => {
+                                unreachable!(
+                                    "Dataset has been changed during iteration ingest process"
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        has_more_flag
     }
 }
 
