@@ -120,9 +120,9 @@ CREATE TRIGGER flow_system_merged_events_notify
 /* ------------------------------ */
 
 CREATE TABLE flow_system_projected_events (
-    projector TEXT NOT NULL,
-    event_id  BIGINT NOT NULL,
-    PRIMARY KEY (projector, event_id)
+    projector TEXT NOT NULL PRIMARY KEY,
+    done  int8multirange NOT NULL DEFAULT '{}'::int8multirange,
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 /* ------------------------------ */
