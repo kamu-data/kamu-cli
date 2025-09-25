@@ -117,6 +117,7 @@ impl FlowHarness {
                 min_debounce_interval: awaiting_step.to_std().unwrap(),
                 max_listening_timeout: (awaiting_step * 5).to_std().unwrap(),
                 batch_size: 10,
+                loopback_offset: 0,
             })
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
