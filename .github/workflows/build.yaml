@@ -101,22 +101,10 @@ jobs:
             ipfs: true
             database: true
             maximize-space: true
-          # TODO: Not running docker as it takes ~7 minutes to install
-          # See: https://github.com/actions/runner/issues/1456
-          - name: MacOS / amd64
-            runs-on: macos-13
-            cargo-flags: --profile ci --features ingest-ftp
-            nextest-flags: --cargo-profile ci --features ingest-ftp
-            nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::))'
-            nextest-exclusions-database-set-part: '& !(test(::containerized::))'
-            container-runtime: ''
-            ipfs: false
-            database: false
-            maximize-space: false
           # TODO: M1 cannot run docker due to lack of nested virtualization
           # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
           - name: MacOS / arm64
-            runs-on: macos-14
+            runs-on: macos-15
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
             nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::))'

@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Discontinued binary releases for MacOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+
 ## [0.249.1] - 2025-09-25
 ### Fixed
 - Introduced `engine.datafusionEmbedded.useLegacyArrowBufferEncoding` option that makes embedded `datafusion` batch query engine use contiguous buffer encoding (e.g. `Utf8` instead of `Utf8View`) for compatibility with older FlightSQL clients.
