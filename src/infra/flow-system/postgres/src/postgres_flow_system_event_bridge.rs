@@ -86,11 +86,11 @@ impl PostgresFlowSystemEventBridge {
         elapsed: Duration,
         remaining_timeout: Duration,
         min_debounce_interval: Duration,
-    ) -> Option<EventID> {
+    ) -> Option<(EventID, EventID)> {
         use tokio::time::{Instant, timeout};
 
         // Seed from the first payload (if any)
-        let mut upper_bound = initial_payload.map(|p| p.max);
+        let mut bounds = initial_payload.map(|p| (p.min, p.max));
 
         // Only buffer if first NOTIFY arrived "too fast"
         if elapsed < min_debounce_interval {
@@ -111,7 +111,9 @@ impl PostgresFlowSystemEventBridge {
                     match timeout(remaining, listener.recv()).await {
                         Ok(Ok(n)) => {
                             if let Ok(p) = serde_json::from_str::<PgNotifyPayload>(n.payload()) {
-                                upper_bound = Some(upper_bound.map_or(p.max, |old| old.max(p.max)));
+                                bounds = Some(bounds.map_or((p.min, p.max), |old| {
+                                    (old.0.min(p.min), old.1.max(p.max))
+                                }));
                             }
                             // keep draining until time budget is up
                         }
@@ -122,7 +124,7 @@ impl PostgresFlowSystemEventBridge {
             }
         }
 
-        upper_bound
+        bounds
     }
 }
 
@@ -189,7 +191,7 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                         .saturating_sub(remaining_timeout);
 
                     // Buffer additional notifications if appropriate
-                    let upper_bound = self
+                    let bounds = self
                         .buffer_notifications(
                             &mut listener,
                             initial_payload,
@@ -202,11 +204,14 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                     // Stash the listener back
                     *self.listener.lock().await = Some(listener);
 
-                    // Return the (potentially updated) upper bound
-                    return match upper_bound {
-                        Some(event_id) => Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                            upper_event_id_bound: event_id,
-                        }),
+                    // Return the (potentially updated) bounds
+                    return match bounds {
+                        Some((min_event_id, max_event_id)) => {
+                            Ok(FlowSystemEventStoreWakeHint::NewEvents {
+                                lower_event_id_bound: min_event_id,
+                                upper_event_id_bound: max_event_id,
+                            })
+                        }
                         None => Ok(FlowSystemEventStoreWakeHint::Timeout),
                     };
                 }
@@ -241,13 +246,31 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         &self,
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
-        limit: usize,
-        maybe_upper_event_id_bound: Option<EventID>,
+        batch_size: usize,
+        loopback_offset: usize,
+        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
 
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
+
+        // Extract bound hints or use rude defaults
+        let (lower_bound_event_id, upper_bound_event_id) = maybe_event_id_bounds_hint
+            .map(|(lower, upper)| (lower.into_inner(), upper.into_inner()))
+            .unwrap_or((0, i64::MAX));
+
+        // Note: lower bound is only a hint, not a guarantee, we might have late events
+        // with earlier IDs, i.e. during crashes or missed PG NOTIFY messages
+
+        // Such a loopback offset should cover close to 100% of late events in realistic
+        // scenarios, and restrict linear scan of events from the stream start
+        let loop_back_offset = i64::try_from(loopback_offset).unwrap();
+        let adjusted_lower_bound_event_id = if lower_bound_event_id > loop_back_offset {
+            lower_bound_event_id - loop_back_offset
+        } else {
+            0
+        };
 
         let rows = sqlx::query!(
             r#"
@@ -266,9 +289,9 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                 SELECT fse.event_id
                 FROM flow_system_events fse
                 CROSS JOIN projected
-                WHERE NOT (fse.event_id <@ projected.done) AND fse.event_id <= $2
+                WHERE fse.event_id >= $2 AND fse.event_id <= $3 AND NOT (fse.event_id <@ projected.done)
                 ORDER BY fse.event_id
-                LIMIT $3
+                LIMIT $4
             ),
             merged as (
                 SELECT
@@ -328,16 +351,15 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
             ORDER BY event_id
             "#,
             projector_name,
-            maybe_upper_event_id_bound
-                .map(EventID::into_inner)
-                .unwrap_or(i64::MAX),
-            i64::try_from(limit).unwrap()
+            adjusted_lower_bound_event_id,
+            upper_bound_event_id,
+            i64::try_from(batch_size).unwrap()
         )
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        let events = rows
+        let events: Vec<FlowSystemEvent> = rows
             .into_iter()
             .map(|r| FlowSystemEvent {
                 event_id: EventID::new(r.event_id),
