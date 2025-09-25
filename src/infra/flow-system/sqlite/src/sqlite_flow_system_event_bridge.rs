@@ -107,29 +107,29 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         projector_name: &'static str,
         batch_size: usize,
         _loopback_offset: usize, // Ignored by SQLite implementation
-        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
+        _maybe_event_id_bounds_hint: Option<(EventID, EventID)>, // Ignored by SQLite implementation
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
 
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        let (lower_bound_event_id, upper_bound_event_id) = maybe_event_id_bounds_hint
-            .map(|(lower, upper)| (lower.into_inner(), upper.into_inner()))
-            .unwrap_or((0, i64::MAX));
-
         let limit = i64::try_from(batch_size).unwrap();
 
         let rows = sqlx::query!(
             r#"
             WITH next AS (
-                SELECT fse.event_id
-                FROM flow_system_events fse
-                LEFT JOIN flow_system_projected_events pe
-                    ON pe.projector = $1 AND pe.event_id = fse.event_id
-                WHERE pe.event_id IS NULL AND fse.event_id >= $2 AND fse.event_id <= $3
-                ORDER BY fse.event_id
-                LIMIT $4
+                SELECT e.*
+                FROM flow_system_events AS e
+                WHERE e.event_id >
+                    COALESCE(
+                        (
+                            SELECT last_event_id FROM flow_system_projected_offsets WHERE projector = $1
+                        ),
+                        0
+                    )
+                ORDER BY e.event_id
+                LIMIT $2
             ),
             merged as (
                 SELECT
@@ -186,8 +186,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
             ORDER BY event_id
                 "#,
             projector_name,
-            lower_bound_event_id,
-            upper_bound_event_id,
             limit
         )
         .fetch_all(connection_mut)
@@ -229,19 +227,20 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        // Convert event IDs to JSON array for SQLite
-        let event_id_values: Vec<i64> = event_ids.iter().map(|id| id.into_inner()).collect();
-        let json_array = serde_json::to_string(&event_id_values).int_err()?;
+        // Use the maximum event_id value from the array to update the boundary
+        let last_event_id = event_ids.iter().map(|id| id.into_inner()).max().unwrap();
 
-        // Use json_each for bulk insert in SQLite
         sqlx::query!(
             r#"
-            INSERT OR IGNORE INTO flow_system_projected_events(projector, event_id)
-                SELECT $1, CAST(value AS INTEGER)
-                FROM json_each($2)
+            INSERT INTO flow_system_projected_offsets(projector, last_event_id, updated_at)
+                VALUES ($1, $2, datetime('now'))
+                ON CONFLICT(projector) DO UPDATE
+                    SET
+                        last_event_id = MAX(last_event_id, excluded.last_event_id),
+                        updated_at    = excluded.updated_at
             "#,
             projector_name,
-            json_array
+            last_event_id
         )
         .execute(connection_mut)
         .await
