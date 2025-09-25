@@ -72,63 +72,30 @@ impl PollingIngestServiceImpl {
             return Ok(result);
         };
 
-        let mut iteration = 0;
-        let mut combined_result = None;
-        loop {
-            iteration += 1;
-            let operation_id = get_random_name(None, 10);
+        let operation_id = get_random_name(None, 10);
 
-            let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
-            std::fs::create_dir_all(&operation_dir).int_err()?;
+        let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
+        std::fs::create_dir_all(&operation_dir).int_err()?;
 
-            let new_ctx = ingest_common::new_session_context(
-                &self.engine_config,
-                self.object_store_registry.clone(),
-            );
-            data_writer.set_session_context(new_ctx.clone());
+        let iteration_args = IngestIterationArgs {
+            dataset_handle: target.get_handle().clone(),
+            operation_id,
+            operation_dir,
+            system_time: self.time_source.now(),
+            options,
+            polling_source,
+            listener,
+            ctx,
+            data_writer: &mut data_writer,
+        };
 
-            // TODO: Avoid excessive cloning
-            let iteration_args = IngestIterationArgs {
-                dataset_handle: target.get_handle().clone(),
-                iteration,
-                operation_id,
-                operation_dir,
-                system_time: self.time_source.now(),
-                options: options.clone(),
-                polling_source: polling_source.clone(),
-                listener: listener.clone(),
-                ctx: new_ctx,
-                data_writer: &mut data_writer,
-            };
-
-            match self.ingest_iteration(iteration_args).await {
-                Ok(res) => {
-                    combined_result = Some(Self::merge_results(combined_result, res));
-
-                    // let has_more = match combined_result {
-                    //     Some(PollingIngestResult::UpToDate { .. }) => false,
-                    //     Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
-                    //     None => unreachable!(),
-                    // };
-
-                    // if !has_more || !options.exhaust_sources {
-                    //     break;
-                    // }
-                    break;
-                }
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(combined_result.unwrap())
+        self.ingest_iteration(iteration_args).await
     }
 
     #[tracing::instrument(
         level = "info",
         skip_all,
-        fields(
-            iteration = %args.iteration,
-            operation_id = %args.operation_id,
-        )
+        fields(operation_id = %args.operation_id)
     )]
     async fn ingest_iteration(
         &self,
@@ -518,44 +485,6 @@ impl PollingIngestServiceImpl {
 
         Ok(Some(df))
     }
-
-    // TODO: Introduce intermediate structs to avoid full unpacking
-    fn merge_results(
-        combined_result: Option<PollingIngestResult>,
-        new_result: PollingIngestResult,
-    ) -> PollingIngestResult {
-        match (combined_result, new_result) {
-            (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
-            (
-                Some(PollingIngestResult::Updated {
-                    old_head, new_head, ..
-                }),
-                PollingIngestResult::UpToDate { uncacheable, .. },
-            ) => PollingIngestResult::Updated {
-                old_head,
-                new_head,
-                has_more: false,
-                uncacheable,
-            },
-            (
-                Some(PollingIngestResult::Updated {
-                    old_head: prev_old_head,
-                    ..
-                }),
-                PollingIngestResult::Updated {
-                    new_head,
-                    has_more,
-                    uncacheable,
-                    ..
-                },
-            ) => PollingIngestResult::Updated {
-                old_head: prev_old_head,
-                new_head,
-                has_more,
-                uncacheable,
-            },
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -592,7 +521,6 @@ pub(crate) struct PrepStepResult {
 
 struct IngestIterationArgs<'a> {
     dataset_handle: odf::DatasetHandle,
-    iteration: usize,
     operation_id: String,
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
