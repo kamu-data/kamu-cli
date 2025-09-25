@@ -252,11 +252,21 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         let rows = sqlx::query!(
             r#"
             WITH next AS (
+                WITH projected AS (
+                    SELECT COALESCE(done, '{}'::int8multirange) AS done
+                    FROM flow_system_projected_events
+                    WHERE projector = $1
+                    UNION ALL
+                    SELECT '{}'::int8multirange AS done
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM flow_system_projected_events WHERE projector = $1
+                    )
+                    LIMIT 1
+                )
                 SELECT fse.event_id
                 FROM flow_system_events fse
-                LEFT JOIN flow_system_projected_events pe
-                    ON pe.projector = $1 AND pe.event_id = fse.event_id
-                WHERE pe.event_id IS NULL AND fse.event_id <= $2
+                CROSS JOIN projected
+                WHERE NOT (fse.event_id <@ projected.done) AND fse.event_id <= $2
                 ORDER BY fse.event_id
                 LIMIT $3
             ),
@@ -368,8 +378,19 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
 
         sqlx::query!(
             r#"
-            INSERT INTO flow_system_projected_events(projector, event_id)
-                SELECT $1, UNNEST($2::BIGINT[]) ON CONFLICT DO NOTHING
+            WITH new_ranges AS (
+                SELECT COALESCE(
+                    range_agg(int8range(id, id, '[]')),
+                    '{}'::int8multirange
+                ) AS ranges
+                FROM unnest($2::bigint[]) AS t(id)
+            )
+            INSERT INTO flow_system_projected_events (projector, done, updated_at)
+                SELECT $1, ranges, now()
+                FROM new_ranges
+                ON CONFLICT (projector) DO UPDATE SET
+                    done = flow_system_projected_events.done + (SELECT ranges FROM new_ranges),
+                    updated_at = now();
             "#,
             projector_name,
             &event_id_values
