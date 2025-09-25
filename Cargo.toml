@@ -141,137 +141,137 @@ aws-sdk-s3 = "=1.68.0"
 aws-lc-rs = "=1.13.3"
 
 # Apps
-kamu-cli = { version = "0.249.0", path = "src/app/cli", default-features = false }
+kamu-cli = { version = "0.249.1", path = "src/app/cli", default-features = false }
 
 # Utils
-async-utils = { version = "0.249.0", path = "src/utils/async-utils", default-features = false }
-common-macros = { version = "0.249.0", path = "src/utils/common-macros", default-features = false }
-container-runtime = { version = "0.249.0", path = "src/utils/container-runtime", default-features = false }
-crypto-utils = { version = "0.249.0", path = "src/utils/crypto-utils", default-features = false }
-database-common = { version = "0.249.0", path = "src/utils/database-common", default-features = false }
-database-common-macros = { version = "0.249.0", path = "src/utils/database-common-macros", default-features = false }
-email-utils = { version = "0.249.0", path = "src/utils/email-utils", default-features = false }
-enum-variants = { version = "0.249.0", path = "src/utils/enum-variants", default-features = false }
-event-sourcing = { version = "0.249.0", path = "src/utils/event-sourcing", default-features = false }
-event-sourcing-macros = { version = "0.249.0", path = "src/utils/event-sourcing-macros", default-features = false }
-file-utils = { version = "0.249.0", path = "src/utils/file-utils", default-features = false }
-http-common = { version = "0.249.0", path = "src/utils/http-common", default-features = false }
-init-on-startup = { version = "0.249.0", path = "src/utils/init-on-startup", default-features = false }
-internal-error = { version = "0.249.0", path = "src/utils/internal-error", default-features = false }
-kamu-cli-puppet = { version = "0.249.0", path = "src/utils/kamu-cli-puppet", default-features = false }
-kamu-datafusion-cli = { version = "0.249.0", path = "src/utils/datafusion-cli", default-features = false }
-messaging-outbox = { version = "0.249.0", path = "src/utils/messaging-outbox", default-features = false }
-multiformats = { version = "0.249.0", path = "src/utils/multiformats", default-features = false }
-observability = { version = "0.249.0", path = "src/utils/observability", default-features = false }
-random-strings = { version = "0.249.0", path = "src/utils/random-strings", default-features = false }
-s3-utils = { version = "0.249.0", path = "src/utils/s3-utils", default-features = false }
-server-console = { version = "0.249.0", path = "src/utils/server-console", default-features = false }
-test-utils = { version = "0.249.0", path = "src/utils/test-utils", default-features = false }
-time-source = { version = "0.249.0", path = "src/utils/time-source", default-features = false }
-tracing-perfetto = { version = "0.249.0", path = "src/utils/tracing-perfetto", default-features = false }
+async-utils = { version = "0.249.1", path = "src/utils/async-utils", default-features = false }
+common-macros = { version = "0.249.1", path = "src/utils/common-macros", default-features = false }
+container-runtime = { version = "0.249.1", path = "src/utils/container-runtime", default-features = false }
+crypto-utils = { version = "0.249.1", path = "src/utils/crypto-utils", default-features = false }
+database-common = { version = "0.249.1", path = "src/utils/database-common", default-features = false }
+database-common-macros = { version = "0.249.1", path = "src/utils/database-common-macros", default-features = false }
+email-utils = { version = "0.249.1", path = "src/utils/email-utils", default-features = false }
+enum-variants = { version = "0.249.1", path = "src/utils/enum-variants", default-features = false }
+event-sourcing = { version = "0.249.1", path = "src/utils/event-sourcing", default-features = false }
+event-sourcing-macros = { version = "0.249.1", path = "src/utils/event-sourcing-macros", default-features = false }
+file-utils = { version = "0.249.1", path = "src/utils/file-utils", default-features = false }
+http-common = { version = "0.249.1", path = "src/utils/http-common", default-features = false }
+init-on-startup = { version = "0.249.1", path = "src/utils/init-on-startup", default-features = false }
+internal-error = { version = "0.249.1", path = "src/utils/internal-error", default-features = false }
+kamu-cli-puppet = { version = "0.249.1", path = "src/utils/kamu-cli-puppet", default-features = false }
+kamu-datafusion-cli = { version = "0.249.1", path = "src/utils/datafusion-cli", default-features = false }
+messaging-outbox = { version = "0.249.1", path = "src/utils/messaging-outbox", default-features = false }
+multiformats = { version = "0.249.1", path = "src/utils/multiformats", default-features = false }
+observability = { version = "0.249.1", path = "src/utils/observability", default-features = false }
+random-strings = { version = "0.249.1", path = "src/utils/random-strings", default-features = false }
+s3-utils = { version = "0.249.1", path = "src/utils/s3-utils", default-features = false }
+server-console = { version = "0.249.1", path = "src/utils/server-console", default-features = false }
+test-utils = { version = "0.249.1", path = "src/utils/test-utils", default-features = false }
+time-source = { version = "0.249.1", path = "src/utils/time-source", default-features = false }
+tracing-perfetto = { version = "0.249.1", path = "src/utils/tracing-perfetto", default-features = false }
 
 # Domain
-kamu-accounts = { version = "0.249.0", path = "src/domain/accounts/domain", default-features = false }
-kamu-auth-rebac = { version = "0.249.0", path = "src/domain/auth-rebac/domain", default-features = false }
-kamu-auth-web3 = { version = "0.249.0", path = "src/domain/auth-web3/domain", default-features = false }
-kamu-core = { version = "0.249.0", path = "src/domain/core", default-features = false }
-kamu-datasets = { version = "0.249.0", path = "src/domain/datasets/domain", default-features = false }
-kamu-flow-system = { version = "0.249.0", path = "src/domain/flow-system/domain", default-features = false }
-kamu-search = { version = "0.249.0", path = "src/domain/search/domain", default-features = false }
-kamu-task-system = { version = "0.249.0", path = "src/domain/task-system/domain", default-features = false }
-kamu-webhooks = { version = "0.249.0", path = "src/domain/webhooks/domain", default-features = false }
+kamu-accounts = { version = "0.249.1", path = "src/domain/accounts/domain", default-features = false }
+kamu-auth-rebac = { version = "0.249.1", path = "src/domain/auth-rebac/domain", default-features = false }
+kamu-auth-web3 = { version = "0.249.1", path = "src/domain/auth-web3/domain", default-features = false }
+kamu-core = { version = "0.249.1", path = "src/domain/core", default-features = false }
+kamu-datasets = { version = "0.249.1", path = "src/domain/datasets/domain", default-features = false }
+kamu-flow-system = { version = "0.249.1", path = "src/domain/flow-system/domain", default-features = false }
+kamu-search = { version = "0.249.1", path = "src/domain/search/domain", default-features = false }
+kamu-task-system = { version = "0.249.1", path = "src/domain/task-system/domain", default-features = false }
+kamu-webhooks = { version = "0.249.1", path = "src/domain/webhooks/domain", default-features = false }
 
 ## Open Data Fabric
-odf = { version = "0.249.0", path = "src/odf/odf", default-features = false, package = "opendatafabric" }
-odf-metadata = { version = "0.249.0", path = "src/odf/metadata", default-features = false, package = "opendatafabric-metadata" }
-odf-dataset = { version = "0.249.0", path = "src/odf/dataset", default-features = false, package = "opendatafabric-dataset" }
-odf-data-utils = { version = "0.249.0", path = "src/odf/data-utils", default-features = false, package = "opendatafabric-data-utils" }
-odf-dataset-impl = { version = "0.249.0", path = "src/odf/dataset-impl", default-features = false, package = "opendatafabric-dataset-impl" }
-odf-storage = { version = "0.249.0", path = "src/odf/storage", default-features = false, package = "opendatafabric-storage" }
-odf-storage-http = { version = "0.249.0", path = "src/odf/storage-http", default-features = false, package = "opendatafabric-storage-http" }
-odf-storage-inmem = { version = "0.249.0", path = "src/odf/storage-inmem", default-features = false, package = "opendatafabric-storage-inmem" }
-odf-storage-lfs = { version = "0.249.0", path = "src/odf/storage-lfs", default-features = false, package = "opendatafabric-storage-lfs" }
-odf-storage-s3 = { version = "0.249.0", path = "src/odf/storage-s3", default-features = false, package = "opendatafabric-storage-s3" }
+odf = { version = "0.249.1", path = "src/odf/odf", default-features = false, package = "opendatafabric" }
+odf-metadata = { version = "0.249.1", path = "src/odf/metadata", default-features = false, package = "opendatafabric-metadata" }
+odf-dataset = { version = "0.249.1", path = "src/odf/dataset", default-features = false, package = "opendatafabric-dataset" }
+odf-data-utils = { version = "0.249.1", path = "src/odf/data-utils", default-features = false, package = "opendatafabric-data-utils" }
+odf-dataset-impl = { version = "0.249.1", path = "src/odf/dataset-impl", default-features = false, package = "opendatafabric-dataset-impl" }
+odf-storage = { version = "0.249.1", path = "src/odf/storage", default-features = false, package = "opendatafabric-storage" }
+odf-storage-http = { version = "0.249.1", path = "src/odf/storage-http", default-features = false, package = "opendatafabric-storage-http" }
+odf-storage-inmem = { version = "0.249.1", path = "src/odf/storage-inmem", default-features = false, package = "opendatafabric-storage-inmem" }
+odf-storage-lfs = { version = "0.249.1", path = "src/odf/storage-lfs", default-features = false, package = "opendatafabric-storage-lfs" }
+odf-storage-s3 = { version = "0.249.1", path = "src/odf/storage-s3", default-features = false, package = "opendatafabric-storage-s3" }
 
 # Domain service layer
-kamu-accounts-services = { version = "0.249.0", path = "src/domain/accounts/services", default-features = false }
-kamu-auth-rebac-services = { version = "0.249.0", path = "src/domain/auth-rebac/services", default-features = false }
-kamu-auth-web3-services = { version = "0.249.0", path = "src/domain/auth-web3/services", default-features = false }
-kamu-datasets-services = { version = "0.249.0", path = "src/domain/datasets/services", default-features = false, features = ["lfs", "s3"] }
-kamu-flow-system-services = { version = "0.249.0", path = "src/domain/flow-system/services", default-features = false }
-kamu-search-services = { version = "0.249.0", path = "src/domain/search/services", default-features = false }
-kamu-task-system-services = { version = "0.249.0", path = "src/domain/task-system/services", default-features = false }
-kamu-webhooks-services = { version = "0.249.0", path = "src/domain/webhooks/services", default-features = false }
+kamu-accounts-services = { version = "0.249.1", path = "src/domain/accounts/services", default-features = false }
+kamu-auth-rebac-services = { version = "0.249.1", path = "src/domain/auth-rebac/services", default-features = false }
+kamu-auth-web3-services = { version = "0.249.1", path = "src/domain/auth-web3/services", default-features = false }
+kamu-datasets-services = { version = "0.249.1", path = "src/domain/datasets/services", default-features = false, features = ["lfs", "s3"] }
+kamu-flow-system-services = { version = "0.249.1", path = "src/domain/flow-system/services", default-features = false }
+kamu-search-services = { version = "0.249.1", path = "src/domain/search/services", default-features = false }
+kamu-task-system-services = { version = "0.249.1", path = "src/domain/task-system/services", default-features = false }
+kamu-webhooks-services = { version = "0.249.1", path = "src/domain/webhooks/services", default-features = false }
 
 # Infra
-kamu = { version = "0.249.0", path = "src/infra/core", default-features = false }
-kamu-ingest-datafusion = { version = "0.249.0", path = "src/infra/ingest-datafusion", default-features = false }
+kamu = { version = "0.249.1", path = "src/infra/core", default-features = false }
+kamu-ingest-datafusion = { version = "0.249.1", path = "src/infra/ingest-datafusion", default-features = false }
 ## Flow System
-kamu-flow-system-repo-tests = { version = "0.249.0", path = "src/infra/flow-system/repo-tests", default-features = false }
-kamu-flow-system-inmem = { version = "0.249.0", path = "src/infra/flow-system/inmem", default-features = false }
-kamu-flow-system-postgres = { version = "0.249.0", path = "src/infra/flow-system/postgres", default-features = false }
-kamu-flow-system-sqlite = { version = "0.249.0", path = "src/infra/flow-system/sqlite", default-features = false }
+kamu-flow-system-repo-tests = { version = "0.249.1", path = "src/infra/flow-system/repo-tests", default-features = false }
+kamu-flow-system-inmem = { version = "0.249.1", path = "src/infra/flow-system/inmem", default-features = false }
+kamu-flow-system-postgres = { version = "0.249.1", path = "src/infra/flow-system/postgres", default-features = false }
+kamu-flow-system-sqlite = { version = "0.249.1", path = "src/infra/flow-system/sqlite", default-features = false }
 ## Accounts
-kamu-accounts-inmem = { version = "0.249.0", path = "src/infra/accounts/inmem", default-features = false }
-kamu-accounts-mysql = { version = "0.249.0", path = "src/infra/accounts/mysql", default-features = false }
-kamu-accounts-postgres = { version = "0.249.0", path = "src/infra/accounts/postgres", default-features = false }
-kamu-accounts-sqlite = { version = "0.249.0", path = "src/infra/accounts/sqlite", default-features = false }
-kamu-accounts-repo-tests = { version = "0.249.0", path = "src/infra/accounts/repo-tests", default-features = false }
+kamu-accounts-inmem = { version = "0.249.1", path = "src/infra/accounts/inmem", default-features = false }
+kamu-accounts-mysql = { version = "0.249.1", path = "src/infra/accounts/mysql", default-features = false }
+kamu-accounts-postgres = { version = "0.249.1", path = "src/infra/accounts/postgres", default-features = false }
+kamu-accounts-sqlite = { version = "0.249.1", path = "src/infra/accounts/sqlite", default-features = false }
+kamu-accounts-repo-tests = { version = "0.249.1", path = "src/infra/accounts/repo-tests", default-features = false }
 ## Datasets
-kamu-datasets-inmem = { version = "0.249.0", path = "src/infra/datasets/inmem", default-features = false }
-kamu-datasets-postgres = { version = "0.249.0", path = "src/infra/datasets/postgres", default-features = false }
-kamu-datasets-sqlite = { version = "0.249.0", path = "src/infra/datasets/sqlite", default-features = false }
-kamu-datasets-repo-tests = { version = "0.249.0", path = "src/infra/datasets/repo-tests", default-features = false }
+kamu-datasets-inmem = { version = "0.249.1", path = "src/infra/datasets/inmem", default-features = false }
+kamu-datasets-postgres = { version = "0.249.1", path = "src/infra/datasets/postgres", default-features = false }
+kamu-datasets-sqlite = { version = "0.249.1", path = "src/infra/datasets/sqlite", default-features = false }
+kamu-datasets-repo-tests = { version = "0.249.1", path = "src/infra/datasets/repo-tests", default-features = false }
 ## Search
-kamu-search-openai = { version = "0.249.0", path = "src/infra/search/openai", default-features = false }
-kamu-search-qdrant = { version = "0.249.0", path = "src/infra/search/qdrant", default-features = false }
+kamu-search-openai = { version = "0.249.1", path = "src/infra/search/openai", default-features = false }
+kamu-search-qdrant = { version = "0.249.1", path = "src/infra/search/qdrant", default-features = false }
 ## Task System
-kamu-task-system-inmem = { version = "0.249.0", path = "src/infra/task-system/inmem", default-features = false }
-kamu-task-system-postgres = { version = "0.249.0", path = "src/infra/task-system/postgres", default-features = false }
-kamu-task-system-sqlite = { version = "0.249.0", path = "src/infra/task-system/sqlite", default-features = false }
-kamu-task-system-repo-tests = { version = "0.249.0", path = "src/infra/task-system/repo-tests", default-features = false }
+kamu-task-system-inmem = { version = "0.249.1", path = "src/infra/task-system/inmem", default-features = false }
+kamu-task-system-postgres = { version = "0.249.1", path = "src/infra/task-system/postgres", default-features = false }
+kamu-task-system-sqlite = { version = "0.249.1", path = "src/infra/task-system/sqlite", default-features = false }
+kamu-task-system-repo-tests = { version = "0.249.1", path = "src/infra/task-system/repo-tests", default-features = false }
 ## ReBAC
-kamu-auth-rebac-inmem = { version = "0.249.0", path = "src/infra/auth-rebac/inmem", default-features = false }
-kamu-auth-rebac-repo-tests = { version = "0.249.0", path = "src/infra/auth-rebac/repo-tests", default-features = false }
-kamu-auth-rebac-postgres = { version = "0.249.0", path = "src/infra/auth-rebac/postgres", default-features = false }
-kamu-auth-rebac-sqlite = { version = "0.249.0", path = "src/infra/auth-rebac/sqlite", default-features = false }
+kamu-auth-rebac-inmem = { version = "0.249.1", path = "src/infra/auth-rebac/inmem", default-features = false }
+kamu-auth-rebac-repo-tests = { version = "0.249.1", path = "src/infra/auth-rebac/repo-tests", default-features = false }
+kamu-auth-rebac-postgres = { version = "0.249.1", path = "src/infra/auth-rebac/postgres", default-features = false }
+kamu-auth-rebac-sqlite = { version = "0.249.1", path = "src/infra/auth-rebac/sqlite", default-features = false }
 ## Outbox
-kamu-messaging-outbox-inmem = { version = "0.249.0", path = "src/infra/messaging-outbox/inmem", default-features = false }
-kamu-messaging-outbox-postgres = { version = "0.249.0", path = "src/infra/messaging-outbox/postgres", default-features = false }
-kamu-messaging-outbox-sqlite = { version = "0.249.0", path = "src/infra/messaging-outbox/sqlite", default-features = false }
-kamu-messaging-outbox-repo-tests = { version = "0.249.0", path = "src/infra/messaging-outbox/repo-tests", default-features = false }
+kamu-messaging-outbox-inmem = { version = "0.249.1", path = "src/infra/messaging-outbox/inmem", default-features = false }
+kamu-messaging-outbox-postgres = { version = "0.249.1", path = "src/infra/messaging-outbox/postgres", default-features = false }
+kamu-messaging-outbox-sqlite = { version = "0.249.1", path = "src/infra/messaging-outbox/sqlite", default-features = false }
+kamu-messaging-outbox-repo-tests = { version = "0.249.1", path = "src/infra/messaging-outbox/repo-tests", default-features = false }
 ## Webhooks
-kamu-webhooks-inmem = { version = "0.249.0", path = "src/infra/webhooks/inmem", default-features = false }
-kamu-webhooks-postgres = { version = "0.249.0", path = "src/infra/webhooks/postgres", default-features = false }
-kamu-webhooks-sqlite = { version = "0.249.0", path = "src/infra/webhooks/sqlite", default-features = false }
-kamu-webhooks-repo-tests = { version = "0.249.0", path = "src/infra/webhooks/repo-tests", default-features = false }
+kamu-webhooks-inmem = { version = "0.249.1", path = "src/infra/webhooks/inmem", default-features = false }
+kamu-webhooks-postgres = { version = "0.249.1", path = "src/infra/webhooks/postgres", default-features = false }
+kamu-webhooks-sqlite = { version = "0.249.1", path = "src/infra/webhooks/sqlite", default-features = false }
+kamu-webhooks-repo-tests = { version = "0.249.1", path = "src/infra/webhooks/repo-tests", default-features = false }
 ## Web3
-kamu-auth-web3-inmem = { version = "0.249.0", path = "src/infra/auth-web3/inmem", default-features = false }
-kamu-auth-web3-postgres = { version = "0.249.0", path = "src/infra/auth-web3/postgres", default-features = false }
-kamu-auth-web3-repo-tests = { version = "0.249.0", path = "src/infra/auth-web3/repo-tests", default-features = false }
-kamu-auth-web3-sqlite = { version = "0.249.0", path = "src/infra/auth-web3/sqlite", default-features = false }
+kamu-auth-web3-inmem = { version = "0.249.1", path = "src/infra/auth-web3/inmem", default-features = false }
+kamu-auth-web3-postgres = { version = "0.249.1", path = "src/infra/auth-web3/postgres", default-features = false }
+kamu-auth-web3-repo-tests = { version = "0.249.1", path = "src/infra/auth-web3/repo-tests", default-features = false }
+kamu-auth-web3-sqlite = { version = "0.249.1", path = "src/infra/auth-web3/sqlite", default-features = false }
 
 # Adapters
-kamu-adapter-auth-oso-rebac = { version = "0.249.0", path = "src/adapter/auth-oso-rebac", default-features = false }
-kamu-adapter-auth-web3 = { version = "0.249.0", path = "src/adapter/auth-web3", default-features = false }
-kamu-adapter-flight-sql = { version = "0.249.0", path = "src/adapter/flight-sql", default-features = false }
-kamu-adapter-flow-dataset = { version = "0.249.0", path = "src/adapter/flow-dataset", default-features = false }
-kamu-adapter-flow-webhook = { version = "0.249.0", path = "src/adapter/flow-webhook", default-features = false }
-kamu-adapter-task-dataset = { version = "0.249.0", path = "src/adapter/task-dataset", default-features = false }
-kamu-adapter-task-webhook = { version = "0.249.0", path = "src/adapter/task-webhook", default-features = false }
+kamu-adapter-auth-oso-rebac = { version = "0.249.1", path = "src/adapter/auth-oso-rebac", default-features = false }
+kamu-adapter-auth-web3 = { version = "0.249.1", path = "src/adapter/auth-web3", default-features = false }
+kamu-adapter-flight-sql = { version = "0.249.1", path = "src/adapter/flight-sql", default-features = false }
+kamu-adapter-flow-dataset = { version = "0.249.1", path = "src/adapter/flow-dataset", default-features = false }
+kamu-adapter-flow-webhook = { version = "0.249.1", path = "src/adapter/flow-webhook", default-features = false }
+kamu-adapter-task-dataset = { version = "0.249.1", path = "src/adapter/task-dataset", default-features = false }
+kamu-adapter-task-webhook = { version = "0.249.1", path = "src/adapter/task-webhook", default-features = false }
 kamu-adapter-flow-task = { version = "0.242.1", path = "src/adapter/flow-task", default-features = false }
-kamu-adapter-graphql = { version = "0.249.0", path = "src/adapter/graphql", default-features = false }
-kamu-adapter-http = { version = "0.249.0", path = "src/adapter/http", default-features = false }
-kamu-adapter-odata = { version = "0.249.0", path = "src/adapter/odata", default-features = false }
-kamu-adapter-oauth = { version = "0.249.0", path = "src/adapter/oauth", default-features = false }
+kamu-adapter-graphql = { version = "0.249.1", path = "src/adapter/graphql", default-features = false }
+kamu-adapter-http = { version = "0.249.1", path = "src/adapter/http", default-features = false }
+kamu-adapter-odata = { version = "0.249.1", path = "src/adapter/odata", default-features = false }
+kamu-adapter-oauth = { version = "0.249.1", path = "src/adapter/oauth", default-features = false }
 
 # E2E
-kamu-cli-e2e-common = { version = "0.249.0", path = "src/e2e/app/cli/common", default-features = false }
-kamu-cli-e2e-common-macros = { version = "0.249.0", path = "src/e2e/app/cli/common-macros", default-features = false }
-kamu-cli-e2e-repo-tests = { version = "0.249.0", path = "src/e2e/app/cli/repo-tests", default-features = false }
+kamu-cli-e2e-common = { version = "0.249.1", path = "src/e2e/app/cli/common", default-features = false }
+kamu-cli-e2e-common-macros = { version = "0.249.1", path = "src/e2e/app/cli/common-macros", default-features = false }
+kamu-cli-e2e-repo-tests = { version = "0.249.1", path = "src/e2e/app/cli/repo-tests", default-features = false }
 
 [workspace.package]
-version = "0.249.0"
+version = "0.249.1"
 edition = "2024"
 homepage = "https://github.com/kamu-data/kamu-cli"
 repository = "https://github.com/kamu-data/kamu-cli"
