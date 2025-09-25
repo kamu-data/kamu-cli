@@ -182,7 +182,7 @@ mime_guess = "2"
 
 # Config
 duration-string = { version = "0.5", features = ["serde"] }
-merge = "0.1"
+merge = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_with = "3"
 serde_yaml = "0.9"

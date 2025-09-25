@@ -18,6 +18,7 @@ use crate::PredefinedAccountsConfig;
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = merge::option::overwrite_none)]
 pub struct AuthConfig {
     pub allow_anonymous: Option<bool>,
     pub users: Option<PredefinedAccountsConfig>,
