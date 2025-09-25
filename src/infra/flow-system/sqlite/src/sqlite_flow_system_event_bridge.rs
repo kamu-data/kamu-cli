@@ -76,9 +76,10 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
 
         loop {
             // Check for new events
-            if let Some(event_id) = self.check_for_new_events().await? {
+            if let Some(max_event_id) = self.check_for_new_events().await? {
                 return Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                    upper_event_id_bound: event_id,
+                    lower_event_id_bound: EventID::new(0), // can't provide this hint in SQLite
+                    upper_event_id_bound: max_event_id,
                 });
             }
 
@@ -104,18 +105,20 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         &self,
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
-        limit: usize,
-        maybe_upper_event_id_bound: Option<EventID>,
+        batch_size: usize,
+        _loopback_offset: usize, // Ignored by SQLite implementation
+        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
 
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        let upper_bound = maybe_upper_event_id_bound
-            .map(EventID::into_inner)
-            .unwrap_or(i64::MAX);
-        let limit = i64::try_from(limit).unwrap();
+        let (lower_bound_event_id, upper_bound_event_id) = maybe_event_id_bounds_hint
+            .map(|(lower, upper)| (lower.into_inner(), upper.into_inner()))
+            .unwrap_or((0, i64::MAX));
+
+        let limit = i64::try_from(batch_size).unwrap();
 
         let rows = sqlx::query!(
             r#"
@@ -124,9 +127,9 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
                 FROM flow_system_events fse
                 LEFT JOIN flow_system_projected_events pe
                     ON pe.projector = $1 AND pe.event_id = fse.event_id
-                WHERE pe.event_id IS NULL AND fse.event_id <= $2
+                WHERE pe.event_id IS NULL AND fse.event_id >= $2 AND fse.event_id <= $3
                 ORDER BY fse.event_id
-                LIMIT $3
+                LIMIT $4
             ),
             merged as (
                 SELECT
@@ -183,7 +186,8 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
             ORDER BY event_id
                 "#,
             projector_name,
-            upper_bound,
+            lower_bound_event_id,
+            upper_bound_event_id,
             limit
         )
         .fetch_all(connection_mut)

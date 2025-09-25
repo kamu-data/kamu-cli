@@ -24,7 +24,7 @@ use tokio::sync::broadcast;
 pub struct InMemoryFlowSystemEventBridge {
     time_source: Arc<dyn SystemTimeSource>,
     state: Mutex<State>,
-    tx: broadcast::Sender<EventID>,
+    tx: broadcast::Sender<(EventID, EventID)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,13 @@ impl InMemoryFlowSystemEventBridge {
         source_type: FlowSystemEventSourceType,
         source_events: &[(EventID, DateTime<Utc>, serde_json::Value)],
     ) {
+        if source_events.is_empty() {
+            return;
+        }
+
         let mut state = self.state.lock().unwrap();
+
+        let min_event_id = state.events.len() + 1;
 
         for (source_event_id, occurred_at, payload) in source_events {
             let event_id = state.events.len() + 1;
@@ -100,9 +106,10 @@ impl InMemoryFlowSystemEventBridge {
         let max_event_id = state.events.len();
 
         // Wake up listeners
-        let _ = self
-            .tx
-            .send(EventID::new(i64::try_from(max_event_id).unwrap()));
+        let _ = self.tx.send((
+            EventID::new(i64::try_from(min_event_id).unwrap()),
+            EventID::new(i64::try_from(max_event_id).unwrap()),
+        ));
     }
 }
 
@@ -121,10 +128,11 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         // Wait until a new event arrives or timeout elapses
         // For testing purposes, we keep this simple without complex backoff strategies
         match tokio::time::timeout(timeout, rx.recv()).await {
-            Ok(Ok(event_id)) => {
+            Ok(Ok((min_event_id, max_event_id))) => {
                 // New event arrived
                 Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                    upper_event_id_bound: event_id,
+                    lower_event_id_bound: min_event_id,
+                    upper_event_id_bound: max_event_id,
                 })
             }
             Ok(Err(broadcast::error::RecvError::Closed)) => {
@@ -134,6 +142,7 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
             Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
                 // We lagged behind, but that's fine, just indicate new events are available
                 Ok(FlowSystemEventStoreWakeHint::NewEvents {
+                    lower_event_id_bound: EventID::new(0),
                     upper_event_id_bound: EventID::new(
                         i64::try_from(self.get_events_count()).unwrap(),
                     ),
@@ -151,23 +160,26 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         &self,
         _: &dill::Catalog,
         projector_name: &'static str,
-        limit: usize,
-        maybe_upper_event_id_bound: Option<EventID>,
+        batch_size: usize,
+        _loopback_offset: usize, // Ignored by in-mem implementation
+        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let mut state = self.state.lock().unwrap();
 
         let pos = state.next_pos.get(projector_name).copied().unwrap_or(0);
         let applied = state.applied.entry(projector_name).or_default().clone();
 
-        let mut res = Vec::with_capacity(limit);
+        let upper_bound_event_id = maybe_event_id_bounds_hint
+            .map(|(_, upper)| upper)
+            .unwrap_or(EventID::new(i64::MAX));
+
+        let mut res = Vec::with_capacity(batch_size);
         let mut i = pos;
 
-        while i < state.events.len() && res.len() < limit {
+        while i < state.events.len() && res.len() < batch_size {
             let e = &state.events[i];
 
-            if let Some(upper_bound) = maybe_upper_event_id_bound
-                && e.event_id > upper_bound
-            {
+            if e.event_id > upper_bound_event_id {
                 break; // don’t scan beyond the hint
             }
 
