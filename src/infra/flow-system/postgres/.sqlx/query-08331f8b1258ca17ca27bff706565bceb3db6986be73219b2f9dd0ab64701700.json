@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH new_ranges AS (\n                SELECT COALESCE(\n                    range_agg(int8range(id, id, '[]')),\n                    '{}'::int8multirange\n                ) AS ranges\n                FROM unnest($2::bigint[]) AS t(id)\n            )\n            INSERT INTO flow_system_projected_events (projector, done, updated_at)\n                SELECT $1, ranges, now()\n                FROM new_ranges\n                ON CONFLICT (projector) DO UPDATE SET\n                    done = flow_system_projected_events.done + (SELECT ranges FROM new_ranges),\n                    updated_at = now();\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "08331f8b1258ca17ca27bff706565bceb3db6986be73219b2f9dd0ab64701700"
+}
