@@ -616,9 +616,8 @@ impl MoleculeProject {
     }
 
     async fn get_activity_announcements(
-        &self,
+        self: &Arc<Self>,
         ctx: &Context<'_>,
-        project: &Arc<Self>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
@@ -652,7 +651,7 @@ impl MoleculeProject {
                 obj.remove(&vocab.operation_type_column);
 
                 MoleculeProjectEvent::Announcement(MoleculeProjectEventAnnouncement {
-                    project: Arc::clone(project),
+                    project: Arc::clone(self),
                     announcement: record,
                 })
             })
@@ -662,9 +661,8 @@ impl MoleculeProject {
     }
 
     async fn get_activity_data_room(
-        &self,
+        self: &Arc<Self>,
         ctx: &Context<'_>,
-        project: &Arc<Self>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
@@ -705,7 +703,7 @@ impl MoleculeProject {
                     odf::metadata::OperationType::Append => {
                         MoleculeProjectEvent::DataRoomEntryAdded(
                             MoleculeProjectEventDataRoomEntryAdded {
-                                project: Arc::clone(project),
+                                project: Arc::clone(self),
                                 entry,
                             },
                         )
@@ -713,7 +711,7 @@ impl MoleculeProject {
                     odf::metadata::OperationType::Retract => {
                         MoleculeProjectEvent::DataRoomEntryRemoved(
                             MoleculeProjectEventDataRoomEntryRemoved {
-                                project: Arc::clone(project),
+                                project: Arc::clone(self),
                                 entry,
                             },
                         )
@@ -722,7 +720,7 @@ impl MoleculeProject {
                     odf::metadata::OperationType::CorrectTo => {
                         MoleculeProjectEvent::DataRoomEntryUpdated(
                             MoleculeProjectEventDataRoomEntryUpdated {
-                                project: Arc::clone(project),
+                                project: Arc::clone(self),
                                 new_entry: entry,
                             },
                         )
@@ -740,9 +738,8 @@ impl MoleculeProject {
     // versions - we likely need to create a derivative dataset to track activity,
     // so we could query it in a single go.
     async fn get_activity_files(
-        &self,
+        self: &Arc<Self>,
         ctx: &Context<'_>,
-        project: &Arc<Self>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
         let (query_svc, dataset_reg) =
@@ -818,7 +815,7 @@ impl MoleculeProject {
 
                 events.push(MoleculeProjectEvent::FileUpdated(
                     MoleculeProjectEventFileUpdated {
-                        project: Arc::clone(project),
+                        project: Arc::clone(self),
                         dataset,
                         new_entry: entry,
                     },
@@ -882,13 +879,9 @@ impl MoleculeProject {
         let project = Arc::new(self.clone());
 
         let mut events = Vec::new();
-        events.append(
-            &mut self
-                .get_activity_announcements(ctx, &project, limit)
-                .await?,
-        );
-        events.append(&mut self.get_activity_data_room(ctx, &project, limit).await?);
-        events.append(&mut self.get_activity_files(ctx, &project, limit).await?);
+        events.append(&mut project.get_activity_announcements(ctx, limit).await?);
+        events.append(&mut project.get_activity_data_room(ctx, limit).await?);
+        events.append(&mut project.get_activity_files(ctx, limit).await?);
 
         let mut events_timed = Vec::with_capacity(events.len());
         for e in events {
