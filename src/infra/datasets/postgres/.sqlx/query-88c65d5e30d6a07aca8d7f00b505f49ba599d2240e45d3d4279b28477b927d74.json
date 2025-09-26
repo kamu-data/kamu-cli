@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    dataset_id   as \"id: _\",\n                    owner_id     as \"owner_id: _\",\n                    owner_name   as owner_name,\n                    dataset_name as name,\n                    created_at   as \"created_at: _\",\n                    kind         as \"kind: _\"\n                FROM dataset_entries\n                ORDER BY dataset_name ASC\n                LIMIT $1 OFFSET $2\n                ",
+  "query": "\n                SELECT dataset_id   as \"id: _\",\n                    owner_id     as \"owner_id: _\",\n                    owner_name,\n                    dataset_name as name,\n                    created_at   as \"created_at: _\",\n                    kind         as \"kind: _\"\n                FROM dataset_entries\n                WHERE owner_id = $1\n                ORDER BY dataset_name\n                LIMIT $2 OFFSET $3\n                ",
   "describe": {
     "columns": [
       {
@@ -46,6 +46,7 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
         "Int8",
         "Int8"
       ]
@@ -59,5 +60,5 @@
       false
     ]
   },
-  "hash": "3d11399dd129f45de4c9e1e74fad20445276ada75b4fc000d8d5c86b34dc4950"
+  "hash": "88c65d5e30d6a07aca8d7f00b505f49ba599d2240e45d3d4279b28477b927d74"
 }

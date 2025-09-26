@@ -255,6 +255,25 @@ impl DataFrameExt {
             Ok(Some(column.value(0)))
         }
     }
+
+    pub fn union_all(dfs: Vec<DataFrameExt>) -> Result<Option<DataFrameExt>> {
+        let mut iter = dfs.into_iter();
+        let Some(df) = iter.next() else {
+            return Ok(None);
+        };
+
+        let (state, plan) = df.into_parts();
+        let mut builder = datafusion::logical_expr::LogicalPlanBuilder::new(plan);
+
+        for df in iter {
+            let (_, plan) = df.into_parts();
+            builder = builder.union(plan)?;
+        }
+
+        let plan = builder.build()?;
+
+        Ok(Some(Self(DataFrame::new(state, plan))))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
