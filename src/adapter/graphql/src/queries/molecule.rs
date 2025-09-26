@@ -7,12 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use kamu::domain;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::auth::DatasetAction;
 use kamu_core::{DatasetRegistryExt, ResolvedDataset};
+use odf::utils::data::DataFrameExt;
 
 use super::{CollectionEntry, VersionedFileEntry};
 use crate::prelude::*;
@@ -223,6 +226,54 @@ impl Molecule {
             Err(err) => Err(err.int_err().into()),
         }
     }
+
+    pub async fn get_projects_snapshot(
+        ctx: &Context<'_>,
+        action: DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>)> {
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        let subject_molecule = molecule_subject(ctx)?;
+
+        // Resolve projects dataset
+        let projects_dataset = Self::get_projects_dataset(
+            ctx,
+            &subject_molecule.account_name,
+            action,
+            create_if_not_exist,
+        )
+        .await?;
+
+        // Query full data
+        let df = match query_svc
+            .get_data(
+                &projects_dataset.get_handle().as_local_ref(),
+                domain::GetDataOptions::default(),
+            )
+            .await
+        {
+            Ok(res) => Ok(res.df),
+            Err(domain::QueryError::Access(err)) => Err(GqlError::Access(err)),
+            Err(err) => Err(err.int_err().into()),
+        }?;
+
+        // Project into snapshot
+        let df = if let Some(df) = df {
+            Some(
+                odf::utils::data::changelog::project(
+                    df,
+                    &["account_id".to_string()],
+                    &odf::metadata::DatasetVocabulary::default(),
+                )
+                .int_err()?,
+            )
+        } else {
+            None
+        };
+
+        Ok((projects_dataset, df))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,6 +282,7 @@ impl Molecule {
 #[Object]
 impl Molecule {
     const DEFAULT_PROJECTS_PER_PAGE: usize = 15;
+    const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
 
     /// Looks up the project
     #[tracing::instrument(level = "info", name = Molecule_project, skip_all, fields(?ipnft_uid))]
@@ -241,44 +293,14 @@ impl Molecule {
     ) -> Result<Option<MoleculeProject>> {
         use datafusion::logical_expr::{col, lit};
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        let subject_molecule = molecule_subject(ctx)?;
-
-        // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(
-            ctx,
-            &subject_molecule.account_name,
-            DatasetAction::Read,
-            false,
-        )
-        .await?;
-
-        // Query data
-        let query_res = match query_svc
-            .get_data(
-                &projects_dataset.get_handle().as_local_ref(),
-                domain::GetDataOptions::default(),
-            )
-            .await
-        {
-            Ok(res) => res,
-            Err(domain::QueryError::Access(err)) => return Err(GqlError::Access(err)),
-            Err(err) => return Err(err.int_err().into()),
-        };
-
-        let Some(df) = query_res.df else {
+        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
+            .await?
+            .1
+        else {
             return Ok(None);
         };
 
         let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["account_id".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
 
         let records = df.collect_json_aos().await.int_err()?;
         if records.is_empty() {
@@ -304,38 +326,12 @@ impl Molecule {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        let subject_molecule = molecule_subject(ctx)?;
-
-        // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(
-            ctx,
-            &subject_molecule.account_name,
-            DatasetAction::Read,
-            false,
-        )
-        .await?;
-
-        // Query data
-        let query_res = query_svc
-            .get_data(
-                &projects_dataset.get_handle().as_local_ref(),
-                domain::GetDataOptions::default(),
-            )
-            .await
-            .int_err()?;
-
-        let Some(df) = query_res.df else {
+        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
+            .await?
+            .1
+        else {
             return Ok(MoleculeProjectConnection::new(Vec::new(), 0, per_page, 0));
         };
-
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["account_id".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
 
         let total_count = df.clone().count().await.int_err()?;
         let df = df
@@ -358,11 +354,106 @@ impl Molecule {
             total_count,
         ))
     }
+
+    /// Latest activity events across all projects in reverse chronological
+    /// order
+    #[tracing::instrument(level = "info", name = Molecule_activity, skip_all)]
+    async fn activity(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<MoleculeProjectEventConnection> {
+        use datafusion::logical_expr::{col, lit};
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
+
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        // TODO: PERF: This "brute force" approach will not scale with growth of
+        // projects and has to be revisited
+        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
+            .await?
+            .1
+        else {
+            return Ok(MoleculeProjectEventConnection::new(Vec::new(), 0, per_page));
+        };
+
+        let projects: std::collections::BTreeMap<odf::DatasetID, Arc<MoleculeProject>> = df
+            .collect_json_aos()
+            .await
+            .int_err()?
+            .into_iter()
+            .map(MoleculeProject::from_json)
+            .map(|p| (p.announcements_dataset_id.clone(), Arc::new(p)))
+            .collect();
+
+        let dataset_refs: Vec<odf::DatasetRef> =
+            projects.keys().map(odf::DatasetID::as_local_ref).collect();
+
+        let mut dataframes = Vec::new();
+        const DATASET_ID_COL: &str = "__dataset_id__";
+
+        for resp in query_svc
+            .get_data_multi(&dataset_refs, true)
+            .await
+            .int_err()?
+        {
+            let Some(df) = resp.df else {
+                // Skip empty datasets
+                continue;
+            };
+
+            // Attach dataset ID as a column to records to associate them later
+            let df = df
+                .with_column(DATASET_ID_COL, lit(resp.dataset_handle.id.to_string()))
+                .int_err()?;
+
+            dataframes.push(df);
+        }
+
+        let Some(df) = DataFrameExt::union_all(dataframes).int_err()? else {
+            return Ok(MoleculeProjectEventConnection::new(Vec::new(), 0, per_page));
+        };
+
+        let vocab = odf::metadata::DatasetVocabulary::default();
+
+        let df = df
+            .sort(vec![col(&vocab.event_time_column).sort(false, false)])
+            .int_err()?
+            .limit(per_page * page, Some(per_page))
+            .int_err()?;
+
+        let nodes = df
+            .collect_json_aos()
+            .await
+            .int_err()?
+            .into_iter()
+            .map(|mut record| {
+                let obj = record.as_object_mut().unwrap();
+                obj.remove(&vocab.offset_column);
+                obj.remove(&vocab.operation_type_column);
+
+                let did = odf::DatasetID::from_did_str(
+                    obj.remove(DATASET_ID_COL).unwrap().as_str().unwrap(),
+                )
+                .unwrap();
+
+                MoleculeProjectEvent::Announcement(MoleculeProjectEventAnnouncement {
+                    project: Arc::clone(&projects[&did]),
+                    announcement: record,
+                })
+            })
+            .collect();
+
+        Ok(MoleculeProjectEventConnection::new(nodes, page, per_page))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Clone)]
 #[graphql(complex)]
 pub struct MoleculeProject {
     #[graphql(skip)]
@@ -520,6 +611,7 @@ impl MoleculeProject {
     async fn get_activity_announcements(
         &self,
         ctx: &Context<'_>,
+        project: &Arc<Self>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
@@ -553,6 +645,7 @@ impl MoleculeProject {
                 obj.remove(&vocab.operation_type_column);
 
                 MoleculeProjectEvent::Announcement(MoleculeProjectEventAnnouncement {
+                    project: Arc::clone(project),
                     announcement: record,
                 })
             })
@@ -564,6 +657,7 @@ impl MoleculeProject {
     async fn get_activity_data_room(
         &self,
         ctx: &Context<'_>,
+        project: &Arc<Self>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
@@ -603,18 +697,27 @@ impl MoleculeProject {
                 let event = match op {
                     odf::metadata::OperationType::Append => {
                         MoleculeProjectEvent::DataRoomEntryAdded(
-                            MoleculeProjectEventDataRoomEntryAdded { entry },
+                            MoleculeProjectEventDataRoomEntryAdded {
+                                project: Arc::clone(project),
+                                entry,
+                            },
                         )
                     }
                     odf::metadata::OperationType::Retract => {
                         MoleculeProjectEvent::DataRoomEntryRemoved(
-                            MoleculeProjectEventDataRoomEntryRemoved { entry },
+                            MoleculeProjectEventDataRoomEntryRemoved {
+                                project: Arc::clone(project),
+                                entry,
+                            },
                         )
                     }
                     odf::metadata::OperationType::CorrectFrom => unreachable!(),
                     odf::metadata::OperationType::CorrectTo => {
                         MoleculeProjectEvent::DataRoomEntryUpdated(
-                            MoleculeProjectEventDataRoomEntryUpdated { new_entry: entry },
+                            MoleculeProjectEventDataRoomEntryUpdated {
+                                project: Arc::clone(project),
+                                new_entry: entry,
+                            },
                         )
                     }
                 };
@@ -632,6 +735,7 @@ impl MoleculeProject {
     async fn get_activity_files(
         &self,
         ctx: &Context<'_>,
+        project: &Arc<Self>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
         let (query_svc, dataset_reg) =
@@ -707,6 +811,7 @@ impl MoleculeProject {
 
                 events.push(MoleculeProjectEvent::FileUpdated(
                     MoleculeProjectEventFileUpdated {
+                        project: Arc::clone(project),
                         dataset,
                         new_entry: entry,
                     },
@@ -767,10 +872,16 @@ impl MoleculeProject {
         // chronological order, and finally truncate to the requested page size
         let limit = per_page * (page + 1);
 
+        let project = Arc::new(self.clone());
+
         let mut events = Vec::new();
-        events.append(&mut self.get_activity_announcements(ctx, limit).await?);
-        events.append(&mut self.get_activity_data_room(ctx, limit).await?);
-        events.append(&mut self.get_activity_files(ctx, limit).await?);
+        events.append(
+            &mut self
+                .get_activity_announcements(ctx, &project, limit)
+                .await?,
+        );
+        events.append(&mut self.get_activity_data_room(ctx, &project, limit).await?);
+        events.append(&mut self.get_activity_files(ctx, &project, limit).await?);
 
         let mut events_timed = Vec::with_capacity(events.len());
         for e in events {
@@ -802,6 +913,7 @@ page_based_connection!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
+#[graphql(field(name = "project", ty = "&Arc<MoleculeProject>"))]
 #[graphql(field(name = "system_time", ty = "DateTime<Utc>"))]
 pub enum MoleculeProjectEvent {
     DataRoomEntryAdded(MoleculeProjectEventDataRoomEntryAdded),
@@ -814,6 +926,8 @@ pub enum MoleculeProjectEvent {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct MoleculeProjectEventDataRoomEntryAdded {
+    /// Associated project
+    pub project: Arc<MoleculeProject>,
     /// Collection entry
     pub entry: CollectionEntry,
 }
@@ -827,6 +941,8 @@ impl MoleculeProjectEventDataRoomEntryAdded {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct MoleculeProjectEventDataRoomEntryRemoved {
+    /// Associated project
+    pub project: Arc<MoleculeProject>,
     /// Collection entry
     pub entry: CollectionEntry,
 }
@@ -840,6 +956,8 @@ impl MoleculeProjectEventDataRoomEntryRemoved {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct MoleculeProjectEventDataRoomEntryUpdated {
+    /// Associated project
+    pub project: Arc<MoleculeProject>,
     /// Collection entry
     pub new_entry: CollectionEntry,
 }
@@ -853,6 +971,8 @@ impl MoleculeProjectEventDataRoomEntryUpdated {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct MoleculeProjectEventAnnouncement {
+    /// Associated project
+    pub project: Arc<MoleculeProject>,
     /// Announcement record
     pub announcement: serde_json::Value,
 }
@@ -874,6 +994,9 @@ impl MoleculeProjectEventAnnouncement {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct MoleculeProjectEventFileUpdated {
+    /// Associated project
+    pub project: Arc<MoleculeProject>,
+
     /// Versioned file dataset
     pub dataset: Dataset,
 

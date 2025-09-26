@@ -676,6 +676,92 @@ impl QueryService for QueryServiceImpl {
         })
     }
 
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_multi, skip_all)]
+    async fn get_data_multi(
+        &self,
+        dataset_refs: &[odf::DatasetRef],
+        skip_if_missing_or_inaccessible: bool,
+    ) -> Result<Vec<GetDataResponse>, QueryError> {
+        let refs: Vec<&odf::DatasetRef> = dataset_refs.iter().collect();
+        let classified = self
+            .rebac_dataset_registry_facade
+            .classify_dataset_refs_by_allowance(&refs, DatasetAction::Read)
+            .await?;
+
+        if !skip_if_missing_or_inaccessible
+            && let Some((_, err)) = classified.inaccessible_refs.into_iter().next()
+        {
+            use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+            let err = match err {
+                E::NotFound(e) => QueryError::DatasetNotFound(e),
+                E::Access(e) => QueryError::Access(e),
+                e @ E::Internal(_) => QueryError::Internal(e.int_err()),
+            };
+            return Err(err);
+        }
+
+        let mut resolved_datasets = Vec::new();
+        for (_, hdl) in classified.accessible_resolved_refs {
+            let resolved = self.dataset_registry.get_dataset_by_handle(&hdl).await;
+            let head = resolved
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?;
+            resolved_datasets.push((resolved, head));
+        }
+
+        let input_datasets = resolved_datasets
+            .iter()
+            .map(|(ds, head)| {
+                (
+                    ds.get_id().clone(),
+                    QueryOptionsDataset {
+                        alias: ds.get_alias().to_string(),
+                        block_hash: Some(head.clone()),
+                        hints: DatasetQueryHints {
+                            handle: Some(ds.get_handle().clone()),
+                            last_records_to_consider: None,
+                            does_not_need_schema: false,
+                        },
+                    },
+                )
+            })
+            .collect();
+
+        let ctx = self
+            .session_context(QueryOptions {
+                input_datasets: Some(input_datasets),
+            })
+            .await?;
+
+        let mut results = Vec::new();
+
+        for (ds, head) in resolved_datasets {
+            let df = ctx
+                .table(TableReference::bare(ds.get_alias().to_string()))
+                .await?;
+
+            let res = if df.schema().fields().is_empty() {
+                GetDataResponse {
+                    df: None,
+                    dataset_handle: ds.take_handle(),
+                    block_hash: head,
+                }
+            } else {
+                GetDataResponse {
+                    df: Some(df.into()),
+                    dataset_handle: ds.take_handle(),
+                    block_hash: head,
+                }
+            };
+
+            results.push(res);
+        }
+
+        Ok(results)
+    }
+
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {
         Ok(vec![
             EngineDesc {

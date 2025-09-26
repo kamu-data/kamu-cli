@@ -49,7 +49,7 @@ pub trait QueryService: Send + Sync {
     ) -> Result<GetDataResponse, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
-    /// [DataFrame] that can be used to get schema and data, and the state
+    /// [`DataFrameExt`] that can be used to get schema and data, and the state
     /// information that can be used for reproducibility.
     async fn sql_statement(
         &self,
@@ -83,12 +83,23 @@ pub trait QueryService: Send + Sync {
     // TODO: Introduce additional options that could be used to narrow down the
     // number of files we collect to construct the dataframe.
     //
-    /// Returns a [DataFrame] representing the contents of an entire dataset
+    /// Returns a [`DataFrameExt`] representing the contents of an entire
+    /// dataset
     async fn get_data(
         &self,
         dataset_ref: &odf::DatasetRef,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError>;
+
+    // TODO: Consider replacing this function with a more sophisticated session
+    // context builder that can be reused for multiple queries
+    /// Returns [`DataFrameExt`]s representing the contents of multiple datasets
+    /// in a batch
+    async fn get_data_multi(
+        &self,
+        dataset_refs: &[odf::DatasetRef],
+        skip_if_missing_or_inaccessible: bool,
+    ) -> Result<Vec<GetDataResponse>, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;

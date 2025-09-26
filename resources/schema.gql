@@ -2875,6 +2875,11 @@ type Molecule {
 	List the registered projects
 	"""
 	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	"""
+	Latest activity events across all projects in reverse chronological
+	order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
 }
 
 type MoleculeMut {
@@ -2949,10 +2954,15 @@ type MoleculeProjectEdge {
 }
 
 interface MoleculeProjectEvent {
+	project: MoleculeProject!
 	systemTime: DateTime!
 }
 
 type MoleculeProjectEventAnnouncement implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
 	"""
 	Announcement record
 	"""
@@ -2974,6 +2984,10 @@ type MoleculeProjectEventConnection {
 
 type MoleculeProjectEventDataRoomEntryAdded implements MoleculeProjectEvent {
 	"""
+	Associated project
+	"""
+	project: MoleculeProject!
+	"""
 	Collection entry
 	"""
 	entry: CollectionEntry!
@@ -2982,6 +2996,10 @@ type MoleculeProjectEventDataRoomEntryAdded implements MoleculeProjectEvent {
 
 type MoleculeProjectEventDataRoomEntryRemoved implements MoleculeProjectEvent {
 	"""
+	Associated project
+	"""
+	project: MoleculeProject!
+	"""
 	Collection entry
 	"""
 	entry: CollectionEntry!
@@ -2989,6 +3007,10 @@ type MoleculeProjectEventDataRoomEntryRemoved implements MoleculeProjectEvent {
 }
 
 type MoleculeProjectEventDataRoomEntryUpdated implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
 	"""
 	Collection entry
 	"""
@@ -3001,6 +3023,10 @@ type MoleculeProjectEventEdge {
 }
 
 type MoleculeProjectEventFileUpdated implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
 	"""
 	Versioned file dataset
 	"""

@@ -41,7 +41,6 @@ impl MoleculeMut {
 
         let (
             subject,
-            query_svc,
             account_svc,
             create_account_use_case,
             create_dataset_use_case,
@@ -50,7 +49,6 @@ impl MoleculeMut {
         ) = from_catalog_n!(
             ctx,
             CurrentAccountSubject,
-            dyn domain::QueryService,
             dyn kamu_accounts::AccountService,
             dyn kamu_accounts::CreateAccountUseCase,
             dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
@@ -66,24 +64,11 @@ impl MoleculeMut {
         }
 
         // Resolve projects dataset
-        let projects_dataset = Molecule::get_projects_dataset(
-            ctx,
-            &subject_molecule.account_name,
-            DatasetAction::Write,
-            true,
-        )
-        .await?;
+        let (projects_dataset, df) =
+            Molecule::get_projects_snapshot(ctx, DatasetAction::Write, true).await?;
 
         // Check for conflicts
-        let query_res = query_svc
-            .get_data(
-                &projects_dataset.get_handle().as_local_ref(),
-                domain::GetDataOptions::default(),
-            )
-            .await
-            .int_err()?;
-
-        if let Some(df) = query_res.df {
+        if let Some(df) = df {
             let df = df
                 .filter(
                     col("ipnft_uid")
@@ -91,13 +76,6 @@ impl MoleculeMut {
                         .or(lower(col("ipnft_symbol")).eq(lit(&lowercase_ipnft_symbol))),
                 )
                 .int_err()?;
-
-            let df = odf::utils::data::changelog::project(
-                df,
-                &["account_id".to_string()],
-                &odf::metadata::DatasetVocabulary::default(),
-            )
-            .int_err()?;
 
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
@@ -242,40 +220,14 @@ impl MoleculeMut {
     ) -> Result<Option<MoleculeProjectMut>> {
         use datafusion::logical_expr::{col, lit};
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        let subject_molecule = molecule_subject(ctx)?;
-
-        // Resolve projects dataset
-        let projects_dataset = Molecule::get_projects_dataset(
-            ctx,
-            &subject_molecule.account_name,
-            DatasetAction::Read,
-            false,
-        )
-        .await?;
-
-        // Query data
-        let query_res = query_svc
-            .get_data(
-                &projects_dataset.get_handle().as_local_ref(),
-                domain::GetDataOptions::default(),
-            )
-            .await
-            .int_err()?;
-
-        let Some(df) = query_res.df else {
+        let Some(df) = Molecule::get_projects_snapshot(ctx, DatasetAction::Read, false)
+            .await?
+            .1
+        else {
             return Ok(None);
         };
 
         let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["account_id".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
 
         let records = df.collect_json_aos().await.int_err()?;
         if records.is_empty() {

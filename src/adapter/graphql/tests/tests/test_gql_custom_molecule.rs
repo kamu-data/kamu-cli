@@ -1141,7 +1141,7 @@ async fn test_molecule_activity() {
         })
     );
 
-    // Check activity events
+    // Check project activity events
     const LIST_EVENTS: &str = indoc!(
         r#"
         query ($ipnftUid: String!) {
@@ -1165,9 +1165,9 @@ async fn test_molecule_activity() {
                                     path
                                 }
                             }
-                            # ... on MoleculeProjectEventAnnouncement {
-                            #     announcement
-                            # }
+                            ... on MoleculeProjectEventAnnouncement {
+                                announcement
+                            }
                             ... on MoleculeProjectEventFileUpdated {
                                 dataset { alias }
                                 newEntry {
@@ -1190,8 +1190,16 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
+    let mut json = res.data.into_json().unwrap();
+    let nodes = &mut json["molecule"]["project"]["activity"]["nodes"];
+
+    let any = serde_json::Value::Null;
+    nodes[1]["announcement"]["announcement_id"] = any.clone();
+    nodes[1]["announcement"]["system_time"] = any.clone();
+    nodes[1]["announcement"]["event_time"] = any.clone();
+
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["activity"]["nodes"],
+        *nodes,
         json!([
             {
                 "__typename": "MoleculeProjectEventFileUpdated",
@@ -1204,6 +1212,16 @@ async fn test_molecule_activity() {
             },
             {
                 "__typename": "MoleculeProjectEventAnnouncement",
+                "announcement": {
+                    "announcement_id": &any,
+                    "attachments": [&test_file_1, &test_file_2],
+                    "body": "Blah blah",
+                    "event_time": &any,
+                    "headline": "Test announcement 1",
+                    "molecule_access_level": "holders",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "system_time": &any,
+                },
             },
             {
                 "__typename": "MoleculeProjectEventDataRoomEntryUpdated",
@@ -1251,6 +1269,139 @@ async fn test_molecule_activity() {
                 },
                 "newEntry": {
                     "version": 1,
+                },
+            },
+        ])
+    );
+
+    ///////////////////////////////////////////////////////////////////////////////
+
+    // Create another project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitaslow",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10",
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
+                "ipnftTokenId": "10",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+
+    // Create an announcement
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10",
+                "headline": "Test announcement 2",
+                "body": "Blah blah bleh",
+                "attachments": [],
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Check global activity events
+    const LIST_ACTIVITY: &str = indoc!(
+        r#"
+        query {
+            molecule {
+                activity {
+                    nodes {
+                        __typename
+                        project {
+                            ipnftSymbol
+                        }
+                        ... on MoleculeProjectEventDataRoomEntryAdded {
+                            entry {
+                                path
+                            }
+                        }
+                        ... on MoleculeProjectEventDataRoomEntryRemoved {
+                            entry {
+                                path
+                            }
+                        }
+                        ... on MoleculeProjectEventDataRoomEntryUpdated {
+                            newEntry {
+                                path
+                            }
+                        }
+                        ... on MoleculeProjectEventAnnouncement {
+                            announcement
+                        }
+                        ... on MoleculeProjectEventFileUpdated {
+                            dataset { alias }
+                            newEntry {
+                                version
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(LIST_ACTIVITY))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let mut json = res.data.into_json().unwrap();
+    let nodes = &mut json["molecule"]["activity"]["nodes"];
+    nodes[0]["announcement"]["announcement_id"] = any.clone();
+    nodes[0]["announcement"]["system_time"] = any.clone();
+    nodes[0]["announcement"]["event_time"] = any.clone();
+    nodes[1]["announcement"]["announcement_id"] = any.clone();
+    nodes[1]["announcement"]["system_time"] = any.clone();
+    nodes[1]["announcement"]["event_time"] = any.clone();
+
+    // NOTE: Only announcements are currently supported
+    pretty_assertions::assert_eq!(
+        *nodes,
+        json!([
+            {
+                "__typename": "MoleculeProjectEventAnnouncement",
+                "project": {
+                    "ipnftSymbol": "vitaslow",
+                },
+                "announcement": {
+                    "announcement_id": &any,
+                    "attachments": [],
+                    "body": "Blah blah bleh",
+                    "event_time": &any,
+                    "headline": "Test announcement 2",
+                    "molecule_access_level": "holders",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "system_time": &any,
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventAnnouncement",
+                "project": {
+                    "ipnftSymbol": "vitafast",
+                },
+                "announcement": {
+                    "announcement_id": &any,
+                    "attachments": [&test_file_1, &test_file_2],
+                    "body": "Blah blah",
+                    "event_time": &any,
+                    "headline": "Test announcement 1",
+                    "molecule_access_level": "holders",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "system_time": &any,
                 },
             },
         ])
