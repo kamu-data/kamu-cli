@@ -172,7 +172,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    kind         as "kind: _"
             FROM dataset_entries
             WHERE dataset_id = ANY($1)
-            ORDER BY created_at
+            ORDER BY owner_name, dataset_name
             "#,
             &dataset_ids_search,
         )
