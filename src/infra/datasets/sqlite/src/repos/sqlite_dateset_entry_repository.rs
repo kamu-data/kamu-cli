@@ -169,7 +169,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                    kind
             FROM dataset_entries
             WHERE dataset_id IN ({})
-            ORDER BY created_at
+            ORDER BY owner_name, dataset_name
             "#,
             sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(1).unwrap())
         );
