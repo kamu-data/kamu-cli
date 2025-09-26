@@ -40,7 +40,7 @@ bytes = { version = "1", default-features = false }
 cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
-merge = "0.1"
+merge = "0.2"
 secrecy = "0.10"
 serde = "1"
 serde_json = { version = "1", default-features = false }

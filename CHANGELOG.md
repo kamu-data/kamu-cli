@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - Discontinued binary releases for MacOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+- Update `merge` crate version `0.1` -> `0.2`
 
 ## [0.249.1] - 2025-09-25
 ### Fixed
