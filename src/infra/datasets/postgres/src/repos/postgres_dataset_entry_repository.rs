@@ -97,7 +97,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                     created_at   as "created_at: _",
                     kind         as "kind: _"
                 FROM dataset_entries
-                ORDER BY dataset_name ASC
+                ORDER BY owner_name, dataset_name
                 LIMIT $1 OFFSET $2
                 "#,
                 limit,
@@ -311,6 +311,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                     kind         as "kind: _"
                 FROM dataset_entries
                 WHERE owner_id = $1
+                ORDER BY dataset_name
                 LIMIT $2 OFFSET $3
                 "#,
                 stack_owner_id.as_str(),

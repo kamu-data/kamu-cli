@@ -17,6 +17,8 @@ Recommendation: for ease of reading, use the following order:
 - Update `merge` crate version `0.1` -> `0.2`
 - Removed `extra.graphql.enableArchetypeInference` config option that was added for compatibility during data migrations
 - GQL: Apollo Tracing removed from response. To bring it back, add `x-trace-graphql=1` to request headers (#1402).
+### Fixed
+- Investigation: potential unstable ordering of dataset entry listings
 
 ## [0.249.1] - 2025-09-25
 ### Fixed
