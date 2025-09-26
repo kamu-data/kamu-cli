@@ -4854,6 +4854,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fallible_map"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c26f4163cf85f3d748cc5d56731a2f0840963ddd67306b808f5f23f789de3b8"
+
+[[package]]
 name = "fancy-regex"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6994,6 +7000,7 @@ dependencies = [
  "dill",
  "email-utils",
  "event-sourcing",
+ "fallible_map",
  "file-utils",
  "futures",
  "http 1.3.1",

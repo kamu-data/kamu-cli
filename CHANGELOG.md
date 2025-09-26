@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - Discontinued binary releases for MacOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+- Removed `extra.graphql.enableArchetypeInference` config option that was added for compatibility during data migrations
 
 ## [0.249.1] - 2025-09-25
 ### Fixed
