@@ -380,7 +380,10 @@ impl Molecule {
             return Ok(MoleculeProjectEventConnection::new(Vec::new(), 0, per_page));
         };
 
-        let projects: std::collections::BTreeMap<odf::DatasetID, Arc<MoleculeProject>> = df
+        let projects_by_announcement_dataset: std::collections::BTreeMap<
+            odf::DatasetID,
+            Arc<MoleculeProject>,
+        > = df
             .collect_json_aos()
             .await
             .int_err()?
@@ -389,14 +392,16 @@ impl Molecule {
             .map(|p| (p.announcements_dataset_id.clone(), Arc::new(p)))
             .collect();
 
-        let dataset_refs: Vec<odf::DatasetRef> =
-            projects.keys().map(odf::DatasetID::as_local_ref).collect();
+        let announcement_dataset_refs: Vec<odf::DatasetRef> = projects_by_announcement_dataset
+            .keys()
+            .map(odf::DatasetID::as_local_ref)
+            .collect();
 
-        let mut dataframes = Vec::new();
+        let mut announcement_dataframes = Vec::new();
         const DATASET_ID_COL: &str = "__dataset_id__";
 
         for resp in query_svc
-            .get_data_multi(&dataset_refs, true)
+            .get_data_multi(&announcement_dataset_refs, true)
             .await
             .int_err()?
         {
@@ -410,22 +415,24 @@ impl Molecule {
                 .with_column(DATASET_ID_COL, lit(resp.dataset_handle.id.to_string()))
                 .int_err()?;
 
-            dataframes.push(df);
+            announcement_dataframes.push(df);
         }
 
-        let Some(df) = DataFrameExt::union_all(dataframes).int_err()? else {
+        let Some(df_global_announcements) =
+            DataFrameExt::union_all(announcement_dataframes).int_err()?
+        else {
             return Ok(MoleculeProjectEventConnection::new(Vec::new(), 0, per_page));
         };
 
         let vocab = odf::metadata::DatasetVocabulary::default();
 
-        let df = df
+        let df_global_announcements = df_global_announcements
             .sort(vec![col(&vocab.event_time_column).sort(false, false)])
             .int_err()?
             .limit(per_page * page, Some(per_page))
             .int_err()?;
 
-        let nodes = df
+        let nodes = df_global_announcements
             .collect_json_aos()
             .await
             .int_err()?
@@ -441,7 +448,7 @@ impl Molecule {
                 .unwrap();
 
                 MoleculeProjectEvent::Announcement(MoleculeProjectEventAnnouncement {
-                    project: Arc::clone(&projects[&did]),
+                    project: Arc::clone(&projects_by_announcement_dataset[&did]),
                     announcement: record,
                 })
             })
