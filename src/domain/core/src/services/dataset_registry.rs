@@ -35,6 +35,8 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
         dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
+    // TODO: This likely should be a sync function to signify that handles are
+    // transformed to resolved datasets with no overhead
     async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;
 }
 
