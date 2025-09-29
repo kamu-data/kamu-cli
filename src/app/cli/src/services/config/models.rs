@@ -1312,6 +1312,9 @@ pub struct FlowSystemConfig {
     pub flow_agent: Option<FlowAgentConfig>,
 
     #[merge(strategy = merge_recursive)]
+    pub flow_system_event_agent: Option<FlowSystemEventAgentConfig>,
+
+    #[merge(strategy = merge_recursive)]
     pub task_agent: Option<TaskAgentConfig>,
 }
 
@@ -1319,6 +1322,7 @@ impl FlowSystemConfig {
     pub fn sample() -> Self {
         Self {
             flow_agent: Some(FlowAgentConfig::sample()),
+            flow_system_event_agent: Some(FlowSystemEventAgentConfig::sample()),
             task_agent: Some(TaskAgentConfig::sample()),
         }
     }
@@ -1328,6 +1332,7 @@ impl Default for FlowSystemConfig {
     fn default() -> Self {
         Self {
             flow_agent: Some(FlowAgentConfig::default()),
+            flow_system_event_agent: Some(FlowSystemEventAgentConfig::default()),
             task_agent: Some(TaskAgentConfig::default()),
         }
     }
@@ -1375,6 +1380,36 @@ pub enum RetryPolicyConfigBackoffType {
     Linear,
     Exponential,
     ExponentialWithJitter,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FlowSystemEventAgentConfig {
+    pub min_debounce_interval_ms: Option<u32>,
+    pub max_listening_timeout_ms: Option<u32>,
+    pub batch_size: Option<usize>,
+    pub loopback_offset: Option<usize>,
+}
+
+impl FlowSystemEventAgentConfig {
+    fn sample() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for FlowSystemEventAgentConfig {
+    fn default() -> Self {
+        // Note: these are good values for CLI use case with SQLite target
+        // Postgres targets need a higher timeout (~60s), larger batch size (~100..500),
+        // and loopback offset (of batch size * 3)
+        Self {
+            min_debounce_interval_ms: Some(100),
+            max_listening_timeout_ms: Some(2000),
+            batch_size: Some(20),
+            loopback_offset: Some(0),
+        }
+    }
 }
 
 #[skip_serializing_none]
