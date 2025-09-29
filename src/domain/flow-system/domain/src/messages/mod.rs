@@ -10,9 +10,11 @@
 mod flow_configuration_updated_message;
 mod flow_message_consumers;
 mod flow_message_producers;
+mod flow_process_lifecycle_message;
 mod flow_trigger_updated_message;
 
 pub use flow_configuration_updated_message::*;
 pub use flow_message_consumers::*;
 pub use flow_message_producers::*;
+pub use flow_process_lifecycle_message::*;
 pub use flow_trigger_updated_message::*;

@@ -19,7 +19,6 @@ use crate::*;
 pub enum FlowProcessEvent {
     EffectiveStateChanged(FlowProcessEventEffectiveStateChanged),
     AutoStopped(FlowProcessEventAutoStopped),
-    ResumedFromAutoStop(FlowProcessEventResumedFromAutoStop),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +52,6 @@ impl FlowProcessEvent {
         match self {
             Self::EffectiveStateChanged(_) => "FlowProcessEventEffectiveStateChanged",
             Self::AutoStopped(_) => "FlowProcessEventAutoStopped",
-            Self::ResumedFromAutoStop(_) => "FlowProcessEventResumedFromAutoStop",
         }
     }
 
@@ -61,7 +59,6 @@ impl FlowProcessEvent {
         match self {
             Self::EffectiveStateChanged(e) => e.event_time,
             Self::AutoStopped(e) => e.event_time,
-            Self::ResumedFromAutoStop(e) => e.event_time,
         }
     }
 }
@@ -73,8 +70,5 @@ impl_enum_variant!(FlowProcessEvent::EffectiveStateChanged(
     FlowProcessEventEffectiveStateChanged
 ));
 impl_enum_variant!(FlowProcessEvent::AutoStopped(FlowProcessEventAutoStopped));
-impl_enum_variant!(FlowProcessEvent::ResumedFromAutoStop(
-    FlowProcessEventResumedFromAutoStop
-));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

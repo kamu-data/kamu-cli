@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use kamu_flow_system::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::FlowSchedulingHelper;
 
@@ -21,6 +22,7 @@ pub struct FlowProcessStateProjector {
     flow_process_state_repository: Arc<dyn FlowProcessStateRepository>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
     flow_scheduling_helper: Arc<FlowSchedulingHelper>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,6 +131,22 @@ impl FlowProcessStateProjector {
                     .await
                     .int_err()?;
 
+                // If it's a failure outcome, emit message to external systems
+                if let FlowOutcome::Failed(error) = &e.outcome {
+                    self.outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
+                            FlowProcessLifecycleMessage::failure_registered(
+                                flow_event.event_time(),
+                                flow_event.flow_binding().clone(),
+                                e.flow_id,
+                                error.clone(),
+                                new_process_state.consecutive_failures(),
+                            ),
+                        )
+                        .await?;
+                }
+
                 // Apply any pending events that were generated as part of the state update
                 let impact = self
                     .apply_flow_process_events(
@@ -201,7 +219,7 @@ impl FlowProcessStateProjector {
             );
 
             match event {
-                // For now only AutoStopped has side effects
+                // Autostop events have side effects on the trigger
                 FlowProcessEvent::AutoStopped(e) => {
                     // Apply auto-stop decision to the trigger
                     let new_trigger_state = self
@@ -215,11 +233,33 @@ impl FlowProcessStateProjector {
                         (Some(x), None) => Some(x),
                         (_, Some(y)) => Some(y),
                     };
+
+                    // Also, notify external systems
+                    self.outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
+                            FlowProcessLifecycleMessage::trigger_auto_stopped(
+                                e.event_time,
+                                flow_binding.clone(),
+                                e.reason,
+                            ),
+                        )
+                        .await?;
                 }
 
-                FlowProcessEvent::EffectiveStateChanged(_)
-                | FlowProcessEvent::ResumedFromAutoStop(_) => {
-                    // No side effects for now
+                // State change events have no side effects on the trigger
+                FlowProcessEvent::EffectiveStateChanged(e) => {
+                    self.outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
+                            FlowProcessLifecycleMessage::effective_state_changed(
+                                e.event_time,
+                                flow_binding.clone(),
+                                e.old_state,
+                                e.new_state,
+                            ),
+                        )
+                        .await?;
                 }
             }
         }
