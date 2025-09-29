@@ -985,8 +985,20 @@ pub fn register_config_in_catalog(
         },
     ));
 
-    // TODO: Make this configurable
-    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig::production_default());
+    let flow_system_event_agent = kamu_flow_system_config
+        .flow_system_event_agent
+        .as_ref()
+        .unwrap();
+    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig {
+        min_debounce_interval: std::time::Duration::from_millis(u64::from(
+            flow_system_event_agent.min_debounce_interval_ms.unwrap(),
+        )),
+        max_listening_timeout: std::time::Duration::from_millis(u64::from(
+            flow_system_event_agent.max_listening_timeout_ms.unwrap(),
+        )),
+        batch_size: flow_system_event_agent.batch_size.unwrap(),
+        loopback_offset: flow_system_event_agent.loopback_offset.unwrap(),
+    });
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
