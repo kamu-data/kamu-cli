@@ -42,7 +42,7 @@ impl SqliteFlowProcessStateRepository {
         let effective_state_str = process_state.effective_state().to_string();
 
         let flow_type = &process_state.flow_binding().flow_type;
-        let paused_manual_int = i32::from(process_state.paused_manual());
+        let user_intent_str = process_state.user_intent().to_string();
         let consecutive_failures = i32::try_from(process_state.consecutive_failures()).unwrap();
         let last_success_at = process_state.last_success_at();
         let last_failure_at = process_state.last_failure_at();
@@ -61,7 +61,7 @@ impl SqliteFlowProcessStateRepository {
             INSERT INTO flow_process_states (
                 scope_data,
                 flow_type,
-                paused_manual,
+                user_intent,
                 stop_policy_kind,
                 stop_policy_data,
                 consecutive_failures,
@@ -80,7 +80,7 @@ impl SqliteFlowProcessStateRepository {
             "#,
             scope_data_json,
             flow_type,
-            paused_manual_int,
+            user_intent_str,
             stop_policy_kind,
             stop_policy_data,
             consecutive_failures,
@@ -129,7 +129,7 @@ impl SqliteFlowProcessStateRepository {
 
         let effective_state_str = state.effective_state().to_string();
 
-        let paused_manual = i32::from(state.paused_manual());
+        let user_intent_str = state.user_intent().to_string();
         let stop_policy_kind = state.stop_policy().kind_to_string();
         let stop_policy_json = serde_json::to_value(state.stop_policy()).int_err()?;
         let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
@@ -151,7 +151,7 @@ impl SqliteFlowProcessStateRepository {
             r#"
             UPDATE flow_process_states
                 SET
-                    paused_manual = $1,
+                    user_intent = $1,
                     stop_policy_kind = $2,
                     stop_policy_data = $3,
                     consecutive_failures = $4,
@@ -168,7 +168,7 @@ impl SqliteFlowProcessStateRepository {
                     flow_type = $14 AND scope_data = $15 AND
                     last_applied_flow_system_event_id = $16
             "#,
-            paused_manual,
+            user_intent_str,
             stop_policy_kind,
             stop_policy_data,
             consecutive_failures,
@@ -246,11 +246,16 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
 
             // No existing row, create new
             Err(FlowProcessLoadError::NotFound(_)) => {
+                let user_intent = if paused_manual {
+                    FlowProcessUserIntent::Paused
+                } else {
+                    FlowProcessUserIntent::Enabled
+                };
                 let process_state = FlowProcessState::new(
                     event_id,
                     self.time_source.now(),
                     flow_binding,
-                    paused_manual,
+                    user_intent,
                     stop_policy,
                 );
 
@@ -276,7 +281,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             Err(FlowProcessLoadError::NotFound(_)) => {
                 // Auto-create a process state if it doesn't exist yet (manual launch)
                 let new_process_state =
-                    FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone());
+                    FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone());
                 self.create_process_state(&new_process_state).await?;
                 new_process_state
             }
@@ -318,7 +323,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             Err(FlowProcessLoadError::NotFound(_)) => {
                 // Auto-create a process state if it doesn't exist yet (manual launch)
                 let new_process_state =
-                    FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone());
+                    FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone());
                 self.create_process_state(&new_process_state).await?;
                 new_process_state
             }

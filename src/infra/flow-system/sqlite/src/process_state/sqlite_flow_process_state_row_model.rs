@@ -15,6 +15,7 @@ use kamu_flow_system::{
     FlowProcessAutoStopReason,
     FlowProcessEffectiveState,
     FlowProcessState,
+    FlowProcessUserIntent,
     FlowTriggerStopPolicy,
 };
 
@@ -24,7 +25,7 @@ use kamu_flow_system::{
 pub(crate) struct SqliteFlowProcessStateRowModel {
     pub flow_type: String,
     pub scope_data: serde_json::Value,
-    pub paused_manual: i64,
+    pub user_intent: String,
     pub stop_policy_kind: String,
     pub stop_policy_data: Option<serde_json::Value>,
     pub consecutive_failures: i64,
@@ -69,6 +70,8 @@ impl TryFrom<SqliteFlowProcessStateRowModel> for FlowProcessState {
         let effective_state =
             FlowProcessEffectiveState::from_str(&row.effective_state).int_err()?;
 
+        let user_intent = FlowProcessUserIntent::from_str(&row.user_intent).int_err()?;
+
         let auto_stopped_reason = row
             .auto_stopped_reason
             .map(|s| FlowProcessAutoStopReason::from_str(&s))
@@ -77,7 +80,7 @@ impl TryFrom<SqliteFlowProcessStateRowModel> for FlowProcessState {
 
         Self::rehydrate_from_snapshot(
             flow_binding,
-            row.paused_manual != 0,
+            user_intent,
             stop_policy,
             u32::try_from(row.consecutive_failures).unwrap(),
             row.last_success_at,

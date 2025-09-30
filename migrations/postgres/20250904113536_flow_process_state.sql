@@ -7,9 +7,18 @@ CREATE TYPE flow_stop_policy_kind AS ENUM (
 
 /* ------------------------------ */
 
+CREATE TYPE flow_process_user_intent AS ENUM (
+    'undefined',
+    'enabled',
+    'paused'
+);
+
+/* ------------------------------ */
+
 CREATE TYPE flow_process_effective_state AS ENUM (
     'stopped_auto',
     'failing',
+    'unconfigured',
     'paused_manual',
     'active'
 );
@@ -24,7 +33,7 @@ CREATE TABLE flow_process_states (
     scope_data      JSONB NOT NULL,
     flow_type       VARCHAR(100) NOT NULL,
 
-    paused_manual   BOOLEAN NOT NULL DEFAULT false,
+    user_intent   flow_process_user_intent NOT NULL DEFAULT 'undefined',
 
     stop_policy_kind flow_stop_policy_kind NOT NULL DEFAULT 'never',
     stop_policy_data JSONB,

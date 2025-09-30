@@ -26,7 +26,7 @@ pub(crate) async fn load_process_state(
         SELECT
             flow_type,
             scope_data,
-            paused_manual,
+            user_intent as "user_intent: FlowProcessUserIntent",
             stop_policy_kind as "stop_policy_kind: PostgresFlowStopPolicyKind",
             stop_policy_data,
             consecutive_failures,

@@ -312,12 +312,12 @@ pub async fn test_list_processes_filter_by_planned_before(catalog: &Catalog) {
     // Should find processes scheduled before 10:00
     assert!(!upcoming_soon.processes.is_empty());
 
-    // All implementations should consistently return 9 processes
+    // All implementations should consistently return 3 processes
     // (excluding the process at exactly 2025-09-08T10:00:00Z)
-    assert_eq!(upcoming_soon.processes.len(), 9);
-    assert_eq!(upcoming_soon.total_count, 9);
-    assert_flow_type_distribution(&upcoming_soon.processes, 4, 1, 4); // (4 ingest, 1 transform, 4 webhook)
-    assert_effective_state_distribution(&upcoming_soon.processes, 5, 1, 3, 0); // (5 active, 1 failing, 3 paused, 0 stopped)
+    assert_eq!(upcoming_soon.processes.len(), 3);
+    assert_eq!(upcoming_soon.total_count, 3);
+    assert_flow_type_distribution(&upcoming_soon.processes, 3, 0, 0); // (3 ingest, 0 transform, 0 webhook)
+    assert_effective_state_distribution(&upcoming_soon.processes, 2, 1, 0, 0); // (2 active, 1 failing, 0 paused, 0 stopped)
 
     for process in &upcoming_soon.processes {
         if let Some(next_planned) = process.next_planned_at() {

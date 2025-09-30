@@ -27,7 +27,7 @@ pub(crate) async fn load_process_state(
             SELECT
                 flow_type,
                 scope_data as "scope_data: _",
-                paused_manual,
+                user_intent,
                 stop_policy_kind,
                 stop_policy_data as "stop_policy_data: _",
                 consecutive_failures,

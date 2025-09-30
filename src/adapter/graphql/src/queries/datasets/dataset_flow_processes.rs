@@ -9,6 +9,7 @@
 
 use std::borrow::Cow;
 
+use chrono::Utc;
 use kamu_adapter_flow_dataset::{ingest_dataset_binding, transform_dataset_binding};
 use kamu_adapter_flow_webhook::FlowScopeSubscription;
 use kamu_flow_system::FlowProcessStateQuery;
@@ -32,7 +33,7 @@ impl<'a> DatasetFlowProcesses<'a> {
         }
     }
 
-    pub async fn primary(&self, ctx: &Context<'_>) -> Result<Option<FlowProcess>> {
+    pub async fn primary(&self, ctx: &Context<'_>) -> Result<FlowProcess> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
 
         // Updates are the primary periodic process for datasets
@@ -54,9 +55,12 @@ impl<'a> DatasetFlowProcesses<'a> {
 
         // Fetch process state
         if let Some(process_state) = maybe_process_state {
-            Ok(Some(FlowProcess::new(Cow::Owned(process_state))))
+            Ok(FlowProcess::new(Cow::Owned(process_state)))
         } else {
-            Ok(None)
+            // Or synthesize unconfigured state if no process state exists
+            Ok(FlowProcess::new(Cow::Owned(
+                kamu_flow_system::FlowProcessState::unconfigured(Utc::now(), flow_binding),
+            )))
         }
     }
 

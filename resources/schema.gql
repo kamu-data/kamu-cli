@@ -1232,7 +1232,7 @@ input DatasetFlowFilters {
 }
 
 type DatasetFlowProcesses {
-	primary: FlowProcess
+	primary: FlowProcess!
 	webhooks: WebhookFlowSubProcessGroup!
 }
 
@@ -2444,6 +2444,7 @@ enum FlowProcessAutoStopReason {
 }
 
 enum FlowProcessEffectiveState {
+	UNCONFIGURED
 	ACTIVE
 	FAILING
 	PAUSED_MANUAL
@@ -2487,6 +2488,7 @@ type FlowProcessGroupRollup {
 	active: Int!
 	failing: Int!
 	paused: Int!
+	unconfigured: Int!
 	stopped: Int!
 	worstConsecutiveFailures: Int!
 }

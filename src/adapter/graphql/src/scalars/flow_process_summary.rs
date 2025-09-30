@@ -49,6 +49,7 @@ impl From<kamu_flow_system::FlowProcessState> for FlowProcessSummary {
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 #[graphql(remote = "kamu_flow_system::FlowProcessEffectiveState")]
 pub enum FlowProcessEffectiveState {
+    Unconfigured,
     Active,
     Failing,
     PausedManual,

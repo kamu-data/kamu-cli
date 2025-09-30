@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            flow_type,\n            scope_data,\n            paused_manual,\n            stop_policy_kind as \"stop_policy_kind: PostgresFlowStopPolicyKind\",\n            stop_policy_data,\n            consecutive_failures,\n            last_success_at,\n            last_failure_at,\n            last_attempt_at,\n            next_planned_at,\n            auto_stopped_at,\n            effective_state as \"effective_state: FlowProcessEffectiveState\",\n            auto_stopped_reason as \"auto_stopped_reason: FlowProcessAutoStopReason\",\n            updated_at,\n            last_applied_flow_system_event_id\n        FROM flow_process_states\n        WHERE\n            flow_type = $1 AND scope_data = $2\n        ",
+  "query": "\n        SELECT\n            flow_type,\n            scope_data,\n            user_intent as \"user_intent: FlowProcessUserIntent\",\n            stop_policy_kind as \"stop_policy_kind: PostgresFlowStopPolicyKind\",\n            stop_policy_data,\n            consecutive_failures,\n            last_success_at,\n            last_failure_at,\n            last_attempt_at,\n            next_planned_at,\n            auto_stopped_at,\n            effective_state as \"effective_state: FlowProcessEffectiveState\",\n            auto_stopped_reason as \"auto_stopped_reason: FlowProcessAutoStopReason\",\n            updated_at,\n            last_applied_flow_system_event_id\n        FROM flow_process_states\n        WHERE\n            flow_type = $1 AND scope_data = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -15,8 +15,19 @@
       },
       {
         "ordinal": 2,
-        "name": "paused_manual",
-        "type_info": "Bool"
+        "name": "user_intent: FlowProcessUserIntent",
+        "type_info": {
+          "Custom": {
+            "name": "flow_process_user_intent",
+            "kind": {
+              "Enum": [
+                "undefined",
+                "enabled",
+                "paused"
+              ]
+            }
+          }
+        }
       },
       {
         "ordinal": 3,
@@ -78,6 +89,7 @@
               "Enum": [
                 "stopped_auto",
                 "failing",
+                "unconfigured",
                 "paused_manual",
                 "active"
               ]
@@ -135,5 +147,5 @@
       false
     ]
   },
-  "hash": "37b4f82b0911493411d91f1f0c16271135f2fd25051a10636e241f94cab232ec"
+  "hash": "e9533b6b78108c0a951689aabe3d6bdba3dbf971cbeebe227c5ec522127bc1b8"
 }

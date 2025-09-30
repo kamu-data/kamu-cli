@@ -101,7 +101,7 @@ impl InMemoryFlowProcessState {
                 // Next planned after filter
                 if let Some(after) = filter.next_planned_after {
                     if let Some(next_planned) = ps.next_planned_at() {
-                        if after > next_planned {
+                        if next_planned <= after {
                             return false;
                         }
                     } else {
@@ -269,11 +269,12 @@ impl InMemoryFlowProcessState {
             }
         }
 
-        let active = counts[FlowProcessEffectiveState::Active];
-        let failing = counts[FlowProcessEffectiveState::Failing];
-        let paused = counts[FlowProcessEffectiveState::PausedManual];
-        let stopped = counts[FlowProcessEffectiveState::StoppedAuto];
-        let total = active + failing + paused + stopped;
+        let active = counts[FlowProcessEffectiveState::Active as usize];
+        let failing = counts[FlowProcessEffectiveState::Failing as usize];
+        let paused = counts[FlowProcessEffectiveState::PausedManual as usize];
+        let stopped = counts[FlowProcessEffectiveState::StoppedAuto as usize];
+        let unconfigured = counts[FlowProcessEffectiveState::Unconfigured as usize];
+        let total = active + failing + paused + stopped + unconfigured;
 
         // Form final rollup result
         FlowProcessGroupRollup {
@@ -282,6 +283,7 @@ impl InMemoryFlowProcessState {
             failing,
             paused,
             stopped,
+            unconfigured,
             worst_consecutive_failures,
         }
     }
@@ -393,11 +395,16 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
                 .int_err()?;
             Ok(existing.clone())
         } else {
+            let user_intent = if paused_manual {
+                FlowProcessUserIntent::Paused
+            } else {
+                FlowProcessUserIntent::Enabled
+            };
             let new_state = FlowProcessState::new(
                 event_id,
                 self.time_source.now(),
                 flow_binding.clone(),
-                paused_manual,
+                user_intent,
                 stop_policy,
             );
             state
@@ -420,7 +427,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             .process_state_by_binding
             .entry(flow_binding.clone())
             .or_insert_with(|| {
-                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
+                FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone())
             });
 
         process_state
@@ -442,7 +449,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             .process_state_by_binding
             .entry(flow_binding.clone())
             .or_insert_with(|| {
-                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
+                FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone())
             });
 
         process_state

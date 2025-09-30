@@ -4,7 +4,8 @@ CREATE TABLE flow_process_states (
     scope_data      JSON NOT NULL,
     flow_type       TEXT NOT NULL,
 
-    paused_manual   INTEGER NOT NULL DEFAULT 0, -- 0/1 for booleans
+    user_intent   TEXT NOT NULL DEFAULT 'undefined'
+        CHECK (user_intent IN ('undefined', 'enabled', 'paused')),
 
     stop_policy_kind TEXT NOT NULL DEFAULT 'never'
         CHECK (stop_policy_kind IN ('never', 'after_consecutive_failures')),
@@ -19,7 +20,7 @@ CREATE TABLE flow_process_states (
     auto_stopped_at  TIMESTAMPTZ,
 
     effective_state  TEXT NOT NULL
-        CHECK (effective_state IN ('failing', 'stopped_auto', 'paused_manual', 'active')),
+        CHECK (effective_state IN ('stopped_auto', 'failing', 'unconfigured', 'paused_manual', 'active')),
     auto_stopped_reason TEXT DEFAULT NULL
         CHECK (auto_stopped_reason IN ('stop_policy', 'unrecoverable_failure')),
         

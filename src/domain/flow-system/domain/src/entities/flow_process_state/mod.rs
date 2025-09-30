@@ -12,9 +12,11 @@ mod flow_process_effective_state;
 mod flow_process_event;
 mod flow_process_group_rollup;
 mod flow_process_state;
+mod flow_process_user_intent;
 
 pub use flow_process_auto_stop_reason::*;
 pub use flow_process_effective_state::*;
 pub use flow_process_event::*;
 pub use flow_process_group_rollup::*;
 pub use flow_process_state::*;
+pub use flow_process_user_intent::*;
