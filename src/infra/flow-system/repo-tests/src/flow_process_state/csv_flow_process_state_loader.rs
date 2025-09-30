@@ -35,7 +35,7 @@ pub(crate) struct CsvFlowProcessRecord {
     pub scope_type: String,
     pub dataset_alias: String,
     pub subscription_label: Option<String>,
-    pub paused_manual: bool,
+    pub user_intent: String,
     pub stop_policy_kind: String,
     pub stop_policy_data: Option<String>,
     pub consecutive_failures: u32,
@@ -132,6 +132,8 @@ impl CsvFlowProcessStateLoader {
             }
         };
 
+        let scope = scope.add_attribute("CSV-ID", record.id);
+
         FlowBinding::new(&flow_type, scope)
     }
 
@@ -140,22 +142,27 @@ impl CsvFlowProcessStateLoader {
         // Create flow binding
         let flow_binding = self.create_flow_binding(&record);
 
+        // Parse user intent
+        let user_intent = self.parse_user_intent(&record);
+
         // Parse stop policy
         let stop_policy = self.parse_stop_policy(&record);
 
         // Generate event ID
         let trigger_event_id = self.next_event_id();
 
-        // Insert the process
-        self.flow_process_repository
-            .upsert_process_state_on_trigger_event(
-                trigger_event_id,
-                flow_binding.clone(),
-                record.paused_manual,
-                stop_policy,
-            )
-            .await
-            .expect("Failed to insert flow process");
+        // Insert the process, unless it's undefined
+        if user_intent != FlowProcessUserIntent::Undefined {
+            self.flow_process_repository
+                .upsert_process_state_on_trigger_event(
+                    trigger_event_id,
+                    flow_binding.clone(),
+                    user_intent == FlowProcessUserIntent::Paused,
+                    stop_policy,
+                )
+                .await
+                .expect("Failed to insert flow process");
+        }
 
         // Apply timing-based results if any
         self.apply_results_from_record(&flow_binding, &record).await;
@@ -186,6 +193,15 @@ impl CsvFlowProcessStateLoader {
             "EXECUTE_TRANSFORM" => FLOW_TYPE_DATASET_TRANSFORM.to_string(),
             "WEBHOOK_DELIVER" => FLOW_TYPE_WEBHOOK_DELIVER.to_string(),
             _ => panic!("Unknown flow type: {csv_flow_type}",),
+        }
+    }
+
+    /// Parse user intent from CSV record
+    fn parse_user_intent(&self, record: &CsvFlowProcessRecord) -> FlowProcessUserIntent {
+        match record.user_intent.as_str() {
+            "enabled" => FlowProcessUserIntent::Enabled,
+            "paused" => FlowProcessUserIntent::Paused,
+            _ => panic!("Unknown user intent: {}", record.user_intent),
         }
     }
 
@@ -234,7 +250,7 @@ impl CsvFlowProcessStateLoader {
             // Generate failure events based on consecutive_failures count
             for i in 0..record.consecutive_failures {
                 // Space out failures over time, ending at last_failure_at
-                let failure_offset = chrono::Duration::hours(i64::from(i));
+                let failure_offset = chrono::Duration::minutes(i64::from(i) * 5);
                 let event_time = failure_time - failure_offset;
                 events.push((event_time, false));
             }
@@ -245,16 +261,6 @@ impl CsvFlowProcessStateLoader {
 
         // Apply events in chronological order
         for (event_time, success) in events {
-            let next_planned = if success {
-                record
-                    .next_planned_at
-                    .or_else(|| Some(event_time + chrono::Duration::hours(1)))
-            } else {
-                record.next_planned_at
-            };
-
-            let flow_event_id = self.next_event_id();
-
             // Apply the appropriate flow result
             let flow_outcome = if success {
                 FlowOutcome::Success(TaskResult::empty())
@@ -262,19 +268,28 @@ impl CsvFlowProcessStateLoader {
                 FlowOutcome::Failed(TaskError::empty_recoverable())
             };
 
+            // The flow was scheduled a bit before the event
+            let schedule_event_id = self.next_event_id();
+            self.flow_process_repository
+                .on_flow_scheduled(schedule_event_id, flow_binding, event_time)
+                .await
+                .expect("Failed to schedule flow");
+
+            // Then the event happened itself
+            let flow_event_id = self.next_event_id();
             self.flow_process_repository
                 .apply_flow_result(flow_event_id, flow_binding, &flow_outcome, event_time)
                 .await
                 .expect("Failed to apply flow result");
+        }
 
-            // Then schedule if needed
-            if let Some(planned_at) = next_planned {
-                let schedule_event_id = self.next_event_id();
-                self.flow_process_repository
-                    .on_flow_scheduled(schedule_event_id, flow_binding, planned_at)
-                    .await
-                    .expect("Failed to schedule flow");
-            }
+        // Schedule current "next" if specified
+        if let Some(planned_at) = record.next_planned_at {
+            let schedule_event_id = self.next_event_id();
+            self.flow_process_repository
+                .on_flow_scheduled(schedule_event_id, flow_binding, planned_at)
+                .await
+                .expect("Failed to schedule flow");
         }
     }
 

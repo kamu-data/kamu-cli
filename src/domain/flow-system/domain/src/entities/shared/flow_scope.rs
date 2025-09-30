@@ -50,6 +50,15 @@ impl FlowScope {
         self.0.get(key)
     }
 
+    pub fn add_attribute(mut self, key: &'static str, value: impl serde::Serialize) -> Self {
+        let value = serde_json::to_value(value).unwrap();
+        self.0
+            .as_object_mut()
+            .unwrap()
+            .insert(key.to_string(), value);
+        self
+    }
+
     pub fn matches_query(&self, query: &FlowScopeQuery) -> bool {
         if let Some((_, type_values)) = query
             .attributes

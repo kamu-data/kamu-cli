@@ -14,6 +14,7 @@ pub struct FlowProcessGroupRollup {
     pub failing: u32,
     pub paused: u32,
     pub stopped: u32,
+    pub unconfigured: u32,
     pub total: u32,
     pub worst_consecutive_failures: u32,
 }
@@ -28,6 +29,7 @@ pub struct FlowProcessGroupRollupRowModel {
     failing: i64,
     paused: i64,
     stopped: i64,
+    unconfigured: i64,
     worst: i64,
 }
 
@@ -48,6 +50,7 @@ impl TryFrom<FlowProcessGroupRollupRowModel> for FlowProcessGroupRollup {
             failing: c(r.failing)?,
             paused: c(r.paused)?,
             stopped: c(r.stopped)?,
+            unconfigured: c(r.unconfigured)?,
             worst_consecutive_failures: c(r.worst)?,
         })
     }

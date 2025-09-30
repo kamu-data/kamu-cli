@@ -15,6 +15,7 @@ use kamu_flow_system::{
     FlowProcessAutoStopReason,
     FlowProcessEffectiveState,
     FlowProcessState,
+    FlowProcessUserIntent,
     FlowTriggerStopPolicy,
 };
 
@@ -24,7 +25,7 @@ use kamu_flow_system::{
 pub(crate) struct PostgresFlowProcessStateRowModel {
     pub flow_type: String,
     pub scope_data: serde_json::Value,
-    pub paused_manual: bool,
+    pub user_intent: FlowProcessUserIntent,
     pub stop_policy_kind: PostgresFlowStopPolicyKind,
     pub stop_policy_data: Option<serde_json::Value>,
     pub consecutive_failures: i32,
@@ -74,7 +75,7 @@ impl TryFrom<PostgresFlowProcessStateRowModel> for FlowProcessState {
 
         Self::rehydrate_from_snapshot(
             flow_binding,
-            row.paused_manual,
+            row.user_intent,
             stop_policy,
             u32::try_from(row.consecutive_failures).unwrap(),
             row.last_success_at,

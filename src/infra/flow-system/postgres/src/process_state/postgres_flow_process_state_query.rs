@@ -169,7 +169,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             SELECT
                 flow_type,
                 scope_data,
-                paused_manual,
+                user_intent,
                 stop_policy_kind,
                 stop_policy_data,
                 consecutive_failures,
@@ -258,6 +258,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                 COALESCE(SUM((effective_state = 'failing')::int), 0)::bigint        AS failing,
                 COALESCE(SUM((effective_state = 'paused_manual')::int), 0)::bigint  AS paused,
                 COALESCE(SUM((effective_state = 'stopped_auto')::int), 0)::bigint   AS stopped,
+                COALESCE(SUM((effective_state = 'unconfigured')::int), 0)::bigint   AS unconfigured,
                 COALESCE(MAX(consecutive_failures), 0)::bigint                      AS worst
             FROM flow_process_states
                 WHERE
