@@ -93,100 +93,14 @@ impl FlowProcessStateProjector {
         flow_event: FlowEvent,
     ) -> Result<(), InternalError> {
         match &flow_event {
-            // Tracking "next activation" time for scheduled flows
             FlowEvent::ScheduledForActivation(e) => {
-                let mut new_process_state = self
-                    .flow_process_state_repository
-                    .on_flow_scheduled(
-                        event_id,
-                        flow_event.flow_binding(),
-                        e.scheduled_for_activation_at,
-                    )
-                    .await
-                    .int_err()?;
-
-                // Apply any pending events that were generated as part of the state update
-                self.apply_flow_process_events(
-                    flow_event.flow_binding(),
-                    new_process_state.take_pending_events(),
-                )
-                .await?;
+                self.handle_flow_scheduled_event(event_id, &flow_event, e)
+                    .await?;
             }
 
-            // Tracking completed flows
             FlowEvent::Completed(e) => {
-                // Now the flow is really finished, we can modify the projection
-                assert_ne!(e.outcome, FlowOutcome::Aborted); // Aborted flows should not generate this event
-
-                // Update process state. Among other values, this computes the latest ones for
-                // "last_attempted_at" and "consecutive_failures"
-                let mut new_process_state = self
-                    .flow_process_state_repository
-                    .apply_flow_result(
-                        event_id,
-                        flow_event.flow_binding(),
-                        &e.outcome,
-                        flow_event.event_time(),
-                    )
-                    .await
-                    .int_err()?;
-
-                // If it's a failure outcome, emit message to external systems
-                if let FlowOutcome::Failed(error) = &e.outcome {
-                    self.outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
-                            FlowProcessLifecycleMessage::failure_registered(
-                                flow_event.event_time(),
-                                flow_event.flow_binding().clone(),
-                                e.flow_id,
-                                error.clone(),
-                                new_process_state.consecutive_failures(),
-                            ),
-                        )
-                        .await?;
-                }
-
-                // Apply any pending events that were generated as part of the state update
-                let impact = self
-                    .apply_flow_process_events(
-                        flow_event.flow_binding(),
-                        new_process_state.take_pending_events(),
-                    )
+                self.handle_flow_completed_event(event_id, &flow_event, e)
                     .await?;
-
-                // There might be late flow activations.
-                // Consider scheduling new flow to handle those, if:
-                // - the last flow attempt succeeded (event if it was originally manually
-                //   launched)
-                // - the trigger is still active after processing the latest events
-                if e.outcome.is_success()
-                    || (e.outcome.is_recoverable_failure() && impact.is_trigger_still_active())
-                {
-                    // Schedule next flow immediately, if we had any late activation cause
-                    if !e.late_activation_causes.is_empty() {
-                        self.flow_scheduling_helper
-                            .schedule_late_flow_activations(
-                                flow_event.event_time(),
-                                flow_event.flow_binding(),
-                                &e.late_activation_causes,
-                            )
-                            .await?;
-                    }
-                }
-
-                // Try to schedule next auto-polling flow, if applicable.
-                if let Some(trigger_state) = &impact.maybe_latest_trigger_state {
-                    // We don't care whether we failed or succeeded,
-                    // as long as the trigger is still active.
-                    self.flow_scheduling_helper
-                        .try_schedule_auto_polling_flow_continuation_if_enabled(
-                            flow_event.event_time(),
-                            flow_event.flow_binding(),
-                            trigger_state,
-                        )
-                        .await?;
-                }
             }
 
             FlowEvent::Initiated(_)
@@ -199,6 +113,132 @@ impl FlowProcessStateProjector {
             | FlowEvent::TaskFinished(_) => {
                 // Ignored
             }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_flow_scheduled_event(
+        &self,
+        event_id: EventID,
+        flow_event: &FlowEvent,
+        scheduled_event: &FlowEventScheduledForActivation,
+    ) -> Result<(), InternalError> {
+        // Tracking "next activation" time for scheduled flows
+        let mut new_process_state = match self
+            .flow_process_state_repository
+            .on_flow_scheduled(
+                event_id,
+                flow_event.flow_binding(),
+                scheduled_event.scheduled_for_activation_at,
+            )
+            .await
+        {
+            Ok(ps) => ps,
+            Err(FlowProcessFlowEventError::ConcurrentModification(e)) => {
+                return Err(e.int_err());
+            }
+            Err(FlowProcessFlowEventError::Internal(e)) => {
+                return Err(e);
+            }
+        };
+
+        // Apply any pending events that were generated as part of the state update
+        self.apply_flow_process_events(
+            flow_event.flow_binding(),
+            new_process_state.take_pending_events(),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn handle_flow_completed_event(
+        &self,
+        event_id: EventID,
+        flow_event: &FlowEvent,
+        completed_event: &FlowEventCompleted,
+    ) -> Result<(), InternalError> {
+        // Tracking completed flows
+        assert_ne!(completed_event.outcome, FlowOutcome::Aborted); // Aborted flows should not generate this event
+
+        // Update process state. Among other values, this computes the latest ones for
+        // "last_attempted_at" and "consecutive_failures"
+        let mut new_process_state = match self
+            .flow_process_state_repository
+            .apply_flow_result(
+                event_id,
+                flow_event.flow_binding(),
+                &completed_event.outcome,
+                flow_event.event_time(),
+            )
+            .await
+        {
+            Ok(ps) => ps,
+            Err(FlowProcessFlowEventError::ConcurrentModification(e)) => {
+                return Err(e.int_err());
+            }
+            Err(FlowProcessFlowEventError::Internal(e)) => {
+                return Err(e);
+            }
+        };
+
+        // If it's a failure outcome, emit message to external systems
+        if let FlowOutcome::Failed(error) = &completed_event.outcome {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
+                    FlowProcessLifecycleMessage::failure_registered(
+                        flow_event.event_time(),
+                        flow_event.flow_binding().clone(),
+                        completed_event.flow_id,
+                        error.clone(),
+                        new_process_state.consecutive_failures(),
+                    ),
+                )
+                .await?;
+        }
+
+        // Apply any pending events that were generated as part of the state update
+        let impact = self
+            .apply_flow_process_events(
+                flow_event.flow_binding(),
+                new_process_state.take_pending_events(),
+            )
+            .await?;
+
+        // There might be late flow activations.
+        // Consider scheduling new flow to handle those, if:
+        // - the last flow attempt succeeded (event if it was originally manually
+        //   launched)
+        // - the trigger is still active after processing the latest events
+        if completed_event.outcome.is_success()
+            || (completed_event.outcome.is_recoverable_failure()
+                && impact.is_trigger_still_active())
+        {
+            // Schedule next flow immediately, if we had any late activation cause
+            if !completed_event.late_activation_causes.is_empty() {
+                self.flow_scheduling_helper
+                    .schedule_late_flow_activations(
+                        flow_event.event_time(),
+                        flow_event.flow_binding(),
+                        &completed_event.late_activation_causes,
+                    )
+                    .await?;
+            }
+        }
+
+        // Try to schedule next auto-polling flow, if applicable.
+        if let Some(trigger_state) = &impact.maybe_latest_trigger_state {
+            // We don't care whether we failed or succeeded,
+            // as long as the trigger is still active.
+            self.flow_scheduling_helper
+                .try_schedule_auto_polling_flow_continuation_if_enabled(
+                    flow_event.event_time(),
+                    flow_event.flow_binding(),
+                    trigger_state,
+                )
+                .await?;
         }
 
         Ok(())

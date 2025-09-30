@@ -62,15 +62,15 @@ pub enum FlowProcessUpsertError {
     Internal(#[from] InternalError),
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum FlowProcessInsertError {
-    #[error("Process already exists for the given flow binding: {flow_binding:?}")]
-    AlreadyExists { flow_binding: FlowBinding },
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
+impl From<FlowProcessSaveError> for FlowProcessUpsertError {
+    fn from(e: FlowProcessSaveError) -> Self {
+        match e {
+            FlowProcessSaveError::ConcurrentModification(e) => {
+                FlowProcessUpsertError::ConcurrentModification(e)
+            }
+            FlowProcessSaveError::Internal(e) => FlowProcessUpsertError::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,6 +82,17 @@ pub enum FlowProcessFlowEventError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<FlowProcessSaveError> for FlowProcessFlowEventError {
+    fn from(e: FlowProcessSaveError) -> Self {
+        match e {
+            FlowProcessSaveError::ConcurrentModification(e) => {
+                FlowProcessFlowEventError::ConcurrentModification(e)
+            }
+            FlowProcessSaveError::Internal(e) => FlowProcessFlowEventError::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -28,6 +28,87 @@ pub struct SqliteFlowProcessStateRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SqliteFlowProcessStateRepository {
+    async fn create_process_state(
+        &self,
+        process_state: &FlowProcessState,
+    ) -> Result<(), FlowProcessSaveError> {
+        let scope_json = serde_json::to_value(&process_state.flow_binding().scope).int_err()?;
+        let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
+
+        let stop_policy_kind = process_state.stop_policy().kind_to_string();
+        let stop_policy_json = serde_json::to_value(process_state.stop_policy()).int_err()?;
+        let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
+
+        let effective_state_str = process_state.effective_state().to_string();
+
+        let flow_type = &process_state.flow_binding().flow_type;
+        let paused_manual_int = i32::from(process_state.paused_manual());
+        let consecutive_failures = i32::try_from(process_state.consecutive_failures()).unwrap();
+        let last_success_at = process_state.last_success_at();
+        let last_failure_at = process_state.last_failure_at();
+        let last_attempt_at = process_state.last_attempt_at();
+        let next_planned_at = process_state.next_planned_at();
+        let auto_stopped_at = process_state.auto_stopped_at();
+        let auto_stopped_reason = process_state.auto_stopped_reason().map(|r| r.to_string());
+        let updated_at = process_state.updated_at();
+        let last_applied_flow_system_event_id = process_state.last_applied_event_id().into_inner();
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let result = sqlx::query!(
+            r#"
+            INSERT INTO flow_process_states (
+                scope_data,
+                flow_type,
+                paused_manual,
+                stop_policy_kind,
+                stop_policy_data,
+                consecutive_failures,
+                last_success_at,
+                last_failure_at,
+                last_attempt_at,
+                next_planned_at,
+                auto_stopped_at,
+                effective_state,
+                auto_stopped_reason,
+                updated_at,
+                last_applied_flow_system_event_id
+            )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            ON CONFLICT (flow_type, scope_data) DO NOTHING
+            "#,
+            scope_data_json,
+            flow_type,
+            paused_manual_int,
+            stop_policy_kind,
+            stop_policy_data,
+            consecutive_failures,
+            last_success_at,
+            last_failure_at,
+            last_attempt_at,
+            next_planned_at,
+            auto_stopped_at,
+            effective_state_str,
+            auto_stopped_reason,
+            updated_at,
+            last_applied_flow_system_event_id,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        if result.rows_affected() == 0 {
+            return Err(FlowProcessSaveError::ConcurrentModification(
+                FlowProcessConcurrentModificationError {
+                    flow_binding: process_state.flow_binding().clone(),
+                },
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn load_process_state(
         &self,
         flow_binding: &FlowBinding,
@@ -173,85 +254,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
                     stop_policy,
                 );
 
-                let scope_json =
-                    serde_json::to_value(&process_state.flow_binding().scope).int_err()?;
-                let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
-
-                let stop_policy_kind = process_state.stop_policy().kind_to_string();
-                let stop_policy_json =
-                    serde_json::to_value(process_state.stop_policy()).int_err()?;
-                let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
-
-                let effective_state_str = process_state.effective_state().to_string();
-
-                let flow_type = &process_state.flow_binding().flow_type;
-                let paused_manual_int = i32::from(process_state.paused_manual());
-                let consecutive_failures =
-                    i32::try_from(process_state.consecutive_failures()).unwrap();
-                let last_success_at = process_state.last_success_at();
-                let last_failure_at = process_state.last_failure_at();
-                let last_attempt_at = process_state.last_attempt_at();
-                let next_planned_at = process_state.next_planned_at();
-                let auto_stopped_at = process_state.auto_stopped_at();
-                let auto_stopped_reason =
-                    process_state.auto_stopped_reason().map(|r| r.to_string());
-                let updated_at = process_state.updated_at();
-                let last_applied_flow_system_event_id =
-                    process_state.last_applied_event_id().into_inner();
-
-                let mut tr = self.transaction.lock().await;
-                let connection_mut = tr.connection_mut().await?;
-
-                let result = sqlx::query!(
-                    r#"
-                    INSERT INTO flow_process_states (
-                        scope_data,
-                        flow_type,
-                        paused_manual,
-                        stop_policy_kind,
-                        stop_policy_data,
-                        consecutive_failures,
-                        last_success_at,
-                        last_failure_at,
-                        last_attempt_at,
-                        next_planned_at,
-                        auto_stopped_at,
-                        effective_state,
-                        auto_stopped_reason,
-                        updated_at,
-                        last_applied_flow_system_event_id
-                    )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-                    ON CONFLICT (flow_type, scope_data) DO NOTHING
-                    "#,
-                    scope_data_json,
-                    flow_type,
-                    paused_manual_int,
-                    stop_policy_kind,
-                    stop_policy_data,
-                    consecutive_failures,
-                    last_success_at,
-                    last_failure_at,
-                    last_attempt_at,
-                    next_planned_at,
-                    auto_stopped_at,
-                    effective_state_str,
-                    auto_stopped_reason,
-                    updated_at,
-                    last_applied_flow_system_event_id,
-                )
-                .execute(connection_mut)
-                .await
-                .int_err()?;
-
-                if result.rows_affected() == 0 {
-                    return Err(FlowProcessUpsertError::ConcurrentModification(
-                        FlowProcessConcurrentModificationError {
-                            flow_binding: process_state.flow_binding().clone(),
-                        },
-                    ));
-                }
-
+                self.create_process_state(&process_state).await?;
                 Ok(process_state)
             }
 
@@ -271,7 +274,11 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
-                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
+                // Auto-create a process state if it doesn't exist yet (manual launch)
+                let new_process_state =
+                    FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone());
+                self.create_process_state(&new_process_state).await?;
+                new_process_state
             }
             Err(FlowProcessLoadError::Internal(e)) => {
                 return Err(FlowProcessFlowEventError::Internal(e));
@@ -309,7 +316,11 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         let mut process_state = match self.load_process_state(flow_binding).await {
             Ok(state) => state,
             Err(FlowProcessLoadError::NotFound(_)) => {
-                FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone())
+                // Auto-create a process state if it doesn't exist yet (manual launch)
+                let new_process_state =
+                    FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone());
+                self.create_process_state(&new_process_state).await?;
+                new_process_state
             }
             Err(FlowProcessLoadError::Internal(e)) => {
                 return Err(FlowProcessFlowEventError::Internal(e));
