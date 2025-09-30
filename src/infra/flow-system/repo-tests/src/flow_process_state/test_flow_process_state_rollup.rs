@@ -38,6 +38,7 @@ pub async fn test_rollup_from_csv_unfiltered(catalog: &Catalog) {
     assert_eq!(rollup.failing, 9);
     assert_eq!(rollup.paused, 3);
     assert_eq!(rollup.stopped, 3);
+    assert_eq!(rollup.unconfigured, 0);
     assert_eq!(rollup.worst_consecutive_failures, 10);
 }
 
@@ -67,6 +68,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     assert_eq!(rollup.failing, 1); // row 6 (failing)
     assert_eq!(rollup.paused, 1); // row 7 (paused_manual)
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 2: Filter by multiple datasets
     let dataset_id2 = odf::DatasetID::new_seeded_ed25519(b"acme/users");
@@ -88,6 +90,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     assert_eq!(rollup.failing, 5); // 1 + 2 + 2
     assert_eq!(rollup.paused, 1); // 1 + 0 + 0
     assert_eq!(rollup.stopped, 2); // 0 + 0 + 2
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 3: Filter by subscription scope for webhook processes of single dataset
     let subscription_query = FlowScopeSubscription::query_for_subscriptions_of_dataset(&dataset_id);
@@ -104,6 +107,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     assert_eq!(rollup.failing, 1); // row 6
     assert_eq!(rollup.paused, 1); // row 7
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 4: Filter by dataset scopes only (exclude webhook subscriptions)
     let dataset_only_query = FlowScopeDataset::query_for_single_dataset_only(&dataset_id);
@@ -120,6 +124,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 5: Filter by webhook subscriptions regardless of dataset
     let all_webhooks_query = FlowScopeSubscription::query_for_all_subscriptions();
@@ -136,6 +141,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     assert_eq!(rollup.failing, 4); // rows 6, 8, 9, 19
     assert_eq!(rollup.paused, 1); // row 7
     assert_eq!(rollup.stopped, 3); // rows 10, 16, 24
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 6: Filter by webhook subscriptions for multiple datasets
     let multi_webhook_query =
@@ -157,6 +163,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     assert_eq!(rollup.failing, 2); // 1 + 1 (rows 6, 8)
     assert_eq!(rollup.paused, 1); // 1 + 0 (row 7)
     assert_eq!(rollup.stopped, 0); // 0 + 0
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 7: Filter by system flows (should return empty since our CSV has no
     // system flows)
@@ -173,6 +180,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
     assert_eq!(rollup.worst_consecutive_failures, 0);
 }
 
@@ -197,6 +205,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     assert_eq!(rollup.failing, 3); // rows 13, 17, 21
     assert_eq!(rollup.paused, 1); // row 3
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 2: Filter by TRANSFORM flow type only
     let transform_flows = [FLOW_TYPE_DATASET_TRANSFORM];
@@ -211,6 +220,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     assert_eq!(rollup.failing, 2); // rows 2, 4
     assert_eq!(rollup.paused, 1); // row 18
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 3: Filter by WEBHOOK_DELIVER flow type only
     let webhook_flows = [FLOW_TYPE_WEBHOOK_DELIVER];
@@ -240,6 +250,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     assert_eq!(rollup.failing, 5); // 3 + 2
     assert_eq!(rollup.paused, 2); // 1 + 1
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -263,6 +274,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 2: Filter by Failing status only
     let failing_states = [FlowProcessEffectiveState::Failing];
@@ -277,6 +289,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     assert_eq!(rollup.failing, 9);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 3: Filter by PausedManual status only
     let paused_states = [FlowProcessEffectiveState::PausedManual];
@@ -291,6 +304,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 3);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 4: Filter by StoppedAuto status only
     let stopped_states = [FlowProcessEffectiveState::StoppedAuto];
@@ -305,6 +319,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 3);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 5: Filter by multiple statuses (problematic states)
     let problematic_states = [
@@ -322,6 +337,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     assert_eq!(rollup.failing, 9);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 3);
+    assert_eq!(rollup.unconfigured, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -353,6 +369,7 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     assert_eq!(rollup.failing, 1); // row 6
     assert_eq!(rollup.paused, 1); // row 7
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 2: Scope filter + Effective status filter
     // Filter by single dataset AND failing status only
@@ -371,6 +388,7 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     assert_eq!(rollup.failing, 1); // row 6
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 3: Flow type filter + Effective status filter
     // Filter by webhook flows AND active status only
@@ -393,6 +411,7 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 4: All three filters combined
     // Filter by specific dataset AND webhook flows AND active status
@@ -413,6 +432,7 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 5: Filters that should return empty results
     // Filter by single dataset AND ingest flows AND stopped status
@@ -432,6 +452,7 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     assert_eq!(rollup.failing, 0);
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -46,7 +46,7 @@ impl PostgresFlowProcessStateRepository {
             INSERT INTO flow_process_states (
                 scope_data,
                 flow_type,
-                paused_manual,
+                user_intent,
                 stop_policy_kind,
                 stop_policy_data,
                 consecutive_failures,
@@ -60,12 +60,12 @@ impl PostgresFlowProcessStateRepository {
                 updated_at,
                 last_applied_flow_system_event_id
             )
-            VALUES ($1, $2, $3, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3::flow_process_user_intent, $4::flow_stop_policy_kind, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT (flow_type, scope_data) DO NOTHING
             "#,
             scope_data_json,
             process_state.flow_binding().flow_type,
-            process_state.paused_manual(),
+            process_state.user_intent() as FlowProcessUserIntent,
             stop_policy_kind as &str,
             stop_policy_data,
             i32::try_from(process_state.consecutive_failures()).unwrap(),
@@ -117,7 +117,7 @@ impl PostgresFlowProcessStateRepository {
             r#"
             UPDATE flow_process_states
                 SET
-                    paused_manual = $1,
+                    user_intent = $1::flow_process_user_intent,
                     stop_policy_kind = $2::flow_stop_policy_kind,
                     stop_policy_data = $3,
                     consecutive_failures = $4,
@@ -134,7 +134,7 @@ impl PostgresFlowProcessStateRepository {
                     flow_type = $14 AND scope_data = $15 AND
                     last_applied_flow_system_event_id = $16
             "#,
-            state.paused_manual(),
+            state.user_intent() as FlowProcessUserIntent,
             state.stop_policy().kind_to_string() as &str,
             serde_json::to_value(state.stop_policy()).int_err()?,
             i32::try_from(state.consecutive_failures()).unwrap(),
@@ -212,11 +212,16 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
 
             // No existing row, create new
             Err(FlowProcessLoadError::NotFound(_)) => {
+                let user_intent = if paused_manual {
+                    FlowProcessUserIntent::Paused
+                } else {
+                    FlowProcessUserIntent::Enabled
+                };
                 let process_state = FlowProcessState::new(
                     event_id,
                     self.time_source.now(),
                     flow_binding,
-                    paused_manual,
+                    user_intent,
                     stop_policy,
                 );
 
@@ -242,7 +247,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
             Err(FlowProcessLoadError::NotFound(_)) => {
                 // Auto-create a process state if it doesn't exist yet (manual launch)
                 let new_process_state =
-                    FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone());
+                    FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone());
                 self.create_process_state(&new_process_state).await?;
                 new_process_state
             }
@@ -284,7 +289,7 @@ impl FlowProcessStateRepository for PostgresFlowProcessStateRepository {
             Err(FlowProcessLoadError::NotFound(_)) => {
                 // Auto-create a process state if it doesn't exist yet (manual launch)
                 let new_process_state =
-                    FlowProcessState::no_trigger_yet(self.time_source.now(), flow_binding.clone());
+                    FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone());
                 self.create_process_state(&new_process_state).await?;
                 new_process_state
             }

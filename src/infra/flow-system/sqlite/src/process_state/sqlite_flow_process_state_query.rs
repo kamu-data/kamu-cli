@@ -50,9 +50,10 @@ impl SqliteFlowProcessStateQuery {
                         CASE effective_state
                             WHEN 'stopped_auto'  THEN 0
                             WHEN 'failing'       THEN 1
-                            WHEN 'paused_manual' THEN 2
-                            WHEN 'active'        THEN 3
-                            ELSE 3
+                            WHEN 'unconfigured'  THEN 2
+                            WHEN 'paused_manual' THEN 3
+                            WHEN 'active'        THEN 4
+                            ELSE 4
                         END
                     "#
                 .to_string();
@@ -208,7 +209,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             SELECT
                 flow_type,
                 scope_data,
-                paused_manual,
+                user_intent,
                 stop_policy_kind,
                 stop_policy_data,
                 consecutive_failures,
@@ -329,6 +330,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 IFNULL(SUM(CASE WHEN effective_state='failing' THEN 1 ELSE 0 END),0) AS failing,
                 IFNULL(SUM(CASE WHEN effective_state='paused_manual' THEN 1 ELSE 0 END),0) AS paused,
                 IFNULL(SUM(CASE WHEN effective_state='stopped_auto' THEN 1 ELSE 0 END),0) AS stopped,
+                IFNULL(SUM(CASE WHEN effective_state='unconfigured' THEN 1 ELSE 0 END),0) AS unconfigured,
                 IFNULL(MAX(consecutive_failures),0) AS worst
             FROM flow_process_states
                 WHERE

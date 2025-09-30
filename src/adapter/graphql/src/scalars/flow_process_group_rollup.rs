@@ -17,6 +17,7 @@ pub struct FlowProcessGroupRollup {
     pub active: u32,
     pub failing: u32,
     pub paused: u32,
+    pub unconfigured: u32,
     pub stopped: u32,
     pub worst_consecutive_failures: u32,
 }
@@ -30,6 +31,7 @@ impl From<kamu_flow_system::FlowProcessGroupRollup> for FlowProcessGroupRollup {
             active: value.active,
             failing: value.failing,
             paused: value.paused,
+            unconfigured: value.unconfigured,
             stopped: value.stopped,
             worst_consecutive_failures: value.worst_consecutive_failures,
         }

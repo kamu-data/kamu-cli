@@ -154,13 +154,13 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
     // Verify triage page results
     assert_eq!(triage_page.processes.len(), 5);
 
-    // From CSV data, failing and stopped_auto processes with their
-    // consecutive_failures: Row 24: WEBHOOK beta/catalog/legacy_partner
-    // (stopped_auto, 10 failures) Row 16: WEBHOOK zeta/metrics/ops_webhook
-    // (stopped_auto, 5 failures) Row 21: INGEST gamma/audit (failing, 4
-    // failures) Row 19: WEBHOOK acme/logs/security_monitor (failing, 3
-    // failures) Row 4: EXECUTE_TRANSFORM beta/catalog.daily (failing, 2
-    // failures)
+    #[rustfmt::skip]
+    // From CSV data, failing and stopped_auto processes with their consecutive_failures:
+    // Row 24: WEBHOOK beta/catalog/legacy_partner (stopped_auto, 10 failures)
+    // Row 16: WEBHOOK zeta/metrics/ops_webhook (stopped_auto, 5 failures)
+    // Row 21: INGEST gamma/audit (failing, 4 failures)
+    // Row 19: WEBHOOK acme/logs/security_monitor (failing, 3 failures)
+    // Row 4: EXECUTE_TRANSFORM beta/catalog.daily (failing, 2 failures)
 
     let first_process = &triage_page.processes[0];
     assert_eq!(
@@ -278,22 +278,22 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     // Verify first page results
     assert_eq!(first_page.processes.len(), 5);
 
-    // From CSV data, INGEST and EXECUTE_TRANSFORM processes with next_planned_at
-    // (ASC order): Row 18: EXECUTE_TRANSFORM acme/logs.processed
-    // (2025-09-07T19:00:00Z) [calculated from NULL + rule] Row 3: INGEST
-    // acme/logs (2025-09-07T21:00:00Z) [calculated from NULL + rule]
+    #[rustfmt::skip]
+    // From CSV data, INGEST and EXECUTE_TRANSFORM processes with next_planned_at  (ASC order): 
     // Row 11: INGEST zeta/metrics (2025-09-08T08:30:00Z)
     // Row 1: INGEST acme/orders (2025-09-08T09:00:00Z)
     // Row 17: INGEST beta/catalog (2025-09-08T09:30:00Z)
+    // Row 2: EXECUTE_TRANSFORM acme/users.daily (2025-09-08T10:00:00Z)
+    // Row 4: EXECUTE_TRANSFORM beta/catalog.daily (2025-09-08T10:15:00Z)
 
     let first_process = &first_page.processes[0];
     assert_eq!(
         first_process.flow_binding().flow_type,
-        FLOW_TYPE_DATASET_TRANSFORM
+        FLOW_TYPE_DATASET_INGEST
     );
     assert_eq!(
         first_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-07T19:00:00+00:00"
+        "2025-09-08T08:30:00+00:00"
     );
 
     let second_process = &first_page.processes[1];
@@ -303,7 +303,7 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     );
     assert_eq!(
         second_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-07T21:00:00+00:00"
+        "2025-09-08T09:00:00+00:00"
     );
 
     let third_process = &first_page.processes[2];
@@ -313,27 +313,27 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     );
     assert_eq!(
         third_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T08:30:00+00:00"
+        "2025-09-08T09:30:00+00:00"
     );
 
     let fourth_process = &first_page.processes[3];
     assert_eq!(
         fourth_process.flow_binding().flow_type,
-        FLOW_TYPE_DATASET_INGEST
+        FLOW_TYPE_DATASET_TRANSFORM
     );
     assert_eq!(
         fourth_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T09:00:00+00:00"
+        "2025-09-08T10:00:00+00:00"
     );
 
     let fifth_process = &first_page.processes[4];
     assert_eq!(
         fifth_process.flow_binding().flow_type,
-        FLOW_TYPE_DATASET_INGEST
+        FLOW_TYPE_DATASET_TRANSFORM
     );
     assert_eq!(
         fifth_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T09:30:00+00:00"
+        "2025-09-08T10:15:00+00:00"
     );
 
     // Verify ordering: next_planned_at should be in ascending order
@@ -369,13 +369,13 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
         .await
         .unwrap();
 
+    #[rustfmt::skip]
     // Verify second page results (continuing from NextPlannedAt ASC order):
-    // Process 5: EXECUTE_TRANSFORM acme/users.daily (2025-09-08T10:00:00Z)
-    // Process 6: EXECUTE_TRANSFORM beta/catalog.daily (2025-09-08T10:15:00Z)
-    // Process 7: EXECUTE_TRANSFORM acme/orders.daily/transform:enrichment
-    // (2025-09-08T10:30:00Z) Process 8: INGEST acme/users
-    // (2025-09-08T11:00:00Z) Process 9: EXECUTE_TRANSFORM
-    // zeta/metrics.daily/transform:daily_rollup (2025-09-08T12:00:00Z)
+    // Row 14: EXECUTE_TRANSFORM acme/orders.daily (2025-09-08T10:30:00Z)
+    // Row 13: INGEST acme/users (2025-09-08T11:00:00Z)
+    // Row 23: EXECUTE_TRANSFORM acme/orders.cleaned (2025-09-08T11:30:00Z)
+    // Row 12: EXECUTE_TRANSFORM zeta/metrics.daily (2025-09-08T12:00:00Z)
+    // Row 21: INGEST gamma/audit (2025-09-08T14:00:00Z)
 
     assert_eq!(second_page.processes.len(), 5);
 
@@ -386,17 +386,17 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     );
     assert_eq!(
         sixth_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T10:00:00+00:00"
+        "2025-09-08T10:30:00+00:00"
     );
 
     let seventh_process = &second_page.processes[1];
     assert_eq!(
         seventh_process.flow_binding().flow_type,
-        FLOW_TYPE_DATASET_TRANSFORM
+        FLOW_TYPE_DATASET_INGEST
     );
     assert_eq!(
         seventh_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T10:15:00+00:00"
+        "2025-09-08T11:00:00+00:00"
     );
 
     let eighth_process = &second_page.processes[2];
@@ -406,27 +406,27 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     );
     assert_eq!(
         eighth_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T10:30:00+00:00"
+        "2025-09-08T11:30:00+00:00"
     );
 
     let ninth_process = &second_page.processes[3];
     assert_eq!(
         ninth_process.flow_binding().flow_type,
-        FLOW_TYPE_DATASET_INGEST
+        FLOW_TYPE_DATASET_TRANSFORM
     );
     assert_eq!(
         ninth_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T11:00:00+00:00"
+        "2025-09-08T12:00:00+00:00"
     );
 
     let tenth_process = &second_page.processes[4];
     assert_eq!(
         tenth_process.flow_binding().flow_type,
-        FLOW_TYPE_DATASET_TRANSFORM
+        FLOW_TYPE_DATASET_INGEST
     );
     assert_eq!(
         tenth_process.next_planned_at().unwrap().to_rfc3339(),
-        "2025-09-08T12:00:00+00:00"
+        "2025-09-08T14:00:00+00:00"
     );
 
     // Verify only INGEST and EXECUTE_TRANSFORM types

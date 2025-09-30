@@ -78,7 +78,7 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert!(!single_state.paused_manual());
+    assert!(!single_state.is_paused_manually());
     assert_eq!(
         single_state.effective_state(),
         FlowProcessEffectiveState::Active,
@@ -175,7 +175,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert!(!single_state.paused_manual());
+    assert!(!single_state.is_paused_manually());
     assert_eq!(
         single_state.effective_state(),
         FlowProcessEffectiveState::StoppedAuto,
@@ -304,7 +304,7 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert!(!single_state.paused_manual());
+    assert!(!single_state.is_paused_manually());
     assert_eq!(
         single_state.effective_state(),
         FlowProcessEffectiveState::Failing,
@@ -455,7 +455,7 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert!(!single_state.paused_manual());
+    assert!(!single_state.is_paused_manually());
     assert_eq!(
         single_state.effective_state(),
         FlowProcessEffectiveState::Active,
@@ -554,7 +554,7 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
 
     let single_state = single_state.unwrap();
     assert_eq!(*single_state.flow_binding(), flow_binding);
-    assert!(single_state.paused_manual());
+    assert!(single_state.is_paused_manually());
     assert_eq!(
         single_state.effective_state(),
         FlowProcessEffectiveState::PausedManual,
@@ -946,7 +946,7 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     assert_eq!(state.consecutive_failures(), 1);
     assert_eq!(state.last_success_at(), Some(success_time));
     assert_eq!(state.last_failure_at(), Some(failure_time));
-    assert!(state.paused_manual());
+    assert!(state.is_paused_manually());
 
     // Delete the flow scope
     flow_process_repository

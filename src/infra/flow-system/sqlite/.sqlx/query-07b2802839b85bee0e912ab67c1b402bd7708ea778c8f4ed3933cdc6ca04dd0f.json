@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                paused_manual,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                auto_stopped_at as \"auto_stopped_at: _\",\n                effective_state,\n                auto_stopped_reason,\n                updated_at as \"updated_at: _\",\n                last_applied_flow_system_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                user_intent,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                auto_stopped_at as \"auto_stopped_at: _\",\n                effective_state,\n                auto_stopped_reason,\n                updated_at as \"updated_at: _\",\n                last_applied_flow_system_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -14,9 +14,9 @@
         "type_info": "Null"
       },
       {
-        "name": "paused_manual",
+        "name": "user_intent",
         "ordinal": 2,
-        "type_info": "Integer"
+        "type_info": "Text"
       },
       {
         "name": "stop_policy_kind",
@@ -100,5 +100,5 @@
       false
     ]
   },
-  "hash": "15d4c829c41b08b29782e46c7890992a06a14db95e8f73cd73b784f1567a8721"
+  "hash": "07b2802839b85bee0e912ab67c1b402bd7708ea778c8f4ed3933cdc6ca04dd0f"
 }

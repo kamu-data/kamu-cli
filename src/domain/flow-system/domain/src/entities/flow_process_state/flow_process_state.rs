@@ -22,6 +22,7 @@ use crate::{
     FlowOutcome,
     FlowProcessAutoStopReason,
     FlowProcessEffectiveState,
+    FlowProcessUserIntent,
     FlowTriggerStopPolicy,
 };
 
@@ -31,7 +32,7 @@ use crate::{
 pub struct FlowProcessState {
     flow_binding: FlowBinding,
 
-    paused_manual: bool,
+    user_intent: FlowProcessUserIntent,
     stop_policy: FlowTriggerStopPolicy,
 
     consecutive_failures: u32,
@@ -57,12 +58,12 @@ impl FlowProcessState {
         event_id: EventID,
         current_time: DateTime<Utc>,
         flow_binding: FlowBinding,
-        paused_manual: bool,
+        user_intent: FlowProcessUserIntent,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Self {
         Self {
             flow_binding,
-            paused_manual,
+            user_intent,
             stop_policy,
             consecutive_failures: 0,
             last_success_at: None,
@@ -70,7 +71,7 @@ impl FlowProcessState {
             last_attempt_at: None,
             next_planned_at: None,
             auto_stopped_at: None,
-            effective_state: FlowProcessEffectiveState::calculate(paused_manual, 0, stop_policy),
+            effective_state: FlowProcessEffectiveState::calculate(user_intent, 0, stop_policy),
             auto_stopped_reason: None,
             updated_at: current_time,
             last_applied_event_id: event_id,
@@ -78,19 +79,19 @@ impl FlowProcessState {
         }
     }
 
-    pub fn no_trigger_yet(current_time: DateTime<Utc>, flow_binding: FlowBinding) -> Self {
+    pub fn unconfigured(current_time: DateTime<Utc>, flow_binding: FlowBinding) -> Self {
         Self::new(
             EventID::new(0),
             current_time,
             flow_binding,
-            true, // auto-paused, as there's no trigger yet
+            FlowProcessUserIntent::Undefined, // no explicit user intent yet
             FlowTriggerStopPolicy::default(),
         )
     }
 
     pub fn rehydrate_from_snapshot(
         flow_binding: FlowBinding,
-        paused_manual: bool,
+        user_intent: FlowProcessUserIntent,
         stop_policy: FlowTriggerStopPolicy,
         consecutive_failures: u32,
         last_success_at: Option<DateTime<Utc>>,
@@ -109,7 +110,7 @@ impl FlowProcessState {
             debug_assert_eq!(
                 effective_state,
                 FlowProcessEffectiveState::calculate(
-                    paused_manual,
+                    user_intent,
                     consecutive_failures,
                     stop_policy,
                 ),
@@ -132,7 +133,7 @@ impl FlowProcessState {
 
         Ok(Self {
             flow_binding,
-            paused_manual,
+            user_intent,
             stop_policy,
             consecutive_failures,
             last_success_at,
@@ -155,8 +156,14 @@ impl FlowProcessState {
     }
 
     #[inline]
-    pub fn paused_manual(&self) -> bool {
-        self.paused_manual
+    pub fn user_intent(&self) -> FlowProcessUserIntent {
+        self.user_intent
+    }
+
+    /// Returns true if the flow process is manually paused by the user
+    #[inline]
+    pub fn is_paused_manually(&self) -> bool {
+        self.user_intent == FlowProcessUserIntent::Paused
     }
 
     #[inline]
@@ -223,17 +230,23 @@ impl FlowProcessState {
         &mut self,
         event_id: EventID,
         current_time: DateTime<Utc>,
-        paused_manual: bool,
+        paused: bool,
         stop_policy: FlowTriggerStopPolicy,
     ) -> Result<(), FlowProcessStateError> {
         self.validate_event_order(event_id)?;
 
+        let new_user_intent = if paused {
+            FlowProcessUserIntent::Paused
+        } else {
+            FlowProcessUserIntent::Enabled
+        };
+
         // Check if we're resuming from a stopped state
         // (transition from STOPPED -> ACTIVE)
         let was_stopped_auto = self.effective_state == FlowProcessEffectiveState::StoppedAuto;
-        let is_resuming = was_stopped_auto && !paused_manual;
+        let is_resuming = was_stopped_auto && !paused;
 
-        self.paused_manual = paused_manual;
+        self.user_intent = new_user_intent;
         self.stop_policy = stop_policy;
 
         // Reset consecutive failures and clear auto-stop state when resuming from
@@ -291,26 +304,38 @@ impl FlowProcessState {
 
         match flow_outcome {
             FlowOutcome::Success(_) => {
-                self.consecutive_failures = 0;
                 self.last_success_at = Some(event_time);
                 self.last_attempt_at = Some(event_time);
-                // Clear auto-stop reason on success as the flow is working again
-                self.auto_stopped_reason = None;
-                self.auto_stopped_at = None;
+
+                // Only enabled flows participate in auto-stop logic
+                if self.user_intent == FlowProcessUserIntent::Enabled {
+                    self.consecutive_failures = 0;
+                    // Clear auto-stop reason on success as the flow is working again
+                    self.auto_stopped_reason = None;
+                    self.auto_stopped_at = None;
+                }
             }
             FlowOutcome::Failed(task_error) => {
-                self.consecutive_failures += 1;
                 self.last_failure_at = Some(event_time);
                 self.last_attempt_at = Some(event_time);
 
-                // Check if this is an unrecoverable failure that should auto-stop immediately
-                if !task_error.recoverable {
-                    self.auto_stopped_reason =
-                        Some(FlowProcessAutoStopReason::UnrecoverableFailure);
-                    self.auto_stopped_at = Some(event_time);
+                // Only enabled flows participate in auto-stop logic, and only if not already
+                // auto-stopped
+                if self.user_intent == FlowProcessUserIntent::Enabled
+                    && self.auto_stopped_reason.is_none()
+                {
+                    self.consecutive_failures += 1;
+
+                    // Check if this is an unrecoverable failure that should auto-stop immediately
+                    if !task_error.recoverable {
+                        self.auto_stopped_reason =
+                            Some(FlowProcessAutoStopReason::UnrecoverableFailure);
+                        self.auto_stopped_at = Some(event_time);
+                    }
+                    // For recoverable failures, the stop policy will be
+                    // evaluated
+                    // in actualize_effective_state
                 }
-                // For recoverable failures, the stop policy will be evaluated
-                // in actualize_effective_state
             }
             FlowOutcome::Aborted => {
                 // Unexpected, we don't track aborted flows in this projection
@@ -356,7 +381,10 @@ impl FlowProcessState {
     ) -> Result<(), FlowProcessStateError> {
         self.validate_event_order(event_id)?;
 
-        self.next_planned_at = Some(next_planned_at);
+        // Only enabled flows participate in automatic scheduling
+        if self.user_intent == FlowProcessUserIntent::Enabled {
+            self.next_planned_at = Some(next_planned_at);
+        }
 
         self.last_applied_event_id = event_id;
         self.updated_at = current_time;
@@ -369,8 +397,8 @@ impl FlowProcessState {
         // stopped state
         if self.auto_stopped_reason.is_some() {
             self.effective_state = FlowProcessEffectiveState::StoppedAuto;
-        } else {
-            // Check if stop policy should trigger auto-stop for recoverable failures
+        } else if self.user_intent == FlowProcessUserIntent::Enabled {
+            // Only enabled flows should consider stop policy for auto-stopping
             let should_auto_stop_per_policy = if self.consecutive_failures > 0 {
                 match self.stop_policy {
                     FlowTriggerStopPolicy::AfterConsecutiveFailures { failures_count }
@@ -390,13 +418,21 @@ impl FlowProcessState {
                 self.auto_stopped_at = Some(event_time);
                 self.effective_state = FlowProcessEffectiveState::StoppedAuto;
             } else {
-                // Calculate normal effective state
+                // Use normal calculation for enabled flows
                 self.effective_state = FlowProcessEffectiveState::calculate(
-                    self.paused_manual,
+                    self.user_intent,
                     self.consecutive_failures,
                     self.stop_policy,
                 );
             }
+        } else {
+            // For non-enabled flows (undefined/paused), use normal calculation
+            // This handles unconfigured and paused states correctly
+            self.effective_state = FlowProcessEffectiveState::calculate(
+                self.user_intent,
+                self.consecutive_failures,
+                self.stop_policy,
+            );
         }
 
         // Clear next_planned_at when flow process is not running (stopped or paused)
@@ -408,7 +444,7 @@ impl FlowProcessState {
     fn actualize_effective_state_simple(&mut self) {
         // Simple version without auto-stop reason update (for trigger state updates)
         self.effective_state = FlowProcessEffectiveState::calculate(
-            self.paused_manual,
+            self.user_intent,
             self.consecutive_failures,
             self.stop_policy,
         );
@@ -487,7 +523,8 @@ impl FlowProcessState {
         if let (Some(next_planned), Some(last_attempt)) = (next_planned_at, last_attempt_at) {
             debug_assert!(
                 next_planned >= last_attempt,
-                "next_planned_at must not be earlier than last_attempt_at"
+                "next_planned_at ({next_planned}) must not be earlier than last_attempt_at \
+                 ({last_attempt})"
             );
         }
     }
@@ -537,17 +574,18 @@ mod tests {
         let stop_policy = FlowTriggerStopPolicy::Never;
         let event_id = EventID::new(123);
 
-        // Test creating a new state without manual pause
+        // Test creating a new state with enabled intent
         let state = FlowProcessState::new(
             event_id,
             current_time,
             flow_binding.clone(),
-            false, // not paused manually
+            FlowProcessUserIntent::Enabled,
             stop_policy,
         );
 
         assert_eq!(state.flow_binding(), &flow_binding);
-        assert!(!state.paused_manual());
+        assert_eq!(state.user_intent(), FlowProcessUserIntent::Enabled);
+        assert!(!state.is_paused_manually());
         assert_eq!(state.stop_policy(), stop_policy);
         assert_eq!(state.consecutive_failures(), 0);
         assert_eq!(state.last_success_at(), None);
@@ -558,21 +596,43 @@ mod tests {
         assert_eq!(state.updated_at, current_time);
         assert_eq!(state.last_applied_event_id, event_id);
 
-        // Test with manual pause
+        // Test with paused intent
         let paused_state = FlowProcessState::new(
             EventID::new(456),
             current_time,
-            flow_binding,
-            true,
-            // paused manually
+            flow_binding.clone(),
+            FlowProcessUserIntent::Paused,
             stop_policy,
         );
 
-        assert!(paused_state.paused_manual());
+        assert_eq!(paused_state.user_intent(), FlowProcessUserIntent::Paused);
+        assert!(paused_state.is_paused_manually());
         assert_eq!(
             paused_state.effective_state(),
             FlowProcessEffectiveState::PausedManual
         );
+
+        // Test with undefined intent
+        let undefined_state = FlowProcessState::new(
+            EventID::new(789),
+            current_time,
+            flow_binding,
+            FlowProcessUserIntent::Undefined,
+            stop_policy,
+        );
+
+        assert_eq!(
+            undefined_state.user_intent(),
+            FlowProcessUserIntent::Undefined
+        );
+        assert!(!undefined_state.is_paused_manually());
+        assert_eq!(
+            undefined_state.effective_state(),
+            FlowProcessEffectiveState::Unconfigured
+        );
+
+        // Unconfigured state should not be running
+        assert!(!undefined_state.effective_state().is_running());
     }
 
     #[test]
@@ -581,24 +641,25 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             FlowTriggerStopPolicy::Never,
         );
 
         let update_time = Utc::now() + Duration::minutes(1);
         let new_stop_policy = make_test_stop_policy_with_failures(3);
 
-        // Test updating both pause and stop policy
+        // Test updating both pause state and stop policy
         state
             .update_trigger_state(
                 EventID::new(2),
                 update_time,
-                true,            // pause manually
+                true,            // pause
                 new_stop_policy, // change stop policy
             )
             .unwrap();
 
-        assert!(state.paused_manual());
+        assert_eq!(state.user_intent(), FlowProcessUserIntent::Paused);
+        assert!(state.is_paused_manually());
         assert_eq!(state.stop_policy, new_stop_policy);
         assert_eq!(
             state.effective_state(),
@@ -607,17 +668,18 @@ mod tests {
         assert_eq!(state.updated_at, update_time);
         assert_eq!(state.last_applied_event_id, EventID::new(2));
 
-        // Test updating to unpause state
+        // Test updating to enabled state
         state
             .update_trigger_state(
                 EventID::new(3),
                 update_time + Duration::minutes(1),
-                false,           // unpause
+                false,           // enable
                 new_stop_policy, // keep same stop policy
             )
             .unwrap();
 
-        assert!(!state.paused_manual());
+        assert_eq!(state.user_intent(), FlowProcessUserIntent::Enabled);
+        assert!(!state.is_paused_manually());
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
     }
 
@@ -627,7 +689,7 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(3),
         );
 
@@ -692,7 +754,7 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             FlowTriggerStopPolicy::Never,
         );
 
@@ -720,7 +782,7 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(2),
         );
 
@@ -733,7 +795,7 @@ mod tests {
             .update_trigger_state(
                 EventID::new(2),
                 Utc::now() + Duration::minutes(1),
-                true, // pause manually
+                true, // pause
                 make_test_stop_policy_with_failures(2),
             )
             .unwrap();
@@ -744,12 +806,12 @@ mod tests {
         );
         assert_eq!(state.consecutive_failures, 3); // failures count preserved
 
-        // Unpause should transition back to StoppedAuto due to existing failures
+        // Enable should transition back to StoppedAuto due to existing failures
         state
             .update_trigger_state(
                 EventID::new(3),
                 Utc::now() + Duration::minutes(2),
-                false, // unpause
+                false, // enable
                 make_test_stop_policy_with_failures(2),
             )
             .unwrap();
@@ -766,7 +828,7 @@ mod tests {
             EventID::new(100),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             FlowTriggerStopPolicy::Never,
         );
 
@@ -849,28 +911,29 @@ mod tests {
 
     #[test]
     fn test_flow_scheduling() {
-        let mut state = FlowProcessState::new(
-            EventID::new(1),
-            Utc::now(),
-            make_test_flow_binding(),
-            false,
-            FlowTriggerStopPolicy::Never,
-        );
-
         let base_time = Utc::now();
         let scheduled_time = base_time + Duration::hours(1);
 
-        // Test basic scheduling
-        state
+        // Test 1: Enabled flows - scheduling works normally
+        let mut enabled_state = FlowProcessState::new(
+            EventID::new(1),
+            base_time,
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Enabled,
+            FlowTriggerStopPolicy::Never,
+        );
+
+        // Basic scheduling for enabled flows
+        enabled_state
             .on_scheduled(EventID::new(2), base_time, scheduled_time)
             .unwrap();
 
-        assert_eq!(state.next_planned_at, Some(scheduled_time));
-        assert_eq!(state.last_applied_event_id, EventID::new(2));
+        assert_eq!(enabled_state.next_planned_at, Some(scheduled_time));
+        assert_eq!(enabled_state.last_applied_event_id, EventID::new(2));
 
         // Test that past planned times are cleared on execution events
-        state.next_planned_at = Some(base_time + Duration::minutes(30));
-        state
+        enabled_state.next_planned_at = Some(base_time + Duration::minutes(30));
+        enabled_state
             .on_flow_outcome(
                 EventID::new(3),
                 base_time + Duration::hours(2),
@@ -878,12 +941,12 @@ mod tests {
                 &FlowOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
-        assert_eq!(state.next_planned_at, None); // Cleared because it was in the past
+        assert_eq!(enabled_state.next_planned_at, None); // Cleared because it was in the past
 
         // Test that future planned times are preserved
         let future_time = base_time + Duration::hours(3);
-        state.next_planned_at = Some(future_time);
-        state
+        enabled_state.next_planned_at = Some(future_time);
+        enabled_state
             .on_flow_outcome(
                 EventID::new(4),
                 base_time + Duration::hours(1),
@@ -891,13 +954,13 @@ mod tests {
                 &FlowOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
-        assert_eq!(state.next_planned_at, Some(future_time)); // Preserved because it's in the future
+        assert_eq!(enabled_state.next_planned_at, Some(future_time)); // Preserved because it's in the future
 
         // Test that non-running states clear planned time
-        state
+        enabled_state
             .on_scheduled(EventID::new(5), base_time, base_time + Duration::hours(2))
             .unwrap();
-        state
+        enabled_state
             .update_trigger_state(
                 EventID::new(6),
                 base_time + Duration::minutes(10),
@@ -905,7 +968,41 @@ mod tests {
                 FlowTriggerStopPolicy::Never,
             )
             .unwrap();
-        assert_eq!(state.next_planned_at, None); // Cleared because state is paused
+        assert_eq!(enabled_state.next_planned_at, None); // Cleared because state is paused
+
+        // Test 2: Paused flows - scheduling should not affect next_planned_at
+        let mut paused_state = FlowProcessState::new(
+            EventID::new(1),
+            base_time,
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Paused,
+            FlowTriggerStopPolicy::Never,
+        );
+
+        // Scheduling events should be ignored for paused flows
+        paused_state
+            .on_scheduled(EventID::new(2), base_time, scheduled_time)
+            .unwrap();
+
+        assert_eq!(paused_state.next_planned_at, None); // Should remain None
+        assert_eq!(paused_state.last_applied_event_id, EventID::new(2)); // Event ID should still update
+
+        // Test 3: Unconfigured flows - scheduling should not affect next_planned_at
+        let mut unconfigured_state = FlowProcessState::new(
+            EventID::new(1),
+            base_time,
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Undefined,
+            FlowTriggerStopPolicy::Never,
+        );
+
+        // Scheduling events should be ignored for unconfigured flows
+        unconfigured_state
+            .on_scheduled(EventID::new(2), base_time, scheduled_time)
+            .unwrap();
+
+        assert_eq!(unconfigured_state.next_planned_at, None); // Should remain None
+        assert_eq!(unconfigured_state.last_applied_event_id, EventID::new(2)); // Event ID should still update
     }
 
     #[test]
@@ -914,7 +1011,7 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(3),
         );
 
@@ -945,7 +1042,8 @@ mod tests {
             FlowProcessEffectiveState::PausedManual
         );
 
-        // 3. Failure while paused -> stays PausedManual
+        // 3. Manual failure while paused -> stays PausedManual, no consecutive failure
+        //    increment
         state
             .on_flow_outcome(
                 EventID::new(4),
@@ -958,9 +1056,9 @@ mod tests {
             state.effective_state(),
             FlowProcessEffectiveState::PausedManual
         );
-        assert_eq!(state.consecutive_failures, 1);
+        assert_eq!(state.consecutive_failures, 0); // Manual failures don't increment
 
-        // 4. Unpause -> transitions to Failing due to existing failures
+        // 4. Unpause -> transitions to Active since no automatic failures occurred
         state
             .update_trigger_state(
                 EventID::new(5),
@@ -969,28 +1067,32 @@ mod tests {
                 make_test_stop_policy_with_failures(3),
             )
             .unwrap();
-        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
 
-        // 5. Change policy to Never -> stays Failing
+        // 5. Add automatic failures -> transitions to Failing
         state
-            .update_trigger_state(
+            .on_flow_outcome(
                 EventID::new(6),
                 base_time + Duration::minutes(5),
+                base_time + Duration::minutes(5),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+        assert_eq!(state.consecutive_failures, 1);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
+
+        // 6. Change policy to Never -> stays Failing
+        state
+            .update_trigger_state(
+                EventID::new(7),
+                base_time + Duration::minutes(6),
                 false,
                 FlowTriggerStopPolicy::Never,
             )
             .unwrap();
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
 
-        // 6. Add more failures -> stays Failing with Never policy
-        state
-            .on_flow_outcome(
-                EventID::new(7),
-                base_time + Duration::minutes(6),
-                base_time + Duration::minutes(6),
-                &FlowOutcome::Failed(TaskError::empty_recoverable()),
-            )
-            .unwrap();
+        // 7. Add more failures -> stays Failing with Never policy
         state
             .on_flow_outcome(
                 EventID::new(8),
@@ -999,10 +1101,10 @@ mod tests {
                 &FlowOutcome::Failed(TaskError::empty_recoverable()),
             )
             .unwrap();
-        assert_eq!(state.consecutive_failures, 3);
+        assert_eq!(state.consecutive_failures, 2);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
 
-        // 7. Success resets everything -> Active
+        // 8. Success resets everything -> Active
         state
             .on_flow_outcome(
                 EventID::new(9),
@@ -1021,7 +1123,7 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(2),
         );
 
@@ -1101,7 +1203,7 @@ mod tests {
             EventID::new(1),
             current_time,
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(5), // High threshold
         );
 
@@ -1139,7 +1241,7 @@ mod tests {
             EventID::new(1),
             current_time,
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(3),
         );
 
@@ -1202,7 +1304,7 @@ mod tests {
             EventID::new(1),
             current_time,
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(2),
         );
 
@@ -1254,7 +1356,7 @@ mod tests {
             EventID::new(1),
             current_time,
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(1),
         );
 
@@ -1301,7 +1403,7 @@ mod tests {
             EventID::new(1),
             current_time,
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(1),
         );
 
@@ -1347,7 +1449,7 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false, // active
+            FlowProcessUserIntent::Enabled,
             FlowTriggerStopPolicy::default(),
         );
 
@@ -1374,7 +1476,7 @@ mod tests {
             EventID::new(1),
             Utc::now(),
             make_test_flow_binding(),
-            false,
+            FlowProcessUserIntent::Enabled,
             make_test_stop_policy_with_failures(1),
         );
 
@@ -1399,6 +1501,279 @@ mod tests {
             }
             _ => panic!("Expected AutoStopped event"),
         }
+    }
+
+    #[test]
+    fn test_manual_vs_automatic_flow_behavior() {
+        let current_time = Utc::now();
+
+        // Test 1: Paused flows (manual executions only)
+        let mut paused_state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Paused,
+            make_test_stop_policy_with_failures(2),
+        );
+
+        assert_eq!(
+            paused_state.effective_state(),
+            FlowProcessEffectiveState::PausedManual
+        );
+
+        // Manual failures should not affect consecutive_failures or auto-stop logic
+        paused_state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time,
+                current_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(paused_state.consecutive_failures, 0); // No increment for manual flows
+        assert_eq!(
+            paused_state.effective_state(),
+            FlowProcessEffectiveState::PausedManual
+        );
+        assert_eq!(paused_state.auto_stopped_reason(), None);
+
+        // Even unrecoverable failures should not auto-stop manual flows
+        paused_state
+            .on_flow_outcome(
+                EventID::new(3),
+                current_time,
+                current_time,
+                &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(paused_state.consecutive_failures, 0);
+        assert_eq!(
+            paused_state.effective_state(),
+            FlowProcessEffectiveState::PausedManual
+        );
+        assert_eq!(paused_state.auto_stopped_reason(), None);
+
+        // Test 2: Unconfigured flows (manual executions only)
+        let mut unconfigured_state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Undefined,
+            make_test_stop_policy_with_failures(1),
+        );
+
+        assert_eq!(
+            unconfigured_state.effective_state(),
+            FlowProcessEffectiveState::Unconfigured
+        );
+
+        // Manual failures should not affect auto-stop logic
+        unconfigured_state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time,
+                current_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(unconfigured_state.consecutive_failures, 0);
+        assert_eq!(
+            unconfigured_state.effective_state(),
+            FlowProcessEffectiveState::Unconfigured
+        );
+
+        // Test 3: Enabled flows (automatic executions)
+        let mut enabled_state = FlowProcessState::new(
+            EventID::new(1),
+            current_time,
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Enabled,
+            make_test_stop_policy_with_failures(2),
+        );
+
+        // Automatic failures should increment consecutive_failures and trigger
+        // auto-stop
+        enabled_state
+            .on_flow_outcome(
+                EventID::new(2),
+                current_time,
+                current_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(enabled_state.consecutive_failures, 1);
+        assert_eq!(
+            enabled_state.effective_state(),
+            FlowProcessEffectiveState::Failing
+        );
+
+        enabled_state
+            .on_flow_outcome(
+                EventID::new(3),
+                current_time,
+                current_time,
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        assert_eq!(enabled_state.consecutive_failures, 2);
+        assert_eq!(
+            enabled_state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(
+            enabled_state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::StopPolicy)
+        );
+
+        // Test 4: Timing fields should be updated regardless of user intent
+        assert!(paused_state.last_failure_at().is_some());
+        assert!(unconfigured_state.last_failure_at().is_some());
+        assert!(enabled_state.last_failure_at().is_some());
+
+        // Test 5: Scheduling behavior - only enabled flows should be scheduled
+        let scheduled_time = current_time + Duration::hours(1);
+
+        // Enabled flows should accept scheduling
+        enabled_state
+            .on_scheduled(EventID::new(10), current_time, scheduled_time)
+            .unwrap();
+        assert_eq!(enabled_state.next_planned_at, Some(scheduled_time));
+
+        // Paused flows should ignore scheduling
+        paused_state
+            .on_scheduled(EventID::new(11), current_time, scheduled_time)
+            .unwrap();
+        assert_eq!(paused_state.next_planned_at, None);
+
+        // Unconfigured flows should ignore scheduling
+        unconfigured_state
+            .on_scheduled(EventID::new(12), current_time, scheduled_time)
+            .unwrap();
+        assert_eq!(unconfigured_state.next_planned_at, None);
+    }
+
+    #[test]
+    fn test_auto_stopped_state_manual_debugging_scenario() {
+        let current_time = Utc::now();
+
+        // Create a flow that's already in auto-stopped state (enabled but auto-stopped)
+        let mut state = FlowProcessState::rehydrate_from_snapshot(
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Enabled, // Still enabled, but auto-stopped
+            make_test_stop_policy_with_failures(2),
+            2,                  // consecutive_failures that caused auto-stop
+            None,               // last_success_at
+            Some(current_time), // last_failure_at
+            Some(current_time), // last_attempt_at
+            None,               /* next_planned_at (cleared because not
+                                 * running) */
+            Some(current_time),                          // auto_stopped_at
+            FlowProcessEffectiveState::StoppedAuto,      // effective_state
+            Some(FlowProcessAutoStopReason::StopPolicy), // auto_stopped_reason
+            current_time,
+            EventID::new(100),
+        )
+        .unwrap();
+
+        // Verify initial auto-stopped state
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::StopPolicy)
+        );
+        assert_eq!(state.consecutive_failures, 2);
+        let original_auto_stopped_at = state.auto_stopped_at().unwrap();
+
+        // User runs first manual debugging attempt on auto-stopped enabled flow - it
+        // fails
+        state
+            .on_flow_outcome(
+                EventID::new(101),
+                current_time + Duration::minutes(5),
+                current_time + Duration::minutes(5),
+                &FlowOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .unwrap();
+
+        // Manual failure on auto-stopped flow should NOT modify auto-stop state
+        assert_eq!(state.consecutive_failures, 2); // Unchanged
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::StopPolicy)
+        ); // Unchanged
+        assert_eq!(state.auto_stopped_at(), Some(original_auto_stopped_at)); // Unchanged
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        // But timing should still be updated for throttling purposes
+        assert_eq!(
+            state.last_failure_at(),
+            Some(current_time + Duration::minutes(5))
+        );
+        assert_eq!(
+            state.last_attempt_at(),
+            Some(current_time + Duration::minutes(5))
+        );
+
+        // User runs second manual debugging attempt - also fails
+        // (unrecoverable this time)
+        state
+            .on_flow_outcome(
+                EventID::new(102),
+                current_time + Duration::minutes(10),
+                current_time + Duration::minutes(10),
+                &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
+            )
+            .unwrap();
+
+        // Still no change to auto-stop state - manual failures don't modify existing
+        // auto-stop, even if they are unrecoverable
+        assert_eq!(state.consecutive_failures, 2);
+        assert_eq!(
+            state.auto_stopped_reason(),
+            Some(FlowProcessAutoStopReason::StopPolicy)
+        );
+        assert_eq!(state.auto_stopped_at(), Some(original_auto_stopped_at));
+        assert_eq!(
+            state.effective_state(),
+            FlowProcessEffectiveState::StoppedAuto
+        );
+        assert_eq!(
+            state.last_failure_at(),
+            Some(current_time + Duration::minutes(10))
+        );
+
+        // User finally succeeds on third manual attempt - fixes the issue!
+        state
+            .on_flow_outcome(
+                EventID::new(103),
+                current_time + Duration::minutes(15),
+                current_time + Duration::minutes(15),
+                &FlowOutcome::Success(TaskResult::empty()),
+            )
+            .unwrap();
+
+        // Manual success should clear auto-stop state and reset consecutive failures
+        // (self-healing)
+        assert_eq!(state.consecutive_failures, 0);
+        assert_eq!(state.auto_stopped_reason(), None);
+        assert_eq!(state.auto_stopped_at(), None);
+        assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
+        assert_eq!(
+            state.last_success_at(),
+            Some(current_time + Duration::minutes(15))
+        );
+
+        // Flow is now healthy and ready for automatic execution again
     }
 }
 
