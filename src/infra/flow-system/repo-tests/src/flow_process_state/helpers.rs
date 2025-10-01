@@ -45,6 +45,7 @@ pub(crate) fn assert_effective_state_distribution(
     expected_failing: usize,
     expected_paused: usize,
     expected_stopped: usize,
+    expected_unconfigured: usize,
 ) {
     let active_count = processes
         .iter()
@@ -62,11 +63,16 @@ pub(crate) fn assert_effective_state_distribution(
         .iter()
         .filter(|p| p.effective_state() == FlowProcessEffectiveState::StoppedAuto)
         .count();
+    let unconfigured_count = processes
+        .iter()
+        .filter(|p| p.effective_state() == FlowProcessEffectiveState::Unconfigured)
+        .count();
 
     assert_eq!(active_count, expected_active);
     assert_eq!(failing_count, expected_failing);
     assert_eq!(paused_count, expected_paused);
     assert_eq!(stopped_count, expected_stopped);
+    assert_eq!(unconfigured_count, expected_unconfigured);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

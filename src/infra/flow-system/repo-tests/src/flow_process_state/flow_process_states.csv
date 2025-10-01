@@ -23,3 +23,5 @@
 22,"WEBHOOK_DELIVER","WebhookSubscription","gamma/audit","sub-arch-gamma","enabled","after_consecutive_failures","{""maxFailures"":2}",0,"2025-09-08T07:20:00Z","NULL","2025-09-08T07:20:00Z","NULL","NULL","NULL","active"
 23,"EXECUTE_TRANSFORM","Dataset","acme/orders.cleaned","NULL","enabled","after_consecutive_failures","{""maxFailures"":3}",0,"NULL","NULL","NULL","2025-09-08T11:30:00Z","NULL","NULL","active"
 24,"WEBHOOK_DELIVER","WebhookSubscription","beta/catalog","sub-fail-beta-cat","enabled","after_consecutive_failures","{""maxFailures"":10}",9,"2025-09-01T10:00:00Z","2025-09-08T07:52:00Z","2025-09-08T07:52:00Z","NULL","unrecoverable_failure","2025-09-08T07:53:00Z","stopped_auto"
+25,"INGEST","Dataset","test/undefined-flow","NULL","undefined","never","{}",0,"2025-09-07T15:00:00Z","NULL","2025-09-07T15:00:00Z","NULL","NULL","NULL","unconfigured"
+26,"INGEST","Dataset","manual/scheduled-pending","NULL","undefined","never","{}",0,"NULL","NULL","NULL","2025-09-08T20:00:00Z","NULL","NULL","unconfigured"
