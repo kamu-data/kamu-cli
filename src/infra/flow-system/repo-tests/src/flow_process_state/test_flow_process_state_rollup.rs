@@ -31,14 +31,12 @@ pub async fn test_rollup_from_csv_unfiltered(catalog: &Catalog) {
         .await
         .unwrap();
 
-    // Verify realistic data distribution (9 active, 9 failing, 3 paused_manual, 3
-    // stopped_auto)
-    assert_eq!(rollup.total, 24);
+    assert_eq!(rollup.total, 26);
     assert_eq!(rollup.active, 9);
     assert_eq!(rollup.failing, 9);
     assert_eq!(rollup.paused, 3);
     assert_eq!(rollup.stopped, 3);
-    assert_eq!(rollup.unconfigured, 0);
+    assert_eq!(rollup.unconfigured, 2);
     assert_eq!(rollup.worst_consecutive_failures, 10);
 }
 
@@ -199,13 +197,14 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
         .await
         .unwrap();
 
-    // Should find 6 ingest processes from CSV data (rows 1, 3, 11, 13, 17, 21)
-    assert_eq!(rollup.total, 6);
+    // Should find 8 ingest processes from CSV data (rows 1, 3, 11, 13, 17, 21, 25,
+    // 26)
+    assert_eq!(rollup.total, 8);
     assert_eq!(rollup.active, 2); // rows 1, 11
     assert_eq!(rollup.failing, 3); // rows 13, 17, 21
     assert_eq!(rollup.paused, 1); // row 3
     assert_eq!(rollup.stopped, 0);
-    assert_eq!(rollup.unconfigured, 0);
+    assert_eq!(rollup.unconfigured, 2); // rows 25, 26 (undefined -> unconfigured)
 
     // Test 2: Filter by TRANSFORM flow type only
     let transform_flows = [FLOW_TYPE_DATASET_TRANSFORM];
@@ -236,6 +235,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     assert_eq!(rollup.failing, 4); // rows 6, 8, 9, 19
     assert_eq!(rollup.paused, 1); // row 7
     assert_eq!(rollup.stopped, 3); // rows 10, 16, 24
+    assert_eq!(rollup.unconfigured, 0);
 
     // Test 4: Filter by multiple flow types
     let multiple_flows = [FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM];
@@ -244,13 +244,13 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
         .await
         .unwrap();
 
-    // Should find 12 processes (6 ingest + 6 transform)
-    assert_eq!(rollup.total, 12);
+    // Should find 14 processes (8 ingest + 6 transform)
+    assert_eq!(rollup.total, 14);
     assert_eq!(rollup.active, 5); // 2 + 3
     assert_eq!(rollup.failing, 5); // 3 + 2
     assert_eq!(rollup.paused, 2); // 1 + 1
     assert_eq!(rollup.stopped, 0);
-    assert_eq!(rollup.unconfigured, 0);
+    assert_eq!(rollup.unconfigured, 2); // 2 undefined ingest
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -453,6 +453,125 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
     assert_eq!(rollup.unconfigured, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Test 1: Filter by Unconfigured status only
+    let unconfigured_states = [FlowProcessEffectiveState::Unconfigured];
+    let rollup = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&unconfigured_states))
+        .await
+        .unwrap();
+
+    // Should find only unconfigured processes (2 from CSV: rows 19 and 26)
+    assert_eq!(rollup.total, 2);
+    assert_eq!(rollup.active, 0);
+    assert_eq!(rollup.failing, 0);
+    assert_eq!(rollup.paused, 0);
+    assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 2);
+
+    // Test 2: Mixed filter - Active + Unconfigured (operational monitoring view)
+    let operational_states = [
+        FlowProcessEffectiveState::Active,
+        FlowProcessEffectiveState::Unconfigured,
+    ];
+    let rollup = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&operational_states))
+        .await
+        .unwrap();
+
+    // Should find active + unconfigured processes (9 active + 2 unconfigured = 11)
+    assert_eq!(rollup.total, 11);
+    assert_eq!(rollup.active, 9);
+    assert_eq!(rollup.failing, 0);
+    assert_eq!(rollup.paused, 0);
+    assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 2);
+
+    // Test 3: Unconfigured flows by type (ingest only)
+    let ingest_flows = [FLOW_TYPE_DATASET_INGEST];
+    let rollup = flow_process_state_query
+        .rollup_by_scope(
+            FlowScopeQuery::all(),
+            Some(&ingest_flows),
+            Some(&unconfigured_states),
+        )
+        .await
+        .unwrap();
+
+    // Should find only unconfigured ingest processes (2 from CSV: both rows 19 and
+    // 26 are ingest)
+    assert_eq!(rollup.total, 2);
+    assert_eq!(rollup.active, 0);
+    assert_eq!(rollup.failing, 0);
+    assert_eq!(rollup.paused, 0);
+    assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 2);
+
+    // Test 4: Unconfigured flows by type (webhook only)
+    let webhook_flows = [FLOW_TYPE_WEBHOOK_DELIVER];
+    let rollup = flow_process_state_query
+        .rollup_by_scope(
+            FlowScopeQuery::all(),
+            Some(&webhook_flows),
+            Some(&unconfigured_states),
+        )
+        .await
+        .unwrap();
+
+    // Should find no unconfigured webhook processes (all unconfigured are ingest)
+    assert_eq!(rollup.total, 0);
+    assert_eq!(rollup.active, 0);
+    assert_eq!(rollup.failing, 0);
+    assert_eq!(rollup.paused, 0);
+    assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 0);
+
+    // Test 5: Complex multi-state filter excluding unconfigured (admin view)
+    let managed_states = [
+        FlowProcessEffectiveState::Active,
+        FlowProcessEffectiveState::Failing,
+        FlowProcessEffectiveState::PausedManual,
+        FlowProcessEffectiveState::StoppedAuto,
+    ];
+    let rollup = flow_process_state_query
+        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&managed_states))
+        .await
+        .unwrap();
+
+    // Should find all managed processes (26 total - 2 unconfigured = 24)
+    assert_eq!(rollup.total, 24);
+    assert_eq!(rollup.active, 9);
+    assert_eq!(rollup.failing, 9);
+    assert_eq!(rollup.paused, 3);
+    assert_eq!(rollup.stopped, 3);
+    assert_eq!(rollup.unconfigured, 0);
+
+    // Test 6: Dataset-specific unconfigured check
+    let dataset_id = odf::DatasetID::new_seeded_ed25519("test/undefined-flow".as_bytes());
+    let scope_query = FlowScopeDataset::query_for_single_dataset(&dataset_id);
+
+    let rollup = flow_process_state_query
+        .rollup_by_scope(scope_query, None, Some(&unconfigured_states))
+        .await
+        .unwrap();
+
+    // Should find unconfigured processes for test/undefined-flow dataset (1 from
+    // row 25)
+    assert_eq!(rollup.total, 1);
+    assert_eq!(rollup.active, 0);
+    assert_eq!(rollup.failing, 0);
+    assert_eq!(rollup.paused, 0);
+    assert_eq!(rollup.stopped, 0);
+    assert_eq!(rollup.unconfigured, 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

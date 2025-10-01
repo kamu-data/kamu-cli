@@ -60,7 +60,7 @@ pub async fn test_list_processes_pagination(catalog: &Catalog) {
 
     assert_eq!(second_page.processes.len(), 10);
 
-    // Get third page (should have 4 remaining)
+    // Get third page (should have 6 remaining)
     let third_page = flow_process_state_query
         .list_processes(
             FlowProcessListFilter::all(),
@@ -73,7 +73,7 @@ pub async fn test_list_processes_pagination(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(third_page.processes.len(), 4);
+    assert_eq!(third_page.processes.len(), 6);
 
     // Verify that the pages don't overlap and together form the complete list
     let mut all_pages = Vec::new();
@@ -81,7 +81,7 @@ pub async fn test_list_processes_pagination(catalog: &Catalog) {
     all_pages.extend(second_page.processes);
     all_pages.extend(third_page.processes);
 
-    assert_eq!(all_pages.len(), 24);
+    assert_eq!(all_pages.len(), 26);
 
     // Verify that the paginated results match the full list
     assert_eq!(all_pages, full_listing.processes);
@@ -117,7 +117,7 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
             FlowProcessOrder::recent(),
             Some(PaginationOpts {
                 limit: 10,
-                offset: 1000, // Way beyond the 24 available records
+                offset: 1000, // Way beyond the 25 available records
             }),
         )
         .await
@@ -131,14 +131,14 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
             FlowProcessListFilter::all(),
             FlowProcessOrder::recent(),
             Some(PaginationOpts {
-                limit: 1000, // Much larger than the 24 available records
+                limit: 1000, // Much larger than the 25 available records
                 offset: 0,
             }),
         )
         .await
         .unwrap();
 
-    assert_eq!(large_limit.processes.len(), 24);
+    assert_eq!(large_limit.processes.len(), 26);
 
     // Test: offset at the last record
     let last_record = flow_process_state_query
@@ -147,7 +147,7 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
             FlowProcessOrder::recent(),
             Some(PaginationOpts {
                 limit: 10,
-                offset: 23, // Should return 1 record (24th record)
+                offset: 25, // Should return 1 record (#26)
             }),
         )
         .await
@@ -162,7 +162,7 @@ pub async fn test_list_processes_pagination_edge_cases(catalog: &Catalog) {
             FlowProcessOrder::recent(),
             Some(PaginationOpts {
                 limit: 10,
-                offset: 24, // Should return 0 records
+                offset: 26, // Should return 0 records
             }),
         )
         .await
@@ -192,7 +192,7 @@ pub async fn test_list_processes_pagination_with_filters(catalog: &Catalog) {
     let filtered_count = full_filtered.processes.len();
     assert!(filtered_count > 0, "Should have some active processes");
     assert!(
-        filtered_count < 24,
+        filtered_count < 25,
         "Should have fewer than total processes"
     );
 
@@ -349,10 +349,10 @@ pub async fn test_list_processes_pagination_boundary_conditions(catalog: &Catalo
             .await
             .unwrap();
 
-        let expected_len = if offset >= 24 {
+        let expected_len = if offset >= 25 {
             0
         } else {
-            std::cmp::min(limit, 24 - offset)
+            std::cmp::min(limit, 25 - offset)
         };
 
         assert_eq!(

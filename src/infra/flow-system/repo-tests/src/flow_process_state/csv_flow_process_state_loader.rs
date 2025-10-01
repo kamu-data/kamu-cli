@@ -151,7 +151,8 @@ impl CsvFlowProcessStateLoader {
         // Generate event ID
         let trigger_event_id = self.next_event_id();
 
-        // Insert the process, unless it's undefined
+        // Insert the process, unless it's undefined (undefined flows are created via
+        // other mechanisms)
         if user_intent != FlowProcessUserIntent::Undefined {
             self.flow_process_repository
                 .upsert_process_state_on_trigger_event(
@@ -201,6 +202,7 @@ impl CsvFlowProcessStateLoader {
         match record.user_intent.as_str() {
             "enabled" => FlowProcessUserIntent::Enabled,
             "paused" => FlowProcessUserIntent::Paused,
+            "undefined" => FlowProcessUserIntent::Undefined,
             _ => panic!("Unknown user intent: {}", record.user_intent),
         }
     }

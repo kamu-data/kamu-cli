@@ -41,9 +41,9 @@ pub async fn test_list_processes_from_csv_unfiltered_with_default_ordering(catal
         .await
         .unwrap();
 
-    // Should get all 24 processes from CSV
-    assert_eq!(listing.processes.len(), 24);
-    assert_eq!(listing.total_count, 24);
+    // Should get all 26 processes from CSV
+    assert_eq!(listing.processes.len(), 26);
+    assert_eq!(listing.total_count, 26);
 
     // Verify ordering: recent first (by last_attempt_at DESC)
     assert_last_attempt_at_ordering(
@@ -53,10 +53,10 @@ pub async fn test_list_processes_from_csv_unfiltered_with_default_ordering(catal
     );
 
     // Verify that we have the expected distribution of flow types
-    assert_flow_type_distribution(&listing.processes, 6, 6, 12);
+    assert_flow_type_distribution(&listing.processes, 8, 6, 12);
 
     // Verify that we have the expected distribution of effective states
-    assert_effective_state_distribution(&listing.processes, 9, 9, 3, 3);
+    assert_effective_state_distribution(&listing.processes, 9, 9, 3, 3, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,9 +77,9 @@ pub async fn test_list_processes_filter_by_flow_types(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(ingest_listing.processes.len(), 6);
-    assert_eq!(ingest_listing.total_count, 6);
-    assert_flow_type_distribution(&ingest_listing.processes, 6, 0, 0);
+    assert_eq!(ingest_listing.processes.len(), 8);
+    assert_eq!(ingest_listing.total_count, 8);
+    assert_flow_type_distribution(&ingest_listing.processes, 8, 0, 0);
 
     // Test filtering by webhook flows only
     let webhook_listing = flow_process_state_query
@@ -106,9 +106,9 @@ pub async fn test_list_processes_filter_by_flow_types(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(multi_listing.processes.len(), 12);
-    assert_eq!(multi_listing.total_count, 12);
-    assert_flow_type_distribution(&multi_listing.processes, 6, 6, 0);
+    assert_eq!(multi_listing.processes.len(), 14);
+    assert_eq!(multi_listing.total_count, 14);
+    assert_flow_type_distribution(&multi_listing.processes, 8, 6, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,7 +132,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
 
     assert_eq!(active_listing.processes.len(), 9);
     assert_eq!(active_listing.total_count, 9);
-    assert_effective_state_distribution(&active_listing.processes, 9, 0, 0, 0);
+    assert_effective_state_distribution(&active_listing.processes, 9, 0, 0, 0, 0);
 
     // Test filtering by failing state only
     let failing_listing = flow_process_state_query
@@ -147,7 +147,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
 
     assert_eq!(failing_listing.processes.len(), 9);
     assert_eq!(failing_listing.total_count, 9);
-    assert_effective_state_distribution(&failing_listing.processes, 0, 9, 0, 0);
+    assert_effective_state_distribution(&failing_listing.processes, 0, 9, 0, 0, 0);
 
     // Test filtering by paused manual state only
     let paused_listing = flow_process_state_query
@@ -162,7 +162,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
 
     assert_eq!(paused_listing.processes.len(), 3);
     assert_eq!(paused_listing.total_count, 3);
-    assert_effective_state_distribution(&paused_listing.processes, 0, 0, 3, 0);
+    assert_effective_state_distribution(&paused_listing.processes, 0, 0, 3, 0, 0);
 
     // Test filtering by stopped auto state only
     let stopped_listing = flow_process_state_query
@@ -177,7 +177,7 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
 
     assert_eq!(stopped_listing.processes.len(), 3);
     assert_eq!(stopped_listing.total_count, 3);
-    assert_effective_state_distribution(&stopped_listing.processes, 0, 0, 0, 3);
+    assert_effective_state_distribution(&stopped_listing.processes, 0, 0, 0, 3, 0);
 
     // Test filtering by multiple states
     let multi_state_listing = flow_process_state_query
@@ -194,7 +194,45 @@ pub async fn test_list_processes_filter_by_effective_states(catalog: &Catalog) {
 
     assert_eq!(multi_state_listing.processes.len(), 6);
     assert_eq!(multi_state_listing.total_count, 6);
-    assert_effective_state_distribution(&multi_state_listing.processes, 0, 0, 3, 3);
+    assert_effective_state_distribution(&multi_state_listing.processes, 0, 0, 3, 3, 0);
+
+    // Test filtering by unconfigured state only
+    let unconfigured_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all()
+                .with_effective_states(&[FlowProcessEffectiveState::Unconfigured]),
+            FlowProcessOrder::recent(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(unconfigured_listing.processes.len(), 2);
+    assert_eq!(unconfigured_listing.total_count, 2);
+    assert_effective_state_distribution(&unconfigured_listing.processes, 0, 0, 0, 0, 2);
+
+    // Verify all unconfigured flows have undefined user intent
+    for process in &unconfigured_listing.processes {
+        assert_eq!(process.user_intent(), FlowProcessUserIntent::Undefined);
+        assert!(!process.effective_state().is_running());
+    }
+
+    // Test filtering by mixed states including unconfigured
+    let mixed_with_unconfigured_listing = flow_process_state_query
+        .list_processes(
+            FlowProcessListFilter::all().with_effective_states(&[
+                FlowProcessEffectiveState::Active,
+                FlowProcessEffectiveState::Unconfigured,
+            ]),
+            FlowProcessOrder::recent(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(mixed_with_unconfigured_listing.processes.len(), 11); // 9 active + 2 unconfigured
+    assert_eq!(mixed_with_unconfigured_listing.total_count, 11);
+    assert_effective_state_distribution(&mixed_with_unconfigured_listing.processes, 9, 0, 0, 0, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,7 +269,7 @@ pub async fn test_list_processes_filter_by_last_attempt_between(catalog: &Catalo
     assert_eq!(time_window_attempts.processes.len(), 15);
     assert_eq!(time_window_attempts.total_count, 15);
     assert_flow_type_distribution(&time_window_attempts.processes, 4, 3, 8);
-    assert_effective_state_distribution(&time_window_attempts.processes, 6, 7, 0, 2);
+    assert_effective_state_distribution(&time_window_attempts.processes, 6, 7, 0, 2, 0);
 
     // All results should have last_attempt_at within the specified range
     // (inclusive)
@@ -275,7 +313,7 @@ pub async fn test_list_processes_filter_by_last_failure_since(catalog: &Catalog)
     assert_eq!(recent_failures.processes.len(), 9);
     assert_eq!(recent_failures.total_count, 9);
     assert_flow_type_distribution(&recent_failures.processes, 2, 2, 5);
-    assert_effective_state_distribution(&recent_failures.processes, 0, 7, 0, 2);
+    assert_effective_state_distribution(&recent_failures.processes, 0, 7, 0, 2, 0);
 
     // All results should have last_failure_at >= 2025-09-08T07:00:00Z
     for process in &recent_failures.processes {
@@ -317,7 +355,7 @@ pub async fn test_list_processes_filter_by_planned_before(catalog: &Catalog) {
     assert_eq!(upcoming_soon.processes.len(), 3);
     assert_eq!(upcoming_soon.total_count, 3);
     assert_flow_type_distribution(&upcoming_soon.processes, 3, 0, 0); // (3 ingest, 0 transform, 0 webhook)
-    assert_effective_state_distribution(&upcoming_soon.processes, 2, 1, 0, 0); // (2 active, 1 failing, 0 paused, 0 stopped)
+    assert_effective_state_distribution(&upcoming_soon.processes, 2, 1, 0, 0, 0); // (2 active, 1 failing, 0 paused, 0 stopped)
 
     for process in &upcoming_soon.processes {
         if let Some(next_planned) = process.next_planned_at() {
@@ -358,7 +396,7 @@ pub async fn test_list_processes_filter_by_planned_after(catalog: &Catalog) {
     assert_eq!(future_scheduled.processes.len(), 3);
     assert_eq!(future_scheduled.total_count, 3);
     assert_flow_type_distribution(&future_scheduled.processes, 1, 1, 1);
-    assert_effective_state_distribution(&future_scheduled.processes, 1, 2, 0, 0);
+    assert_effective_state_distribution(&future_scheduled.processes, 1, 2, 0, 0, 0);
 
     // All results should have next_planned_at > 2025-09-08T11:30:00Z
     for process in &future_scheduled.processes {
@@ -386,11 +424,11 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .await
         .unwrap();
 
-    // Should find all 24 processes (0+ failures includes everything)
-    assert_eq!(all_processes.processes.len(), 24);
-    assert_eq!(all_processes.total_count, 24);
-    assert_flow_type_distribution(&all_processes.processes, 6, 6, 12);
-    assert_effective_state_distribution(&all_processes.processes, 9, 9, 3, 3);
+    // Should find all 26 processes (0+ failures includes everything)
+    assert_eq!(all_processes.processes.len(), 26);
+    assert_eq!(all_processes.total_count, 26);
+    assert_flow_type_distribution(&all_processes.processes, 8, 6, 12);
+    assert_effective_state_distribution(&all_processes.processes, 9, 9, 3, 3, 2);
 
     // Test filtering by minimum consecutive failures
     let chronic_failures = flow_process_state_query
@@ -407,7 +445,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
     assert_eq!(chronic_failures.processes.len(), 4);
     assert_eq!(chronic_failures.total_count, 4);
     assert_flow_type_distribution(&chronic_failures.processes, 1, 0, 3);
-    assert_effective_state_distribution(&chronic_failures.processes, 0, 2, 0, 2);
+    assert_effective_state_distribution(&chronic_failures.processes, 0, 2, 0, 2, 0);
 
     for process in &chronic_failures.processes {
         assert!(process.consecutive_failures() >= 3);
@@ -427,7 +465,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
     assert_eq!(severe_failures.processes.len(), 1);
     assert_eq!(severe_failures.total_count, 1);
     assert_flow_type_distribution(&severe_failures.processes, 0, 0, 1);
-    assert_effective_state_distribution(&severe_failures.processes, 0, 0, 0, 1);
+    assert_effective_state_distribution(&severe_failures.processes, 0, 0, 0, 1, 0);
 
     for process in &severe_failures.processes {
         assert!(process.consecutive_failures() >= 10);
@@ -478,7 +516,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
     assert_eq!(single_dataset_listing.processes.len(), 4);
     assert_eq!(single_dataset_listing.total_count, 4);
     assert_flow_type_distribution(&single_dataset_listing.processes, 1, 0, 3);
-    assert_effective_state_distribution(&single_dataset_listing.processes, 2, 1, 1, 0);
+    assert_effective_state_distribution(&single_dataset_listing.processes, 2, 1, 1, 0, 0);
 
     // Verify all processes are related to acme/orders dataset
     for process in &single_dataset_listing.processes {
@@ -513,7 +551,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
     assert_eq!(multi_dataset_listing.processes.len(), 11);
     assert_eq!(multi_dataset_listing.total_count, 11);
     assert_flow_type_distribution(&multi_dataset_listing.processes, 3, 0, 8);
-    assert_effective_state_distribution(&multi_dataset_listing.processes, 3, 5, 1, 2);
+    assert_effective_state_distribution(&multi_dataset_listing.processes, 3, 5, 1, 2, 0);
 
     // Test 3: Filter by webhook subscriptions for single dataset
     let subscription_query = FlowScopeSubscription::query_for_subscriptions_of_dataset(&dataset_id);
@@ -532,7 +570,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
     assert_eq!(subscription_listing.processes.len(), 3);
     assert_eq!(subscription_listing.total_count, 3);
     assert_flow_type_distribution(&subscription_listing.processes, 0, 0, 3);
-    assert_effective_state_distribution(&subscription_listing.processes, 1, 1, 1, 0);
+    assert_effective_state_distribution(&subscription_listing.processes, 1, 1, 1, 0, 0);
 
     // Verify all processes are webhook subscriptions for the correct dataset
     for process in &subscription_listing.processes {
@@ -559,7 +597,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
     assert_eq!(dataset_only_listing.processes.len(), 1);
     assert_eq!(dataset_only_listing.total_count, 1);
     assert_flow_type_distribution(&dataset_only_listing.processes, 1, 0, 0);
-    assert_effective_state_distribution(&dataset_only_listing.processes, 1, 0, 0, 0);
+    assert_effective_state_distribution(&dataset_only_listing.processes, 1, 0, 0, 0, 0);
 
     // Verify the process is a dataset scope, not webhook subscription
     let process = &dataset_only_listing.processes[0];
@@ -584,7 +622,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
     assert_eq!(all_webhooks_listing.processes.len(), 12);
     assert_eq!(all_webhooks_listing.total_count, 12);
     assert_flow_type_distribution(&all_webhooks_listing.processes, 0, 0, 12);
-    assert_effective_state_distribution(&all_webhooks_listing.processes, 4, 4, 1, 3);
+    assert_effective_state_distribution(&all_webhooks_listing.processes, 4, 4, 1, 3, 0);
 
     // Verify all processes are webhook subscriptions
     for process in &all_webhooks_listing.processes {
@@ -613,7 +651,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
     assert_eq!(multi_webhook_listing.processes.len(), 5);
     assert_eq!(multi_webhook_listing.total_count, 5);
     assert_flow_type_distribution(&multi_webhook_listing.processes, 0, 0, 5);
-    assert_effective_state_distribution(&multi_webhook_listing.processes, 2, 2, 1, 0);
+    assert_effective_state_distribution(&multi_webhook_listing.processes, 2, 2, 1, 0, 0);
 
     // Verify all processes are webhook subscriptions for the correct datasets
     for process in &multi_webhook_listing.processes {
@@ -679,6 +717,7 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
         &failing_webhooks.processes,
         0,
         failing_webhooks.processes.len(),
+        0,
         0,
         0,
     );
