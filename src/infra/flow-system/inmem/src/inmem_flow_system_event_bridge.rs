@@ -87,12 +87,12 @@ impl InMemoryFlowSystemEventBridge {
 
         let min_event_id = state.events.len() + 1;
 
-        for (source_event_id, occurred_at, payload) in source_events {
+        // TODO: revise event IDs
+        for (_source_event_id, occurred_at, payload) in source_events {
             let event_id = state.events.len() + 1;
             let event = FlowSystemEvent {
                 event_id: EventID::new(i64::try_from(event_id).unwrap()),
                 source_type,
-                source_event_id: *source_event_id,
                 occurred_at: *occurred_at,
                 payload: payload.clone(),
             };

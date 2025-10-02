@@ -118,69 +118,70 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
 
         let rows = sqlx::query!(
             r#"
-            WITH next AS (
-                SELECT e.*
-                FROM flow_system_events AS e
-                WHERE e.event_id >
-                    COALESCE(
-                        (
-                            SELECT last_event_id FROM flow_system_projected_offsets WHERE projector = $1
-                        ),
-                        0
-                    )
-                ORDER BY e.event_id
+            WITH p(last_id) AS (
+                SELECT COALESCE(
+                    (
+                        SELECT last_event_id
+                        FROM flow_system_projected_offsets
+                        WHERE projector = ?1
+                    ),
+                    0
+                )
+            ),
+
+            flows AS (
+                SELECT
+                    f.event_id AS event_id,
+                    'flows'           AS source_stream,
+                    f.event_time      AS occurred_at,
+                    f.event_payload   AS event_payload
+                FROM flow_events f, p
+                WHERE f.event_id > p.last_id
+                ORDER BY f.event_id
                 LIMIT $2
             ),
-            merged as (
-                SELECT
-                    fse.event_id,
-                    fse.source_stream,
-                    fse.source_event_id,
-                    fse.occurred_at,
-                    fe.event_payload
-                FROM flow_system_events fse
-                JOIN next n
-                    ON n.event_id = fse.event_id
-                JOIN flow_events fe
-                    ON fse.source_stream = 'flows' AND fe.event_id = fse.source_event_id
 
+            triggers AS (
+                SELECT
+                    t.event_id AS event_id,
+                    'triggers'        AS source_stream,
+                    t.event_time      AS occurred_at,
+                    t.event_payload   AS event_payload
+                FROM flow_trigger_events t, p
+                WHERE t.event_id > p.last_id
+                ORDER BY t.event_id
+                LIMIT $2
+            ),
+
+            configs AS (
+                SELECT
+                    c.event_id AS event_id,
+                    'configurations'  AS source_stream,
+                    c.event_time      AS occurred_at,
+                    c.event_payload   AS event_payload
+                FROM flow_configuration_events c, p
+                WHERE c.event_id > p.last_id
+                ORDER BY c.event_id
+                LIMIT $2
+            ),
+
+            unioned AS (
+                SELECT * FROM flows
                 UNION ALL
-
-                SELECT
-                    fse.event_id,
-                    fse.source_stream,
-                    fse.source_event_id,
-                    fse.occurred_at,
-                    fte.event_payload
-                FROM flow_system_events fse
-                JOIN next n
-                    ON n.event_id = fse.event_id
-                JOIN flow_trigger_events fte
-                    ON fse.source_stream = 'triggers' AND fte.event_id = fse.source_event_id
-
+                SELECT * FROM triggers
                 UNION ALL
-
-                SELECT
-                    fse.event_id,
-                    fse.source_stream,
-                    fse.source_event_id,
-                    fse.occurred_at,
-                    fce.event_payload
-                FROM flow_system_events fse
-                JOIN next n
-                    ON n.event_id = fse.event_id
-                JOIN flow_configuration_events fce
-                    ON fse.source_stream = 'configurations' AND fce.event_id = fse.source_event_id
+                SELECT * FROM configs
             )
+
             SELECT
-                event_id as "event_id!",
-                source_stream as "source_stream!: String",
-                source_event_id as "source_event_id!",
-                occurred_at as "occurred_at!: DateTime<Utc>",
-                event_payload as "event_payload!: serde_json::Value"
-            FROM merged
+                event_id                  AS "event_id!",
+                source_stream             AS "source_stream!: String",
+                occurred_at               AS "occurred_at!: DateTime<Utc>",
+                event_payload             AS "event_payload!: serde_json::Value"
+            FROM unioned
             ORDER BY event_id
-                "#,
+            LIMIT $2;
+            "#,
             projector_name,
             limit
         )
@@ -195,9 +196,9 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
                 source_type: match r.source_stream.as_str() {
                     "flows" => FlowSystemEventSourceType::Flow,
                     "triggers" => FlowSystemEventSourceType::FlowTrigger,
-                    _ => FlowSystemEventSourceType::FlowConfiguration,
+                    "configurations" => FlowSystemEventSourceType::FlowConfiguration,
+                    _ => panic!("Unknown source_stream type"),
                 },
-                source_event_id: EventID::new(r.source_event_id),
                 occurred_at: r.occurred_at,
                 payload: r.event_payload,
             })

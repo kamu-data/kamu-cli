@@ -293,7 +293,6 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                 SELECT
                     f.event_id,
                     'flows'::text         AS source_stream,
-                    f.event_id            AS source_event_id,
                     f.event_time          AS occurred_at,
                     f.event_payload       AS event_payload
                 FROM flow_events f
@@ -307,7 +306,6 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                 SELECT
                     t.event_id,
                     'triggers'::text      AS source_stream,
-                    t.event_id            AS source_event_id,
                     t.event_time          AS occurred_at,
                     t.event_payload       AS event_payload
                 FROM flow_trigger_events t
@@ -321,7 +319,6 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                 SELECT
                     c.event_id,
                     'configurations'::text AS source_stream,
-                    c.event_id             AS source_event_id,
                     c.event_time           AS occurred_at,
                     c.event_payload        AS event_payload
                 FROM flow_configuration_events c
@@ -342,7 +339,6 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
             SELECT
                 event_id            AS "event_id!",
                 source_stream       AS "source_stream!: String",
-                source_event_id     AS "source_event_id!",
                 occurred_at         AS "occurred_at!: DateTime<Utc>",
                 event_payload       AS "event_payload!"
             FROM unioned
@@ -368,7 +364,6 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                     "configurations" => FlowSystemEventSourceType::FlowConfiguration,
                     _ => panic!("Unknown source_stream type"),
                 },
-                source_event_id: EventID::new(r.source_event_id),
                 occurred_at: r.occurred_at,
                 payload: r.event_payload,
             })
