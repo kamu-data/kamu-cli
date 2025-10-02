@@ -137,7 +137,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
                     fse.source_stream,
                     fse.source_event_id,
                     fse.occurred_at,
-                    fse.inserted_at,
                     fe.event_payload
                 FROM flow_system_events fse
                 JOIN next n
@@ -152,7 +151,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
                     fse.source_stream,
                     fse.source_event_id,
                     fse.occurred_at,
-                    fse.inserted_at,
                     fte.event_payload
                 FROM flow_system_events fse
                 JOIN next n
@@ -167,7 +165,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
                     fse.source_stream,
                     fse.source_event_id,
                     fse.occurred_at,
-                    fse.inserted_at,
                     fce.event_payload
                 FROM flow_system_events fse
                 JOIN next n
@@ -180,7 +177,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
                 source_stream as "source_stream!: String",
                 source_event_id as "source_event_id!",
                 occurred_at as "occurred_at!: DateTime<Utc>",
-                inserted_at as "inserted_at!: DateTime<Utc>",
                 event_payload as "event_payload!: serde_json::Value"
             FROM merged
             ORDER BY event_id
@@ -203,7 +199,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
                 },
                 source_event_id: EventID::new(r.source_event_id),
                 occurred_at: r.occurred_at,
-                inserted_at: r.inserted_at,
                 payload: r.event_payload,
             })
             .collect();

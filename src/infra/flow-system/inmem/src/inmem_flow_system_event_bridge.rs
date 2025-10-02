@@ -11,18 +11,16 @@
 #![allow(dead_code)]
 
 use std::collections::{BTreeSet, HashMap};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use kamu_flow_system::*;
-use time_source::SystemTimeSource;
 use tokio::sync::broadcast;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowSystemEventBridge {
-    time_source: Arc<dyn SystemTimeSource>,
     state: Mutex<State>,
     tx: broadcast::Sender<(EventID, EventID)>,
 }
@@ -44,11 +42,10 @@ struct State {
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl InMemoryFlowSystemEventBridge {
-    pub fn new(time_source: Arc<dyn SystemTimeSource>) -> Self {
+    pub fn new() -> Self {
         let (tx, _rx) = broadcast::channel(1024);
 
         Self {
-            time_source,
             state: Mutex::new(State::default()),
             tx,
         }
@@ -97,7 +94,6 @@ impl InMemoryFlowSystemEventBridge {
                 source_type,
                 source_event_id: *source_event_id,
                 occurred_at: *occurred_at,
-                inserted_at: self.time_source.now(),
                 payload: payload.clone(),
             };
             state.events.push(event);

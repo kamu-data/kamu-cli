@@ -274,81 +274,80 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
 
         let rows = sqlx::query!(
             r#"
-            WITH next AS (
-                WITH projected AS (
-                    SELECT COALESCE(done, '{}'::int8multirange) AS done
-                    FROM flow_system_projected_events
-                    WHERE projector = $1
-                    UNION ALL
-                    SELECT '{}'::int8multirange AS done
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM flow_system_projected_events WHERE projector = $1
-                    )
-                    LIMIT 1
+            WITH projected AS (
+                SELECT COALESCE(done, '{}'::int8multirange) AS done
+                FROM flow_system_projected_events
+                WHERE projector = $1
+
+                UNION ALL
+
+                SELECT '{}'::int8multirange
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM flow_system_projected_events WHERE projector = $1
                 )
-                SELECT fse.event_id
-                FROM flow_system_events fse
-                CROSS JOIN projected
-                WHERE fse.event_id >= $2 AND fse.event_id <= $3 AND NOT (fse.event_id <@ projected.done)
-                ORDER BY fse.event_id
+
+                LIMIT 1
+            ),
+
+            flows AS (
+                SELECT
+                    f.event_id,
+                    'flows'::text         AS source_stream,
+                    f.event_id            AS source_event_id,
+                    f.event_time          AS occurred_at,
+                    f.event_payload       AS event_payload
+                FROM flow_events f
+                CROSS JOIN projected p
+                WHERE f.event_id >= $2 AND f.event_id <= $3 AND NOT (f.event_id <@ p.done)
+                ORDER BY f.event_id
                 LIMIT $4
             ),
-            merged as (
-                SELECT
-                    fse.event_id,
-                    fse.source_stream,
-                    fse.source_event_id,
-                    fse.occurred_at,
-                    fse.inserted_at,
-                    fe.event_payload
-                FROM flow_system_events fse
-                JOIN next n
-                    ON n.event_id = fse.event_id
-                JOIN flow_events fe
-                    ON fse.source_stream = 'flows'::flow_system_stream_type AND
-                        fe.event_id = fse.source_event_id
 
+            triggers AS (
+                SELECT
+                    t.event_id,
+                    'triggers'::text      AS source_stream,
+                    t.event_id            AS source_event_id,
+                    t.event_time          AS occurred_at,
+                    t.event_payload       AS event_payload
+                FROM flow_trigger_events t
+                CROSS JOIN projected p
+                WHERE t.event_id >= $2 AND t.event_id <= $3 AND NOT (t.event_id <@ p.done)
+                ORDER BY t.event_id
+                LIMIT $4
+            ),
+
+            configs AS (
+                SELECT
+                    c.event_id,
+                    'configurations'::text AS source_stream,
+                    c.event_id             AS source_event_id,
+                    c.event_time           AS occurred_at,
+                    c.event_payload        AS event_payload
+                FROM flow_configuration_events c
+                CROSS JOIN projected p
+                WHERE c.event_id >= $2 AND c.event_id <= $3 AND NOT (c.event_id <@ p.done)
+                ORDER BY c.event_id
+                LIMIT $4
+            ),
+
+            unioned AS (
+                SELECT * FROM flows
                 UNION ALL
-
-                SELECT
-                    fse.event_id,
-                    fse.source_stream,
-                    fse.source_event_id,
-                    fse.occurred_at,
-                    fse.inserted_at,
-                    fte.event_payload
-                FROM flow_system_events fse
-                JOIN next n
-                    ON n.event_id = fse.event_id
-                JOIN flow_trigger_events fte
-                    ON fse.source_stream = 'triggers'::flow_system_stream_type AND
-                        fte.event_id = fse.source_event_id
-
+                SELECT * FROM triggers
                 UNION ALL
-
-                SELECT
-                    fse.event_id,
-                    fse.source_stream,
-                    fse.source_event_id,
-                    fse.occurred_at,
-                    fse.inserted_at,
-                    fce.event_payload
-                FROM flow_system_events fse
-                JOIN next n
-                    ON n.event_id = fse.event_id
-                JOIN flow_configuration_events fce
-                    ON fse.source_stream = 'configurations'::flow_system_stream_type AND
-                        fce.event_id = fse.source_event_id
+                SELECT * FROM configs
             )
+
             SELECT
-                event_id as "event_id!",
-                source_stream as "source_stream!: String",
-                source_event_id as "source_event_id!",
-                occurred_at as "occurred_at!: DateTime<Utc>",
-                inserted_at as "inserted_at!: DateTime<Utc>",
-                event_payload as "event_payload!"
-            FROM merged
+                event_id            AS "event_id!",
+                source_stream       AS "source_stream!: String",
+                source_event_id     AS "source_event_id!",
+                occurred_at         AS "occurred_at!: DateTime<Utc>",
+                event_payload       AS "event_payload!"
+            FROM unioned
             ORDER BY event_id
+            LIMIT $4;
             "#,
             projector_name,
             adjusted_lower_bound_event_id,
@@ -371,7 +370,6 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                 },
                 source_event_id: EventID::new(r.source_event_id),
                 occurred_at: r.occurred_at,
-                inserted_at: r.inserted_at,
                 payload: r.event_payload,
             })
             .collect();
