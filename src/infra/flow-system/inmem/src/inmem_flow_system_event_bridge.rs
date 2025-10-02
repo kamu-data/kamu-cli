@@ -77,18 +77,18 @@ impl InMemoryFlowSystemEventBridge {
     pub(crate) fn save_events(
         &self,
         source_type: FlowSystemEventSourceType,
-        source_events: &[(EventID, DateTime<Utc>, serde_json::Value)],
-    ) {
-        if source_events.is_empty() {
-            return;
-        }
-
+        source_events: &[(DateTime<Utc>, serde_json::Value)],
+    ) -> EventID {
         let mut state = self.state.lock().unwrap();
 
-        let min_event_id = state.events.len() + 1;
+        if source_events.is_empty() {
+            return EventID::new(i64::try_from(state.events.len()).unwrap());
+        }
+
+        let min_event_id = EventID::new(i64::try_from(state.events.len() + 1).unwrap());
 
         // TODO: revise event IDs
-        for (_source_event_id, occurred_at, payload) in source_events {
+        for (occurred_at, payload) in source_events {
             let event_id = state.events.len() + 1;
             let event = FlowSystemEvent {
                 event_id: EventID::new(i64::try_from(event_id).unwrap()),
@@ -99,13 +99,12 @@ impl InMemoryFlowSystemEventBridge {
             state.events.push(event);
         }
 
-        let max_event_id = state.events.len();
+        let max_event_id = EventID::new(i64::try_from(state.events.len()).unwrap());
 
         // Wake up listeners
-        let _ = self.tx.send((
-            EventID::new(i64::try_from(min_event_id).unwrap()),
-            EventID::new(i64::try_from(max_event_id).unwrap()),
-        ));
+        let _ = self.tx.send((min_event_id, max_event_id));
+
+        max_event_id
     }
 }
 
