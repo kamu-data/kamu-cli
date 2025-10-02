@@ -11,18 +11,16 @@
 #![allow(dead_code)]
 
 use std::collections::{BTreeSet, HashMap};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use kamu_flow_system::*;
-use time_source::SystemTimeSource;
 use tokio::sync::broadcast;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowSystemEventBridge {
-    time_source: Arc<dyn SystemTimeSource>,
     state: Mutex<State>,
     tx: broadcast::Sender<(EventID, EventID)>,
 }
@@ -44,11 +42,10 @@ struct State {
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl InMemoryFlowSystemEventBridge {
-    pub fn new(time_source: Arc<dyn SystemTimeSource>) -> Self {
+    pub fn new() -> Self {
         let (tx, _rx) = broadcast::channel(1024);
 
         Self {
-            time_source,
             state: Mutex::new(State::default()),
             tx,
         }
@@ -80,36 +77,34 @@ impl InMemoryFlowSystemEventBridge {
     pub(crate) fn save_events(
         &self,
         source_type: FlowSystemEventSourceType,
-        source_events: &[(EventID, DateTime<Utc>, serde_json::Value)],
-    ) {
-        if source_events.is_empty() {
-            return;
-        }
-
+        source_events: &[(DateTime<Utc>, serde_json::Value)],
+    ) -> EventID {
         let mut state = self.state.lock().unwrap();
 
-        let min_event_id = state.events.len() + 1;
+        if source_events.is_empty() {
+            return EventID::new(i64::try_from(state.events.len()).unwrap());
+        }
 
-        for (source_event_id, occurred_at, payload) in source_events {
+        let min_event_id = EventID::new(i64::try_from(state.events.len() + 1).unwrap());
+
+        // TODO: revise event IDs
+        for (occurred_at, payload) in source_events {
             let event_id = state.events.len() + 1;
             let event = FlowSystemEvent {
                 event_id: EventID::new(i64::try_from(event_id).unwrap()),
                 source_type,
-                source_event_id: *source_event_id,
                 occurred_at: *occurred_at,
-                inserted_at: self.time_source.now(),
                 payload: payload.clone(),
             };
             state.events.push(event);
         }
 
-        let max_event_id = state.events.len();
+        let max_event_id = EventID::new(i64::try_from(state.events.len()).unwrap());
 
         // Wake up listeners
-        let _ = self.tx.send((
-            EventID::new(i64::try_from(min_event_id).unwrap()),
-            EventID::new(i64::try_from(max_event_id).unwrap()),
-        ));
+        let _ = self.tx.send((min_event_id, max_event_id));
+
+        max_event_id
     }
 }
 
