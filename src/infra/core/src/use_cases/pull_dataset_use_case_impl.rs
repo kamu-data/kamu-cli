@@ -464,23 +464,30 @@ impl PullDatasetUseCaseImpl {
 
     #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn elaborate_transform(
-        target_handle: &odf::DatasetHandle,
-        plan: TransformPreliminaryPlan,
+        mut pti: PullTransformItem,
         transform_options: TransformOptions,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         catalog: dill::Catalog,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformElaboration, TransformElaborateError> {
-        let transactional_target = dataset_registry.get_dataset_by_handle(target_handle).await;
+        pti.refresh_from_dataset_registry(&*dataset_registry)
+            .await
+            .int_err()?;
 
-        transform_elaboration_svc
+        let mut result = transform_elaboration_svc
             .elaborate_transform(
-                transactional_target,
-                plan,
+                pti.target.clone(),
+                pti.plan,
                 transform_options,
                 maybe_listener.clone(),
             )
-            .await
+            .await;
+
+        if let Ok(TransformElaboration::Elaborated(elaborate_res)) = &mut result {
+            elaborate_res.datasets_map.detach_from_transaction();
+        }
+
+        result
     }
 
     async fn transform(
@@ -498,8 +505,7 @@ impl PullDatasetUseCaseImpl {
         let pti_target = pti.target.clone();
 
         let transform_result = match Self::elaborate_transform(
-            pti.target.get_handle(),
-            pti.plan,
+            pti,
             transform_options,
             transform_elaboration_svc,
             catalog.clone(),
@@ -511,7 +517,7 @@ impl PullDatasetUseCaseImpl {
             Ok(TransformElaboration::Elaborated(plan)) => {
                 // Execute phase
                 let (target, result) = transform_executor
-                    .execute_transform(pti.target, plan, maybe_listener)
+                    .execute_transform(pti_target.clone(), plan, maybe_listener)
                     .await;
                 if let Ok(TransformResult::Updated {
                     old_head, new_head, ..
