@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH p(last_id) AS (\n                SELECT COALESCE(\n                    (\n                        SELECT last_event_id\n                        FROM flow_system_projected_offsets\n                        WHERE projector = ?1\n                    ),\n                    0\n                )\n            ),\n\n            flows AS (\n                SELECT\n                    f.event_id AS event_id,\n                    'flows'           AS source_stream,\n                    f.event_time      AS occurred_at,\n                    f.event_payload   AS event_payload\n                FROM flow_events f, p\n                WHERE f.event_id > p.last_id\n                ORDER BY f.event_id\n                LIMIT $2\n            ),\n\n            triggers AS (\n                SELECT\n                    t.event_id AS event_id,\n                    'triggers'        AS source_stream,\n                    t.event_time      AS occurred_at,\n                    t.event_payload   AS event_payload\n                FROM flow_trigger_events t, p\n                WHERE t.event_id > p.last_id\n                ORDER BY t.event_id\n                LIMIT $2\n            ),\n\n            configs AS (\n                SELECT\n                    c.event_id AS event_id,\n                    'configurations'  AS source_stream,\n                    c.event_time      AS occurred_at,\n                    c.event_payload   AS event_payload\n                FROM flow_configuration_events c, p\n                WHERE c.event_id > p.last_id\n                ORDER BY c.event_id\n                LIMIT $2\n            ),\n\n            unioned AS (\n                SELECT * FROM flows\n                UNION ALL\n                SELECT * FROM triggers\n                UNION ALL\n                SELECT * FROM configs\n            )\n\n            SELECT\n                event_id                  AS \"event_id!\",\n                source_stream             AS \"source_stream!: String\",\n                occurred_at               AS \"occurred_at!: DateTime<Utc>\",\n                event_payload             AS \"event_payload!: serde_json::Value\"\n            FROM unioned\n            ORDER BY event_id\n            LIMIT $2;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "source_stream!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "occurred_at!: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "event_payload!: serde_json::Value",
+        "ordinal": 3,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bc47e45c4a24641616155e7f36e63cdbfe37d2bdce7fbeec95439db1225cf727"
+}

@@ -45,7 +45,7 @@ impl FlowSystemEventAgentConfig {
             min_debounce_interval: Duration::from_millis(100),
             max_listening_timeout: Duration::from_secs(60),
             batch_size: 100,
-            loopback_offset: 300,
+            loopback_offset: 100,
         }
     }
 }

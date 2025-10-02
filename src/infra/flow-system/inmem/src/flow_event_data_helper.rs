@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,23 +19,16 @@ impl FlowEventDataHelper {
     /// Takes events and an extractor function to get the event time.
     pub(crate) fn prepare_merge_event_data<T, F>(
         events: &[T],
-        maybe_prev_stored_event_id: Option<EventID>,
         event_time_extractor: F,
-    ) -> Vec<(EventID, DateTime<Utc>, serde_json::Value)>
+    ) -> Vec<(DateTime<Utc>, serde_json::Value)>
     where
         F: Fn(&T) -> DateTime<Utc>,
         T: serde::Serialize,
     {
-        let prev_event_id = maybe_prev_stored_event_id
-            .map(|id| usize::try_from(id.into_inner()).unwrap())
-            .unwrap_or(0);
-
         events
             .iter()
-            .enumerate()
-            .map(|(i, event)| {
+            .map(|event| {
                 (
-                    EventID::new(i64::try_from(prev_event_id + 1 + i).unwrap()),
                     event_time_extractor(event),
                     serde_json::to_value(event).unwrap(),
                 )

@@ -94,23 +94,22 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
         }
 
         // Prepare data for FlowSystemEventStore - a merged stream
-        let merge_event_data = FlowEventDataHelper::prepare_merge_event_data(
-            &events,
-            maybe_prev_stored_event_id,
-            FlowTriggerEvent::event_time,
-        );
+        let merge_event_data =
+            FlowEventDataHelper::prepare_merge_event_data(&events, FlowTriggerEvent::event_time);
 
         // Save events to this store
-        let event_id = self
-            .inner
+        self.inner
             .save_events(query, maybe_prev_stored_event_id, events)
             .await?;
 
         // Save merged events to FlowSystemEventStore
-        self.flow_system_event_store
+        let global_event_id = self
+            .flow_system_event_store
             .save_events(FlowSystemEventSourceType::FlowTrigger, &merge_event_data);
 
-        Ok(event_id)
+        // Return the global event ID as the result of this operation,
+        // ignore local event ID in the inner store
+        Ok(global_event_id)
     }
 }
 

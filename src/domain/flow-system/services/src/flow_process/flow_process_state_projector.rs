@@ -341,7 +341,6 @@ impl FlowSystemEventProjector for FlowProcessStateProjector {
         tracing::debug!(
             event_id = %event.event_id,
             source_type = ?event.source_type,
-            source_event_id = %event.source_event_id,
             payload = ?event.payload,
             "Applying flow system event"
         );
