@@ -92,6 +92,7 @@ impl InMemoryFlowSystemEventBridge {
             let event_id = state.events.len() + 1;
             let event = FlowSystemEvent {
                 event_id: EventID::new(i64::try_from(event_id).unwrap()),
+                tx_id: 0, // tx_id, not used in in-mem impl
                 source_type,
                 occurred_at: *occurred_at,
                 payload: payload.clone(),
@@ -156,27 +157,17 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         _: &dill::Catalog,
         projector_name: &'static str,
         batch_size: usize,
-        _loopback_offset: usize, // Ignored by in-mem implementation
-        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let mut state = self.state.lock().unwrap();
 
         let pos = state.next_pos.get(projector_name).copied().unwrap_or(0);
         let applied = state.applied.entry(projector_name).or_default().clone();
 
-        let upper_bound_event_id = maybe_event_id_bounds_hint
-            .map(|(_, upper)| upper)
-            .unwrap_or(EventID::new(i64::MAX));
-
         let mut res = Vec::with_capacity(batch_size);
         let mut i = pos;
 
         while i < state.events.len() && res.len() < batch_size {
             let e = &state.events[i];
-
-            if e.event_id > upper_bound_event_id {
-                break; // don’t scan beyond the hint
-            }
 
             if !applied.contains(&e.event_id) {
                 res.push(e.clone());
@@ -196,13 +187,14 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         &self,
         _: &dill::Catalog,
         projector_name: &'static str,
-        event_ids: &[EventID],
+        event_ids_with_tx_ids: &[(EventID, i64)],
     ) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
+        // In-memory implementation does not care about
         let set = state.applied.entry(projector_name).or_default();
-        for &id in event_ids {
-            set.insert(id);
+        for (id, _) in event_ids_with_tx_ids {
+            set.insert(*id);
         }
 
         Ok(())

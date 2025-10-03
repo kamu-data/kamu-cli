@@ -57,7 +57,7 @@ impl FlowSystemEventAgentImpl {
             let mut num_total_processed = 0;
             loop {
                 // Apply a batch of events to the projector
-                match self.apply_batch_to_projector(&builder, None).await {
+                match self.apply_batch_to_projector(&builder).await {
                     // Success
                     Ok(num_processed) => {
                         tracing::debug!(
@@ -97,15 +97,6 @@ impl FlowSystemEventAgentImpl {
     async fn run_single_iteration(&self, hint: FlowSystemEventStoreWakeHint) {
         tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-        // We might have a hint from the event bridge about upper bound of new events
-        let maybe_event_id_bounds_hint = match hint {
-            FlowSystemEventStoreWakeHint::NewEvents {
-                lower_event_id_bound,
-                upper_event_id_bound,
-            } => Some((lower_event_id_bound, upper_event_id_bound)),
-            FlowSystemEventStoreWakeHint::Timeout => None,
-        };
-
         // For each projector, apply a batch of new events, just 1 batch per iteration.
         // Each projector will run in a separate transaction.
         let projector_builders = self
@@ -114,10 +105,7 @@ impl FlowSystemEventAgentImpl {
             .collect::<Vec<_>>();
 
         for builder in projector_builders {
-            match self
-                .apply_batch_to_projector(&builder, maybe_event_id_bounds_hint)
-                .await
-            {
+            match self.apply_batch_to_projector(&builder).await {
                 // Success
                 Ok(num_processed) => {
                     tracing::debug!(
@@ -145,7 +133,6 @@ impl FlowSystemEventAgentImpl {
     async fn apply_batch_to_projector(
         &self,
         projector_builder: &dill::TypecastBuilder<'_, dyn FlowSystemEventProjector>,
-        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<usize, InternalError> {
         // Construct projector instance
         let projector = projector_builder.get(&transaction_catalog).unwrap();
@@ -157,8 +144,6 @@ impl FlowSystemEventAgentImpl {
                 &transaction_catalog,
                 projector.name(),
                 self.agent_config.batch_size,
-                self.agent_config.loopback_offset,
-                maybe_event_id_bounds_hint,
             )
             .await?;
         tracing::debug!(batch_size = batch.len(), "Fetched batch");
@@ -174,7 +159,7 @@ impl FlowSystemEventAgentImpl {
         }
 
         // Mark projection progress
-        let ids: Vec<EventID> = batch.iter().map(|e| e.event_id).collect();
+        let ids: Vec<(EventID, i64)> = batch.iter().map(|e| (e.event_id, e.tx_id)).collect();
         self.flow_system_event_bridge
             .mark_applied(&transaction_catalog, projector.name(), &ids)
             .await?;

@@ -247,107 +247,50 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
         batch_size: usize,
-        loopback_offset: usize,
-        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
 
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        // Extract bound hints or use rude defaults
-        let (lower_bound_event_id, upper_bound_event_id) = maybe_event_id_bounds_hint
-            .map(|(lower, upper)| (lower.into_inner(), upper.into_inner()))
-            .unwrap_or((0, i64::MAX));
-
-        // Note: lower bound is only a hint, not a guarantee, we might have late events
-        // with earlier IDs, i.e. during crashes or missed PG NOTIFY messages
-
-        // Such a loopback offset should cover close to 100% of late events in realistic
-        // scenarios, and restrict linear scan of events from the stream start
-        let loop_back_offset = i64::try_from(loopback_offset).unwrap();
-        let adjusted_lower_bound_event_id = if lower_bound_event_id > loop_back_offset {
-            lower_bound_event_id - loop_back_offset
-        } else {
-            0
-        };
-
         let rows = sqlx::query!(
             r#"
-            WITH projected AS (
-                SELECT COALESCE(done, '{}'::int8multirange) AS done
-                FROM flow_system_projected_events
-                WHERE projector = $1
-
-                UNION ALL
-
-                SELECT '{}'::int8multirange
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM flow_system_projected_events WHERE projector = $1
-                )
-
-                LIMIT 1
-            ),
-
-            flows AS (
+            WITH projected_offsets AS (
                 SELECT
-                    f.event_id,
-                    'flows'::text         AS source_stream,
-                    f.event_time          AS occurred_at,
-                    f.event_payload       AS event_payload
-                FROM flow_events f
-                CROSS JOIN projected p
-                WHERE f.event_id >= $2 AND f.event_id <= $3 AND NOT (f.event_id <@ p.done)
-                ORDER BY f.event_id
-                LIMIT $4
-            ),
-
-            triggers AS (
-                SELECT
-                    t.event_id,
-                    'triggers'::text      AS source_stream,
-                    t.event_time          AS occurred_at,
-                    t.event_payload       AS event_payload
-                FROM flow_trigger_events t
-                CROSS JOIN projected p
-                WHERE t.event_id >= $2 AND t.event_id <= $3 AND NOT (t.event_id <@ p.done)
-                ORDER BY t.event_id
-                LIMIT $4
-            ),
-
-            configs AS (
-                SELECT
-                    c.event_id,
-                    'configurations'::text AS source_stream,
-                    c.event_time           AS occurred_at,
-                    c.event_payload        AS event_payload
-                FROM flow_configuration_events c
-                CROSS JOIN projected p
-                WHERE c.event_id >= $2 AND c.event_id <= $3 AND NOT (c.event_id <@ p.done)
-                ORDER BY c.event_id
-                LIMIT $4
-            ),
-
-            unioned AS (
-                SELECT * FROM flows
-                UNION ALL
-                SELECT * FROM triggers
-                UNION ALL
-                SELECT * FROM configs
+                    COALESCE(
+                        ( SELECT last_tx_id FROM flow_system_projected_offsets WHERE projector = $1),
+                        '0'::xid8
+                    ) AS last_tx_id,
+                    COALESCE(
+                        ( SELECT last_event_id FROM flow_system_projected_offsets WHERE projector = $1),
+                        0::bigint
+                    ) AS last_event_id
             )
 
             SELECT
                 event_id            AS "event_id!",
+                tx_id::text::bigint AS "tx_id!: i64",
                 source_stream       AS "source_stream!: String",
-                occurred_at         AS "occurred_at!: DateTime<Utc>",
+                event_time          AS "occurred_at!: DateTime<Utc>",
                 event_payload       AS "event_payload!"
-            FROM unioned
-            ORDER BY event_id
-            LIMIT $4;
+            FROM flow_system_events e, projected_offsets
+            WHERE
+                -- Ignore rows from txns that might still be in flight ("Usain Bolt")
+                e.tx_id < pg_snapshot_xmin(pg_current_snapshot()) AND (
+                    (
+                        -- Same transaction as last projected event, but higher event id
+                        e.tx_id = projected_offsets.last_tx_id AND
+                        e.event_id > projected_offsets.last_event_id
+                    ) OR
+                    (
+                        -- Later transaction than last projected event
+                        e.tx_id > projected_offsets.last_tx_id
+                    )
+                )
+            ORDER BY e.tx_id ASC, e.event_id ASC
+            LIMIT $2
             "#,
             projector_name,
-            adjusted_lower_bound_event_id,
-            upper_bound_event_id,
             i64::try_from(batch_size).unwrap()
         )
         .fetch_all(connection_mut)
@@ -358,6 +301,7 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
             .into_iter()
             .map(|r| FlowSystemEvent {
                 event_id: EventID::new(r.event_id),
+                tx_id: r.tx_id,
                 source_type: match r.source_stream.as_str() {
                     "flows" => FlowSystemEventSourceType::Flow,
                     "triggers" => FlowSystemEventSourceType::FlowTrigger,
@@ -377,9 +321,9 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         &self,
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
-        event_ids: &[EventID],
+        event_ids_with_tx_ids: &[(EventID, i64)],
     ) -> Result<(), InternalError> {
-        if event_ids.is_empty() {
+        if event_ids_with_tx_ids.is_empty() {
             return Ok(());
         }
 
@@ -388,27 +332,27 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        // Convert event IDs to a vector of i64 for bulk insert
-        let event_id_values: Vec<i64> = event_ids.iter().map(|id| id.into_inner()).collect();
+        let (last_event_id, last_tx_id) = event_ids_with_tx_ids
+            .iter()
+            .map(|(event_id, tx_id)| (event_id.into_inner(), *tx_id))
+            .max()
+            .unwrap();
 
         sqlx::query!(
             r#"
-            WITH new_ranges AS (
-                SELECT COALESCE(
-                    range_agg(int8range(id, id, '[]')),
-                    '{}'::int8multirange
-                ) AS ranges
-                FROM unnest($2::bigint[]) AS t(id)
-            )
-            INSERT INTO flow_system_projected_events (projector, done, updated_at)
-                SELECT $1, ranges, now()
-                FROM new_ranges
-                ON CONFLICT (projector) DO UPDATE SET
-                    done = flow_system_projected_events.done + (SELECT ranges FROM new_ranges),
-                    updated_at = now();
+            INSERT INTO flow_system_projected_offsets (projector, last_tx_id, last_event_id, updated_at)
+                VALUES ($1, ($2)::text::xid8, $3, now())
+                ON CONFLICT (projector) DO UPDATE
+                SET
+                    last_tx_id    = EXCLUDED.last_tx_id,
+                    last_event_id = EXCLUDED.last_event_id,
+                    updated_at    = now()
+                WHERE (EXCLUDED.last_tx_id, EXCLUDED.last_event_id)
+                    > (flow_system_projected_offsets.last_tx_id, flow_system_projected_offsets.last_event_id);
             "#,
             projector_name,
-            &event_id_values
+            last_tx_id.to_string(),
+            last_event_id,
         )
         .execute(connection_mut)
         .await

@@ -106,8 +106,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
         batch_size: usize,
-        _loopback_offset: usize, // Ignored by SQLite implementation
-        _maybe_event_id_bounds_hint: Option<(EventID, EventID)>, // Ignored by SQLite implementation
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
 
@@ -193,6 +191,7 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
             .into_iter()
             .map(|r| FlowSystemEvent {
                 event_id: EventID::new(r.event_id),
+                tx_id: 0, // tx_id not tracked in SQLite impl
                 source_type: match r.source_stream.as_str() {
                     "flows" => FlowSystemEventSourceType::Flow,
                     "triggers" => FlowSystemEventSourceType::FlowTrigger,
@@ -212,9 +211,9 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         &self,
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
-        event_ids: &[EventID],
+        event_ids_with_tx_ids: &[(EventID, i64)],
     ) -> Result<(), InternalError> {
-        if event_ids.is_empty() {
+        if event_ids_with_tx_ids.is_empty() {
             return Ok(());
         }
 
@@ -224,7 +223,12 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         let connection_mut = guard.connection_mut().await?;
 
         // Use the maximum event_id value from the array to update the boundary
-        let last_event_id = event_ids.iter().map(|id| id.into_inner()).max().unwrap();
+        // Note: in SQLite we ignore the tx_ids as they are not needed
+        let last_event_id = event_ids_with_tx_ids
+            .iter()
+            .map(|(event_id, _)| event_id.into_inner())
+            .max()
+            .unwrap();
 
         sqlx::query!(
             r#"
