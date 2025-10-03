@@ -31,8 +31,6 @@ pub trait FlowSystemEventBridge: Send + Sync {
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
         batch_size: usize,
-        loopback_offset: usize,
-        maybe_event_id_bounds_hint: Option<(EventID, EventID)>,
     ) -> Result<Vec<FlowSystemEvent>, InternalError>;
 
     /// Mark these events as applied for this projector (should be idempotent!).
@@ -40,7 +38,7 @@ pub trait FlowSystemEventBridge: Send + Sync {
         &self,
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
-        event_ids: &[EventID],
+        event_ids_with_tx_ids: &[(EventID, i64)],
     ) -> Result<(), InternalError>;
 }
 
@@ -51,11 +49,8 @@ pub enum FlowSystemEventStoreWakeHint {
     /// Timeout elapsed without new events
     Timeout,
 
-    /// New events detected with lower/upper bounds
-    NewEvents {
-        lower_event_id_bound: EventID,
-        upper_event_id_bound: EventID,
-    },
+    /// New events detected
+    NewEvents,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

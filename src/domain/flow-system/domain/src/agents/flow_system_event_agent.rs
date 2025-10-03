@@ -27,7 +27,6 @@ pub struct FlowSystemEventAgentConfig {
     pub min_debounce_interval: Duration,
     pub max_listening_timeout: Duration,
     pub batch_size: usize,
-    pub loopback_offset: usize,
 }
 
 impl FlowSystemEventAgentConfig {
@@ -36,7 +35,6 @@ impl FlowSystemEventAgentConfig {
             min_debounce_interval: Duration::from_millis(100),
             max_listening_timeout: Duration::from_secs(2),
             batch_size: 20,
-            loopback_offset: 0,
         }
     }
 
@@ -45,7 +43,6 @@ impl FlowSystemEventAgentConfig {
             min_debounce_interval: Duration::from_millis(100),
             max_listening_timeout: Duration::from_secs(60),
             batch_size: 100,
-            loopback_offset: 100,
         }
     }
 }

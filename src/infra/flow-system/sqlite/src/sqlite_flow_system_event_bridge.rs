@@ -76,11 +76,8 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
 
         loop {
             // Check for new events
-            if let Some(max_event_id) = self.check_for_new_events().await? {
-                return Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                    lower_event_id_bound: EventID::new(0), // can't provide this hint in SQLite
-                    upper_event_id_bound: max_event_id,
-                });
+            if let Some(_max_event_id) = self.check_for_new_events().await? {
+                return Ok(FlowSystemEventStoreWakeHint::NewEvents);
             }
 
             // Calculate remaining time
@@ -106,8 +103,6 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
         batch_size: usize,
-        _loopback_offset: usize, // Ignored by SQLite implementation
-        _maybe_event_id_bounds_hint: Option<(EventID, EventID)>, // Ignored by SQLite implementation
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
         let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
 
@@ -118,68 +113,21 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
 
         let rows = sqlx::query!(
             r#"
-            WITH p(last_id) AS (
-                SELECT COALESCE(
-                    (
-                        SELECT last_event_id
-                        FROM flow_system_projected_offsets
-                        WHERE projector = ?1
-                    ),
-                    0
-                )
-            ),
-
-            flows AS (
-                SELECT
-                    f.event_id AS event_id,
-                    'flows'           AS source_stream,
-                    f.event_time      AS occurred_at,
-                    f.event_payload   AS event_payload
-                FROM flow_events f, p
-                WHERE f.event_id > p.last_id
-                ORDER BY f.event_id
-                LIMIT $2
-            ),
-
-            triggers AS (
-                SELECT
-                    t.event_id AS event_id,
-                    'triggers'        AS source_stream,
-                    t.event_time      AS occurred_at,
-                    t.event_payload   AS event_payload
-                FROM flow_trigger_events t, p
-                WHERE t.event_id > p.last_id
-                ORDER BY t.event_id
-                LIMIT $2
-            ),
-
-            configs AS (
-                SELECT
-                    c.event_id AS event_id,
-                    'configurations'  AS source_stream,
-                    c.event_time      AS occurred_at,
-                    c.event_payload   AS event_payload
-                FROM flow_configuration_events c, p
-                WHERE c.event_id > p.last_id
-                ORDER BY c.event_id
-                LIMIT $2
-            ),
-
-            unioned AS (
-                SELECT * FROM flows
-                UNION ALL
-                SELECT * FROM triggers
-                UNION ALL
-                SELECT * FROM configs
-            )
-
             SELECT
-                event_id                  AS "event_id!",
-                source_stream             AS "source_stream!: String",
-                occurred_at               AS "occurred_at!: DateTime<Utc>",
-                event_payload             AS "event_payload!: serde_json::Value"
-            FROM unioned
-            ORDER BY event_id
+                e.event_id                AS "event_id!",
+                e.source_stream           AS "source_stream!: String",
+                e.event_time              AS "occurred_at!: DateTime<Utc>",
+                e.event_payload           AS "event_payload!: serde_json::Value"
+            FROM flow_system_events e
+            WHERE e.event_id > COALESCE(
+                (
+                    SELECT last_event_id
+                    FROM flow_system_projected_offsets
+                    WHERE projector = $1
+                ),
+                0
+            )
+            ORDER BY e.event_id
             LIMIT $2;
             "#,
             projector_name,
@@ -193,6 +141,7 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
             .into_iter()
             .map(|r| FlowSystemEvent {
                 event_id: EventID::new(r.event_id),
+                tx_id: 0, // tx_id not tracked in SQLite impl
                 source_type: match r.source_stream.as_str() {
                     "flows" => FlowSystemEventSourceType::Flow,
                     "triggers" => FlowSystemEventSourceType::FlowTrigger,
@@ -212,9 +161,9 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         &self,
         transaction_catalog: &dill::Catalog,
         projector_name: &'static str,
-        event_ids: &[EventID],
+        event_ids_with_tx_ids: &[(EventID, i64)],
     ) -> Result<(), InternalError> {
-        if event_ids.is_empty() {
+        if event_ids_with_tx_ids.is_empty() {
             return Ok(());
         }
 
@@ -224,7 +173,12 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         let connection_mut = guard.connection_mut().await?;
 
         // Use the maximum event_id value from the array to update the boundary
-        let last_event_id = event_ids.iter().map(|id| id.into_inner()).max().unwrap();
+        // Note: in SQLite we ignore the tx_ids as they are not needed
+        let last_event_id = event_ids_with_tx_ids
+            .iter()
+            .map(|(event_id, _)| event_id.into_inner())
+            .max()
+            .unwrap();
 
         sqlx::query!(
             r#"
