@@ -51,7 +51,7 @@ CREATE TABLE flow_trigger_events (
 );
 
 -- Assign global event_id from shared counter on insert
-CREATE TRIGGER flow_trigger_events_assign_gid
+CREATE TRIGGER flow_trigger_events_assign_event_id
     AFTER INSERT ON flow_trigger_events
 BEGIN
     UPDATE flow_event_global_counter SET val = val + 1 WHERE name = 'global';
