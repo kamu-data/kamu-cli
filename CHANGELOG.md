@@ -13,9 +13,10 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Changed
-- Discontinued binary releases for MacOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+- Discontinued binary releases for macOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
 - Update `merge` crate version `0.1` -> `0.2`
 - Removed `extra.graphql.enableArchetypeInference` config option that was added for compatibility during data migrations
+- (#1402) GQL: Apollo Tracing removed from response. To bring it back, add `x-trace-graphql=1` to request headers.
 
 ## [0.249.1] - 2025-09-25
 ### Fixed
@@ -23,7 +24,7 @@ Recommendation: for ease of reading, use the following order:
 
 ## [0.249.0] - 2025-09-23
 ### Changed
-- (#1372): GQL: Performance improvement via query vectorization for APIs:
+- (#1372) GQL: Performance improvement via query vectorization for APIs:
   - `Dataset::by_ids()`;
   - `DatasetMut::by_ids()`;
   - `Account::by_ids()`;
@@ -37,7 +38,7 @@ Recommendation: for ease of reading, use the following order:
   Ability to disable hints during iteration.
 - (#1384) `SearchActivePushSourcesVisitor`, `SearchActivePollingSourceVisitor`: accounting for the evolution of data 
   sources.
-- (#1366): Experiment: beginning of `cheap_clone()` integration.
+- (#1366) Experiment: beginning of `cheap_clone()` integration.
 
 ## [0.248.1] - 2025-09-11
 ### Fixed
@@ -67,7 +68,7 @@ Recommendation: for ease of reading, use the following order:
 - Flows: each input contribution to batching rule is reflected as an update of start condition,
    so that flow history may show how many accumulated records were present at the moment of each update
 - GQL: `Search::query()`: case insensitive search.
-- (#1263): `images/kamu-base-with-data-mt`: make datasets public by default.
+- (#1263) `images/kamu-base-with-data-mt`: make datasets public by default.
 ### Fixed
 - Crash when multiple unlabeled webhook subscriptions are defined within the same dataset
 - Restrict dataset creation with duplicate transform inputs.
