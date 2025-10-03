@@ -100,6 +100,8 @@ CREATE OR REPLACE VIEW flow_system_events AS
 
 /* ------------------------------ */
 
+-- Projector offsets table (with transaction tracking)
+
 CREATE TABLE flow_system_projected_offsets (
     projector TEXT NOT NULL PRIMARY KEY,
     last_tx_id xid8 NOT NULL DEFAULT '0'::xid8,

@@ -116,68 +116,21 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
 
         let rows = sqlx::query!(
             r#"
-            WITH p(last_id) AS (
-                SELECT COALESCE(
-                    (
-                        SELECT last_event_id
-                        FROM flow_system_projected_offsets
-                        WHERE projector = ?1
-                    ),
-                    0
-                )
-            ),
-
-            flows AS (
-                SELECT
-                    f.event_id AS event_id,
-                    'flows'           AS source_stream,
-                    f.event_time      AS occurred_at,
-                    f.event_payload   AS event_payload
-                FROM flow_events f, p
-                WHERE f.event_id > p.last_id
-                ORDER BY f.event_id
-                LIMIT $2
-            ),
-
-            triggers AS (
-                SELECT
-                    t.event_id AS event_id,
-                    'triggers'        AS source_stream,
-                    t.event_time      AS occurred_at,
-                    t.event_payload   AS event_payload
-                FROM flow_trigger_events t, p
-                WHERE t.event_id > p.last_id
-                ORDER BY t.event_id
-                LIMIT $2
-            ),
-
-            configs AS (
-                SELECT
-                    c.event_id AS event_id,
-                    'configurations'  AS source_stream,
-                    c.event_time      AS occurred_at,
-                    c.event_payload   AS event_payload
-                FROM flow_configuration_events c, p
-                WHERE c.event_id > p.last_id
-                ORDER BY c.event_id
-                LIMIT $2
-            ),
-
-            unioned AS (
-                SELECT * FROM flows
-                UNION ALL
-                SELECT * FROM triggers
-                UNION ALL
-                SELECT * FROM configs
-            )
-
             SELECT
-                event_id                  AS "event_id!",
-                source_stream             AS "source_stream!: String",
-                occurred_at               AS "occurred_at!: DateTime<Utc>",
-                event_payload             AS "event_payload!: serde_json::Value"
-            FROM unioned
-            ORDER BY event_id
+                e.event_id                AS "event_id!",
+                e.source_stream           AS "source_stream!: String",
+                e.event_time              AS "occurred_at!: DateTime<Utc>",
+                e.event_payload           AS "event_payload!: serde_json::Value"
+            FROM flow_system_events e
+            WHERE e.event_id > COALESCE(
+                (
+                    SELECT last_event_id
+                    FROM flow_system_projected_offsets
+                    WHERE projector = $1
+                ),
+                0
+            )
+            ORDER BY e.event_id
             LIMIT $2;
             "#,
             projector_name,
