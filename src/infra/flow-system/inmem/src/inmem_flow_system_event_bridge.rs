@@ -22,7 +22,7 @@ use tokio::sync::broadcast;
 
 pub struct InMemoryFlowSystemEventBridge {
     state: Mutex<State>,
-    tx: broadcast::Sender<(EventID, EventID)>,
+    tx: broadcast::Sender<()>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,8 +85,6 @@ impl InMemoryFlowSystemEventBridge {
             return EventID::new(i64::try_from(state.events.len()).unwrap());
         }
 
-        let min_event_id = EventID::new(i64::try_from(state.events.len() + 1).unwrap());
-
         // TODO: revise event IDs
         for (occurred_at, payload) in source_events {
             let event_id = state.events.len() + 1;
@@ -103,7 +101,7 @@ impl InMemoryFlowSystemEventBridge {
         let max_event_id = EventID::new(i64::try_from(state.events.len()).unwrap());
 
         // Wake up listeners
-        let _ = self.tx.send((min_event_id, max_event_id));
+        let _ = self.tx.send(());
 
         max_event_id
     }
@@ -124,12 +122,9 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         // Wait until a new event arrives or timeout elapses
         // For testing purposes, we keep this simple without complex backoff strategies
         match tokio::time::timeout(timeout, rx.recv()).await {
-            Ok(Ok((min_event_id, max_event_id))) => {
+            Ok(Ok(())) => {
                 // New event arrived
-                Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                    lower_event_id_bound: min_event_id,
-                    upper_event_id_bound: max_event_id,
-                })
+                Ok(FlowSystemEventStoreWakeHint::NewEvents)
             }
             Ok(Err(broadcast::error::RecvError::Closed)) => {
                 // Sender has been dropped, which should never happen in this case
@@ -137,12 +132,7 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
             }
             Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
                 // We lagged behind, but that's fine, just indicate new events are available
-                Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                    lower_event_id_bound: EventID::new(0),
-                    upper_event_id_bound: EventID::new(
-                        i64::try_from(self.get_events_count()).unwrap(),
-                    ),
-                })
+                Ok(FlowSystemEventStoreWakeHint::NewEvents)
             }
             Err(_elapsed) => {
                 // Timeout elapsed

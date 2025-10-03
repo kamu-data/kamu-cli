@@ -49,11 +49,8 @@ pub enum FlowSystemEventStoreWakeHint {
     /// Timeout elapsed without new events
     Timeout,
 
-    /// New events detected with lower/upper bounds
-    NewEvents {
-        lower_event_id_bound: EventID,
-        upper_event_id_bound: EventID,
-    },
+    /// New events detected
+    NewEvents,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

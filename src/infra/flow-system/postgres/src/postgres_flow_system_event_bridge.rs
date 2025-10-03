@@ -78,54 +78,6 @@ impl PostgresFlowSystemEventBridge {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         std::cmp::min(min_debounce_interval, remaining)
     }
-
-    async fn buffer_notifications(
-        &self,
-        listener: &mut PgListener,
-        initial_payload: Option<PgNotifyPayload>,
-        elapsed: Duration,
-        remaining_timeout: Duration,
-        min_debounce_interval: Duration,
-    ) -> Option<(EventID, EventID)> {
-        use tokio::time::{Instant, timeout};
-
-        // Seed from the first payload (if any)
-        let mut bounds = initial_payload.map(|p| (p.min, p.max));
-
-        // Only buffer if first NOTIFY arrived "too fast"
-        if elapsed < min_debounce_interval {
-            // Calculate how much time we have left in the debounce window
-            // also respect the outer wait_wake timeout
-            let budget = std::cmp::min(
-                min_debounce_interval.saturating_sub(elapsed),
-                remaining_timeout,
-            );
-            if !budget.is_zero() {
-                let end = Instant::now() + budget;
-                loop {
-                    let remaining = end.saturating_duration_since(Instant::now());
-                    if remaining.is_zero() {
-                        break;
-                    }
-
-                    match timeout(remaining, listener.recv()).await {
-                        Ok(Ok(n)) => {
-                            if let Ok(p) = serde_json::from_str::<PgNotifyPayload>(n.payload()) {
-                                bounds = Some(bounds.map_or((p.min, p.max), |old| {
-                                    (old.0.min(p.min), old.1.max(p.max))
-                                }));
-                            }
-                            // keep draining until time budget is up
-                        }
-                        Ok(Err(_)) | Err(_) => break, /* connection error → caller handles
-                                                       * reconnect, or time budget elapsed */
-                    }
-                }
-            }
-        }
-
-        bounds
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,41 +131,30 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
 
             // Wait for notification with remaining timeout
             match tokio::time::timeout(remaining_timeout, listener.recv()).await {
-                // Got a NOTIFY — check if we should buffer for more events
-                Ok(Ok(notification)) => {
-                    // Parse initial payload
-                    let initial_payload: Option<PgNotifyPayload> =
-                        serde_json::from_str(notification.payload()).ok();
+                // Got a NOTIFY - new events are available
+                Ok(Ok(_notification)) => {
+                    // Optionally debounce by waiting a bit to collect more notifications
+                    if !min_debounce_interval.is_zero() {
+                        let remaining_after_debounce = deadline
+                            .saturating_duration_since(tokio::time::Instant::now())
+                            .saturating_sub(min_debounce_interval);
 
-                    // Calculate how long we've been waiting since the start
-                    let elapsed = deadline
-                        .saturating_duration_since(tokio::time::Instant::now())
-                        .saturating_sub(remaining_timeout);
-
-                    // Buffer additional notifications if appropriate
-                    let bounds = self
-                        .buffer_notifications(
-                            &mut listener,
-                            initial_payload,
-                            elapsed,
-                            remaining_timeout,
-                            min_debounce_interval,
-                        )
-                        .await;
+                        if !remaining_after_debounce.is_zero() {
+                            // Drain additional notifications during debounce period
+                            let _ = tokio::time::timeout(min_debounce_interval, async {
+                                while (listener.recv().await).is_ok() {
+                                    // Just drain, we don't need the payload
+                                    // anymore
+                                }
+                            })
+                            .await;
+                        }
+                    }
 
                     // Stash the listener back
                     *self.listener.lock().await = Some(listener);
 
-                    // Return the (potentially updated) bounds
-                    return match bounds {
-                        Some((min_event_id, max_event_id)) => {
-                            Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                                lower_event_id_bound: min_event_id,
-                                upper_event_id_bound: max_event_id,
-                            })
-                        }
-                        None => Ok(FlowSystemEventStoreWakeHint::Timeout),
-                    };
+                    return Ok(FlowSystemEventStoreWakeHint::NewEvents);
                 }
 
                 // Socket/conn error — drop listener and try to reconnect after delay
@@ -360,15 +301,6 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
 
         Ok(())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Deserialize)]
-struct PgNotifyPayload {
-    #[allow(dead_code)]
-    min: EventID,
-    max: EventID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

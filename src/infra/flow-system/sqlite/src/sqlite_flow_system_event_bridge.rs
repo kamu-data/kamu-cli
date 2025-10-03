@@ -76,11 +76,8 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
 
         loop {
             // Check for new events
-            if let Some(max_event_id) = self.check_for_new_events().await? {
-                return Ok(FlowSystemEventStoreWakeHint::NewEvents {
-                    lower_event_id_bound: EventID::new(0), // can't provide this hint in SQLite
-                    upper_event_id_bound: max_event_id,
-                });
+            if let Some(_max_event_id) = self.check_for_new_events().await? {
+                return Ok(FlowSystemEventStoreWakeHint::NewEvents);
             }
 
             // Calculate remaining time

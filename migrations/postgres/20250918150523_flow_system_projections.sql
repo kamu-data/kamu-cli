@@ -54,14 +54,8 @@ CREATE INDEX idx_flow_events_tx_order ON flow_events (tx_id, event_id);
 
 CREATE OR REPLACE FUNCTION notify_flow_system_events()
     RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE
-    min_id BIGINT; max_id BIGINT;
 BEGIN
-    SELECT min(event_id), max(event_id) INTO min_id, max_id FROM new_rows;
-    PERFORM pg_notify(
-        'flow_system_events_ready',
-        json_build_object('min', min_id, 'max', max_id)::text
-    );
+    PERFORM pg_notify('flow_system_events_ready', '');
     RETURN NULL;
 END $$;
 
