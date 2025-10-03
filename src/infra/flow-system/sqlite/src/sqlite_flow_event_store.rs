@@ -15,7 +15,7 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use sqlx::sqlite::SqliteRow;
-use sqlx::{FromRow, QueryBuilder, Row, Sqlite};
+use sqlx::{QueryBuilder, Row, Sqlite};
 
 use crate::helpers::*;
 
@@ -172,13 +172,6 @@ impl SqliteFlowEventStore {
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
         events: &[FlowEvent],
     ) -> Result<EventID, SaveEventsError> {
-        let connection_mut = tr.connection_mut().await?;
-
-        #[derive(FromRow)]
-        struct ResultRow {
-            event_id: i64,
-        }
-
         let mut query_builder = QueryBuilder::<sqlx::Sqlite>::new(
             r#"
             INSERT INTO flow_events (flow_id, event_time, event_type, event_payload)
@@ -193,15 +186,21 @@ impl SqliteFlowEventStore {
             b.push_bind(serde_json::to_value(event).unwrap());
         });
 
-        query_builder.push("RETURNING event_id");
-
-        let rows = query_builder
-            .build_query_as::<ResultRow>()
+        let connection_mut = tr.connection_mut().await?;
+        query_builder
+            .build()
             .fetch_all(connection_mut)
             .await
             .int_err()?;
-        let last_event_id = rows.last().unwrap().event_id;
-        Ok(EventID::new(last_event_id))
+
+        let connection_mut = tr.connection_mut().await?;
+        let actual_last_event_id =
+            sqlx::query_scalar!("SELECT val FROM flow_event_global_counter WHERE name = 'global'")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
+
+        Ok(EventID::new(actual_last_event_id))
     }
 }
 

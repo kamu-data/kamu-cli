@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{EventModel, ReturningEventModel, TransactionRefT};
+use database_common::{EventModel, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -124,7 +124,6 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
         }
 
         let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
 
         let mut query_builder = QueryBuilder::<Sqlite>::new(
             r#"
@@ -143,17 +142,21 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
             b.push_bind(serde_json::to_value(event).unwrap());
         });
 
-        query_builder.push("RETURNING event_id");
-
-        let rows = query_builder
-            .build_query_as::<ReturningEventModel>()
+        let connection_mut = tr.connection_mut().await?;
+        query_builder
+            .build()
             .fetch_all(connection_mut)
             .await
             .int_err()?;
 
-        let last_event_id = rows.last().unwrap().event_id;
+        let connection_mut = tr.connection_mut().await?;
+        let actual_last_event_id =
+            sqlx::query_scalar!("SELECT val FROM flow_event_global_counter WHERE name = 'global'")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
 
-        Ok(EventID::new(last_event_id))
+        Ok(EventID::new(actual_last_event_id))
     }
 
     async fn len(&self) -> Result<usize, InternalError> {

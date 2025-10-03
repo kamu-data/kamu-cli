@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT val FROM flow_event_global_counter WHERE name = 'global'",
+  "describe": {
+    "columns": [
+      {
+        "name": "val",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8e8af82d5b782b6b1a8e45d9c6554980bcbb40a2e3a45fd8156e14261588cc29"
+}

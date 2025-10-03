@@ -9,12 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{
-    EventModel,
-    ReturningEventModel,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{EventModel, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -131,7 +126,6 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
         }
 
         let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
 
         let mut query_builder = QueryBuilder::<Sqlite>::new(
             r#"
@@ -150,17 +144,22 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
             b.push_bind(serde_json::to_value(event).unwrap());
         });
 
-        query_builder.push("RETURNING event_id");
-
-        let rows = query_builder
-            .build_query_as::<ReturningEventModel>()
-            .fetch_all(connection_mut)
+        // Execute the insert - triggers will assign proper event_ids
+        let connection_mut = tr.connection_mut().await?;
+        query_builder
+            .build()
+            .execute(connection_mut)
             .await
             .int_err()?;
 
-        let last_event_id = rows.last().unwrap().event_id;
+        let connection_mut = tr.connection_mut().await?;
+        let actual_last_event_id =
+            sqlx::query_scalar!("SELECT val FROM flow_event_global_counter WHERE name = 'global'")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
 
-        Ok(EventID::new(last_event_id))
+        Ok(EventID::new(actual_last_event_id))
     }
 
     async fn len(&self) -> Result<usize, InternalError> {
