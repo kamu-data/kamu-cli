@@ -63,6 +63,7 @@ kamu-adapter-flow-webhook = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
 kamu-adapter-task-webhook = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
+graphql-http = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",
 ], default-features = false }

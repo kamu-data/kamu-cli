@@ -7460,6 +7460,7 @@ dependencies = [
  "fs_extra",
  "futures",
  "glob",
+ "graphql-http",
  "hex",
  "http 1.3.1",
  "http-common",
