@@ -1432,7 +1432,6 @@ pub struct FlowSystemEventAgentConfig {
     pub min_debounce_interval_ms: Option<u32>,
     pub max_listening_timeout_ms: Option<u32>,
     pub batch_size: Option<usize>,
-    pub loopback_offset: Option<usize>,
 }
 
 impl FlowSystemEventAgentConfig {
@@ -1450,7 +1449,6 @@ impl Default for FlowSystemEventAgentConfig {
             min_debounce_interval_ms: Some(100),
             max_listening_timeout_ms: Some(2000),
             batch_size: Some(20),
-            loopback_offset: Some(0),
         }
     }
 }

@@ -15,6 +15,7 @@ use event_sourcing::EventID;
 #[derive(Debug, Clone)]
 pub struct FlowSystemEvent {
     pub event_id: EventID,
+    pub tx_id: i64,
     pub source_type: FlowSystemEventSourceType,
     pub occurred_at: DateTime<Utc>,
     pub payload: serde_json::Value,

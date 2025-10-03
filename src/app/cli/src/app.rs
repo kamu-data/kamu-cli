@@ -1002,7 +1002,6 @@ pub fn register_config_in_catalog(
             flow_system_event_agent.max_listening_timeout_ms.unwrap(),
         )),
         batch_size: flow_system_event_agent.batch_size.unwrap(),
-        loopback_offset: flow_system_event_agent.loopback_offset.unwrap(),
     });
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();

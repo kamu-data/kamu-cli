@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO flow_system_projected_offsets (projector, last_tx_id, last_event_id, updated_at)\n                VALUES ($1, ($2)::text::xid8, $3, now())\n                ON CONFLICT (projector) DO UPDATE\n                SET\n                    last_tx_id    = EXCLUDED.last_tx_id,\n                    last_event_id = EXCLUDED.last_event_id,\n                    updated_at    = now()\n                WHERE (EXCLUDED.last_tx_id, EXCLUDED.last_event_id)\n                    > (flow_system_projected_offsets.last_tx_id, flow_system_projected_offsets.last_event_id);\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7139380447bc10c884a95e4249fba5fe5ae54f69ee799fa22bc04672de2ccfe1"
+}
