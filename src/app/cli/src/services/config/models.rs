@@ -1456,6 +1456,7 @@ impl Default for FlowSystemEventAgentConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct TaskAgentConfig {
     pub checking_interval_secs: Option<u32>,
 }
