@@ -132,13 +132,6 @@ resolver = "2"
 # TODO: Updating aws-sdk version forces to update minio image version. 
 # Update it once we will modify our tests to be compatible with latest version
 aws-sdk-s3 = "=1.68.0"
-# TODO: Delete after fixing error in transitive dependency:
-#       "Cross" cross compiler fails in GitHub action building aws-lc-sys for aarch64-unknown-linux-gnu (ARMv8)
-#       https://github.com/aws/aws-lc-rs/issues/889
-#       - OR -
-#       Your compiler (cc) is not supported due to a memcmp related bug
-#       https://github.com/cross-rs/cross/issues/1686
-aws-lc-rs = "=1.13.3"
 
 # Apps
 kamu-cli = { version = "0.249.1", path = "src/app/cli", default-features = false }
