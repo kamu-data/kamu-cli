@@ -46,6 +46,14 @@ impl FlowAgentConfig {
         }
     }
 
+    pub fn test_default() -> Self {
+        Self::new(
+            chrono::Duration::seconds(1),
+            chrono::Duration::minutes(1),
+            HashMap::new(),
+        )
+    }
+
     pub fn round_time(&self, time: DateTime<Utc>) -> Result<DateTime<Utc>, InternalError> {
         let rounded_time = time.duration_round(self.awaiting_step).int_err()?;
         Ok(rounded_time)
