@@ -10,18 +10,26 @@
 use std::sync::Arc;
 
 use async_graphql::value;
-use kamu::MetadataQueryServiceImpl;
-use kamu_core::TenancyConfig;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_services::testing::FakeDependencyGraphIndexer;
-use kamu_flow_system::{FlowAgentConfig, FlowSystemEventAgent, FlowSystemEventAgentConfig};
-use kamu_flow_system_inmem::{
-    InMemoryFlowConfigurationEventStore,
-    InMemoryFlowEventStore,
-    InMemoryFlowProcessState,
-    InMemoryFlowSystemEventBridge,
-    InMemoryFlowTriggerEventStore,
+use chrono::{DateTime, Duration, DurationRound, Utc};
+use kamu::{MetadataQueryServiceImpl, TransformRequestPlannerImpl};
+use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
+use kamu_core::{PullResult, TenancyConfig};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetResult,
+    DatasetIncrementQueryService,
+    DatasetIntervalIncrement,
 };
+use kamu_datasets_services::testing::{
+    FakeDependencyGraphIndexer,
+    MockDatasetIncrementQueryService,
+};
+use kamu_flow_system::*;
+use kamu_flow_system_inmem::*;
+use kamu_task_system::*;
+use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_services::TaskSchedulerImpl;
+use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -32,60 +40,85 @@ use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_
 async fn test_basic_process_state_actions_root_dataset() {
     let harness = FlowProcessesHarness::new().await;
 
+    // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo_result = harness.create_root_dataset(foo_alias).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
+    // Confirm initial primary process state
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "INGEST");
-    assert_eq!(process_summary.effective_state, "UNCONFIGURED");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "UNCONFIGURED".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
 
+    // Configure trigger and confirm state transitions
     harness
         .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
         .await;
 
-    harness.project_flow_system_events().await;
-
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "INGEST");
-    assert_eq!(process_summary.effective_state, "ACTIVE");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "ACTIVE".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // Pause trigger and confirm state transitions
 
     harness
         .pause_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
         .await;
 
-    harness.project_flow_system_events().await;
-
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "INGEST");
-    assert_eq!(process_summary.effective_state, "PAUSED_MANUAL");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "PAUSED_MANUAL".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // Resume trigger and confirm state transitions
 
     harness
         .resume_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
         .await;
 
-    harness.project_flow_system_events().await;
-
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "INGEST");
-    assert_eq!(process_summary.effective_state, "ACTIVE");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "ACTIVE".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,9 +127,11 @@ async fn test_basic_process_state_actions_root_dataset() {
 async fn test_basic_process_state_actions_derived_dataset() {
     let harness = FlowProcessesHarness::new().await;
 
+    // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo_result = harness.create_root_dataset(foo_alias).await;
 
+    // Create derived dataset
     let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let bar_result = harness
         .create_derived_dataset(bar_alias, vec![foo_result.dataset_handle.id.clone()])
@@ -104,55 +139,287 @@ async fn test_basic_process_state_actions_derived_dataset() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
+    // Confirm initial primary process state
+
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "EXECUTE_TRANSFORM");
-    assert_eq!(process_summary.effective_state, "UNCONFIGURED");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "EXECUTE_TRANSFORM".to_string(),
+            effective_state: "UNCONFIGURED".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // Configure trigger and confirm state transitions
 
     harness
         .set_reactive_trigger(&schema, &bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
         .await;
 
-    harness.project_flow_system_events().await;
-
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "EXECUTE_TRANSFORM");
-    assert_eq!(process_summary.effective_state, "ACTIVE");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "EXECUTE_TRANSFORM".to_string(),
+            effective_state: "ACTIVE".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // Pause trigger and confirm state transitions
 
     harness
         .pause_trigger(&schema, &bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
         .await;
 
-    harness.project_flow_system_events().await;
-
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "EXECUTE_TRANSFORM");
-    assert_eq!(process_summary.effective_state, "PAUSED_MANUAL");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "EXECUTE_TRANSFORM".to_string(),
+            effective_state: "PAUSED_MANUAL".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // Resume trigger and confirm state transitions
 
     harness
         .resume_trigger(&schema, &bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
         .await;
 
-    harness.project_flow_system_events().await;
-
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
     let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
-    assert_eq!(process_summary.flow_type, "EXECUTE_TRANSFORM");
-    assert_eq!(process_summary.effective_state, "ACTIVE");
-    assert_eq!(process_summary.consecutive_failures, 0);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "EXECUTE_TRANSFORM".to_string(),
+            effective_state: "ACTIVE".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_process_several_runs() {
+    let harness = FlowProcessesHarness::new().await;
+
+    // Create root dataset
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_result = harness.create_root_dataset(foo_alias).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    // Configure trigger
+    harness
+        .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .await;
+
+    // Mimic a successful 1st run
+    harness
+        .mimic_flow_run_with_outcome(
+            "0",
+            TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                    pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    },
+                }
+                .into_task_result(),
+            ),
+        )
+        .await;
+
+    // Read latest state
+
+    let response = harness
+        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
+        .await;
+    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "ACTIVE".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // Mimic a failed 2nd run
+    harness
+        .mimic_flow_run_with_outcome("1", TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    let response = harness
+        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
+        .await;
+    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "FAILING".to_string(),
+            consecutive_failures: 1,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // Mimic a failed 3rd run
+    harness
+        .mimic_flow_run_with_outcome("2", TaskOutcome::Failed(TaskError::empty_recoverable()))
+        .await;
+
+    let response = harness
+        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
+        .await;
+    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "FAILING".to_string(),
+            consecutive_failures: 2,
+            maybe_auto_stop_reason: None,
+        }
+    );
+
+    // 4th run succeeds
+    harness
+        .mimic_flow_run_with_outcome(
+            "3",
+            TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                    pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
+                    },
+                }
+                .into_task_result(),
+            ),
+        )
+        .await;
+
+    let response = harness
+        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
+        .await;
+    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "ACTIVE".to_string(),
+            consecutive_failures: 0,
+            maybe_auto_stop_reason: None,
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_process_reach_auto_stop_via_failures_count() {
+    let harness = FlowProcessesHarness::new().await;
+
+    // Create root dataset
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_result = harness.create_root_dataset(foo_alias).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    // Configure trigger
+    harness
+        .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .await;
+
+    // Mimic 3 failures
+    for i in 0..3 {
+        harness
+            .mimic_flow_run_with_outcome(
+                &i.to_string(),
+                TaskOutcome::Failed(TaskError::empty_recoverable()),
+            )
+            .await;
+
+        // Sync events explicitly to active re-scheduling
+        harness
+            .flow_system_event_agent
+            .catchup_remaining_events()
+            .await
+            .unwrap();
+    }
+
+    // Must see auto-stopped state with 3 consecutive failures
+    let response = harness
+        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
+        .await;
+    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "STOPPED_AUTO".to_string(),
+            consecutive_failures: 3,
+            maybe_auto_stop_reason: Some("STOP_POLICY".to_string()),
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
+    let harness = FlowProcessesHarness::new().await;
+
+    // Create root dataset
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_result = harness.create_root_dataset(foo_alias).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    // Configure trigger
+    harness
+        .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .await;
+
+    // Mimic an unrecoverable failure
+    harness
+        .mimic_flow_run_with_outcome("0", TaskOutcome::Failed(TaskError::empty_unrecoverable()))
+        .await;
+
+    // Must see auto-stopped state with unrecoverable failure
+    let response = harness
+        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
+        .await;
+    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    assert_eq!(
+        process_summary,
+        FlowProcessSummaryBasic {
+            flow_type: "INGEST".to_string(),
+            effective_state: "STOPPED_AUTO".to_string(),
+            consecutive_failures: 1,
+            maybe_auto_stop_reason: Some("UNRECOVERABLE_FAILURE".to_string()),
+        }
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,7 +428,7 @@ async fn test_basic_process_state_actions_derived_dataset() {
 struct FlowProcessesHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
-    _catalog_anonymous: dill::Catalog,
+    catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
@@ -174,7 +441,17 @@ impl FlowProcessesHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
+            let dataset_changes_mock = MockDatasetIncrementQueryService::with_increment_between(
+                DatasetIntervalIncrement {
+                    num_blocks: 1,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
+            );
+
             b.add::<MetadataQueryServiceImpl>()
+                .add_value(dataset_changes_mock)
+                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
                 .add_value(FlowSystemEventAgentConfig::local_default())
                 .add_value(FlowAgentConfig::test_default())
                 .add::<InMemoryFlowProcessState>()
@@ -182,25 +459,23 @@ impl FlowProcessesHarness {
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowEventStore>()
                 .add::<InMemoryFlowSystemEventBridge>()
-                .add::<FakeDependencyGraphIndexer>();
+                .add::<TaskSchedulerImpl>()
+                .add::<InMemoryTaskEventStore>()
+                .add::<FakeDependencyGraphIndexer>()
+                .add::<TransformRequestPlannerImpl>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
-            // kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
+            kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
 
-            /*register_message_dispatcher::<ts::TaskProgressMessage>(
+            register_message_dispatcher::<TaskProgressMessage>(
                 &mut b,
-                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-            );
-
-            register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
             );
 
             register_message_dispatcher::<FlowTriggerUpdatedMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-            );*/
+            );
 
             b.build()
         };
@@ -212,7 +487,7 @@ impl FlowProcessesHarness {
         Self {
             base_gql_harness,
             flow_system_event_agent: catalog_anonymous.get_one().unwrap(),
-            _catalog_anonymous: catalog_anonymous,
+            catalog_anonymous,
             catalog_authorized,
         }
     }
@@ -268,6 +543,11 @@ impl FlowProcessesHarness {
         schema: &kamu_adapter_graphql::Schema,
         dataset_id: &odf::DatasetID,
     ) -> async_graphql::Value {
+        self.flow_system_event_agent
+            .catchup_remaining_events()
+            .await
+            .unwrap();
+
         let request_code = r#"
             query($id: DatasetID!) {
                 datasets {
@@ -332,7 +612,7 @@ impl FlowProcessesHarness {
                                         }
                                     }
                                     triggerStopPolicyInput: {
-                                        never: { dummy: true }
+                                        afterConsecutiveFailures: { maxFailures: 3 }
                                     }
                                 ) {
                                     __typename
@@ -482,9 +762,95 @@ impl FlowProcessesHarness {
         assert!(response.is_ok(), "{:?}", response.errors);
     }
 
-    async fn project_flow_system_events(&self) {
-        self.flow_system_event_agent
-            .catchup_remaining_events()
+    async fn mimic_flow_run_with_outcome(
+        &self,
+        flow_id: &str,
+        task_outcome: TaskOutcome,
+    ) -> TaskID {
+        let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+        let flow_task_id = self.mimic_flow_scheduled(flow_id, schedule_time).await;
+        let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+
+        let running_time = schedule_time.duration_round(Duration::seconds(1)).unwrap();
+        self.mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
+            .await;
+
+        let complete_time = schedule_time.duration_round(Duration::seconds(1)).unwrap();
+        self.mimic_task_completed(
+            flow_task_id,
+            flow_task_metadata,
+            complete_time,
+            task_outcome,
+        )
+        .await;
+
+        flow_task_id
+    }
+
+    async fn mimic_flow_scheduled(&self, flow_id: &str, schedule_time: DateTime<Utc>) -> TaskID {
+        let flow_service_test_driver = self
+            .catalog_authorized
+            .get_one::<dyn FlowAgentTestDriver>()
+            .unwrap();
+
+        let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
+        flow_service_test_driver
+            .mimic_flow_scheduled(&self.catalog_authorized, flow_id, schedule_time)
+            .await
+            .unwrap()
+    }
+
+    async fn mimic_task_running(
+        &self,
+        task_id: TaskID,
+        task_metadata: TaskMetadata,
+        event_time: DateTime<Utc>,
+    ) {
+        let task_event_store = self
+            .catalog_anonymous
+            .get_one::<dyn TaskEventStore>()
+            .unwrap();
+
+        let mut task = Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap();
+        task.run(event_time).unwrap();
+        task.save(task_event_store.as_ref()).await.unwrap();
+
+        let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+                TaskProgressMessage::running(event_time, task_id, task_metadata),
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn mimic_task_completed(
+        &self,
+        task_id: TaskID,
+        task_metadata: TaskMetadata,
+        event_time: DateTime<Utc>,
+        task_outcome: TaskOutcome,
+    ) {
+        let task_event_store = self
+            .catalog_anonymous
+            .get_one::<dyn TaskEventStore>()
+            .unwrap();
+
+        let mut task = Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap();
+        task.finish(event_time, task_outcome.clone()).unwrap();
+        task.save(task_event_store.as_ref()).await.unwrap();
+
+        let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+                TaskProgressMessage::finished(event_time, task_id, task_metadata, task_outcome),
+            )
             .await
             .unwrap();
     }
@@ -514,10 +880,12 @@ impl FlowProcessesHarness {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Eq, PartialEq)]
 struct FlowProcessSummaryBasic {
     flow_type: String,
     effective_state: String,
     consecutive_failures: i32,
+    maybe_auto_stop_reason: Option<String>,
 }
 
 impl From<async_graphql::Value> for FlowProcessSummaryBasic {
@@ -533,10 +901,13 @@ impl From<async_graphql::Value> for FlowProcessSummaryBasic {
         let consecutive_failures =
             i32::try_from(summary["consecutiveFailures"].as_i64().unwrap()).unwrap();
 
+        let maybe_auto_stop_reason = summary["autoStoppedReason"].as_str();
+
         Self {
             flow_type,
             effective_state,
             consecutive_failures,
+            maybe_auto_stop_reason: maybe_auto_stop_reason.map(ToString::to_string),
         }
     }
 }
