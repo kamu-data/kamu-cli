@@ -9,10 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::collections::HashMap;
-
 use async_graphql::value;
-use chrono::Duration;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
@@ -597,11 +594,7 @@ impl FlowTriggerHarness {
                 .add::<InMemoryFlowEventStore>()
                 .add::<InMemoryFlowSystemEventBridge>()
                 .add::<InMemoryFlowProcessState>()
-                .add_value(FlowAgentConfig::new(
-                    Duration::seconds(1),
-                    Duration::minutes(1),
-                    HashMap::new(),
-                ))
+                .add_value(FlowAgentConfig::test_default())
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()
                 .add::<FakeDependencyGraphIndexer>();

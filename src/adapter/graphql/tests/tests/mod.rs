@@ -16,6 +16,7 @@ mod test_gql_dataset_adapter_collection;
 mod test_gql_dataset_adapter_versioned_file;
 mod test_gql_dataset_env_vars;
 mod test_gql_dataset_flow_configs;
+mod test_gql_dataset_flow_processes;
 mod test_gql_dataset_flow_runs;
 mod test_gql_dataset_flow_triggers;
 mod test_gql_datasets;
