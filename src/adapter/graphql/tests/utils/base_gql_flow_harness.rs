@@ -54,6 +54,11 @@ impl BaseGQLFlowHarness {
         b.build()
     }
 
+    pub fn logged_account_id(&self) -> odf::AccountID {
+        self.logged_account_from_catalog(&self.catalog_authorized)
+            .account_id
+    }
+
     pub async fn create_root_dataset(
         &self,
         dataset_alias: odf::DatasetAlias,

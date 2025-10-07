@@ -8,15 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use chrono::{DateTime, Duration, DurationRound, Utc};
+use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use indoc::indoc;
-use kamu_accounts::{
-    CurrentAccountSubject,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME_STR,
-    LoggedAccount,
-};
+use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_adapter_flow_dataset::{
     DATASET_RESOURCE_TYPE,
     DatasetResourceUpdateDetails,
@@ -24,21 +19,15 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
 };
 use kamu_adapter_task_dataset::*;
-use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
-use kamu_datasets_services::testing::{
-    FakeDependencyGraphIndexer,
-    MockDatasetIncrementQueryService,
-};
+use kamu_core::{CompactionResult, PullResult, ResetResult};
+use kamu_datasets::DatasetIntervalIncrement;
+use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{self as ts, TaskError};
-use kamu_task_system_inmem::InMemoryTaskEventStore;
-use kamu_task_system_services::TaskSchedulerImpl;
-use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
 
 use crate::utils::{
-    BaseGQLDatasetHarness,
-    BaseGQLFlowHarness,
+    BaseGQLFlowRunsHarness,
+    FlowRunsHarnessOverrides,
     GraphQLQueryRequest,
     expect_anonymous_access_error,
 };
@@ -4008,170 +3997,17 @@ async fn test_trigger_flow_automatically_via_schedule() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseGQLFlowHarness, base_gql_flow_harness)]
+#[oop::extend(BaseGQLFlowRunsHarness, base_gql_flow_runs_harness)]
 struct FlowRunsHarness {
-    base_gql_flow_harness: BaseGQLFlowHarness,
-}
-
-#[derive(Default)]
-struct FlowRunsHarnessOverrides {
-    dataset_changes_mock: Option<MockDatasetIncrementQueryService>,
+    base_gql_flow_runs_harness: BaseGQLFlowRunsHarness,
 }
 
 impl FlowRunsHarness {
     async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(TenancyConfig::SingleTenant)
-            .build();
-
-        let base_gql_flow_catalog =
-            BaseGQLFlowHarness::make_base_gql_flow_catalog(&base_gql_harness);
-
-        let runs_catalog = {
-            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);
-
-            let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
-
-            b.add_value(dataset_changes_mock)
-                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-                .add_value(FlowAgentConfig::test_default())
-                .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>()
-                .add::<FakeDependencyGraphIndexer>();
-
-            kamu_flow_system_services::register_dependencies(&mut b);
-            kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
-
-            register_message_dispatcher::<ts::TaskProgressMessage>(
-                &mut b,
-                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-            );
-
-            register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-            );
-
-            register_message_dispatcher::<FlowTriggerUpdatedMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-            );
-
-            b.build()
-        };
-
-        let base_gql_flow_harness = BaseGQLFlowHarness::new(base_gql_harness, runs_catalog).await;
-
+        let base_gql_flow_runs_harness = BaseGQLFlowRunsHarness::with_overrides(overrides).await;
         Self {
-            base_gql_flow_harness,
+            base_gql_flow_runs_harness,
         }
-    }
-
-    fn logged_account_id(&self) -> odf::AccountID {
-        Self::logged_account_from_catalog(&self.catalog_authorized).account_id
-    }
-
-    fn logged_account_from_catalog(catalog: &dill::Catalog) -> LoggedAccount {
-        let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-        if let CurrentAccountSubject::Logged(logged) = current_account_subject.as_ref() {
-            logged.clone()
-        } else {
-            panic!("Expected logged current user");
-        }
-    }
-
-    async fn mimic_flow_scheduled(
-        &self,
-        flow_id: &str,
-        schedule_time: DateTime<Utc>,
-    ) -> ts::TaskID {
-        let flow_service_test_driver = self
-            .catalog_authorized
-            .get_one::<dyn FlowAgentTestDriver>()
-            .unwrap();
-
-        let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
-        flow_service_test_driver
-            .mimic_flow_scheduled(&self.catalog_authorized, flow_id, schedule_time)
-            .await
-            .unwrap()
-    }
-
-    async fn mimic_flow_secondary_activation_cause(
-        &self,
-        flow_id: &str,
-        activation_cause: FlowActivationCause,
-    ) {
-        let flow_event_store = self
-            .catalog_authorized
-            .get_one::<dyn FlowEventStore>()
-            .unwrap();
-
-        let mut flow = Flow::load(
-            FlowID::new(flow_id.parse::<u64>().unwrap()),
-            flow_event_store.as_ref(),
-        )
-        .await
-        .unwrap();
-
-        flow.add_activation_cause_if_unique(Utc::now(), activation_cause)
-            .unwrap();
-        flow.save(flow_event_store.as_ref()).await.unwrap();
-    }
-
-    async fn mimic_task_running(
-        &self,
-        task_id: ts::TaskID,
-        task_metadata: ts::TaskMetadata,
-        event_time: DateTime<Utc>,
-    ) {
-        let task_event_store = self
-            .catalog_anonymous
-            .get_one::<dyn ts::TaskEventStore>()
-            .unwrap();
-
-        let mut task = ts::Task::load(task_id, task_event_store.as_ref())
-            .await
-            .unwrap();
-        task.run(event_time).unwrap();
-        task.save(task_event_store.as_ref()).await.unwrap();
-
-        let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
-        outbox
-            .post_message(
-                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-                ts::TaskProgressMessage::running(event_time, task_id, task_metadata),
-            )
-            .await
-            .unwrap();
-    }
-
-    async fn mimic_task_completed(
-        &self,
-        task_id: ts::TaskID,
-        task_metadata: ts::TaskMetadata,
-        event_time: DateTime<Utc>,
-        task_outcome: ts::TaskOutcome,
-    ) {
-        let task_event_store = self
-            .catalog_anonymous
-            .get_one::<dyn ts::TaskEventStore>()
-            .unwrap();
-
-        let mut task = ts::Task::load(task_id, task_event_store.as_ref())
-            .await
-            .unwrap();
-        task.finish(event_time, task_outcome.clone()).unwrap();
-        task.save(task_event_store.as_ref()).await.unwrap();
-
-        let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
-        outbox
-            .post_message(
-                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-                ts::TaskProgressMessage::finished(event_time, task_id, task_metadata, task_outcome),
-            )
-            .await
-            .unwrap();
     }
 
     fn extract_flow_id_from_trigger_response<'a>(
