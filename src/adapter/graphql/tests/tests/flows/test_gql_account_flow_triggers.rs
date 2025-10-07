@@ -279,20 +279,10 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
-        &foo_create_result.dataset_handle.id,
-        "INGEST",
-        1,
-        "DAYS",
-    );
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    harness
+        .set_time_delta_trigger(&foo_create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
 
     let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
@@ -478,20 +468,10 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
-        &bar_create_result.dataset_handle.id,
-        "INGEST",
-        1,
-        "DAYS",
-    );
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    harness
+        .set_time_delta_trigger(&bar_create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
 
     let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
@@ -921,62 +901,6 @@ impl FlowTriggerHarness {
             "#
         )
         .replace("<account_name>", account_name)
-    }
-
-    fn set_ingest_trigger_time_delta_mutation(
-        id: &odf::DatasetID,
-        dataset_flow_type: &str,
-        every: u64,
-        unit: &str,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    triggerRuleInput: {
-                                        schedule: {
-                                            timeDelta: { every: <every>, unit: "<unit>" }
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowTriggerSuccess {
-                                        trigger {
-                                            __typename
-                                            paused
-                                            schedule {
-                                                __typename
-                                                ... on TimeDelta {
-                                                    every
-                                                    unit
-                                                }
-                                            }
-                                            reactive {
-                                                __typename
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<every>", every.to_string().as_str())
-        .replace("<unit>", unit)
     }
 }
 

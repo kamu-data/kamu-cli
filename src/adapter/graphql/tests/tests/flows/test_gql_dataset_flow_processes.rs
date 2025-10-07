@@ -56,7 +56,8 @@ async fn test_basic_process_state_actions_root_dataset() {
 
     // Configure trigger and confirm state transitions
     harness
-        .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response = harness
@@ -150,7 +151,8 @@ async fn test_basic_process_state_actions_derived_dataset() {
     // Configure trigger and confirm state transitions
 
     harness
-        .set_reactive_trigger(&schema, &bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
+        .set_reactive_trigger_immediate(&bar_result.dataset_handle.id, "EXECUTE_TRANSFORM", false)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response = harness
@@ -222,7 +224,8 @@ async fn test_ingest_process_several_runs() {
 
     // Configure trigger
     harness
-        .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     // Mimic a successful 1st run
@@ -340,7 +343,8 @@ async fn test_ingest_process_reach_auto_stop_via_failures_count() {
 
     // Configure trigger
     harness
-        .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     // Mimic 3 failures
@@ -390,7 +394,8 @@ async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
 
     // Configure trigger
     harness
-        .set_time_delta_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     // Mimic an unrecoverable failure
@@ -528,104 +533,6 @@ impl FlowProcessesHarness {
         assert!(response.is_ok(), "{:?}", response.errors);
 
         response.data
-    }
-
-    async fn set_time_delta_trigger(
-        &self,
-        schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &odf::DatasetID,
-        flow_type: &str,
-    ) {
-        let mutation_code = r#"
-            mutation($id: DatasetID!, $flowType: String!) {
-                datasets {
-                    byId (datasetId: $id) {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: $flowType,
-                                    triggerRuleInput: {
-                                        schedule: {
-                                            timeDelta: { every: 5, unit: "MINUTES" }
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        afterConsecutiveFailures: { maxFailures: 3 }
-                                    }
-                                ) {
-                                    __typename
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#;
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code)
-                    .variables(async_graphql::Variables::from_value(value!({
-                        "id": dataset_id.to_string(),
-                        "flowType": flow_type,
-                    })))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await;
-
-        assert!(response.is_ok(), "{:?}", response.errors);
-    }
-
-    async fn set_reactive_trigger(
-        &self,
-        schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &odf::DatasetID,
-        flow_type: &str,
-    ) {
-        let mutation_code = r#"
-            mutation($id: DatasetID!, $flowType: String!) {
-                datasets {
-                    byId (datasetId: $id) {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: $flowType,
-                                    triggerRuleInput: {
-                                        reactive: {
-                                            forNewData: {
-                                                buffering: {
-                                                    minRecordsToAwait: 1,
-                                                    maxBatchingInterval: { every: 10, unit: "MINUTES" }
-                                                }
-                                            },
-                                            forBreakingChange: "NO_ACTION"
-                                        }
-                                    },
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
-                                ) {
-                                    __typename
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#;
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code)
-                    .variables(async_graphql::Variables::from_value(value!({
-                        "id": dataset_id.to_string(),
-                        "flowType": flow_type,
-                    })))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await;
-
-        assert!(response.is_ok(), "{:?}", response.errors);
     }
 
     async fn pause_trigger(
