@@ -117,6 +117,8 @@ async fn do_test_sync(
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     );
 
+    database_common::NoOpDatabasePlugin::init_database_components(&mut catalog_foo_builder);
+
     let catalog_foo = catalog_foo_builder.build();
 
     let mut mock_dataset_entry_writer_bar = MockDatasetEntryWriter::new();
@@ -172,6 +174,8 @@ async fn do_test_sync(
         &mut catalog_bar_builder,
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     );
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut catalog_bar_builder);
 
     let catalog_bar = catalog_bar_builder.build();
 

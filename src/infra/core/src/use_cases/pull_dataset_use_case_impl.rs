@@ -13,7 +13,7 @@ use std::sync::Arc;
 use database_common_macros::{
     transactional_method1,
     transactional_static_method1,
-    transactional_static_method3,
+    transactional_static_method2,
 };
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -34,6 +34,7 @@ pub struct PullDatasetUseCaseImpl {
     transform_executor: Arc<dyn TransformExecutor>,
     tenancy_config: Arc<TenancyConfig>,
     polling_ingest_service: Arc<dyn PollingIngestService>,
+    sync_svc: Arc<dyn SyncService>,
     catalog: dill::Catalog,
 }
 
@@ -118,6 +119,7 @@ impl PullDatasetUseCaseImpl {
                         tasks.spawn(Self::sync(
                             psi,
                             sync_options,
+                            self.sync_svc.clone(),
                             self.catalog.clone(),
                             maybe_listener,
                         ))
@@ -549,23 +551,13 @@ impl PullDatasetUseCaseImpl {
         })
     }
 
-    #[transactional_static_method3(dataset_registry: Arc<dyn DatasetRegistry>, sync_svc: Arc<dyn SyncService>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
     async fn sync(
-        mut psi: PullSyncItem,
+        psi: PullSyncItem,
         options: PullOptions,
+        sync_svc: Arc<dyn SyncService>,
         catalog: dill::Catalog,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
-        // Run sync action
-        psi.sync_request
-            .src
-            .refresh_dataset_from_registry(&*dataset_registry)
-            .await;
-        psi.sync_request
-            .dst
-            .refresh_dataset_from_registry(&*dataset_registry)
-            .await;
-
         let mut sync_result = sync_svc
             .sync(*psi.sync_request, options.sync_options, listener)
             .await;
@@ -573,24 +565,14 @@ impl PullDatasetUseCaseImpl {
         // Associate newly-synced datasets with remotes
         if options.add_aliases
             && let Ok(SyncResult::Updated { old_head: None, .. }) = &sync_result
+            && let Err(e) = Self::store_dataset_alias_transactional(
+                catalog,
+                &psi.local_target.as_local_ref(),
+                &psi.remote_ref,
+            )
+            .await
         {
-            // Note: this would have failed before sync if dataset didn't exist,
-            // however, by this moment the dataset must have been created
-            let hdl = dataset_registry
-                .resolve_dataset_handle_by_ref(&psi.local_target.as_local_ref())
-                .await
-                .int_err()?;
-
-            let alias_add_result = match remote_alias_registry.get_remote_aliases(&hdl).await {
-                Ok(mut aliases) => aliases.add(&psi.remote_ref, RemoteAliasKind::Pull).await,
-                Err(e) => match e {
-                    GetAliasesError::Internal(e) => Err(e),
-                },
-            };
-
-            if let Err(e) = alias_add_result {
-                sync_result = Err(SyncError::Internal(e));
-            }
+            sync_result = Err(SyncError::Internal(e));
         }
 
         // Prepare response
@@ -693,6 +675,27 @@ impl PullDatasetUseCaseImpl {
         }
 
         Ok(res)
+    }
+
+    #[transactional_static_method2(dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
+    async fn store_dataset_alias_transactional(
+        catalog: dill::Catalog,
+        local_ref: &odf::DatasetRef,
+        remote_ref: &odf::DatasetRefRemote,
+    ) -> Result<bool, InternalError> {
+        // Note: this would have failed before sync if dataset didn't exist,
+        // however, by this moment the dataset must have been created
+        let hdl = dataset_registry
+            .resolve_dataset_handle_by_ref(local_ref)
+            .await
+            .int_err()?;
+
+        match remote_alias_registry.get_remote_aliases(&hdl).await {
+            Ok(mut aliases) => aliases.add(remote_ref, RemoteAliasKind::Pull).await,
+            Err(e) => match e {
+                GetAliasesError::Internal(e) => Err(e),
+            },
+        }
     }
 }
 
