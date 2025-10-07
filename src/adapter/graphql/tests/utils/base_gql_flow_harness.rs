@@ -10,7 +10,6 @@
 use async_graphql::value;
 use kamu::MetadataQueryServiceImpl;
 use kamu_datasets::*;
-use kamu_flow_system_inmem::domain::{RetryBackoffType, RetryPolicy};
 use kamu_flow_system_inmem::*;
 use odf::metadata::testing::MetadataFactory;
 
@@ -583,9 +582,14 @@ impl BaseGQLFlowHarness {
         &self,
         dataset_id: &odf::DatasetID,
         fetch_uncacheable: bool,
+        retry_policy: Option<async_graphql::Value>,
     ) -> GraphQLQueryRequest {
         let mutation_code = r#"
-            mutation($datasetId: DatasetID!, $fetchUncacheable: Boolean!) {
+            mutation(
+                $datasetId: DatasetID!,
+                $fetchUncacheable: Boolean!,
+                $retryPolicy: FlowRetryPolicyInput
+            ) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
@@ -593,7 +597,8 @@ impl BaseGQLFlowHarness {
                                 setIngestConfig (
                                     ingestConfigInput : {
                                         fetchUncacheable: $fetchUncacheable,
-                                    }
+                                    },
+                                    retryPolicyInput: $retryPolicy
                                 ) {
                                     __typename,
                                     message
@@ -606,6 +611,15 @@ impl BaseGQLFlowHarness {
                                                     fetchUncacheable
                                                 }
                                             }
+                                            retryPolicy {
+                                                __typename
+                                                maxAttempts
+                                                minDelay {
+                                                    every
+                                                    unit
+                                                }
+                                                backoffType
+                                            }
                                         }
                                     }
                                 }
@@ -616,13 +630,19 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        GraphQLQueryRequest::new(
-            mutation_code,
-            async_graphql::Variables::from_value(value!({
-                "datasetId": dataset_id.to_string(),
-                "fetchUncacheable": fetch_uncacheable,
-            })),
-        )
+        let mut vars = value!({
+            "datasetId": dataset_id.to_string(),
+            "fetchUncacheable": fetch_uncacheable,
+        });
+
+        use async_graphql::*;
+        if let Some(retry_policy) = retry_policy
+            && let Value::Object(ref mut map) = vars
+        {
+            map.insert(Name::new("retryPolicy"), retry_policy);
+        }
+
+        GraphQLQueryRequest::new(mutation_code, async_graphql::Variables::from_value(vars))
     }
 
     pub fn set_compaction_config(
@@ -675,86 +695,6 @@ impl BaseGQLFlowHarness {
                 "datasetId": dataset_id.to_string(),
                 "maxSliceSize": max_slice_size,
                 "maxSliceRecords": max_slice_records,
-            })),
-        )
-    }
-
-    pub fn set_ingest_config_with_retries(
-        &self,
-        dataset_id: &odf::DatasetID,
-        fetch_uncacheable: bool,
-        retry_policy: &RetryPolicy,
-    ) -> GraphQLQueryRequest {
-        let mutation_code = r#"
-            mutation(
-                $datasetId: DatasetID!,
-                $fetchUncacheable: Boolean!,
-                $retryMaxAttempts: Int!,
-                $retryMinDelayMinutes: Int!,
-                $retryBackoffType: String!
-            ) {
-                datasets {
-                    byId (datasetId: $datasetId) {
-                        flows {
-                            configs {
-                                setIngestConfig (
-                                    ingestConfigInput : {
-                                        fetchUncacheable: $fetchUncacheable,
-                                    },
-                                    retryPolicyInput: {
-                                        maxAttempts: $retryMaxAttempts,
-                                        minDelay: {
-                                            every: $retryMinDelayMinutes,
-                                            unit: "MINUTES"
-                                        },
-                                        backoffType: $retryBackoffType
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowConfigSuccess {
-                                        config {
-                                            __typename
-                                            rule {
-                                                __typename
-                                                ... on FlowConfigRuleIngest {
-                                                    fetchUncacheable
-                                                }
-                                            }
-                                            retryPolicy {
-                                                __typename
-                                                maxAttempts
-                                                minDelay {
-                                                    every
-                                                    unit
-                                                }
-                                                backoffType
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#;
-
-        let retry_backoff_str = match retry_policy.backoff_type {
-            RetryBackoffType::Fixed => "FIXED",
-            RetryBackoffType::Linear => "LINEAR",
-            RetryBackoffType::Exponential => "EXPONENTIAL",
-            RetryBackoffType::ExponentialWithJitter => "EXPONENTIAL_WITH_JITTER",
-        };
-
-        GraphQLQueryRequest::new(
-            mutation_code,
-            async_graphql::Variables::from_value(value!({
-                "datasetId": dataset_id.to_string(),
-                "fetchUncacheable": fetch_uncacheable,
-                "retryMaxAttempts": retry_policy.max_attempts,
-                "retryMinDelayMinutes": retry_policy.min_delay_seconds / 60,
-                "retryBackoffType": retry_backoff_str,
             })),
         )
     }
