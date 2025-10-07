@@ -49,7 +49,12 @@ async fn test_crud_time_delta_root_dataset() {
     );
 
     let response = harness
-        .set_time_delta_trigger(&create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .set_time_delta_trigger(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -72,6 +77,10 @@ async fn test_crud_time_delta_root_dataset() {
                                         "unit": "DAYS"
                                     },
                                     "reactive": null,
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                        "maxFailures": 1
+                                    }
                                 }
                             }
                         }
@@ -82,7 +91,12 @@ async fn test_crud_time_delta_root_dataset() {
     );
 
     let response = harness
-        .set_time_delta_trigger(&create_result.dataset_handle.id, "INGEST", (2, "HOURS"))
+        .set_time_delta_trigger(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            (2, "HOURS"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -105,6 +119,10 @@ async fn test_crud_time_delta_root_dataset() {
                                         "unit": "HOURS"
                                     },
                                     "reactive": null,
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                        "maxFailures": 1
+                                    }
                                 }
                             }
                         }
@@ -139,6 +157,7 @@ async fn test_time_delta_validation() {
                 &create_result.dataset_handle.id,
                 "INGEST",
                 (test_case.0, test_case.1),
+                None,
             )
             .execute(&schema, &harness.catalog_authorized)
             .await;
@@ -161,6 +180,7 @@ async fn test_time_delta_validation() {
                 &create_result.dataset_handle.id,
                 "INGEST",
                 (test_case.0, test_case.1),
+                None,
             )
             .execute(&schema, &harness.catalog_authorized)
             .await;
@@ -203,7 +223,12 @@ async fn test_crud_cron_root_dataset() {
     );
 
     let response = harness
-        .set_cron_trigger(&create_result.dataset_handle.id, "INGEST", "*/2 * * * *")
+        .set_cron_trigger(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            "*/2 * * * *",
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -225,6 +250,10 @@ async fn test_crud_cron_root_dataset() {
                                         "cron5ComponentExpression": "*/2 * * * *",
                                     },
                                     "reactive": null,
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                        "maxFailures": 1
+                                    }
                                 }
                             }
                         }
@@ -235,7 +264,12 @@ async fn test_crud_cron_root_dataset() {
     );
 
     let response = harness
-        .set_cron_trigger(&create_result.dataset_handle.id, "INGEST", "0 */1 * * *")
+        .set_cron_trigger(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            "0 */1 * * *",
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -257,6 +291,10 @@ async fn test_crud_cron_root_dataset() {
                                         "cron5ComponentExpression": "0 */1 * * *",
                                     },
                                     "reactive": null,
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                        "maxFailures": 1
+                                    }
                                 }
                             }
                         }
@@ -274,6 +312,7 @@ async fn test_crud_cron_root_dataset() {
             &create_result.dataset_handle.id,
             "INGEST",
             invalid_cron_expression,
+            None,
         )
         .execute(&schema, &harness.catalog_authorized)
         .await;
@@ -303,11 +342,11 @@ async fn test_crud_cron_root_dataset() {
             &create_result.dataset_handle.id,
             "INGEST",
             past_cron_expression,
+            None,
         )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    // assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         response.data,
         value!({
@@ -630,7 +669,12 @@ async fn test_pause_resume_dataset_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     harness
-        .set_time_delta_trigger(&create_root_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .set_time_delta_trigger(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -845,6 +889,7 @@ async fn test_conditions_not_met_for_flows() {
             &create_root_result.dataset_handle.id,
             "INGEST",
             "0 */2 * * *",
+            None,
         )
         .execute(&schema, &harness.catalog_authorized)
         .await;
@@ -877,60 +922,27 @@ async fn test_stop_policies() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_root_result = harness.create_root_dataset(foo_alias).await;
 
-    //// Set ingest trigger stop policy with non-default consecutive failures
-
-    let mutation_code = indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: "INGEST",
-                                    triggerRuleInput: {
-                                        schedule: {
-                                            timeDelta: { every: 1, unit: "DAYS" }
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        afterConsecutiveFailures: { maxFailures: 3 }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowTriggerSuccess {
-                                        trigger {
-                                            __typename
-                                            stopPolicy {
-                                                __typename
-                                                ... on FlowTriggerStopPolicyAfterConsecutiveFailures {
-                                                    maxFailures
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &create_root_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    //// Set ingest trigger stop policy with non-default consecutive failures
+
+    let response = harness
+        .set_time_delta_trigger(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            Some(value!(
+                {
+                    "afterConsecutiveFailures": {
+                        "maxFailures": 3
+                    }
+                }
+            )),
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -942,6 +954,13 @@ async fn test_stop_policies() {
                                 "message": "Success",
                                 "trigger": {
                                     "__typename": "FlowTrigger",
+                                    "paused": false,
+                                    "schedule": {
+                                        "__typename": "TimeDelta",
+                                        "every": 1,
+                                        "unit": "DAYS"
+                                    },
+                                    "reactive": null,
                                     "stopPolicy": {
                                         "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
                                         "maxFailures": 3
@@ -956,52 +975,18 @@ async fn test_stop_policies() {
     );
 
     // Set another stop policy - never
-    let mutation_code = indoc!(
-        r#"
-        mutation {
-            datasets {
-                byId (datasetId: "<id>") {
-                    flows {
-                        triggers {
-                            setTrigger (
-                                datasetFlowType: "INGEST",
-                                triggerRuleInput: {
-                                    schedule: {
-                                        timeDelta: { every: 1, unit: "DAYS" }
-                                    }
-                                }
-                                triggerStopPolicyInput: {
-                                    never: { dummy: false }
-                                }
-                            ) {
-                                __typename,
-                                message
-                                ... on SetFlowTriggerSuccess {
-                                    trigger {
-                                        __typename
-                                        stopPolicy {
-                                            __typename
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    )
-    .replace("<id>", &create_root_result.dataset_handle.id.to_string());
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_time_delta_trigger(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            Some(value!( {
+                "never": { "dummy": true }
+            })),
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -1014,6 +999,13 @@ async fn test_stop_policies() {
                                 "message": "Success",
                                 "trigger": {
                                     "__typename": "FlowTrigger",
+                                    "paused": false,
+                                    "schedule": {
+                                        "__typename": "TimeDelta",
+                                        "every": 1,
+                                        "unit": "DAYS"
+                                    },
+                                    "reactive": null,
                                     "stopPolicy": {
                                         "__typename": "FlowTriggerStopPolicyNever",
                                     }
@@ -1038,46 +1030,24 @@ async fn test_stop_policies_validation() {
 
     //// Set ingest trigger stop policy with incorrect consecutive failures
 
-    let mutation_code = indoc!(
-        r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: "INGEST",
-                                    triggerRuleInput: {
-                                        schedule: {
-                                            timeDelta: { every: 1, unit: "DAYS" }
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        afterConsecutiveFailures: { maxFailures: 0 }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-    )
-    .replace("<id>", &create_root_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_time_delta_trigger(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            Some(value!(
+                {
+                    "afterConsecutiveFailures": {
+                        "maxFailures": 0
+                    }
+                }
+            )),
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -1113,6 +1083,7 @@ async fn test_anonymous_setters_fail() {
             &create_root_result.dataset_handle.id,
             "INGEST",
             (5, "MINUTES"),
+            None,
         )
         .expect_error()
         .execute(&schema, &harness.catalog_anonymous)

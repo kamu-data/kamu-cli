@@ -148,6 +148,15 @@ pub enum FlowTriggerStopPolicyInput {
     AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailuresInput),
 }
 
+// For tests only!
+impl Default for FlowTriggerStopPolicyInput {
+    fn default() -> Self {
+        Self::AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailuresInput {
+            max_failures: 1,
+        })
+    }
+}
+
 #[derive(InputObject, Debug)]
 pub struct FlowTriggerStopPolicyNeverInput {
     pub dummy: bool,

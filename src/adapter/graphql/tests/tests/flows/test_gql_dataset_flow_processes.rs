@@ -56,7 +56,12 @@ async fn test_basic_process_state_actions_root_dataset() {
 
     // Configure trigger and confirm state transitions
     harness
-        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .set_time_delta_trigger(
+            &foo_result.dataset_handle.id,
+            "INGEST",
+            (10, "MINUTES"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -228,7 +233,18 @@ async fn test_ingest_process_several_runs() {
 
     // Configure trigger
     harness
-        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .set_time_delta_trigger(
+            &foo_result.dataset_handle.id,
+            "INGEST",
+            (10, "MINUTES"),
+            Some(value!(
+                {
+                    "afterConsecutiveFailures": {
+                        "maxFailures": 3
+                    }
+                }
+            )),
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -347,7 +363,18 @@ async fn test_ingest_process_reach_auto_stop_via_failures_count() {
 
     // Configure trigger
     harness
-        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .set_time_delta_trigger(
+            &foo_result.dataset_handle.id,
+            "INGEST",
+            (10, "MINUTES"),
+            Some(value!(
+                {
+                    "afterConsecutiveFailures": {
+                        "maxFailures": 3
+                    }
+                }
+            )),
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -398,7 +425,12 @@ async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
 
     // Configure trigger
     harness
-        .set_time_delta_trigger(&foo_result.dataset_handle.id, "INGEST", (10, "MINUTES"))
+        .set_time_delta_trigger(
+            &foo_result.dataset_handle.id,
+            "INGEST",
+            (10, "MINUTES"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 

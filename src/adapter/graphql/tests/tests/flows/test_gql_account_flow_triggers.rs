@@ -280,7 +280,12 @@ async fn test_pause_resume_account_flows() {
     );
 
     harness
-        .set_time_delta_trigger(&foo_create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .set_time_delta_trigger(
+            &foo_create_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -469,7 +474,12 @@ async fn test_account_triggers_all_paused() {
     );
 
     harness
-        .set_time_delta_trigger(&bar_create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .set_time_delta_trigger(
+            &bar_create_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
