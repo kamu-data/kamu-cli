@@ -4208,7 +4208,12 @@ async fn test_trigger_flow_automatically_via_schedule() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let response = harness
-        .set_time_delta_trigger(&create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .set_time_delta_trigger(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            (1, "DAYS"),
+            None,
+        )
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -4231,6 +4236,10 @@ async fn test_trigger_flow_automatically_via_schedule() {
                                         "unit": "DAYS"
                                     },
                                     "reactive": null,
+                                    "stopPolicy": {
+                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                        "maxFailures": 1
+                                    }
                                 }
                             }
                         }

@@ -146,14 +146,31 @@ impl BaseGQLFlowHarness {
             .unwrap()
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn set_time_delta_trigger(
         &self,
         dataset_id: &odf::DatasetID,
         flow_type: &str,
         time_delta: (u64, &str),
+        stop_policy: Option<async_graphql::Value>,
     ) -> GraphQLQueryRequest {
+        let stop_policy = stop_policy.unwrap_or_else(|| {
+            value!(
+                {
+                    "afterConsecutiveFailures": {
+                        "maxFailures": 1_i32
+                    }
+                }
+            )
+        });
+
         let mutation_code = r#"
-            mutation($datasetId: DatasetID!, $flowType: String!, $timeDelta: TimeDeltaInput!) {
+            mutation(
+                $datasetId: DatasetID!,
+                $flowType: String!,
+                $timeDelta: TimeDeltaInput!,
+                $stopPolicy: FlowTriggerStopPolicyInput!
+            ) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
@@ -165,11 +182,7 @@ impl BaseGQLFlowHarness {
                                             timeDelta: $timeDelta
                                         }
                                     }
-                                    triggerStopPolicyInput: {
-                                        afterConsecutiveFailures: {
-                                            maxFailures: 3
-                                        }
-                                    }
+                                    triggerStopPolicyInput: $stopPolicy
                                 ) {
                                     __typename,
                                     message
@@ -187,6 +200,12 @@ impl BaseGQLFlowHarness {
                                             reactive {
                                                 __typename
                                             }
+                                            stopPolicy {
+                                                __typename
+                                                ... on FlowTriggerStopPolicyAfterConsecutiveFailures {
+                                                    maxFailures
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -197,27 +216,48 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        GraphQLQueryRequest::new(
-            mutation_code,
-            async_graphql::Variables::from_value(value!({
-                "datasetId": dataset_id.to_string(),
-                "flowType": flow_type,
-                "timeDelta": {
-                    "every": time_delta.0,
-                    "unit": time_delta.1,
-                },
-            })),
-        )
+        let mut vars = value!({
+            "datasetId": dataset_id.to_string(),
+            "flowType": flow_type.to_string(),
+            "timeDelta": {
+                "every": i32::try_from(time_delta.0).unwrap(),
+                "unit": time_delta.1,
+            },
+        });
+
+        use async_graphql::*;
+        if let Value::Object(ref mut map) = vars {
+            map.insert(Name::new("stopPolicy"), stop_policy);
+        }
+
+        GraphQLQueryRequest::new(mutation_code, Variables::from_value(vars))
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn set_cron_trigger(
         &self,
         dataset_id: &odf::DatasetID,
         flow_type: &str,
         cron_expression: &str,
+        stop_policy: Option<async_graphql::Value>,
     ) -> GraphQLQueryRequest {
+        let stop_policy = stop_policy.unwrap_or_else(|| {
+            value!(
+                {
+                    "afterConsecutiveFailures": {
+                        "maxFailures": 1_i32
+                    }
+                }
+            )
+        });
+
         let mutation_code = r#"
-            mutation($datasetId: DatasetID!, $flowType: String!, $cronExpression: String!) {
+            mutation(
+                $datasetId: DatasetID!,
+                $flowType: String!,
+                $cronExpression: String!,
+                $stopPolicy: FlowTriggerStopPolicyInput!
+            ) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
@@ -229,9 +269,7 @@ impl BaseGQLFlowHarness {
                                             cron5ComponentExpression: $cronExpression
                                         }
                                     }
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
+                                    triggerStopPolicyInput: $stopPolicy
                                 ) {
                                     __typename,
                                     message
@@ -248,6 +286,12 @@ impl BaseGQLFlowHarness {
                                             reactive {
                                                 __typename
                                             }
+                                            stopPolicy {
+                                                __typename
+                                                ... on FlowTriggerStopPolicyAfterConsecutiveFailures {
+                                                    maxFailures
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -258,14 +302,18 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        GraphQLQueryRequest::new(
-            mutation_code,
-            async_graphql::Variables::from_value(value!({
-                "datasetId": dataset_id.to_string(),
-                "flowType": flow_type,
-                "cronExpression": cron_expression,
-            })),
-        )
+        let mut vars = value!({
+            "datasetId": dataset_id.to_string(),
+            "flowType": flow_type.to_string(),
+            "cronExpression": cron_expression,
+        });
+
+        use async_graphql::*;
+        if let Value::Object(ref mut map) = vars {
+            map.insert(Name::new("stopPolicy"), stop_policy);
+        }
+
+        GraphQLQueryRequest::new(mutation_code, Variables::from_value(vars))
     }
 
     pub fn set_reactive_trigger_buffering(
