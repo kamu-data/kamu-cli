@@ -21,7 +21,7 @@ pub(crate) struct MoleculeMut;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeMut {
     #[graphql(guard = "LoggedInGuard")]
@@ -274,7 +274,7 @@ impl MoleculeProjectMut {
     }
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeProjectMut {
     /// Creates an announcement record for the project
