@@ -77,7 +77,8 @@ async fn test_basic_process_state_actions_root_dataset() {
     // Pause trigger and confirm state transitions
 
     harness
-        .pause_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .pause_flow_trigger(&foo_result.dataset_handle.id, "INGEST")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response = harness
@@ -97,7 +98,8 @@ async fn test_basic_process_state_actions_root_dataset() {
     // Resume trigger and confirm state transitions
 
     harness
-        .resume_trigger(&schema, &foo_result.dataset_handle.id, "INGEST")
+        .resume_flow_trigger(&foo_result.dataset_handle.id, "INGEST")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response = harness
@@ -172,7 +174,8 @@ async fn test_basic_process_state_actions_derived_dataset() {
     // Pause trigger and confirm state transitions
 
     harness
-        .pause_trigger(&schema, &bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
+        .pause_flow_trigger(&bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response = harness
@@ -192,7 +195,8 @@ async fn test_basic_process_state_actions_derived_dataset() {
     // Resume trigger and confirm state transitions
 
     harness
-        .resume_trigger(&schema, &bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
+        .resume_flow_trigger(&bar_result.dataset_handle.id, "EXECUTE_TRANSFORM")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response = harness
@@ -533,78 +537,6 @@ impl FlowProcessesHarness {
         assert!(response.is_ok(), "{:?}", response.errors);
 
         response.data
-    }
-
-    async fn pause_trigger(
-        &self,
-        schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &odf::DatasetID,
-        flow_type: &str,
-    ) {
-        let mutation_code = r#"
-            mutation($id: DatasetID!, $flowType: String!) {
-                datasets {
-                    byId (datasetId: $id) {
-                        flows {
-                            triggers {
-                                pauseFlow (
-                                    datasetFlowType: $flowType
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            "#;
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code)
-                    .variables(async_graphql::Variables::from_value(value!({
-                        "id": dataset_id.to_string(),
-                        "flowType": flow_type,
-                    })))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await;
-
-        assert!(response.is_ok(), "{:?}", response.errors);
-    }
-
-    async fn resume_trigger(
-        &self,
-        schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &odf::DatasetID,
-        flow_type: &str,
-    ) {
-        let mutation_code = r#"
-            mutation($id: DatasetID!, $flowType: String!) {
-                datasets {
-                    byId (datasetId: $id) {
-                        flows {
-                            triggers {
-                                resumeFlow (
-                                    datasetFlowType: $flowType
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            "#;
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code)
-                    .variables(async_graphql::Variables::from_value(value!({
-                        "id": dataset_id.to_string(),
-                        "flowType": flow_type,
-                    })))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await;
-
-        assert!(response.is_ok(), "{:?}", response.errors);
     }
 
     async fn mimic_flow_run_with_outcome(

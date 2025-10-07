@@ -810,18 +810,13 @@ async fn test_pause_resume_dataset_flows() {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
-    let mutation_pause_root_compaction = FlowTriggerHarness::pause_flow_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_pause_root_compaction)
-                .data(harness.catalog_authorized.clone()),
+    let _response = harness
+        .pause_flow_trigger(
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
 
     // execute transform should be paused
 
@@ -841,16 +836,10 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Pause all the root
-    let mutation_pause_all_root =
-        FlowTriggerHarness::pause_all_flows_mutation(&create_root_result.dataset_handle.id);
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_pause_all_root)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let _response = harness
+        .pause_all_flow_triggers(&create_root_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
 
     // Root flows should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![true, true])
@@ -869,16 +858,10 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Resume ingestion
-    let mutation_resume_ingest =
-        FlowTriggerHarness::resume_flow_mutation(&create_root_result.dataset_handle.id, "INGEST");
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_resume_ingest)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let _response = harness
+        .resume_flow_trigger(&create_root_result.dataset_handle.id, "INGEST")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
 
     // Only transform of deriving should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
@@ -897,18 +880,13 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Pause derived transform
-    let mutation_pause_derived_transform = FlowTriggerHarness::pause_flow_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_pause_derived_transform)
-                .data(harness.catalog_authorized.clone()),
+    let _response = harness
+        .pause_flow_trigger(
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
 
     // Observe status change
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
@@ -927,16 +905,10 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Resume all derived
-    let mutation_resume_derived_all =
-        FlowTriggerHarness::resume_all_flows_mutation(&create_derived_result.dataset_handle.id);
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_resume_derived_all)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let _response = harness
+        .resume_all_flow_triggers(&create_derived_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
 
     // Observe status change
     for ((dataset_id, dataset_flow_type), expect_paused) in
@@ -1356,88 +1328,6 @@ impl FlowTriggerHarness {
                         flows {
                             triggers {
                                 allPaused
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-    }
-
-    fn pause_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                pauseFlow (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-    }
-
-    fn resume_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                resumeFlow (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-    }
-
-    fn pause_all_flows_mutation(id: &odf::DatasetID) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                pauseFlows
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-    }
-
-    fn resume_all_flows_mutation(id: &odf::DatasetID) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                resumeFlows
                             }
                         }
                     }

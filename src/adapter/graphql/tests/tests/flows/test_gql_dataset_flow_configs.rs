@@ -72,14 +72,9 @@ async fn test_crud_ingest_root_dataset() {
         })
     );
 
-    let mutation_code =
-        FlowConfigHarness::set_ingest_config_mutation(&create_result.dataset_handle.id, false);
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .set_ingest_config(&create_result.dataset_handle.id, false)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -108,14 +103,9 @@ async fn test_crud_ingest_root_dataset() {
         })
     );
 
-    let mutation_code =
-        FlowConfigHarness::set_ingest_config_mutation(&create_result.dataset_handle.id, true);
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .set_ingest_config(&create_result.dataset_handle.id, true)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -205,17 +195,9 @@ async fn test_crud_compaction_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
-        &create_result.dataset_handle.id,
-        1_000_000,
-        10000,
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .set_compaction_config(&create_result.dataset_handle.id, 1_000_000, 10000)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -265,17 +247,13 @@ async fn test_compaction_config_validation() {
             "Maximum slice records must be a positive number",
         ),
     ] {
-        let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
-            &create_root_result.dataset_handle.id,
-            test_case.0,
-            test_case.1,
-        );
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_authorized.clone()),
+        let response = harness
+            .set_compaction_config(
+                &create_root_result.dataset_handle.id,
+                test_case.0,
+                test_case.1,
             )
+            .execute(&schema, &harness.catalog_authorized)
             .await;
         assert!(response.is_ok(), "{response:?}");
         assert_eq!(
@@ -316,16 +294,9 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let mutation_code = FlowConfigHarness::set_ingest_config_mutation(
-        &create_derived_result.dataset_handle.id,
-        false,
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .set_ingest_config(&create_derived_result.dataset_handle.id, false)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -349,17 +320,9 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_compaction_mutation(
-        &create_derived_result.dataset_handle.id,
-        1000,
-        1000,
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .set_compaction_config(&create_derived_result.dataset_handle.id, 1000, 1000)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -391,22 +354,15 @@ async fn test_anonymous_setters_fail() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_root_result = harness.create_root_dataset(foo_alias).await;
 
-    let mutation_codes = [FlowConfigHarness::set_ingest_config_mutation(
-        &create_root_result.dataset_handle.id,
-        false,
-    )];
-
     let schema = kamu_adapter_graphql::schema_quiet();
-    for mutation_code in mutation_codes {
-        let res = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_anonymous.clone()),
-            )
-            .await;
 
-        expect_anonymous_access_error(res);
-    }
+    let res = harness
+        .set_ingest_config(&create_root_result.dataset_handle.id, false)
+        .expect_error()
+        .execute(&schema, &harness.catalog_anonymous)
+        .await;
+
+    expect_anonymous_access_error(res);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -437,96 +393,6 @@ impl FlowConfigHarness {
         Self {
             base_gql_flow_harness,
         }
-    }
-
-    fn set_ingest_config_mutation(id: &odf::DatasetID, fetch_uncacheable: bool) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            configs {
-                                setIngestConfig (
-                                    ingestConfigInput : {
-                                        fetchUncacheable: <fetch_uncacheable>,
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowConfigSuccess {
-                                        config {
-                                            __typename
-                                            rule {
-                                                __typename
-                                                ... on FlowConfigRuleIngest {
-                                                    fetchUncacheable
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace(
-            "<fetch_uncacheable>",
-            if fetch_uncacheable { "true" } else { "false" },
-        )
-    }
-
-    fn set_config_compaction_mutation(
-        id: &odf::DatasetID,
-        max_slice_size: u64,
-        max_slice_records: u64,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            configs {
-                                setCompactionConfig (
-                                    compactionConfigInput: {
-                                        maxSliceSize: <max_slice_size>,
-                                        maxSliceRecords: <max_slice_records>,
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowConfigSuccess {
-                                        __typename,
-                                        message
-                                        ... on SetFlowConfigSuccess {
-                                            config {
-                                                __typename
-                                                rule {
-                                                    __typename
-                                                    ... on FlowConfigRuleCompaction {
-                                                        maxSliceSize
-                                                        maxSliceRecords
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<max_slice_records>", &max_slice_records.to_string())
-        .replace("<max_slice_size>", &max_slice_size.to_string())
     }
 }
 
