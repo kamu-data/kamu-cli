@@ -16,7 +16,7 @@ use odf::metadata::testing::MetadataFactory;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
-    MutationRequest,
+    GraphQLQueryRequest,
     PredefinedAccountOpts,
     authentication_catalogs,
 };
@@ -151,9 +151,9 @@ impl BaseGQLFlowHarness {
         dataset_id: &odf::DatasetID,
         flow_type: &str,
         time_delta: (u64, &str),
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
-            mutation($datasetId: ID!, $flowType: String!, $timeDelta: TimeDeltaInput!) {
+            mutation($datasetId: DatasetID!, $flowType: String!, $timeDelta: TimeDeltaInput!) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
@@ -197,7 +197,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -215,9 +215,9 @@ impl BaseGQLFlowHarness {
         dataset_id: &odf::DatasetID,
         flow_type: &str,
         cron_expression: &str,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
-            mutation($datasetId: ID!, $flowType: String!, $cronExpression: String!) {
+            mutation($datasetId: DatasetID!, $flowType: String!, $cronExpression: String!) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
@@ -258,7 +258,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -275,7 +275,7 @@ impl BaseGQLFlowHarness {
         min_records_to_await: u64,
         max_batching_interval: (u32, &str),
         recover_from_breaking_changes: bool,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation(
                 $datasetId: DatasetID!,
@@ -346,7 +346,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -364,7 +364,7 @@ impl BaseGQLFlowHarness {
         dataset_id: &odf::DatasetID,
         flow_type: &str,
         recover_from_breaking_changes: bool,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation($datasetId: DatasetID!, $flowType: String!, $forBreakingChange: String!) {
                 datasets {
@@ -415,7 +415,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -429,7 +429,7 @@ impl BaseGQLFlowHarness {
         &self,
         dataset_id: &odf::DatasetID,
         flow_type: &str,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation($datasetId: DatasetID!, $flowType: String!) {
                 datasets {
@@ -446,7 +446,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -459,7 +459,7 @@ impl BaseGQLFlowHarness {
         &self,
         dataset_id: &odf::DatasetID,
         flow_type: &str,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation($datasetId: DatasetID!, $flowType: String!) {
                 datasets {
@@ -476,7 +476,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -485,7 +485,7 @@ impl BaseGQLFlowHarness {
         )
     }
 
-    pub fn pause_all_flow_triggers(&self, dataset_id: &odf::DatasetID) -> MutationRequest {
+    pub fn pause_all_flow_triggers(&self, dataset_id: &odf::DatasetID) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation($datasetId: DatasetID!) {
                 datasets {
@@ -500,7 +500,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -508,7 +508,7 @@ impl BaseGQLFlowHarness {
         )
     }
 
-    pub fn resume_all_flow_triggers(&self, dataset_id: &odf::DatasetID) -> MutationRequest {
+    pub fn resume_all_flow_triggers(&self, dataset_id: &odf::DatasetID) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation($datasetId: DatasetID!) {
                 datasets {
@@ -523,7 +523,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -535,7 +535,7 @@ impl BaseGQLFlowHarness {
         &self,
         dataset_id: &odf::DatasetID,
         fetch_uncacheable: bool,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation($datasetId: DatasetID!, $fetchUncacheable: Boolean!) {
                 datasets {
@@ -568,7 +568,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -582,7 +582,7 @@ impl BaseGQLFlowHarness {
         dataset_id: &odf::DatasetID,
         max_slice_size: u64,
         max_slice_records: u64,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation($datasetId: DatasetID!, $maxSliceSize: Int!, $maxSliceRecords: Int!) {
                 datasets {
@@ -621,7 +621,7 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
@@ -636,7 +636,7 @@ impl BaseGQLFlowHarness {
         dataset_id: &odf::DatasetID,
         fetch_uncacheable: bool,
         retry_policy: &RetryPolicy,
-    ) -> MutationRequest {
+    ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation(
                 $datasetId: DatasetID!,
@@ -699,7 +699,7 @@ impl BaseGQLFlowHarness {
             RetryBackoffType::ExponentialWithJitter => "EXPONENTIAL_WITH_JITTER",
         };
 
-        MutationRequest::new(
+        GraphQLQueryRequest::new(
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
