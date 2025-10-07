@@ -76,23 +76,13 @@ async fn test_crud_time_delta_root_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        1,
-        "DAYS",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .set_time_delta_trigger(&create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -119,23 +109,13 @@ async fn test_crud_time_delta_root_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        2,
-        "HOURS",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .set_time_delta_trigger(&create_result.dataset_handle.id, "INGEST", (2, "HOURS"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -182,20 +162,14 @@ async fn test_time_delta_validation() {
         (169, "DAYS"),
         (169, "WEEKS"),
     ] {
-        let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
-            &create_result.dataset_handle.id,
-            "INGEST",
-            test_case.0,
-            test_case.1,
-        );
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_authorized.clone()),
+        let response = harness
+            .set_time_delta_trigger(
+                &create_result.dataset_handle.id,
+                "INGEST",
+                (test_case.0, test_case.1),
             )
+            .execute(&schema, &harness.catalog_authorized)
             .await;
-        assert!(response.is_ok(), "{response:?}");
 
         let response_json = response.data.into_json().unwrap();
         assert_eq!(
@@ -210,20 +184,14 @@ async fn test_time_delta_validation() {
         (48, "HOURS", 2, "DAYS"),
         (7, "DAYS", 1, "WEEKS"),
     ] {
-        let mutation_code = FlowTriggerHarness::set_time_delta_trigger_mutation(
-            &create_result.dataset_handle.id,
-            "INGEST",
-            test_case.0,
-            test_case.1,
-        );
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_authorized.clone()),
+        let response = harness
+            .set_time_delta_trigger(
+                &create_result.dataset_handle.id,
+                "INGEST",
+                (test_case.0, test_case.1),
             )
+            .execute(&schema, &harness.catalog_authorized)
             .await;
-        assert!(response.is_ok(), "{response:?}");
 
         let response_json = response.data.into_json().unwrap();
         assert_eq!(
@@ -295,22 +263,13 @@ async fn test_crud_cron_root_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        "*/2 * * * *",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .set_cron_trigger(&create_result.dataset_handle.id, "INGEST", "*/2 * * * *")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -336,22 +295,13 @@ async fn test_crud_cron_root_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        "0 */1 * * *",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .set_cron_trigger(&create_result.dataset_handle.id, "INGEST", "0 */1 * * *")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -379,21 +329,19 @@ async fn test_crud_cron_root_dataset() {
 
     // Try to pass invalid cron expression
     let invalid_cron_expression = "0 0 */1 *";
-    let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        invalid_cron_expression,
-    );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_cron_trigger(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            invalid_cron_expression,
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
+
+    //assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -412,21 +360,18 @@ async fn test_crud_cron_root_dataset() {
 
     // Try to pass valid cron expression with year (not supported)
     let past_cron_expression = "0 0 1 JAN ? 2024";
-    let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        past_cron_expression,
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_cron_trigger(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            past_cron_expression,
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
+
+    // assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -519,24 +464,19 @@ async fn test_crud_reactive_buffering_derived_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-        1,
-        (30, "MINUTES"),
-        "NO_ACTION",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_reactive_trigger_buffering(
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
+            1,
+            (30, "MINUTES"),
+            false,
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -639,22 +579,17 @@ async fn test_crud_reactive_immediate_derived_dataset() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::set_trigger_reactive_immediate_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-        "NO_ACTION",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_reactive_trigger_immediate(
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
+            false,
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -720,21 +655,17 @@ async fn test_reactive_buffering_trigger_validation() {
             "Minimum records to await should be positive",
         ),
     ] {
-        let mutation_code = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
-            &create_derived_result.dataset_handle.id,
-            "EXECUTE_TRANSFORM",
-            test_case.0,
-            (test_case.1, test_case.2),
-            "NO_ACTION",
-        );
-
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_authorized.clone()),
+        let response = harness
+            .set_reactive_trigger_buffering(
+                &create_derived_result.dataset_handle.id,
+                "EXECUTE_TRANSFORM",
+                test_case.0,
+                (test_case.1, test_case.2),
+                false,
             )
+            .execute(&schema, &harness.catalog_authorized)
             .await;
-        assert!(response.is_ok(), "{response:?}");
+
         assert_eq!(
             response.data,
             value!({
@@ -833,36 +764,21 @@ async fn test_pause_resume_dataset_flows() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let mutation_set_ingest = FlowTriggerHarness::set_time_delta_trigger_mutation(
-        &create_root_result.dataset_handle.id,
-        "INGEST",
-        1,
-        "DAYS",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_set_ingest)
-                .data(harness.catalog_authorized.clone()),
-        )
+    harness
+        .set_time_delta_trigger(&create_root_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
 
-    let mutation_set_transform = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-        1,
-        (30, "MINUTES"),
-        "RECOVER",
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_set_transform)
-                .data(harness.catalog_authorized.clone()),
+    harness
+        .set_reactive_trigger_buffering(
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
+            1,
+            (30, "MINUTES"),
+            true,
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(res.is_ok(), "{res:?}");
 
     let flow_cases = [
         (&create_root_result.dataset_handle.id, "INGEST"),
@@ -1054,24 +970,19 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowTriggerHarness::set_trigger_reactive_buffering_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-        1,
-        (30, "MINUTES"),
-        "RECOVER",
-    );
-
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_reactive_trigger_buffering(
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
+            1,
+            (30, "MINUTES"),
+            true,
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -1092,22 +1003,15 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowTriggerHarness::set_cron_trigger_mutation(
-        &create_root_result.dataset_handle.id,
-        "INGEST",
-        "0 */2 * * *",
-    );
-
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
+    let response = harness
+        .set_cron_trigger(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
+            "0 */2 * * *",
         )
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -1362,27 +1266,22 @@ async fn test_stop_policies_validation() {
 async fn test_anonymous_setters_fail() {
     let harness = FlowTriggerHarness::make().await;
 
+    let schema = kamu_adapter_graphql::schema_quiet();
+
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_root_result = harness.create_root_dataset(foo_alias).await;
 
-    let mutation_codes = [FlowTriggerHarness::set_time_delta_trigger_mutation(
-        &create_root_result.dataset_handle.id,
-        "INGEST",
-        5,
-        "MINUTES",
-    )];
+    let response = harness
+        .set_time_delta_trigger(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
+            (5, "MINUTES"),
+        )
+        .expect_error()
+        .execute(&schema, &harness.catalog_anonymous)
+        .await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    for mutation_code in mutation_codes {
-        let res = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_anonymous.clone()),
-            )
-            .await;
-
-        expect_anonymous_access_error(res);
-    }
+    expect_anonymous_access_error(response);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1423,254 +1322,6 @@ impl FlowTriggerHarness {
             schedule_json["every"].as_u64().unwrap(),
             schedule_json["unit"].as_str().unwrap(),
         )
-    }
-
-    fn set_time_delta_trigger_mutation(
-        id: &odf::DatasetID,
-        dataset_flow_type: &str,
-        every: u64,
-        unit: &str,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    triggerRuleInput: {
-                                        schedule: {
-                                            timeDelta: { every: <every>, unit: "<unit>" }
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowTriggerSuccess {
-                                        trigger {
-                                            __typename
-                                            paused
-                                            schedule {
-                                                __typename
-                                                ... on TimeDelta {
-                                                    every
-                                                    unit
-                                                }
-                                            }
-                                            reactive {
-                                                __typename
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<every>", every.to_string().as_str())
-        .replace("<unit>", unit)
-    }
-
-    fn set_cron_trigger_mutation(
-        id: &odf::DatasetID,
-        dataset_flow_type: &str,
-        cron_expression: &str,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    triggerRuleInput: {
-                                        schedule: {
-                                            cron5ComponentExpression: "<cron_expression>"
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowTriggerSuccess {
-                                        trigger {
-                                            __typename,
-                                            paused
-                                            schedule {
-                                                __typename
-                                                ... on Cron5ComponentExpression {
-                                                    cron5ComponentExpression
-                                                }
-                                            }
-                                            reactive {
-                                                __typename
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<cron_expression>", cron_expression)
-    }
-
-    fn set_trigger_reactive_buffering_mutation(
-        id: &odf::DatasetID,
-        dataset_flow_type: &str,
-        min_records_to_await: u64,
-        max_batching_interval: (u32, &str),
-        for_breaking_change: &str,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    triggerRuleInput: {
-                                        reactive: {
-                                            forNewData: {
-                                                buffering: {
-                                                    minRecordsToAwait: <minRecordsToAwait>,
-                                                    maxBatchingInterval: { every: <every>, unit: "<unit>" }
-                                                }
-                                            },
-                                            forBreakingChange: "<forBreakingChange>"
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowTriggerSuccess {
-                                        __typename,
-                                        message
-                                        ... on SetFlowTriggerSuccess {
-                                            trigger {
-                                                __typename
-                                                paused
-                                                schedule {
-                                                    __typename
-                                                }
-                                                reactive {
-                                                    __typename
-                                                    forNewData {
-                                                        __typename
-                                                        ... on FlowTriggerBatchingRuleBuffering {
-                                                            minRecordsToAwait
-                                                            maxBatchingInterval {
-                                                                every
-                                                                unit
-                                                            }
-                                                        }
-                                                    }
-                                                    forBreakingChange
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<every>", &max_batching_interval.0.to_string())
-        .replace("<unit>", max_batching_interval.1)
-        .replace("<minRecordsToAwait>", &min_records_to_await.to_string())
-        .replace("<forBreakingChange>", for_breaking_change)
-    }
-
-    fn set_trigger_reactive_immediate_mutation(
-        id: &odf::DatasetID,
-        dataset_flow_type: &str,
-        for_breaking_change: &str,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    triggerRuleInput: {
-                                        reactive: {
-                                            forNewData: {
-                                                immediate: {
-                                                    dummy: false
-                                                }
-                                            },
-                                            forBreakingChange: "<forBreakingChange>"
-                                        }
-                                    },
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowTriggerSuccess {
-                                        __typename,
-                                        message
-                                        ... on SetFlowTriggerSuccess {
-                                            trigger {
-                                                __typename
-                                                paused
-                                                schedule {
-                                                    __typename
-                                                }
-                                                reactive {
-                                                    __typename
-                                                    forNewData {
-                                                        __typename
-                                                    }
-                                                    forBreakingChange
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<forBreakingChange>", for_breaking_change)
     }
 
     fn quick_flow_trigger_query(id: &odf::DatasetID, dataset_flow_type: &str) -> String {

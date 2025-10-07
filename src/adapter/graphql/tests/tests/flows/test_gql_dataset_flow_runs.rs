@@ -4212,20 +4212,15 @@ async fn test_trigger_flow_automatically_via_schedule() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let mutation_code =
-        FlowRunsHarness::set_daily_ingest_schedule_trigger(&create_result.dataset_handle.id);
-
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+
+    let response = harness
+        .set_time_delta_trigger(&create_result.dataset_handle.id, "INGEST", (1, "DAYS"))
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
     pretty_assertions::assert_eq!(
         response.data,
         value!({
@@ -4236,6 +4231,16 @@ async fn test_trigger_flow_automatically_via_schedule() {
                             "setTrigger": {
                                 "__typename": "SetFlowTriggerSuccess",
                                 "message": "Success",
+                                "trigger": {
+                                    "__typename": "FlowTrigger",
+                                    "paused": false,
+                                    "schedule": {
+                                        "__typename": "TimeDelta",
+                                        "every": 1,
+                                        "unit": "DAYS"
+                                    },
+                                    "reactive": null,
+                                }
                             }
                         }
                     }
@@ -5139,38 +5144,6 @@ impl FlowRunsHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<flow_id>", flow_id)
-    }
-
-    fn set_daily_ingest_schedule_trigger(id: &odf::DatasetID) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                setTrigger(
-                                    datasetFlowType: "INGEST",
-                                    triggerRuleInput: {
-                                        schedule: {
-                                            timeDelta: { every: 1, unit: "DAYS" }
-                                        }
-                                    }
-                                    triggerStopPolicyInput: {
-                                        never: { dummy: true }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
     }
 
     fn set_ingest_config_with_retries(
