@@ -10,6 +10,7 @@
 use async_graphql::value;
 use kamu::MetadataQueryServiceImpl;
 use kamu_datasets::*;
+use kamu_flow_system_inmem::domain::{RetryBackoffType, RetryPolicy};
 use kamu_flow_system_inmem::*;
 use odf::metadata::testing::MetadataFactory;
 
@@ -420,6 +421,292 @@ impl BaseGQLFlowHarness {
                 "datasetId": dataset_id.to_string(),
                 "flowType": flow_type,
                 "forBreakingChange": if recover_from_breaking_changes { "RECOVER" } else { "NO_ACTION" },
+            })),
+        )
+    }
+
+    pub fn pause_flow_trigger(
+        &self,
+        dataset_id: &odf::DatasetID,
+        flow_type: &str,
+    ) -> MutationRequest {
+        let mutation_code = r#"
+            mutation($datasetId: DatasetID!, $flowType: String!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            triggers {
+                                pauseFlow (
+                                    datasetFlowType: $flowType
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        MutationRequest::new(
+            mutation_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "flowType": flow_type,
+            })),
+        )
+    }
+
+    pub fn resume_flow_trigger(
+        &self,
+        dataset_id: &odf::DatasetID,
+        flow_type: &str,
+    ) -> MutationRequest {
+        let mutation_code = r#"
+            mutation($datasetId: DatasetID!, $flowType: String!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            triggers {
+                                resumeFlow (
+                                    datasetFlowType: $flowType
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        MutationRequest::new(
+            mutation_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "flowType": flow_type,
+            })),
+        )
+    }
+
+    pub fn pause_all_flow_triggers(&self, dataset_id: &odf::DatasetID) -> MutationRequest {
+        let mutation_code = r#"
+            mutation($datasetId: DatasetID!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            triggers {
+                                pauseFlows
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        MutationRequest::new(
+            mutation_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+            })),
+        )
+    }
+
+    pub fn resume_all_flow_triggers(&self, dataset_id: &odf::DatasetID) -> MutationRequest {
+        let mutation_code = r#"
+            mutation($datasetId: DatasetID!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            triggers {
+                                resumeFlows
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        MutationRequest::new(
+            mutation_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+            })),
+        )
+    }
+
+    pub fn set_ingest_config(
+        &self,
+        dataset_id: &odf::DatasetID,
+        fetch_uncacheable: bool,
+    ) -> MutationRequest {
+        let mutation_code = r#"
+            mutation($datasetId: DatasetID!, $fetchUncacheable: Boolean!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            configs {
+                                setIngestConfig (
+                                    ingestConfigInput : {
+                                        fetchUncacheable: $fetchUncacheable,
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        config {
+                                            __typename
+                                            rule {
+                                                __typename
+                                                ... on FlowConfigRuleIngest {
+                                                    fetchUncacheable
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        MutationRequest::new(
+            mutation_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "fetchUncacheable": fetch_uncacheable,
+            })),
+        )
+    }
+
+    pub fn set_compaction_config(
+        &self,
+        dataset_id: &odf::DatasetID,
+        max_slice_size: u64,
+        max_slice_records: u64,
+    ) -> MutationRequest {
+        let mutation_code = r#"
+            mutation($datasetId: DatasetID!, $maxSliceSize: Int!, $maxSliceRecords: Int!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            configs {
+                                setCompactionConfig (
+                                    compactionConfigInput: {
+                                        maxSliceSize: $maxSliceSize,
+                                        maxSliceRecords: $maxSliceRecords,
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        __typename,
+                                        message
+                                        ... on SetFlowConfigSuccess {
+                                            config {
+                                                __typename
+                                                rule {
+                                                    __typename
+                                                    ... on FlowConfigRuleCompaction {
+                                                        maxSliceSize
+                                                        maxSliceRecords
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        MutationRequest::new(
+            mutation_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "maxSliceSize": max_slice_size,
+                "maxSliceRecords": max_slice_records,
+            })),
+        )
+    }
+
+    pub fn set_ingest_config_with_retries(
+        &self,
+        dataset_id: &odf::DatasetID,
+        fetch_uncacheable: bool,
+        retry_policy: &RetryPolicy,
+    ) -> MutationRequest {
+        let mutation_code = r#"
+            mutation(
+                $datasetId: DatasetID!,
+                $fetchUncacheable: Boolean!,
+                $retryMaxAttempts: Int!,
+                $retryMinDelayMinutes: Int!,
+                $retryBackoffType: String!
+            ) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            configs {
+                                setIngestConfig (
+                                    ingestConfigInput : {
+                                        fetchUncacheable: $fetchUncacheable,
+                                    },
+                                    retryPolicyInput: {
+                                        maxAttempts: $retryMaxAttempts,
+                                        minDelay: {
+                                            every: $retryMinDelayMinutes,
+                                            unit: "MINUTES"
+                                        },
+                                        backoffType: $retryBackoffType
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        config {
+                                            __typename
+                                            rule {
+                                                __typename
+                                                ... on FlowConfigRuleIngest {
+                                                    fetchUncacheable
+                                                }
+                                            }
+                                            retryPolicy {
+                                                __typename
+                                                maxAttempts
+                                                minDelay {
+                                                    every
+                                                    unit
+                                                }
+                                                backoffType
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        let retry_backoff_str = match retry_policy.backoff_type {
+            RetryBackoffType::Fixed => "FIXED",
+            RetryBackoffType::Linear => "LINEAR",
+            RetryBackoffType::Exponential => "EXPONENTIAL",
+            RetryBackoffType::ExponentialWithJitter => "EXPONENTIAL_WITH_JITTER",
+        };
+
+        MutationRequest::new(
+            mutation_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "fetchUncacheable": fetch_uncacheable,
+                "retryMaxAttempts": retry_policy.max_attempts,
+                "retryMinDelayMinutes": retry_policy.min_delay_seconds / 60,
+                "retryBackoffType": retry_backoff_str,
             })),
         )
     }

@@ -3727,20 +3727,11 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         backoff_type: RetryBackoffType::Fixed,
     };
 
-    // Set ing retry policy for the flow
-
-    let mutation_code = FlowRunsHarness::set_ingest_config_with_retries(
-        &create_result.dataset_handle.id,
-        false,
-        retry_policy,
-    );
-
+    // Set ingest retry policy for the flow
     let schema = kamu_adapter_graphql::schema_quiet();
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .set_ingest_config_with_retries(&create_result.dataset_handle.id, false, &retry_policy)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -5144,86 +5135,6 @@ impl FlowRunsHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<flow_id>", flow_id)
-    }
-
-    fn set_ingest_config_with_retries(
-        id: &odf::DatasetID,
-        fetch_uncacheable: bool,
-        retry_policy: RetryPolicy,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            configs {
-                                setIngestConfig (
-                                    ingestConfigInput : {
-                                        fetchUncacheable: <fetch_uncacheable>,
-                                    },
-                                    retryPolicyInput: {
-                                        maxAttempts: <retry_max_attempts>,
-                                        minDelay: {
-                                            every: <retry_min_delay_every>,
-                                            unit: "<retry_min_delay_unit>"
-                                        },
-                                        backoffType: "<retry_backoff_type>"
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on SetFlowConfigSuccess {
-                                        config {
-                                            __typename
-                                            rule {
-                                                __typename
-                                                ... on FlowConfigRuleIngest {
-                                                    fetchUncacheable
-                                                }
-                                            }
-                                            retryPolicy {
-                                                __typename
-                                                maxAttempts
-                                                minDelay {
-                                                    every
-                                                    unit
-                                                }
-                                                backoffType
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace(
-            "<fetch_uncacheable>",
-            if fetch_uncacheable { "true" } else { "false" },
-        )
-        .replace(
-            "<retry_max_attempts>",
-            &retry_policy.max_attempts.to_string(),
-        )
-        .replace(
-            "<retry_min_delay_every>",
-            &(retry_policy.min_delay_seconds / 60).to_string(),
-        )
-        .replace("<retry_min_delay_unit>", "MINUTES")
-        .replace(
-            "<retry_backoff_type>",
-            match retry_policy.backoff_type {
-                RetryBackoffType::Fixed => "FIXED",
-                RetryBackoffType::Linear => "LINEAR",
-                RetryBackoffType::Exponential => "EXPONENTIAL",
-                RetryBackoffType::ExponentialWithJitter => "EXPONENTIAL_WITH_JITTER",
-            },
-        )
     }
 }
 
