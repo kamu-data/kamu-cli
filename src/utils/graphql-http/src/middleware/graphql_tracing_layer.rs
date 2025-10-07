@@ -21,6 +21,7 @@ const HEADER_TRACE_GRAPHQL_ENABLED_VALUE: http::HeaderValue = http::HeaderValue:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct GraphqlTracingLayer<Query, Mutation, Subscription> {
+    // NOTE: We don't use `async_graphql::SchemaBuilder` here because it isn't cloneable.
     schema: async_graphql::Schema<Query, Mutation, Subscription>,
     schema_quiet: async_graphql::Schema<Query, Mutation, Subscription>,
 }
@@ -29,6 +30,7 @@ pub struct GraphqlTracingLayer<Query, Mutation, Subscription> {
 //       types.
 impl<Query, Mutation, Subscription> Clone for GraphqlTracingLayer<Query, Mutation, Subscription> {
     fn clone(&self) -> Self {
+        // Cheap clones
         Self {
             schema: self.schema.clone(),
             schema_quiet: self.schema_quiet.clone(),
@@ -54,6 +56,7 @@ impl<Svc, Query, Mutation, Subscription> tower::Layer<Svc>
     type Service = GraphqlTracingMiddleware<Svc, Query, Mutation, Subscription>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
+        // Cheap clones
         GraphqlTracingMiddleware {
             inner,
             schema: self.schema.clone(),
