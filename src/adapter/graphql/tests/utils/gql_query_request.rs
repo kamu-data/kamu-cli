@@ -9,16 +9,16 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MutationRequest {
-    mutation_code: String,
+pub struct GraphQLQueryRequest {
+    request_code: String,
     variables: async_graphql::Variables,
     expect_success: bool,
 }
 
-impl MutationRequest {
-    pub fn new(mutation_code: &str, variables: async_graphql::Variables) -> Self {
+impl GraphQLQueryRequest {
+    pub fn new(request_code: &str, variables: async_graphql::Variables) -> Self {
         Self {
-            mutation_code: mutation_code.to_string(),
+            request_code: request_code.to_string(),
             variables,
             expect_success: true,
         }
@@ -36,7 +36,7 @@ impl MutationRequest {
     ) -> async_graphql::Response {
         let response = schema
             .execute(
-                async_graphql::Request::new(self.mutation_code)
+                async_graphql::Request::new(self.request_code)
                     .variables(self.variables)
                     .data(catalog.clone()),
             )

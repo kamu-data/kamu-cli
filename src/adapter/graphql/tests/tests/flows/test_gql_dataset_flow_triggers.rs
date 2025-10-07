@@ -12,7 +12,12 @@ use indoc::indoc;
 use kamu_core::TenancyConfig;
 use kamu_flow_system_services::FlowTriggerServiceImpl;
 
-use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness, expect_anonymous_access_error};
+use crate::utils::{
+    BaseGQLDatasetHarness,
+    BaseGQLFlowHarness,
+    GraphQLQueryRequest,
+    expect_anonymous_access_error,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,44 +28,11 @@ async fn test_crud_time_delta_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let request_code = indoc!(
-        r#"
-        {
-            datasets {
-                byId (datasetId: "<id>") {
-                    flows {
-                        triggers {
-                            byType (datasetFlowType: "INGEST") {
-                                __typename
-                                schedule {
-                                    __typename
-                                    ... on TimeDelta {
-                                        every
-                                        unit
-                                    }
-                                }
-                                reactive {
-                                    __typename
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = FlowTriggerHarness::query_flow_trigger(&create_result.dataset_handle.id, "INGEST")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -210,44 +182,11 @@ async fn test_crud_cron_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let request_code = indoc!(
-        r#"
-        {
-            datasets {
-                byId (datasetId: "<id>") {
-                    flows {
-                        triggers {
-                            byType (datasetFlowType: "INGEST") {
-                                __typename
-                                paused
-                                schedule {
-                                    __typename
-                                    ... on Cron5ComponentExpression {
-                                        cron5ComponentExpression
-                                    }
-                                }
-                                reactive {
-                                    __typename
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = FlowTriggerHarness::query_flow_trigger(&create_result.dataset_handle.id, "INGEST")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -339,7 +278,6 @@ async fn test_crud_cron_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    //assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         response.data,
         value!({
@@ -403,52 +341,14 @@ async fn test_crud_reactive_buffering_derived_dataset() {
         .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
-    let request_code = indoc!(
-        r#"
-        {
-            datasets {
-                byId (datasetId: "<id>") {
-                    flows {
-                        triggers {
-                            byType (datasetFlowType: "EXECUTE_TRANSFORM") {
-                                __typename
-                                paused
-                                schedule {
-                                    __typename
-                                }
-                                reactive {
-                                    __typename
-                                    forNewData {
-                                        __typename
-                                        ... on FlowTriggerBatchingRuleBuffering {
-                                            minRecordsToAwait
-                                            maxBatchingInterval {
-                                                every
-                                                unit
-                                            }
-                                        }
-                                    }
-                                    forBreakingChange
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    )
-    .replace("<id>", &create_derived_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+    let res = FlowTriggerHarness::query_flow_trigger(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
+    )
+    .execute(&schema, &harness.catalog_authorized)
+    .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -525,45 +425,14 @@ async fn test_crud_reactive_immediate_derived_dataset() {
         .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
-    let request_code = indoc!(
-        r#"
-        {
-            datasets {
-                byId (datasetId: "<id>") {
-                    flows {
-                        triggers {
-                            byType (datasetFlowType: "EXECUTE_TRANSFORM") {
-                                __typename
-                                paused
-                                schedule {
-                                    __typename
-                                }
-                                reactive {
-                                    __typename
-                                    forNewData {
-                                        __typename
-                                    }
-                                    forBreakingChange
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    )
-    .replace("<id>", &create_derived_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+    let res = FlowTriggerHarness::query_flow_trigger(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
+    )
+    .execute(&schema, &harness.catalog_authorized)
+    .await;
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -697,14 +566,12 @@ async fn test_pause_resume_dataset_flows() {
         dataset_flow_type: &str,
         expect_paused: bool,
     ) {
-        let query = FlowTriggerHarness::quick_flow_trigger_query(dataset_id, dataset_flow_type);
-
-        let res = schema
-            .execute(async_graphql::Request::new(query).data(harness.catalog_authorized.clone()))
+        let response = FlowTriggerHarness::quick_flow_trigger_query(dataset_id, dataset_flow_type)
+            .execute(schema, &harness.catalog_authorized)
             .await;
-        assert!(res.is_ok(), "{res:?}");
+
         assert_eq!(
-            res.data,
+            response.data,
             value!({
                 "datasets": {
                     "byId": {
@@ -728,14 +595,12 @@ async fn test_pause_resume_dataset_flows() {
         dataset_id: &odf::DatasetID,
         expect_paused: bool,
     ) {
-        let query = FlowTriggerHarness::all_paused_trigger_query(dataset_id);
-
-        let res = schema
-            .execute(async_graphql::Request::new(query).data(harness.catalog_authorized.clone()))
+        let response = FlowTriggerHarness::all_paused_trigger_query(dataset_id)
+            .execute(schema, &harness.catalog_authorized)
             .await;
-        assert!(res.is_ok(), "{res:?}");
+
         assert_eq!(
-            res.data,
+            response.data,
             value!({
                 "datasets": {
                     "byId": {
@@ -1296,15 +1161,18 @@ impl FlowTriggerHarness {
         )
     }
 
-    fn quick_flow_trigger_query(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
-        indoc!(
+    fn quick_flow_trigger_query(
+        id: &odf::DatasetID,
+        dataset_flow_type: &str,
+    ) -> GraphQLQueryRequest {
+        let query_code = indoc!(
             r#"
-            {
+            query($datasetId: DatasetID!, $flowType: DatasetFlowType!) {
                 datasets {
-                    byId (datasetId: "<id>") {
+                    byId (datasetId: $datasetId) {
                         flows {
                             triggers {
-                                byType (datasetFlowType: "<dataset_flow_type>") {
+                                byType (datasetFlowType: $flowType) {
                                     __typename
                                     paused
                                 }
@@ -1314,17 +1182,79 @@ impl FlowTriggerHarness {
                 }
             }
             "#
+        );
+
+        GraphQLQueryRequest::new(
+            query_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": id.to_string(),
+                "flowType": dataset_flow_type,
+            })),
         )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn all_paused_trigger_query(id: &odf::DatasetID) -> String {
-        indoc!(
+    fn query_flow_trigger(
+        dataset_id: &odf::DatasetID,
+        dataset_flow_type: &str,
+    ) -> GraphQLQueryRequest {
+        let query_code = indoc!(
             r#"
-            {
+            query($datasetId: DatasetID!, $datasetFlowType: DatasetFlowType!) {
                 datasets {
-                    byId (datasetId: "<id>") {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            triggers {
+                                byType (datasetFlowType: $datasetFlowType) {
+                                    __typename
+                                    paused
+                                    schedule {
+                                        __typename
+                                        ... on TimeDelta {
+                                            every
+                                            unit
+                                        }
+                                        ... on Cron5ComponentExpression {
+                                            cron5ComponentExpression
+                                        }
+                                    }
+                                    reactive {
+                                        __typename
+                                        forNewData {
+                                            __typename
+                                            ... on FlowTriggerBatchingRuleBuffering {
+                                                minRecordsToAwait
+                                                maxBatchingInterval {
+                                                    every
+                                                    unit
+                                                }
+                                            }
+                                        }
+                                        forBreakingChange
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        );
+
+        GraphQLQueryRequest::new(
+            query_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "datasetFlowType": dataset_flow_type,
+            })),
+        )
+    }
+
+    fn all_paused_trigger_query(dataset_id: &odf::DatasetID) -> GraphQLQueryRequest {
+        let query_code = indoc!(
+            r#"
+            query($datasetId: DatasetID!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
                         flows {
                             triggers {
                                 allPaused
@@ -1334,8 +1264,14 @@ impl FlowTriggerHarness {
                 }
             }
             "#
+        );
+
+        GraphQLQueryRequest::new(
+            query_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string()
+            })),
         )
-        .replace("<id>", &id.to_string())
     }
 }
 

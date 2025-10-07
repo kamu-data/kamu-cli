@@ -12,7 +12,12 @@ use indoc::indoc;
 use kamu_core::TenancyConfig;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
 
-use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness, expect_anonymous_access_error};
+use crate::utils::{
+    BaseGQLDatasetHarness,
+    BaseGQLFlowHarness,
+    GraphQLQueryRequest,
+    expect_anonymous_access_error,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,37 +28,10 @@ async fn test_crud_ingest_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let request_code = indoc!(
-        r#"
-        {
-            datasets {
-                byId (datasetId: "<id>") {
-                    flows {
-                        configs {
-                            byType (datasetFlowType: "INGEST") {
-                                __typename
-                                rule {
-                                    __typename
-                                    ... on FlowConfigRuleIngest {
-                                        fetchUncacheable
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .query_flow_config(&create_result.dataset_handle.id, "INGEST")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -144,39 +122,10 @@ async fn test_crud_compaction_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let request_code = indoc!(
-        r#"
-        {
-            datasets {
-                byId (datasetId: "<id>") {
-                    flows {
-                        configs {
-                            byType (datasetFlowType: "HARD_COMPACTION") {
-                                __typename
-                                rule {
-                                    __typename
-                                    ... on FlowConfigRuleCompaction {
-                                        __typename
-                                        maxSliceSize
-                                        maxSliceRecords
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
-
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .query_flow_config(&create_result.dataset_handle.id, "HARD_COMPACTION")
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -393,6 +342,49 @@ impl FlowConfigHarness {
         Self {
             base_gql_flow_harness,
         }
+    }
+
+    fn query_flow_config(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_flow_type: &str,
+    ) -> GraphQLQueryRequest {
+        let query_code = indoc!(
+            r#"
+            query($datasetId: DatasetID!, $datasetFlowType: String!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            configs {
+                                byType (datasetFlowType: $datasetFlowType) {
+                                    __typename
+                                    rule {
+                                        __typename
+                                        ... on FlowConfigRuleIngest {
+                                            fetchUncacheable
+                                        }
+                                        ... on FlowConfigRuleCompaction {
+                                            __typename
+                                            maxSliceSize
+                                            maxSliceRecords
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        );
+
+        GraphQLQueryRequest::new(
+            query_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "datasetFlowType": dataset_flow_type,
+            })),
+        )
     }
 }
 
