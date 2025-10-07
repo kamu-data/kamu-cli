@@ -11,28 +11,21 @@ use std::sync::Arc;
 
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
-use kamu::{MetadataQueryServiceImpl, TransformRequestPlannerImpl};
+use kamu::TransformRequestPlannerImpl;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
 use kamu_core::{PullResult, TenancyConfig};
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
-    DatasetIncrementQueryService,
-    DatasetIntervalIncrement,
-};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
 use kamu_datasets_services::testing::{
     FakeDependencyGraphIndexer,
     MockDatasetIncrementQueryService,
 };
 use kamu_flow_system::*;
-use kamu_flow_system_inmem::*;
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
-use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
+use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,14 +120,13 @@ async fn test_basic_process_state_actions_root_dataset() {
 async fn test_basic_process_state_actions_derived_dataset() {
     let harness = FlowProcessesHarness::new().await;
 
-    // Create root dataset
+    // Create datasets
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let foo_result = harness.create_root_dataset(foo_alias).await;
+    harness.create_root_dataset(foo_alias.clone()).await;
 
-    // Create derived dataset
     let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let bar_result = harness
-        .create_derived_dataset(bar_alias, vec![foo_result.dataset_handle.id.clone()])
+        .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -424,12 +416,10 @@ async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+#[oop::extend(BaseGQLFlowHarness, base_gql_flow_harness)]
 struct FlowProcessesHarness {
-    base_gql_harness: BaseGQLDatasetHarness,
+    base_gql_flow_harness: BaseGQLFlowHarness,
     flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
-    catalog_anonymous: dill::Catalog,
-    catalog_authorized: dill::Catalog,
 }
 
 impl FlowProcessesHarness {
@@ -438,8 +428,11 @@ impl FlowProcessesHarness {
             .tenancy_config(TenancyConfig::SingleTenant)
             .build();
 
-        let catalog_base = {
-            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+        let base_gql_flow_catalog =
+            BaseGQLFlowHarness::make_base_gql_flow_catalog(&base_gql_harness);
+
+        let processes_catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);
 
             let dataset_changes_mock = MockDatasetIncrementQueryService::with_increment_between(
                 DatasetIntervalIncrement {
@@ -449,16 +442,10 @@ impl FlowProcessesHarness {
                 },
             );
 
-            b.add::<MetadataQueryServiceImpl>()
-                .add_value(dataset_changes_mock)
+            b.add_value(dataset_changes_mock)
                 .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
                 .add_value(FlowSystemEventAgentConfig::local_default())
                 .add_value(FlowAgentConfig::test_default())
-                .add::<InMemoryFlowProcessState>()
-                .add::<InMemoryFlowTriggerEventStore>()
-                .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<InMemoryFlowEventStore>()
-                .add::<InMemoryFlowSystemEventBridge>()
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()
                 .add::<FakeDependencyGraphIndexer>()
@@ -480,62 +467,13 @@ impl FlowProcessesHarness {
             b.build()
         };
 
-        // Init dataset with no sources
-        let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
+        let base_gql_flow_harness =
+            BaseGQLFlowHarness::new(base_gql_harness, processes_catalog).await;
 
         Self {
-            base_gql_harness,
-            flow_system_event_agent: catalog_anonymous.get_one().unwrap(),
-            catalog_anonymous,
-            catalog_authorized,
+            flow_system_event_agent: base_gql_flow_harness.catalog_anonymous.get_one().unwrap(),
+            base_gql_flow_harness,
         }
-    }
-
-    async fn create_root_dataset(&self, dataset_alias: odf::DatasetAlias) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .kind(odf::DatasetKind::Root)
-                    .name(dataset_alias)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
-
-    async fn create_derived_dataset(
-        &self,
-        dataset_alias: odf::DatasetAlias,
-        inputs: Vec<odf::DatasetID>,
-    ) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_alias)
-                    .kind(odf::DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(inputs)
-                            .build(),
-                    )
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
     }
 
     async fn read_flow_process_state(
