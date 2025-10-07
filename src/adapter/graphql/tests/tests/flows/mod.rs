@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod auth_utils;
-mod base_gql_dataset_harness;
-mod base_gql_flow_harness;
-
-pub use auth_utils::*;
-pub use base_gql_dataset_harness::*;
-pub use base_gql_flow_harness::*;
+mod test_gql_account_flow_triggers;
+mod test_gql_dataset_flow_configs;
+mod test_gql_dataset_flow_processes;
+mod test_gql_dataset_flow_runs;
+mod test_gql_dataset_flow_triggers;

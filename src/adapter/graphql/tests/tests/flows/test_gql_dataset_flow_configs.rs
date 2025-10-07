@@ -9,19 +9,10 @@
 
 use async_graphql::value;
 use indoc::indoc;
-use kamu::MetadataQueryServiceImpl;
 use kamu_core::TenancyConfig;
-use kamu_datasets::*;
-use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowSystemEventBridge};
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
-use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{
-    BaseGQLDatasetHarness,
-    PredefinedAccountOpts,
-    authentication_catalogs,
-    expect_anonymous_access_error,
-};
+use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness, expect_anonymous_access_error};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +20,8 @@ use crate::utils::{
 async fn test_crud_ingest_root_dataset() {
     let harness = FlowConfigHarness::make().await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let request_code = indoc!(
         r#"
@@ -158,7 +150,9 @@ async fn test_crud_ingest_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_crud_compaction_root_dataset() {
     let harness = FlowConfigHarness::make().await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let request_code = indoc!(
         r#"
@@ -257,8 +251,9 @@ async fn test_crud_compaction_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_compaction_config_validation() {
     let harness = FlowConfigHarness::make().await;
-    // ToDo#Separate check compaction for derivative
-    let create_root_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -309,8 +304,13 @@ async fn test_compaction_config_validation() {
 async fn test_incorrect_dataset_kinds_for_flow_type() {
     let harness = FlowConfigHarness::make().await;
 
-    harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     ////
 
@@ -387,7 +387,9 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 #[test_log::test(tokio::test)]
 async fn test_anonymous_setters_fail() {
     let harness = FlowConfigHarness::make().await;
-    let create_root_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_codes = [FlowConfigHarness::set_ingest_config_mutation(
         &create_root_result.dataset_handle.id,
@@ -409,11 +411,9 @@ async fn test_anonymous_setters_fail() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+#[oop::extend(BaseGQLFlowHarness, base_gql_flow_harness)]
 struct FlowConfigHarness {
-    base_gql_harness: BaseGQLDatasetHarness,
-    catalog_anonymous: dill::Catalog,
-    catalog_authorized: dill::Catalog,
+    base_gql_flow_harness: BaseGQLFlowHarness,
 }
 
 impl FlowConfigHarness {
@@ -422,68 +422,21 @@ impl FlowConfigHarness {
             .tenancy_config(TenancyConfig::SingleTenant)
             .build();
 
-        let catalog_base = {
-            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+        let base_gql_flow_catalog =
+            BaseGQLFlowHarness::make_base_gql_flow_catalog(&base_gql_harness);
 
-            b.add::<MetadataQueryServiceImpl>()
-                .add::<FlowConfigurationServiceImpl>()
-                .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<InMemoryFlowSystemEventBridge>();
-
+        let configs_catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);
+            b.add::<FlowConfigurationServiceImpl>();
             b.build()
         };
 
-        // Init dataset with no sources
-        let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
+        let base_gql_flow_harness =
+            BaseGQLFlowHarness::new(base_gql_harness, configs_catalog).await;
 
         Self {
-            base_gql_harness,
-            catalog_anonymous,
-            catalog_authorized,
+            base_gql_flow_harness,
         }
-    }
-
-    async fn create_root_dataset(&self) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .kind(odf::DatasetKind::Root)
-                    .name("foo")
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
-
-    async fn create_derived_dataset(&self) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name("bar")
-                    .kind(odf::DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(["foo"])
-                            .build(),
-                    )
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
     }
 
     fn set_ingest_config_mutation(id: &odf::DatasetID, fetch_uncacheable: bool) -> String {

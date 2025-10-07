@@ -11,7 +11,6 @@
 
 use async_graphql::value;
 use indoc::indoc;
-use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::*;
 use kamu_datasets::*;
@@ -20,12 +19,10 @@ use kamu_datasets_services::testing::{
     MockDatasetIncrementQueryService,
 };
 use kamu_flow_system::FlowAgentConfig;
-use kamu_flow_system_inmem::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
-use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
+use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -571,29 +568,25 @@ async fn test_account_triggers_all_paused() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+#[oop::extend(BaseGQLFlowHarness, base_gql_flow_harness)]
 struct FlowTriggerHarness {
-    base_gql_harness: BaseGQLDatasetHarness,
-    catalog_authorized: dill::Catalog,
+    base_gql_flow_harness: BaseGQLFlowHarness,
 }
 
 impl FlowTriggerHarness {
     async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(TenancyConfig::MultiTenant)
+            .tenancy_config(TenancyConfig::SingleTenant)
             .build();
 
-        let catalog_base = {
-            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+        let base_gql_flow_catalog =
+            BaseGQLFlowHarness::make_base_gql_flow_catalog(&base_gql_harness);
 
-            b.add::<MetadataQueryServiceImpl>()
-                .add_value(MockDatasetIncrementQueryService::default())
+        let account_triggers_catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);
+
+            b.add_value(MockDatasetIncrementQueryService::default())
                 .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-                .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<InMemoryFlowTriggerEventStore>()
-                .add::<InMemoryFlowEventStore>()
-                .add::<InMemoryFlowSystemEventBridge>()
-                .add::<InMemoryFlowProcessState>()
                 .add_value(FlowAgentConfig::test_default())
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()
@@ -604,32 +597,12 @@ impl FlowTriggerHarness {
             b.build()
         };
 
-        let (_, catalog_authorized) =
-            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
+        let base_gql_flow_harness =
+            BaseGQLFlowHarness::new(base_gql_harness, account_triggers_catalog).await;
 
         Self {
-            base_gql_harness,
-            catalog_authorized,
+            base_gql_flow_harness,
         }
-    }
-
-    async fn create_root_dataset(&self, dataset_alias: odf::DatasetAlias) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .kind(odf::DatasetKind::Root)
-                    .name(dataset_alias)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
     }
 
     fn list_flows_query(account_name: &odf::AccountName) -> String {

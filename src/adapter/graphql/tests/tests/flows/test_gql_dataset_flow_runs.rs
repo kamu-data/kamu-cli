@@ -11,7 +11,6 @@ use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use indoc::indoc;
-use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
@@ -26,25 +25,18 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
 use kamu_datasets_services::testing::{
     FakeDependencyGraphIndexer,
     MockDatasetIncrementQueryService,
 };
 use kamu_flow_system::*;
-use kamu_flow_system_inmem::*;
 use kamu_task_system::{self as ts, TaskError};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
-use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{
-    BaseGQLDatasetHarness,
-    PredefinedAccountOpts,
-    authentication_catalogs,
-    expect_anonymous_access_error,
-};
+use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness, expect_anonymous_access_error};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,7 +53,8 @@ async fn test_trigger_ingest_root_dataset() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -425,7 +418,8 @@ async fn test_trigger_reset_root_dataset_flow() {
     })
     .await;
 
-    let create_root_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias).await;
 
     use odf::dataset::MetadataChainExt;
     let root_dataset_blocks: Vec<_> = create_root_result
@@ -585,7 +579,8 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     })
     .await;
 
-    let create_root_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias).await;
 
     let new_invalid_head = odf::Multihash::from_digest_sha3_256(b"new_invalid_head");
     let old_invalid_head = odf::Multihash::from_digest_sha3_256(b"old_invalid_head");
@@ -682,8 +677,13 @@ async fn test_trigger_execute_transform_derived_dataset() {
     })
     .await;
 
-    harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     let mutation_code =
         FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id);
@@ -922,7 +922,8 @@ async fn test_trigger_compaction_root_dataset() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
@@ -1268,7 +1269,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_reset_to_metadata_flow_mutation(&create_result.dataset_handle.id);
@@ -1613,7 +1615,9 @@ async fn test_list_flows_with_filters_and_pagination() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let ingest_mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -2019,7 +2023,9 @@ async fn test_list_flow_initiators() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let ingest_mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -2109,8 +2115,12 @@ async fn test_conditions_not_met_for_flows() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_root_result = harness.create_root_dataset_no_source().await;
-    let create_derived_result = harness.create_derived_dataset_no_transform().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset_no_source(foo_alias).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness.create_derived_dataset_no_transform(bar_alias).await;
 
     ////
 
@@ -2188,8 +2198,13 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     })
     .await;
 
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     ////
 
@@ -2297,7 +2312,9 @@ async fn test_cancel_ingest_root_dataset() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -2367,8 +2384,14 @@ async fn test_cancel_running_transform_derived_dataset() {
         dataset_changes_mock: None,
     })
     .await;
-    harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     let mutation_code =
         FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id);
@@ -2442,7 +2465,9 @@ async fn test_cancel_hard_compaction_root_dataset() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
@@ -2514,7 +2539,9 @@ async fn test_cancel_wrong_flow_id_fails() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, "5");
@@ -2555,8 +2582,14 @@ async fn test_cancel_foreign_flow_fails() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     let mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id);
@@ -2614,7 +2647,9 @@ async fn test_cancel_waiting_flow() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -2682,7 +2717,9 @@ async fn test_cancel_already_aborted_flow() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -2765,7 +2802,9 @@ async fn test_cancel_already_succeeded_flow() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result = harness.create_root_dataset().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -2844,7 +2883,8 @@ async fn test_history_of_completed_ingest_flow() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
@@ -2985,8 +3025,13 @@ async fn test_history_of_completed_transform_flow() {
     })
     .await;
 
-    let foo_result = harness.create_root_dataset().await;
-    let bar_result = harness.create_derived_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_result = harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let bar_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     let mutation_code =
         FlowRunsHarness::trigger_transform_flow_mutation(&bar_result.dataset_handle.id);
@@ -3196,8 +3241,13 @@ async fn test_execute_transform_flow_error_after_compaction() {
     })
     .await;
 
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     let mutation_code = FlowRunsHarness::trigger_compaction_flow_mutation_with_config(
         &create_root_result.dataset_handle.id,
@@ -3494,8 +3544,13 @@ async fn test_anonymous_operation_fails() {
     })
     .await;
 
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let create_derived_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
 
     let mutation_codes = [
         FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id),
@@ -3534,7 +3589,8 @@ async fn test_config_snapshot_returned_correctly() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code = FlowRunsHarness::trigger_compaction_flow_mutation_with_config(
         &create_result.dataset_handle.id,
@@ -3662,7 +3718,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let retry_policy = RetryPolicy {
         max_attempts: 2,
@@ -4152,7 +4209,8 @@ async fn test_trigger_flow_automatically_via_schedule() {
     })
     .await;
 
-    let create_result = harness.create_root_dataset().await;
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
 
     let mutation_code =
         FlowRunsHarness::set_daily_ingest_schedule_trigger(&create_result.dataset_handle.id);
@@ -4260,11 +4318,9 @@ async fn test_trigger_flow_automatically_via_schedule() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+#[oop::extend(BaseGQLFlowHarness, base_gql_flow_harness)]
 struct FlowRunsHarness {
-    base_gql_harness: BaseGQLDatasetHarness,
-    catalog_anonymous: dill::Catalog,
-    catalog_authorized: dill::Catalog,
+    base_gql_flow_harness: BaseGQLFlowHarness,
 }
 
 #[derive(Default)]
@@ -4278,19 +4334,16 @@ impl FlowRunsHarness {
             .tenancy_config(TenancyConfig::SingleTenant)
             .build();
 
-        let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
+        let base_gql_flow_catalog =
+            BaseGQLFlowHarness::make_base_gql_flow_catalog(&base_gql_harness);
 
-        let catalog_base = {
-            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+        let runs_catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);
 
-            b.add::<MetadataQueryServiceImpl>()
-                .add_value(dataset_changes_mock)
+            let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
+
+            b.add_value(dataset_changes_mock)
                 .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-                .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<InMemoryFlowTriggerEventStore>()
-                .add::<InMemoryFlowEventStore>()
-                .add::<InMemoryFlowSystemEventBridge>()
-                .add::<InMemoryFlowProcessState>()
                 .add_value(FlowAgentConfig::test_default())
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()
@@ -4317,14 +4370,10 @@ impl FlowRunsHarness {
             b.build()
         };
 
-        // Init dataset with no sources
-        let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
+        let base_gql_flow_harness = BaseGQLFlowHarness::new(base_gql_harness, runs_catalog).await;
 
         Self {
-            base_gql_harness,
-            catalog_anonymous,
-            catalog_authorized,
+            base_gql_flow_harness,
         }
     }
 
@@ -4339,84 +4388,6 @@ impl FlowRunsHarness {
         } else {
             panic!("Expected logged current user");
         }
-    }
-
-    async fn create_root_dataset(&self) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .kind(odf::DatasetKind::Root)
-                    .name("foo")
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
-
-    async fn create_root_dataset_no_source(&self) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .kind(odf::DatasetKind::Root)
-                    .name("foo")
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
-
-    async fn create_derived_dataset(&self) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name("bar")
-                    .kind(odf::DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(["foo"])
-                            .build(),
-                    )
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
-
-    async fn create_derived_dataset_no_transform(&self) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name("bar")
-                    .kind(odf::DatasetKind::Derivative)
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
     }
 
     async fn mimic_flow_scheduled(
