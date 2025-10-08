@@ -25,13 +25,19 @@ impl WebhookFlowSubProcess {
     #[graphql(skip)]
     #[allow(dead_code)]
     pub fn new(
-        id: wh::WebhookSubscriptionID,
-        name: String,
+        subscription: &wh::WebhookSubscription,
         flow_process_state: fs::FlowProcessState,
     ) -> Self {
+        // Decide on subprocess name
+        let subprocess_name = if subscription.label().as_ref().is_empty() {
+            subscription.target_url().to_string()
+        } else {
+            subscription.label().as_ref().to_string()
+        };
+
         Self {
-            id,
-            name,
+            id: subscription.id(),
+            name: subprocess_name,
             flow_process_state,
         }
     }

@@ -9,18 +9,18 @@
 
 use super::{DatasetFlowConfigs, DatasetFlowRuns, DatasetFlowTriggers};
 use crate::prelude::*;
-use crate::queries::{DatasetFlowProcesses, DatasetRequestState};
+use crate::queries::{DatasetFlowProcesses, DatasetRequestStateWithOwner};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlows<'a> {
-    dataset_request_state: &'a DatasetRequestState,
+    dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
 #[Object]
 impl<'a> DatasetFlows<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestStateWithOwner) -> Self {
         Self {
             dataset_request_state,
         }

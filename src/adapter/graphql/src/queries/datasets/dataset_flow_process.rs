@@ -7,33 +7,54 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
-
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
+use crate::queries::{Dataset, DatasetRequestStateWithOwner};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowProcess<'a> {
-    process_state: Cow<'a, fs::FlowProcessState>,
+pub struct DatasetFlowProcess {
+    dataset_request_state: DatasetRequestStateWithOwner,
+    process_state: fs::FlowProcessState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl<'a> FlowProcess<'a> {
+impl DatasetFlowProcess {
     #[graphql(skip)]
-    pub fn new(process_state: Cow<'a, fs::FlowProcessState>) -> Self {
-        Self { process_state }
+    pub fn new(
+        dataset_request_state: DatasetRequestStateWithOwner,
+        process_state: fs::FlowProcessState,
+    ) -> Self {
+        Self {
+            dataset_request_state,
+            process_state,
+        }
     }
 
     pub async fn flow_type(&self) -> DatasetFlowType {
         decode_dataset_flow_type(&self.process_state.flow_binding().flow_type)
     }
 
+    pub async fn dataset(&self) -> Dataset {
+        Dataset::new_access_checked(
+            self.dataset_request_state.owner().clone(),
+            self.dataset_request_state.dataset_handle().clone(),
+        )
+    }
+
     pub async fn summary(&self) -> FlowProcessSummary {
-        (*self.process_state).clone().into()
+        self.process_state.clone().into()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+page_based_connection!(
+    DatasetFlowProcess,
+    DatasetFlowProcessConnection,
+    DatasetFlowProcessEdge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
