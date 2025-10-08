@@ -36,54 +36,64 @@ pub struct FlowRunsHarnessOverrides {
 }
 
 impl BaseGQLFlowRunsHarness {
+    pub async fn new(base_gql_harness: BaseGQLDatasetHarness, runs_catalog: dill::Catalog) -> Self {
+        let base_gql_flow_harness = BaseGQLFlowHarness::new(base_gql_harness, runs_catalog).await;
+
+        Self {
+            base_gql_flow_harness,
+        }
+    }
+
     pub async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
             .build();
 
         let base_gql_flow_catalog =
-            BaseGQLFlowHarness::make_base_gql_flow_catalog(&base_gql_harness);
+            BaseGQLFlowHarness::make_base_gql_flow_catalog(base_gql_harness.catalog());
 
-        let runs_catalog = {
-            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);
+        let base_gql_flow_runs_catalog =
+            Self::make_base_gql_flow_runs_catalog(&base_gql_flow_catalog, overrides);
 
-            let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
+        Self::new(base_gql_harness, base_gql_flow_runs_catalog).await
+    }
 
-            b.add_value(dataset_changes_mock)
-                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-                .add_value(FlowAgentConfig::test_default())
-                .add_value(FlowSystemEventAgentConfig::local_default())
-                .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>()
-                .add::<TransformRequestPlannerImpl>()
-                .add::<FakeDependencyGraphIndexer>();
+    pub fn make_base_gql_flow_runs_catalog(
+        base_catalog: &dill::Catalog,
+        overrides: FlowRunsHarnessOverrides,
+    ) -> dill::Catalog {
+        let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
-            kamu_flow_system_services::register_dependencies(&mut b);
-            kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
+        let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
 
-            register_message_dispatcher::<TaskProgressMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-            );
+        b.add_value(dataset_changes_mock)
+            .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
+            .add_value(FlowAgentConfig::test_default())
+            .add_value(FlowSystemEventAgentConfig::local_default())
+            .add::<TaskSchedulerImpl>()
+            .add::<InMemoryTaskEventStore>()
+            .add::<TransformRequestPlannerImpl>()
+            .add::<FakeDependencyGraphIndexer>();
 
-            register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-            );
+        kamu_flow_system_services::register_dependencies(&mut b);
+        kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
 
-            register_message_dispatcher::<FlowTriggerUpdatedMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-            );
+        register_message_dispatcher::<TaskProgressMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+        );
 
-            b.build()
-        };
+        register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+        );
 
-        let base_gql_flow_harness = BaseGQLFlowHarness::new(base_gql_harness, runs_catalog).await;
+        register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
+        );
 
-        Self {
-            base_gql_flow_harness,
-        }
+        b.build()
     }
 
     pub async fn mimic_flow_run_with_outcome(
