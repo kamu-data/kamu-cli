@@ -1106,7 +1106,7 @@ impl FlowTriggerHarness {
             .build();
 
         let base_gql_flow_catalog =
-            BaseGQLFlowHarness::make_base_gql_flow_catalog(&base_gql_harness);
+            BaseGQLFlowHarness::make_base_gql_flow_catalog(base_gql_harness.catalog());
 
         let triggers_catalog = {
             let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);

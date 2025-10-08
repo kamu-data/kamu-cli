@@ -7,17 +7,28 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_graphql::value;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
-use kamu_core::PullResult;
+use kamu_core::{PullResult, TenancyConfig};
 use kamu_datasets::DatasetIntervalIncrement;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
+use kamu_webhooks::*;
+use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_services::{CreateWebhookSubscriptionUseCaseImpl, WebhookSecretGeneratorImpl};
+use messaging_outbox::register_message_dispatcher;
+use uuid::Uuid;
 
-use crate::utils::{BaseGQLFlowRunsHarness, FlowRunsHarnessOverrides};
+use crate::utils::{
+    BaseGQLDatasetHarness,
+    BaseGQLFlowHarness,
+    BaseGQLFlowRunsHarness,
+    FlowRunsHarnessOverrides,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,14 +46,16 @@ async fn test_basic_process_state_actions_root_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "UNCONFIGURED".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "UNCONFIGURED".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -60,14 +73,16 @@ async fn test_basic_process_state_actions_root_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "ACTIVE".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "ACTIVE".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -81,14 +96,16 @@ async fn test_basic_process_state_actions_root_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "PAUSED_MANUAL".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "PAUSED_MANUAL".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -102,14 +119,16 @@ async fn test_basic_process_state_actions_root_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "ACTIVE".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "ACTIVE".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 }
@@ -136,14 +155,16 @@ async fn test_basic_process_state_actions_derived_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "EXECUTE_TRANSFORM".to_string(),
-            effective_state: "UNCONFIGURED".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "UNCONFIGURED".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -157,14 +178,16 @@ async fn test_basic_process_state_actions_derived_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "EXECUTE_TRANSFORM".to_string(),
-            effective_state: "ACTIVE".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "ACTIVE".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -178,14 +201,16 @@ async fn test_basic_process_state_actions_derived_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "EXECUTE_TRANSFORM".to_string(),
-            effective_state: "PAUSED_MANUAL".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "PAUSED_MANUAL".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -199,14 +224,16 @@ async fn test_basic_process_state_actions_derived_dataset() {
     let response = harness
         .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "EXECUTE_TRANSFORM".to_string(),
-            effective_state: "ACTIVE".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "ACTIVE".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 }
@@ -261,14 +288,16 @@ async fn test_ingest_process_several_runs() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "ACTIVE".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "ACTIVE".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -280,14 +309,16 @@ async fn test_ingest_process_several_runs() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "FAILING".to_string(),
-            consecutive_failures: 1,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "FAILING".to_string(),
+                consecutive_failures: 1,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -299,14 +330,16 @@ async fn test_ingest_process_several_runs() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "FAILING".to_string(),
-            consecutive_failures: 2,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "FAILING".to_string(),
+                consecutive_failures: 2,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 
@@ -329,14 +362,16 @@ async fn test_ingest_process_several_runs() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "ACTIVE".to_string(),
-            consecutive_failures: 0,
-            maybe_auto_stop_reason: None,
+            summary: FlowProcessSummaryBasic {
+                effective_state: "ACTIVE".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
         }
     );
 }
@@ -391,14 +426,16 @@ async fn test_ingest_process_reach_auto_stop_via_failures_count() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "STOPPED_AUTO".to_string(),
-            consecutive_failures: 3,
-            maybe_auto_stop_reason: Some("STOP_POLICY".to_string()),
+            summary: FlowProcessSummaryBasic {
+                effective_state: "STOPPED_AUTO".to_string(),
+                consecutive_failures: 3,
+                maybe_auto_stop_reason: Some("STOP_POLICY".to_string()),
+            }
         }
     );
 }
@@ -435,16 +472,87 @@ async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
     let response = harness
         .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
         .await;
-    let process_summary = FlowProcessesHarness::extract_primary_flow_process(&response);
+    let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
-        FlowProcessSummaryBasic {
+        FlowPrimaryProcessSummary {
             flow_type: "INGEST".to_string(),
-            effective_state: "STOPPED_AUTO".to_string(),
-            consecutive_failures: 1,
-            maybe_auto_stop_reason: Some("UNRECOVERABLE_FAILURE".to_string()),
+            summary: FlowProcessSummaryBasic {
+                effective_state: "STOPPED_AUTO".to_string(),
+                consecutive_failures: 1,
+                maybe_auto_stop_reason: Some("UNRECOVERABLE_FAILURE".to_string()),
+            }
         }
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_process_with_multiple_webhooks() {
+    let harness = FlowProcessesHarness::new().await;
+
+    // Create root dataset
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_result = harness.create_root_dataset(foo_alias).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    // Create multiple webhook subscriptions
+    let webhook_names = ["alpha", "beta", "gamma", "delta"];
+    let webhook_subscription_ids =
+        futures::future::join_all(webhook_names.iter().map(|name| async {
+            let id = harness
+                .create_webhook_for_dataset_updates(&foo_result.dataset_handle.id, name)
+                .await;
+            (id, *name)
+        }))
+        .await;
+
+    // Read webhooks state
+    let webhooks_state = harness
+        .read_webhooks_processes(&schema, &foo_result.dataset_handle.id)
+        .await;
+
+    // Rollup checks
+    let rollup = harness.extract_webhooks_rollup(&webhooks_state);
+    pretty_assertions::assert_eq!(
+        rollup,
+        value!({
+            "total": 4,
+            "active": 4,
+            "failing": 0,
+            "paused": 0,
+            "unconfigured": 0,
+            "stopped": 0,
+            "worstConsecutiveFailures": 0,
+        })
+    );
+
+    // Subprocesses checks
+    let subprocesses_by_id: HashMap<_, _> = harness
+        .extract_webhooks_subprocesses(&webhooks_state)
+        .into_iter()
+        .map(|sp| (sp.id, sp))
+        .collect();
+    assert_eq!(subprocesses_by_id.len(), 4);
+
+    for (webhook_subscription_id, webhook_name) in webhook_subscription_ids {
+        pretty_assertions::assert_eq!(
+            subprocesses_by_id
+                .get(&webhook_subscription_id)
+                .unwrap_or_else(|| panic!("Missing webhook {webhook_name}")),
+            &FlowWebhookSubprocessSummary {
+                id: webhook_subscription_id,
+                name: webhook_name.to_string(),
+                summary: FlowProcessSummaryBasic {
+                    effective_state: "ACTIVE".to_string(),
+                    consecutive_failures: 0,
+                    maybe_auto_stop_reason: None,
+                }
+            }
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -452,29 +560,64 @@ async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
 #[oop::extend(BaseGQLFlowRunsHarness, base_gql_flow_runs_harness)]
 struct FlowProcessesHarness {
     base_gql_flow_runs_harness: BaseGQLFlowRunsHarness,
+    processes_catalog: dill::Catalog,
     flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
 }
 
 impl FlowProcessesHarness {
     async fn new() -> Self {
-        let dataset_changes_mock =
-            MockDatasetIncrementQueryService::with_increment_between(DatasetIntervalIncrement {
-                num_blocks: 1,
-                num_records: 10,
-                updated_watermark: None,
-            });
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
+
+        let base_gql_flow_catalog =
+            BaseGQLFlowHarness::make_base_gql_flow_catalog(base_gql_harness.catalog());
+
+        let base_gql_flow_runs_catalog = BaseGQLFlowRunsHarness::make_base_gql_flow_runs_catalog(
+            &base_gql_flow_catalog,
+            FlowRunsHarnessOverrides {
+                dataset_changes_mock: Some(
+                    MockDatasetIncrementQueryService::with_increment_between(
+                        DatasetIntervalIncrement {
+                            num_blocks: 1,
+                            num_records: 10,
+                            updated_watermark: None,
+                        },
+                    ),
+                ),
+            },
+        );
+
+        let processes_catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_runs_catalog);
+            b.add::<CreateWebhookSubscriptionUseCaseImpl>()
+                .add::<WebhookSecretGeneratorImpl>()
+                .add::<InMemoryWebhookSubscriptionEventStore>()
+                .add_value(WebhooksConfig::default());
+
+            kamu_adapter_flow_webhook::register_dependencies(&mut b);
+
+            register_message_dispatcher::<WebhookSubscriptionLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
+            );
+            register_message_dispatcher::<WebhookSubscriptionEventChangesMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+            );
+
+            b.build()
+        };
 
         let base_gql_flow_runs_harness =
-            BaseGQLFlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-                dataset_changes_mock: Some(dataset_changes_mock),
-            })
-            .await;
+            BaseGQLFlowRunsHarness::new(base_gql_harness, processes_catalog.clone()).await;
+
         Self {
-            flow_system_event_agent: base_gql_flow_runs_harness
-                .catalog_anonymous
+            base_gql_flow_runs_harness,
+            flow_system_event_agent: processes_catalog
                 .get_one::<dyn FlowSystemEventAgent>()
                 .unwrap(),
-            base_gql_flow_runs_harness,
+            processes_catalog,
         }
     }
 
@@ -532,26 +675,142 @@ impl FlowProcessesHarness {
         response.data
     }
 
-    fn extract_primary_flow_process(response: &async_graphql::Value) -> FlowProcessSummaryBasic {
-        fn get_obj<'a>(
-            value: &'a async_graphql::Value,
-            key: &str,
-        ) -> Option<&'a async_graphql::Value> {
-            if let async_graphql::Value::Object(obj) = value {
-                obj.get(key)
-            } else {
-                None
-            }
-        }
+    async fn read_webhooks_processes(
+        &self,
+        schema: &kamu_adapter_graphql::Schema,
+        dataset_id: &odf::DatasetID,
+    ) -> async_graphql::Value {
+        self.flow_system_event_agent
+            .catchup_remaining_events()
+            .await
+            .unwrap();
 
+        let request_code = r#"
+            query($id: DatasetID!) {
+                datasets {
+                    byId (datasetId: $id) {
+                        flows {
+                            processes {
+                                webhooks {
+                                    rollup {
+                                        total
+                                        active
+                                        failing
+                                        paused
+                                        unconfigured
+                                        stopped
+                                        worstConsecutiveFailures
+                                    }
+                                    subprocesses {
+                                        id
+                                        name
+                                        summary {
+                                            effectiveState
+                                            consecutiveFailures
+                                            lastSuccessAt
+                                            lastAttemptAt
+                                            lastFailureAt
+                                            nextPlannedAt
+                                            autoStoppedReason
+                                            autoStoppedAt
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#;
+
+        let response = schema
+            .execute(
+                async_graphql::Request::new(request_code)
+                    .variables(async_graphql::Variables::from_value(value!({
+                        "id": dataset_id.to_string(),
+                    })))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await;
+
+        assert!(response.is_ok(), "{:?}", response.errors);
+
+        response.data
+    }
+
+    fn extract_primary_flow_process(
+        &self,
+        response: &async_graphql::Value,
+    ) -> FlowPrimaryProcessSummary {
         // Navigate through the nested structure more compactly
-        get_obj(response, "datasets")
-            .and_then(|v| get_obj(v, "byId"))
-            .and_then(|v| get_obj(v, "flows"))
-            .and_then(|v| get_obj(v, "processes"))
-            .and_then(|v| get_obj(v, "primary"))
-            .map(|primary| FlowProcessSummaryBasic::from(primary.clone()))
+        get_property(response, "datasets")
+            .and_then(|v| get_property(v, "byId"))
+            .and_then(|v| get_property(v, "flows"))
+            .and_then(|v| get_property(v, "processes"))
+            .and_then(|v| get_property(v, "primary"))
+            .map(FlowPrimaryProcessSummary::from)
             .unwrap_or_else(|| panic!("Invalid GraphQL response structure"))
+    }
+
+    fn extract_webhooks_rollup(&self, response: &async_graphql::Value) -> async_graphql::Value {
+        // Navigate through the nested structure more compactly
+        get_property(response, "datasets")
+            .and_then(|v| get_property(v, "byId"))
+            .and_then(|v| get_property(v, "flows"))
+            .and_then(|v| get_property(v, "processes"))
+            .and_then(|v| get_property(v, "webhooks"))
+            .and_then(|v| get_property(v, "rollup"))
+            .cloned()
+            .unwrap_or_else(|| panic!("Invalid GraphQL response structure"))
+    }
+
+    fn extract_webhooks_subprocesses(
+        &self,
+        response: &async_graphql::Value,
+    ) -> Vec<FlowWebhookSubprocessSummary> {
+        // Navigate through the nested structure more compactly
+        let subprocesses_value = get_property(response, "datasets")
+            .and_then(|v| get_property(v, "byId"))
+            .and_then(|v| get_property(v, "flows"))
+            .and_then(|v| get_property(v, "processes"))
+            .and_then(|v| get_property(v, "webhooks"))
+            .and_then(|v| get_property(v, "subprocesses"))
+            .and_then(|v| {
+                if let async_graphql::Value::List(list) = v {
+                    Some(list.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| panic!("Invalid GraphQL response structure"));
+
+        subprocesses_value
+            .into_iter()
+            .map(|subprocess_value| FlowWebhookSubprocessSummary::from(&subprocess_value))
+            .collect()
+    }
+
+    async fn create_webhook_for_dataset_updates(
+        &self,
+        dataset_id: &odf::DatasetID,
+        webhook_label: &str,
+    ) -> WebhookSubscriptionID {
+        let create_webhook_uc = self
+            .processes_catalog
+            .get_one::<dyn kamu_webhooks::CreateWebhookSubscriptionUseCase>()
+            .unwrap();
+
+        let result = create_webhook_uc
+            .execute(
+                Some(dataset_id.clone()),
+                url::Url::parse(&format!("https://example.com/{webhook_label}")).unwrap(),
+                vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+                WebhookSubscriptionLabel::try_new(webhook_label.to_string()).unwrap(),
+            )
+            .await
+            .unwrap();
+
+        result.subscription_id
     }
 }
 
@@ -559,34 +818,105 @@ impl FlowProcessesHarness {
 
 #[derive(Debug, Eq, PartialEq)]
 struct FlowProcessSummaryBasic {
-    flow_type: String,
     effective_state: String,
     consecutive_failures: i32,
     maybe_auto_stop_reason: Option<String>,
 }
 
-impl From<async_graphql::Value> for FlowProcessSummaryBasic {
-    fn from(value: async_graphql::Value) -> Self {
-        // Convert the GraphQL Value to a JSON Value for easier access
-        let json_value = value.into_json().unwrap();
-
-        let flow_type = json_value["flowType"].as_str().unwrap().to_string();
-
-        let summary = &json_value["summary"];
-        let effective_state = summary["effectiveState"].as_str().unwrap().to_string();
+impl From<&async_graphql::Value> for FlowProcessSummaryBasic {
+    fn from(value: &async_graphql::Value) -> Self {
+        let effective_state = get_string_property(value, "effectiveState").unwrap();
 
         let consecutive_failures =
-            i32::try_from(summary["consecutiveFailures"].as_i64().unwrap()).unwrap();
+            i32::try_from(get_i64_property(value, "consecutiveFailures").unwrap()).unwrap();
 
-        let maybe_auto_stop_reason = summary["autoStoppedReason"].as_str();
+        let maybe_auto_stop_reason = get_string_property(value, "autoStoppedReason");
 
         Self {
-            flow_type,
             effective_state,
             consecutive_failures,
-            maybe_auto_stop_reason: maybe_auto_stop_reason.map(ToString::to_string),
+            maybe_auto_stop_reason,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Eq, PartialEq)]
+struct FlowPrimaryProcessSummary {
+    flow_type: String,
+    summary: FlowProcessSummaryBasic,
+}
+
+impl From<&async_graphql::Value> for FlowPrimaryProcessSummary {
+    fn from(value: &async_graphql::Value) -> Self {
+        let flow_type = get_string_property(value, "flowType").unwrap();
+
+        let summary = FlowProcessSummaryBasic::from(get_property(value, "summary").unwrap());
+
+        Self { flow_type, summary }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Eq, PartialEq)]
+struct FlowWebhookSubprocessSummary {
+    id: WebhookSubscriptionID,
+    name: String,
+    summary: FlowProcessSummaryBasic,
+}
+
+impl From<&async_graphql::Value> for FlowWebhookSubprocessSummary {
+    fn from(value: &async_graphql::Value) -> Self {
+        let id = WebhookSubscriptionID::new(
+            Uuid::parse_str(&get_string_property(value, "id").unwrap())
+                .expect("Invalid UUID in webhook subprocess id"),
+        );
+
+        let name = get_string_property(value, "name").unwrap();
+
+        let summary = FlowProcessSummaryBasic::from(get_property(value, "summary").unwrap());
+
+        Self { id, name, summary }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_property<'a>(
+    value: &'a async_graphql::Value,
+    key: &str,
+) -> Option<&'a async_graphql::Value> {
+    if let async_graphql::Value::Object(obj) = value {
+        obj.get(key)
+    } else {
+        None
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_string_property(value: &async_graphql::Value, key: &str) -> Option<String> {
+    get_property(value, key)
+        .and_then(|v| match v {
+            async_graphql::Value::String(s) => Some(s.as_str()),
+            async_graphql::Value::Enum(e) => Some(e.as_str()),
+            _ => None,
+        })
+        .map(ToString::to_string)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_i64_property(value: &async_graphql::Value, key: &str) -> Option<i64> {
+    get_property(value, key).and_then(|v| {
+        if let async_graphql::Value::Number(n) = v {
+            n.as_i64()
+        } else {
+            None
+        }
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

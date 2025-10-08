@@ -41,8 +41,8 @@ impl BaseGQLFlowHarness {
         }
     }
 
-    pub fn make_base_gql_flow_catalog(base_gql_harness: &BaseGQLDatasetHarness) -> dill::Catalog {
-        let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+    pub fn make_base_gql_flow_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {
+        let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
         b.add::<MetadataQueryServiceImpl>()
             .add::<InMemoryFlowEventStore>()

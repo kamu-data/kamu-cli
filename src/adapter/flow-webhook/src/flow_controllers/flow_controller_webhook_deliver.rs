@@ -43,7 +43,6 @@ use crate::{
 pub struct FlowControllerWebhookDeliver {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 impl FlowControllerWebhookDeliver {
@@ -72,9 +71,10 @@ impl FlowControllerWebhookDeliver {
         flow: &fs::FlowState,
         input_dataset_id: &odf::DatasetID,
     ) -> Result<serde_json::Value, InternalError> {
+        let dataset_entry_service = self.catalog.get_one::<dyn DatasetEntryService>().unwrap();
+
         // Find out who is the owner of the dataset
-        let dataset_entry = self
-            .dataset_entry_service
+        let dataset_entry = dataset_entry_service
             .get_entry(input_dataset_id)
             .await
             .int_err()?;
