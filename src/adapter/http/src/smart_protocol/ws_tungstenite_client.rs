@@ -552,7 +552,7 @@ impl WsSmartTransferProtocolClient {
     ) -> Result<odf::Multihash, InternalError> {
         let transactional_target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
-        append_dataset_metadata_batch_use_case
+        let new_head = append_dataset_metadata_batch_use_case
             .execute(
                 transactional_target.as_ref(),
                 Box::new(new_blocks.into_iter()),
@@ -564,15 +564,10 @@ impl WsSmartTransferProtocolClient {
                 },
             )
             .await
-            .int_err()?;
+            .int_err()?
+            .unwrap();
 
-        let new_dst_head = transactional_target
-            .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
-            .await
-            .int_err()?;
-
-        Ok(new_dst_head)
+        Ok(new_head)
     }
 }
 

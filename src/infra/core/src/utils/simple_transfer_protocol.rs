@@ -303,7 +303,7 @@ impl SimpleTransferProtocol {
         dst_alias: Option<&odf::DatasetAlias>,
         new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlock> + Send>,
         options: AppendDatasetMetadataBatchUseCaseOptions,
-    ) -> Result<(), AppendDatasetMetadataBatchUseCaseError> {
+    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
         if let Some(alias) = dst_alias {
             let res = dataset_registry
                 .get_dataset_by_ref(&alias.clone().into())

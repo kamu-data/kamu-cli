@@ -87,6 +87,7 @@ pub enum PollingIngestResult {
         new_head: odf::Multihash,
         has_more: bool,
         uncacheable: bool,
+        metadata_state: DataWriterMetadataState,
     },
 }
 

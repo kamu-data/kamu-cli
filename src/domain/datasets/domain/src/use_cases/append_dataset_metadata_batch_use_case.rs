@@ -19,7 +19,7 @@ pub trait AppendDatasetMetadataBatchUseCase: Send + Sync {
         dataset: &dyn odf::Dataset,
         new_blocks_into_it: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlock> + Send>,
         options: AppendDatasetMetadataBatchUseCaseOptions,
-    ) -> Result<(), AppendDatasetMetadataBatchUseCaseError>;
+    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

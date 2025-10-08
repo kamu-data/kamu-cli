@@ -347,13 +347,13 @@ impl PullDatasetUseCaseImpl {
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let mut combined_result = None;
-        let mut metadata_state = pii.metadata_state.clone();
+        let mut latest_metadata_state = pii.metadata_state;
 
         loop {
             match polling_ingest_svc
                 .ingest(
                     pii.target.clone(),
-                    metadata_state.clone(),
+                    latest_metadata_state.clone(),
                     ingest_options.clone(),
                     maybe_listener.clone(),
                 )
@@ -361,20 +361,20 @@ impl PullDatasetUseCaseImpl {
             {
                 Ok(ingest_res) => {
                     if let PollingIngestResult::Updated {
-                        old_head, new_head, ..
+                        old_head,
+                        new_head,
+                        metadata_state,
+                        ..
                     } = &ingest_res
                     {
-                        metadata_state = Box::new(
-                            Self::update_ref_transactionally(
-                                catalog.clone(),
-                                pii.target.get_handle(),
-                                new_head,
-                                old_head,
-                                true,
-                            )
-                            .await?
-                            .unwrap(),
-                        );
+                        Self::update_ref_transactionally(
+                            catalog.clone(),
+                            pii.target.get_handle(),
+                            new_head,
+                            old_head,
+                        )
+                        .await?;
+                        latest_metadata_state = Box::new(metadata_state.clone());
                     }
 
                     combined_result = Some(Self::merge_results(combined_result, ingest_res));
@@ -432,10 +432,10 @@ impl PullDatasetUseCaseImpl {
         target_handle: &odf::DatasetHandle,
         new_head: &odf::Multihash,
         old_head: &odf::Multihash,
-        returns_metadata: bool,
-    ) -> Result<Option<DataWriterMetadataState>, InternalError> {
+    ) -> Result<(), InternalError> {
         let transactional_target = dataset_registry.get_dataset_by_handle(target_handle).await;
 
+        // ToDo: Handle concurrent `HEAD` updates
         transactional_target
             .as_metadata_chain()
             .set_ref(
@@ -447,21 +447,7 @@ impl PullDatasetUseCaseImpl {
                 },
             )
             .await
-            .int_err()?;
-
-        if returns_metadata {
-            return Ok(Some(
-                DataWriterMetadataState::build(
-                    transactional_target.clone(),
-                    &odf::BlockRef::Head,
-                    None,
-                    None,
-                )
-                .await
-                .int_err()?,
-            ));
-        }
-        Ok(None)
+            .int_err()
     }
 
     #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
@@ -530,7 +516,6 @@ impl PullDatasetUseCaseImpl {
                         target.get_handle(),
                         new_head,
                         old_head,
-                        false,
                     )
                     .await?;
                 }
@@ -596,7 +581,10 @@ impl PullDatasetUseCaseImpl {
             (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
             (
                 Some(PollingIngestResult::Updated {
-                    old_head, new_head, ..
+                    old_head,
+                    new_head,
+                    metadata_state,
+                    ..
                 }),
                 PollingIngestResult::UpToDate { uncacheable, .. },
             ) => PollingIngestResult::Updated {
@@ -604,6 +592,7 @@ impl PullDatasetUseCaseImpl {
                 new_head,
                 has_more: false,
                 uncacheable,
+                metadata_state,
             },
             (
                 Some(PollingIngestResult::Updated {
@@ -614,6 +603,7 @@ impl PullDatasetUseCaseImpl {
                     new_head,
                     has_more,
                     uncacheable,
+                    metadata_state,
                     ..
                 },
             ) => PollingIngestResult::Updated {
@@ -621,6 +611,7 @@ impl PullDatasetUseCaseImpl {
                 new_head,
                 has_more,
                 uncacheable,
+                metadata_state,
             },
         }
     }

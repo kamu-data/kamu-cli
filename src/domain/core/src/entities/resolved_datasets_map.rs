@@ -64,18 +64,11 @@ impl ResolvedDatasetsMap {
         }
     }
 
-    fn get_all_values(&self) -> Vec<ResolvedDataset> {
-        self.resolved_datasets_by_id.values().cloned().collect()
-    }
-
     pub async fn refresh_datasets_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
-        for resolved_dataset in self.get_all_values() {
-            self.resolved_datasets_by_id.insert(
-                resolved_dataset.get_id().clone(),
-                dataset_registry
-                    .get_dataset_by_handle(resolved_dataset.get_handle())
-                    .await,
-            );
+        for resolved_dataset in self.resolved_datasets_by_id.values_mut() {
+            *resolved_dataset = dataset_registry
+                .get_dataset_by_handle(resolved_dataset.get_handle())
+                .await;
         }
     }
 }

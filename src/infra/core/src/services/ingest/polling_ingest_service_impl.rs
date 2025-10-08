@@ -253,6 +253,7 @@ impl PollingIngestServiceImpl {
                     new_head: res.new_head,
                     has_more: savepoint.has_more,
                     uncacheable,
+                    metadata_state: args.data_writer.as_metadata_state(),
                 })
             }
             Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
