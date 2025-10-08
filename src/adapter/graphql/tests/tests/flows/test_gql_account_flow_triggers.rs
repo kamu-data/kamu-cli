@@ -146,9 +146,9 @@ async fn test_list_datasets_with_flow() {
     // Pure datasets listing
     let request_code = indoc!(
         r#"
-        {
+        query($accountName: String!) {
             accounts {
-                byName (name: "<account_name>") {
+                byName (name: $accountName) {
                     flows {
                         runs {
                             listDatasetsWithFlow {
@@ -166,11 +166,16 @@ async fn test_list_datasets_with_flow() {
             }
         }
         "#
-    )
-    .replace("<account_name>", DEFAULT_ACCOUNT_NAME_STR);
+    );
 
     let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_json(serde_json::json!({
+                    "accountName": DEFAULT_ACCOUNT_NAME_STR,
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");

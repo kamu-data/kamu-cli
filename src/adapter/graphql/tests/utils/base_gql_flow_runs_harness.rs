@@ -9,6 +9,8 @@
 
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use kamu::TransformRequestPlannerImpl;
+use kamu_adapter_flow_dataset::*;
+use kamu_adapter_flow_webhook::webhook_deliver_binding;
 use kamu_core::TenancyConfig;
 use kamu_datasets::DatasetIncrementQueryService;
 use kamu_datasets_services::testing::{
@@ -19,6 +21,8 @@ use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
+use kamu_webhooks::*;
+use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
 
 use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness};
@@ -75,8 +79,14 @@ impl BaseGQLFlowRunsHarness {
             .add::<TransformRequestPlannerImpl>()
             .add::<FakeDependencyGraphIndexer>();
 
+        b.add::<InMemoryWebhookSubscriptionEventStore>()
+            .add_value(WebhooksConfig::default());
+
         kamu_flow_system_services::register_dependencies(&mut b);
+        kamu_webhooks_services::register_dependencies(&mut b);
+
         kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
+        kamu_adapter_flow_webhook::register_dependencies(&mut b);
 
         register_message_dispatcher::<TaskProgressMessage>(
             &mut b,
@@ -93,7 +103,142 @@ impl BaseGQLFlowRunsHarness {
             MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         );
 
+        register_message_dispatcher::<WebhookSubscriptionLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
+        );
+        register_message_dispatcher::<WebhookSubscriptionEventChangesMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+        );
+
         b.build()
+    }
+
+    pub async fn create_webhook_for_dataset_updates(
+        &self,
+        dataset_id: &odf::DatasetID,
+        webhook_label: &str,
+    ) -> WebhookSubscriptionID {
+        let create_webhook_uc = self
+            .catalog_authorized
+            .get_one::<dyn CreateWebhookSubscriptionUseCase>()
+            .unwrap();
+
+        let result = create_webhook_uc
+            .execute(
+                Some(dataset_id.clone()),
+                url::Url::parse(&format!("https://example.com/{webhook_label}")).unwrap(),
+                vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+                WebhookSubscriptionLabel::try_new(webhook_label.to_string()).unwrap(),
+            )
+            .await
+            .unwrap();
+
+        result.subscription_id
+    }
+
+    pub async fn pause_webhook_subscription(&self, subscription_id: &WebhookSubscriptionID) {
+        let pause_webhook_uc = self
+            .catalog_authorized
+            .get_one::<dyn PauseWebhookSubscriptionUseCase>()
+            .unwrap();
+
+        let subscription_store = self
+            .catalog_authorized
+            .get_one::<dyn WebhookSubscriptionEventStore>()
+            .unwrap();
+
+        let mut subscription =
+            WebhookSubscription::load(subscription_id, subscription_store.as_ref())
+                .await
+                .unwrap();
+
+        pause_webhook_uc.execute(&mut subscription).await.unwrap();
+    }
+
+    pub async fn mimic_webhook_flow_success(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+    ) {
+        let flow_id = self.trigger_webhook_flow(dataset_id, subscription_id).await;
+
+        self.mimic_flow_run_with_outcome(
+            flow_id.to_string().as_str(),
+            TaskOutcome::Success(TaskResult::empty()),
+        )
+        .await;
+    }
+
+    pub async fn mimic_webhook_flow_failure(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+        unrecoverable: bool,
+    ) {
+        let flow_id = self.trigger_webhook_flow(dataset_id, subscription_id).await;
+
+        self.mimic_flow_run_with_outcome(
+            flow_id.to_string().as_str(),
+            TaskOutcome::Failed(if unrecoverable {
+                TaskError::empty_unrecoverable()
+            } else {
+                TaskError::empty_recoverable()
+            }),
+        )
+        .await;
+    }
+
+    pub async fn trigger_webhook_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+    ) -> FlowID {
+        let flow_run_service = self
+            .catalog_authorized
+            .get_one::<dyn FlowRunService>()
+            .unwrap();
+
+        let flow_binding = webhook_deliver_binding(
+            subscription_id,
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
+            Some(dataset_id),
+        );
+
+        let flow_state = flow_run_service
+            .run_flow_automatically(
+                Utc::now(),
+                &flow_binding,
+                vec![FlowActivationCause::ResourceUpdate(
+                    FlowActivationCauseResourceUpdate {
+                        activation_time: Utc::now(),
+                        resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                        changes: ResourceChanges::NewData(ResourceDataChanges {
+                            blocks_added: 1,
+                            records_added: 10,
+                            new_watermark: None,
+                        }),
+                        details: serde_json::to_value(DatasetResourceUpdateDetails {
+                            dataset_id: dataset_id.clone(),
+                            source: DatasetUpdateSource::UpstreamFlow {
+                                flow_type: FLOW_TYPE_DATASET_INGEST.to_string(),
+                                flow_id: FlowID::new(1),
+                                maybe_flow_config_snapshot: None,
+                            },
+                            new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
+                            old_head_maybe: Some(odf::Multihash::from_digest_sha3_256(b"old_head")),
+                        })
+                        .unwrap(),
+                    },
+                )],
+                Some(FlowTriggerRule::Reactive(ReactiveRule::empty())),
+                None,
+            )
+            .await
+            .unwrap();
+
+        flow_state.flow_id
     }
 
     pub async fn mimic_flow_run_with_outcome(
