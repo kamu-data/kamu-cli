@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_graphql::value;
+use chrono::Utc;
+use kamu_adapter_flow_dataset::*;
+use kamu_adapter_flow_webhook::webhook_deliver_binding;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
 use kamu_core::{PullResult, TenancyConfig};
 use kamu_datasets::DatasetIntervalIncrement;
@@ -19,7 +22,6 @@ use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
-use kamu_webhooks_services::{CreateWebhookSubscriptionUseCaseImpl, WebhookSecretGeneratorImpl};
 use messaging_outbox::register_message_dispatcher;
 use uuid::Uuid;
 
@@ -28,6 +30,7 @@ use crate::utils::{
     BaseGQLFlowHarness,
     BaseGQLFlowRunsHarness,
     FlowRunsHarnessOverrides,
+    GraphQLQueryRequest,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,8 +47,12 @@ async fn test_basic_process_state_actions_root_dataset() {
 
     // Confirm initial primary process state
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -71,8 +78,12 @@ async fn test_basic_process_state_actions_root_dataset() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -94,8 +105,12 @@ async fn test_basic_process_state_actions_root_dataset() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -117,8 +132,12 @@ async fn test_basic_process_state_actions_root_dataset() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -153,8 +172,12 @@ async fn test_basic_process_state_actions_derived_dataset() {
     // Confirm initial primary process state
 
     let response = harness
-        .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&bar_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -176,8 +199,12 @@ async fn test_basic_process_state_actions_derived_dataset() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&bar_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -199,8 +226,12 @@ async fn test_basic_process_state_actions_derived_dataset() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&bar_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -222,8 +253,12 @@ async fn test_basic_process_state_actions_derived_dataset() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &bar_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&bar_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -286,8 +321,12 @@ async fn test_ingest_process_several_runs() {
     // Read latest state
 
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -307,8 +346,12 @@ async fn test_ingest_process_several_runs() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -328,8 +371,12 @@ async fn test_ingest_process_several_runs() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -360,8 +407,12 @@ async fn test_ingest_process_several_runs() {
         .await;
 
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -424,8 +475,12 @@ async fn test_ingest_process_reach_auto_stop_via_failures_count() {
 
     // Must see auto-stopped state with 3 consecutive failures
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -470,8 +525,12 @@ async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
 
     // Must see auto-stopped state with unrecoverable failure
     let response = harness
-        .read_flow_process_state(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
     let process_summary = harness.extract_primary_flow_process(&response);
     assert_eq!(
         process_summary,
@@ -500,19 +559,24 @@ async fn test_ingest_process_with_multiple_webhooks() {
 
     // Create multiple webhook subscriptions
     let webhook_names = ["alpha", "beta", "gamma", "delta"];
-    let webhook_subscription_ids =
+    let webhook_subscription_ids: HashMap<_, _> =
         futures::future::join_all(webhook_names.iter().map(|name| async {
             let id = harness
                 .create_webhook_for_dataset_updates(&foo_result.dataset_handle.id, name)
                 .await;
-            (id, *name)
+            ((*name).to_string(), id)
         }))
-        .await;
+        .await
+        .into_iter()
+        .collect();
 
     // Read webhooks state
     let webhooks_state = harness
-        .read_webhooks_processes(&schema, &foo_result.dataset_handle.id)
-        .await;
+        .read_webhooks_processes(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
 
     // Rollup checks
     let rollup = harness.extract_webhooks_rollup(&webhooks_state);
@@ -537,13 +601,13 @@ async fn test_ingest_process_with_multiple_webhooks() {
         .collect();
     assert_eq!(subprocesses_by_id.len(), 4);
 
-    for (webhook_subscription_id, webhook_name) in webhook_subscription_ids {
+    for (webhook_name, webhook_subscription_id) in &webhook_subscription_ids {
         pretty_assertions::assert_eq!(
             subprocesses_by_id
-                .get(&webhook_subscription_id)
+                .get(webhook_subscription_id)
                 .unwrap_or_else(|| panic!("Missing webhook {webhook_name}")),
             &FlowWebhookSubprocessSummary {
-                id: webhook_subscription_id,
+                id: *webhook_subscription_id,
                 name: webhook_name.to_string(),
                 summary: FlowProcessSummaryBasic {
                     effective_state: "ACTIVE".to_string(),
@@ -553,6 +617,139 @@ async fn test_ingest_process_with_multiple_webhooks() {
             }
         );
     }
+
+    // Make the following changes:
+    // - webhook "alpha" fails once
+    // - webhook "beta" is paused
+    // - webhook "gamma" fails with critical error and is marked unreachable
+    // - webhook "delta" succeeds once
+
+    let alpha_id = webhook_subscription_ids.get("alpha").unwrap();
+    let beta_id = webhook_subscription_ids.get("beta").unwrap();
+    let gamma_id = webhook_subscription_ids.get("gamma").unwrap();
+    let delta_id = webhook_subscription_ids.get("delta").unwrap();
+
+    harness
+        .mimic_webhook_flow_failure(&foo_result.dataset_handle.id, *alpha_id, false)
+        .await;
+    harness.pause_webhook_subscription(beta_id).await;
+    harness
+        .mimic_webhook_flow_failure(&foo_result.dataset_handle.id, *gamma_id, true)
+        .await;
+    harness
+        .mimic_webhook_flow_success(&foo_result.dataset_handle.id, *delta_id)
+        .await;
+
+    // Read webhooks state after changes
+    let webhooks_state = harness
+        .read_webhooks_processes(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data;
+
+    // Rollup checks
+    let rollup = harness.extract_webhooks_rollup(&webhooks_state);
+    pretty_assertions::assert_eq!(
+        rollup,
+        value!({
+            "total": 4,
+            "active": 1,
+            "failing": 1,
+            "paused": 1,
+            "unconfigured": 0,
+            "stopped": 1,
+            "worstConsecutiveFailures": 1,
+        })
+    );
+
+    // Subprocesses checks
+    let subprocesses_by_id: HashMap<_, _> = harness
+        .extract_webhooks_subprocesses(&webhooks_state)
+        .into_iter()
+        .map(|sp| (sp.id, sp))
+        .collect();
+    assert_eq!(subprocesses_by_id.len(), 4);
+
+    pretty_assertions::assert_eq!(
+        subprocesses_by_id.get(alpha_id).unwrap(),
+        &FlowWebhookSubprocessSummary {
+            id: *alpha_id,
+            name: "alpha".to_string(),
+            summary: FlowProcessSummaryBasic {
+                effective_state: "FAILING".to_string(),
+                consecutive_failures: 1,
+                maybe_auto_stop_reason: None,
+            }
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        subprocesses_by_id.get(beta_id).unwrap(),
+        &FlowWebhookSubprocessSummary {
+            id: *beta_id,
+            name: "beta".to_string(),
+            summary: FlowProcessSummaryBasic {
+                effective_state: "PAUSED_MANUAL".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        subprocesses_by_id.get(gamma_id).unwrap(),
+        &FlowWebhookSubprocessSummary {
+            id: *gamma_id,
+            name: "gamma".to_string(),
+            summary: FlowProcessSummaryBasic {
+                effective_state: "STOPPED_AUTO".to_string(),
+                consecutive_failures: 1,
+                maybe_auto_stop_reason: Some("UNRECOVERABLE_FAILURE".to_string()),
+            }
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        subprocesses_by_id.get(delta_id).unwrap(),
+        &FlowWebhookSubprocessSummary {
+            id: *delta_id,
+            name: "delta".to_string(),
+            summary: FlowProcessSummaryBasic {
+                effective_state: "ACTIVE".to_string(),
+                consecutive_failures: 0,
+                maybe_auto_stop_reason: None,
+            }
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_access_flow_process_state_anonymous() {
+    let harness = FlowProcessesHarness::new().await;
+
+    // Create root dataset
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_result = harness.create_root_dataset(foo_alias).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    // Anonymous access can't find a dataset
+    let response = harness
+        .read_flow_process_state(&foo_result.dataset_handle.id)
+        .await
+        .execute(&schema, &harness.catalog_anonymous)
+        .await;
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": null
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -590,11 +787,10 @@ impl FlowProcessesHarness {
 
         let processes_catalog = {
             let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_runs_catalog);
-            b.add::<CreateWebhookSubscriptionUseCaseImpl>()
-                .add::<WebhookSecretGeneratorImpl>()
-                .add::<InMemoryWebhookSubscriptionEventStore>()
+            b.add::<InMemoryWebhookSubscriptionEventStore>()
                 .add_value(WebhooksConfig::default());
 
+            kamu_webhooks_services::register_dependencies(&mut b);
             kamu_adapter_flow_webhook::register_dependencies(&mut b);
 
             register_message_dispatcher::<WebhookSubscriptionLifecycleMessage>(
@@ -621,11 +817,7 @@ impl FlowProcessesHarness {
         }
     }
 
-    async fn read_flow_process_state(
-        &self,
-        schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &odf::DatasetID,
-    ) -> async_graphql::Value {
+    async fn read_flow_process_state(&self, dataset_id: &odf::DatasetID) -> GraphQLQueryRequest {
         self.flow_system_event_agent
             .catchup_remaining_events()
             .await
@@ -660,26 +852,14 @@ impl FlowProcessesHarness {
             }
             "#;
 
-        let response = schema
-            .execute(
-                async_graphql::Request::new(request_code)
-                    .variables(async_graphql::Variables::from_value(value!({
-                        "id": dataset_id.to_string(),
-                    })))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await;
+        let variables = async_graphql::Variables::from_value(value!({
+            "id": dataset_id.to_string(),
+        }));
 
-        assert!(response.is_ok(), "{:?}", response.errors);
-
-        response.data
+        GraphQLQueryRequest::new(request_code, variables)
     }
 
-    async fn read_webhooks_processes(
-        &self,
-        schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &odf::DatasetID,
-    ) -> async_graphql::Value {
+    async fn read_webhooks_processes(&self, dataset_id: &odf::DatasetID) -> GraphQLQueryRequest {
         self.flow_system_event_agent
             .catchup_remaining_events()
             .await
@@ -723,19 +903,11 @@ impl FlowProcessesHarness {
             }
             "#;
 
-        let response = schema
-            .execute(
-                async_graphql::Request::new(request_code)
-                    .variables(async_graphql::Variables::from_value(value!({
-                        "id": dataset_id.to_string(),
-                    })))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await;
+        let variables = async_graphql::Variables::from_value(value!({
+            "id": dataset_id.to_string(),
+        }));
 
-        assert!(response.is_ok(), "{:?}", response.errors);
-
-        response.data
+        GraphQLQueryRequest::new(request_code, variables)
     }
 
     fn extract_primary_flow_process(
@@ -797,7 +969,7 @@ impl FlowProcessesHarness {
     ) -> WebhookSubscriptionID {
         let create_webhook_uc = self
             .processes_catalog
-            .get_one::<dyn kamu_webhooks::CreateWebhookSubscriptionUseCase>()
+            .get_one::<dyn CreateWebhookSubscriptionUseCase>()
             .unwrap();
 
         let result = create_webhook_uc
@@ -811,6 +983,109 @@ impl FlowProcessesHarness {
             .unwrap();
 
         result.subscription_id
+    }
+
+    async fn pause_webhook_subscription(&self, subscription_id: &WebhookSubscriptionID) {
+        let pause_webhook_uc = self
+            .processes_catalog
+            .get_one::<dyn PauseWebhookSubscriptionUseCase>()
+            .unwrap();
+
+        let subscription_store = self
+            .processes_catalog
+            .get_one::<dyn WebhookSubscriptionEventStore>()
+            .unwrap();
+
+        let mut subscription =
+            WebhookSubscription::load(subscription_id, subscription_store.as_ref())
+                .await
+                .unwrap();
+
+        pause_webhook_uc.execute(&mut subscription).await.unwrap();
+    }
+
+    async fn mimic_webhook_flow_success(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+    ) {
+        let flow_id = self.trigger_webhook_flow(dataset_id, subscription_id).await;
+
+        self.mimic_flow_run_with_outcome(
+            flow_id.to_string().as_str(),
+            TaskOutcome::Success(TaskResult::empty()),
+        )
+        .await;
+    }
+
+    async fn mimic_webhook_flow_failure(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+        unrecoverable: bool,
+    ) {
+        let flow_id = self.trigger_webhook_flow(dataset_id, subscription_id).await;
+
+        self.mimic_flow_run_with_outcome(
+            flow_id.to_string().as_str(),
+            TaskOutcome::Failed(if unrecoverable {
+                TaskError::empty_unrecoverable()
+            } else {
+                TaskError::empty_recoverable()
+            }),
+        )
+        .await;
+    }
+
+    async fn trigger_webhook_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+    ) -> FlowID {
+        let flow_run_service = self
+            .processes_catalog
+            .get_one::<dyn FlowRunService>()
+            .unwrap();
+
+        let flow_binding = webhook_deliver_binding(
+            subscription_id,
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
+            Some(dataset_id),
+        );
+
+        let flow_state = flow_run_service
+            .run_flow_automatically(
+                Utc::now(),
+                &flow_binding,
+                vec![FlowActivationCause::ResourceUpdate(
+                    FlowActivationCauseResourceUpdate {
+                        activation_time: Utc::now(),
+                        resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                        changes: ResourceChanges::NewData(ResourceDataChanges {
+                            blocks_added: 1,
+                            records_added: 10,
+                            new_watermark: None,
+                        }),
+                        details: serde_json::to_value(DatasetResourceUpdateDetails {
+                            dataset_id: dataset_id.clone(),
+                            source: DatasetUpdateSource::UpstreamFlow {
+                                flow_type: FLOW_TYPE_DATASET_INGEST.to_string(),
+                                flow_id: FlowID::new(1),
+                                maybe_flow_config_snapshot: None,
+                            },
+                            new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
+                            old_head_maybe: Some(odf::Multihash::from_digest_sha3_256(b"old_head")),
+                        })
+                        .unwrap(),
+                    },
+                )],
+                Some(FlowTriggerRule::Reactive(ReactiveRule::empty())),
+                None,
+            )
+            .await
+            .unwrap();
+
+        flow_state.flow_id
     }
 }
 
