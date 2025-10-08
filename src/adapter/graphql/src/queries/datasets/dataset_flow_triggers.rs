@@ -49,20 +49,6 @@ impl<'a> DatasetFlowTriggers<'a> {
 
         Ok(maybe_flow_trigger.map(Into::into))
     }
-
-    /// Checks if all triggers of this dataset are disabled
-    #[tracing::instrument(level = "info", name = DatasetFlowTriggers_all_paused, skip_all)]
-    pub async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
-
-        let scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
-
-        let has_active_triggers = flow_trigger_service
-            .has_active_triggers_for_scopes(&[scope])
-            .await?;
-
-        Ok(!has_active_triggers)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

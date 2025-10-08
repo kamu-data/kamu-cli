@@ -208,194 +208,6 @@ async fn test_list_datasets_with_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_pause_resume_account_flows() {
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let foo_dataset_alias = odf::DatasetAlias::new(
-        Some(DEFAULT_ACCOUNT_NAME.clone()),
-        odf::DatasetName::new_unchecked("foo"),
-    );
-
-    let harness = FlowTriggerHarness::new().await;
-
-    let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
-
-    let request_code =
-        FlowTriggerHarness::trigger_ingest_flow_mutation(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-
-    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
-        value!({
-            "accounts": {
-                "byName": {
-                    "flows": {
-                        "runs": {
-                            "listFlows": {
-                                "nodes": [
-                                    {
-                                        "flowId": "0",
-                                        "datasetId": foo_create_result.dataset_handle.id.to_string(),
-                                        "description": {
-                                            "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "ingestResult": null,
-                                        },
-                                        "status": "WAITING",
-                                        "outcome": null,
-                                        "timing": {
-                                            "awaitingExecutorSince": null,
-                                            "runningSince": null,
-                                            "lastAttemptFinishedAt": null,
-                                        },
-                                        "taskIds": [],
-                                        "primaryActivationCause": {
-                                            "__typename": "FlowActivationCauseManual",
-                                        },
-                                        "startCondition": null,
-                                    }
-                                ],
-                                "pageInfo": {
-                                    "hasPreviousPage": false,
-                                    "hasNextPage": false,
-                                    "currentPage": 0,
-                                    "totalPages": 1,
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    );
-
-    harness
-        .set_time_delta_trigger(
-            &foo_create_result.dataset_handle.id,
-            "INGEST",
-            (1, "DAYS"),
-            None,
-        )
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
-
-    let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
-        value!({
-            "accounts": {
-                "byName": {
-                    "flows": {
-                        "triggers": {
-                            "pauseAccountDatasetFlows": true
-                        }
-                    }
-                }
-            }
-        })
-    );
-
-    let request_code =
-        FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "allPaused": true
-                        }
-                    }
-                }
-            }
-        })
-    );
-
-    let mutation_code = FlowTriggerHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
-        value!({
-            "accounts": {
-                "byName": {
-                    "flows": {
-                        "triggers": {
-                            "resumeAccountDatasetFlows": true
-                        }
-                    }
-                }
-            }
-        })
-    );
-
-    let request_code =
-        FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "allPaused": false
-                        }
-                    }
-                }
-            }
-        })
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_account_triggers_all_paused() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -553,6 +365,54 @@ async fn test_account_triggers_all_paused() {
                     "flows": {
                         "triggers": {
                             "allPaused": true
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_code = FlowTriggerHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "flows": {
+                        "triggers": {
+                            "resumeAccountDatasetFlows": true
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "flows": {
+                        "triggers": {
+                            "allPaused": false
                         }
                     }
                 }
@@ -878,25 +738,6 @@ impl FlowTriggerHarness {
         "#
         )
         .replace("<name>", account_name.as_ref())
-    }
-
-    fn all_paused_trigger_query(id: &odf::DatasetID) -> String {
-        indoc!(
-            r#"
-            {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            triggers {
-                                allPaused
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
     }
 
     fn all_paused_account_triggers_query(account_name: &odf::AccountName) -> String {

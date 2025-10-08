@@ -1256,10 +1256,6 @@ type DatasetFlowTriggers {
 	Returns defined trigger for a flow of specified type
 	"""
 	byType(datasetFlowType: DatasetFlowType!): FlowTrigger
-	"""
-	Checks if all triggers of this dataset are disabled
-	"""
-	allPaused: Boolean!
 }
 
 type DatasetFlowTriggersMut {
