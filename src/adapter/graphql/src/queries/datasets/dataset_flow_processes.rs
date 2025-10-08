@@ -7,33 +7,35 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
-
 use chrono::Utc;
 use kamu_adapter_flow_dataset::{ingest_dataset_binding, transform_dataset_binding};
 use kamu_adapter_flow_webhook::FlowScopeSubscription;
 use kamu_flow_system::FlowProcessStateQuery;
 
 use crate::prelude::*;
-use crate::queries::{DatasetRequestState, FlowProcess, WebhookFlowSubProcessGroup};
+use crate::queries::{
+    DatasetFlowProcess,
+    DatasetRequestStateWithOwner,
+    WebhookFlowSubProcessGroup,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowProcesses<'a> {
-    dataset_request_state: &'a DatasetRequestState,
+    dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowProcesses<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestStateWithOwner) -> Self {
         Self {
             dataset_request_state,
         }
     }
 
-    pub async fn primary(&self, ctx: &Context<'_>) -> Result<FlowProcess> {
+    pub async fn primary(&self, ctx: &Context<'_>) -> Result<DatasetFlowProcess> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
 
         // Updates are the primary periodic process for datasets
@@ -55,12 +57,16 @@ impl<'a> DatasetFlowProcesses<'a> {
 
         // Fetch process state
         if let Some(process_state) = maybe_process_state {
-            Ok(FlowProcess::new(Cow::Owned(process_state)))
+            Ok(DatasetFlowProcess::new(
+                self.dataset_request_state.clone(),
+                process_state,
+            ))
         } else {
             // Or synthesize unconfigured state if no process state exists
-            Ok(FlowProcess::new(Cow::Owned(
+            Ok(DatasetFlowProcess::new(
+                self.dataset_request_state.clone(),
                 kamu_flow_system::FlowProcessState::unconfigured(Utc::now(), flow_binding),
-            )))
+            ))
         }
     }
 

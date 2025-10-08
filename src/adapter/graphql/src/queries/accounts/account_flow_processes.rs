@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
@@ -18,6 +18,11 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowScopeDataset,
 };
+use kamu_adapter_flow_webhook::{
+    FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION,
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
+};
 use kamu_core::DatasetRegistry;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system as fs;
@@ -25,10 +30,10 @@ use kamu_flow_system as fs;
 use crate::prelude::*;
 use crate::queries::{
     Account,
-    Dataset,
+    DatasetFlowProcess,
+    DatasetFlowProcessConnection,
     DatasetRequestState,
-    DatasetRequestStateWithOwner,
-    FlowProcess,
+    WebhookFlowSubProcess,
 };
 use crate::scalars::FlowProcessGroupRollup;
 
@@ -64,47 +69,27 @@ impl<'a> AccountFlowProcesses<'a> {
         Ok(rollup.into())
     }
 
-    #[tracing::instrument(level = "info", name = AccountFlowProcesses_dataset_cards, skip_all, fields(?page, ?per_page))]
-    pub async fn dataset_cards(
+    #[tracing::instrument(level = "info", name = AccountFlowProcesses_dataset_primary_cards, skip_all, fields(?page, ?per_page))]
+    pub async fn dataset_primary_cards(
         &self,
         ctx: &Context<'_>,
         filters: Option<FlowProcessFilters>,
         ordering: Option<FlowProcessOrdering>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<AccountFlowProcessDatasetCardConnection> {
-        let filters = filters.unwrap_or_default();
-
-        let scope_query = self.build_scope_query(ctx).await?;
-
-        let effective_state_in_converted: Option<Vec<fs::FlowProcessEffectiveState>> = filters
-            .effective_state_in
-            .as_ref()
-            .map(|v| v.iter().map(|s| (*s).into()).collect());
-
-        let filter = fs::FlowProcessListFilter::for_scope(scope_query)
-            .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM])
-            .with_effective_states_opt(effective_state_in_converted.as_deref())
-            .with_last_attempt_between_opt(
-                filters
-                    .last_attempt_between
-                    .as_ref()
-                    .map(|r| (r.start, r.end)),
-            )
-            .with_last_failure_since_opt(filters.last_failure_since)
-            .with_next_planned_after_opt(filters.next_planned_after)
-            .with_next_planned_before_opt(filters.next_planned_before)
-            .with_min_consecutive_failures_opt(filters.min_consecutive_failures);
-
-        let ordering = self.convert_ordering(ordering);
-
+    ) -> Result<DatasetFlowProcessConnection> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
         let pagination = PaginationOpts::from_page(page, per_page);
 
-        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
-        let listing = flow_process_state_query
-            .list_processes(filter, ordering, Some(pagination))
+        let listing = self
+            .get_process_state_listing(
+                ctx,
+                &[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM],
+                filters,
+                ordering,
+                pagination,
+            )
             .await?;
 
         let dataset_handles_by_id = self.build_dataset_id_handle_mapping(ctx, &listing).await?;
@@ -125,16 +110,148 @@ impl<'a> AccountFlowProcesses<'a> {
                     .expect("Inconsistent state: all datasets with flows must exist")
                     .clone();
 
-                AccountFlowProcessDatasetCard::new(account.clone(), hdl, process_state)
+                DatasetFlowProcess::new(
+                    DatasetRequestState::new(hdl).with_owner(account.clone()),
+                    process_state,
+                )
             })
             .collect();
 
-        Ok(AccountFlowProcessDatasetCardConnection::new(
+        Ok(DatasetFlowProcessConnection::new(
             dataset_cards,
             page,
             per_page,
             listing.total_count,
         ))
+    }
+
+    #[tracing::instrument(level = "info", name = AccountFlowProcesses_all_cards, skip_all, fields(?page, ?per_page))]
+    pub async fn all_cards(
+        &self,
+        ctx: &Context<'_>,
+        filters: Option<FlowProcessFilters>,
+        ordering: Option<FlowProcessOrdering>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<AccountFlowProcessCardConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+        let pagination = PaginationOpts::from_page(page, per_page);
+
+        let listing = self
+            .get_process_state_listing(
+                ctx,
+                &[
+                    FLOW_TYPE_DATASET_INGEST,
+                    FLOW_TYPE_DATASET_TRANSFORM,
+                    FLOW_TYPE_WEBHOOK_DELIVER,
+                ],
+                filters,
+                ordering,
+                pagination,
+            )
+            .await?;
+
+        let dataset_handles_by_id = self.build_dataset_id_handle_mapping(ctx, &listing).await?;
+
+        let webhook_subscriptions_by_id = self
+            .build_webhook_id_subscription_mapping(ctx, &listing)
+            .await?;
+
+        let account = Account::new(
+            self.account.id.clone().into(),
+            self.account.account_name.clone().into(),
+        );
+
+        let flat_cards: Vec<_> = listing
+            .processes
+            .into_iter()
+            .map(
+                |process_state| match process_state.flow_binding().flow_type.as_str() {
+                    FLOW_TYPE_DATASET_INGEST | FLOW_TYPE_DATASET_TRANSFORM => {
+                        let dataset_id =
+                            FlowScopeDataset::new(&process_state.flow_binding().scope).dataset_id();
+                        let hdl = dataset_handles_by_id
+                            .get(&dataset_id)
+                            .expect("Inconsistent state: all datasets with flows must exist")
+                            .clone();
+
+                        let dataset_flow_process = DatasetFlowProcess::new(
+                            DatasetRequestState::new(hdl).with_owner(account.clone()),
+                            process_state,
+                        );
+
+                        AccountFlowProcessCard::Dataset(dataset_flow_process)
+                    }
+
+                    FLOW_TYPE_WEBHOOK_DELIVER => {
+                        let scope = &process_state.flow_binding().scope;
+                        let subscription_id = FlowScopeSubscription::new(scope).subscription_id();
+                        let webhook_subscription =
+                            webhook_subscriptions_by_id.get(&subscription_id).expect(
+                                "Inconsistent state: all webhook subscriptions with flows must \
+                                 exist",
+                            );
+
+                        let webhook_flow_subprocess =
+                            WebhookFlowSubProcess::new(webhook_subscription, process_state);
+
+                        AccountFlowProcessCard::Webhook(webhook_flow_subprocess)
+                    }
+
+                    _ => unreachable!("Unsupported flow type"),
+                },
+            )
+            .collect();
+
+        Ok(AccountFlowProcessCardConnection::new(
+            flat_cards,
+            page,
+            per_page,
+            listing.total_count,
+        ))
+    }
+
+    #[graphql(skip)]
+    async fn get_process_state_listing(
+        &self,
+        ctx: &Context<'_>,
+        flow_types: &[&'static str],
+        filters: Option<FlowProcessFilters>,
+        ordering: Option<FlowProcessOrdering>,
+        pagination: PaginationOpts,
+    ) -> Result<fs::FlowProcessStateListing> {
+        let filters = filters.unwrap_or_default();
+
+        let scope_query = self.build_scope_query(ctx).await?;
+
+        let effective_state_in_converted: Option<Vec<fs::FlowProcessEffectiveState>> = filters
+            .effective_state_in
+            .as_ref()
+            .map(|v| v.iter().map(|s| (*s).into()).collect());
+
+        let filter = fs::FlowProcessListFilter::for_scope(scope_query)
+            .for_flow_types(flow_types)
+            .with_effective_states_opt(effective_state_in_converted.as_deref())
+            .with_last_attempt_between_opt(
+                filters
+                    .last_attempt_between
+                    .as_ref()
+                    .map(|r| (r.start, r.end)),
+            )
+            .with_last_failure_since_opt(filters.last_failure_since)
+            .with_next_planned_after_opt(filters.next_planned_after)
+            .with_next_planned_before_opt(filters.next_planned_before)
+            .with_min_consecutive_failures_opt(filters.min_consecutive_failures);
+
+        let ordering = self.convert_ordering(ordering);
+
+        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
+        let listing = flow_process_state_query
+            .list_processes(filter, ordering, Some(pagination))
+            .await?;
+
+        Ok(listing)
     }
 
     #[graphql(skip)]
@@ -172,17 +289,29 @@ impl<'a> AccountFlowProcesses<'a> {
         ctx: &Context<'_>,
         matched_processes_listing: &fs::FlowProcessStateListing,
     ) -> Result<HashMap<odf::DatasetID, odf::DatasetHandle>> {
+        if matched_processes_listing.processes.is_empty() {
+            return Ok(HashMap::new());
+        }
+
         let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
 
-        let matched_dataset_ids = matched_processes_listing
+        let unique_dataset_ids = matched_processes_listing
             .processes
             .iter()
-            .map(|proc| FlowScopeDataset::new(&proc.flow_binding().scope).dataset_id())
+            .filter_map(|proc| {
+                FlowScopeDataset::maybe_dataset_id_in_scope(&proc.flow_binding().scope)
+            })
             .map(Cow::Owned)
+            .collect::<HashSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>();
 
+        if unique_dataset_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
         let dataset_handles_resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&matched_dataset_ids)
+            .resolve_multiple_dataset_handles_by_ids(&unique_dataset_ids)
             .await
             .int_err()?;
 
@@ -200,50 +329,73 @@ impl<'a> AccountFlowProcesses<'a> {
             .map(|hdl| (hdl.id.clone(), hdl))
             .collect::<HashMap<_, _>>())
     }
+
+    #[graphql(skip)]
+    async fn build_webhook_id_subscription_mapping(
+        &self,
+        ctx: &Context<'_>,
+        matched_processes_listing: &fs::FlowProcessStateListing,
+    ) -> Result<HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>>
+    {
+        if matched_processes_listing.processes.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // Collect unique subscription ids from the processes
+        let unique_subscription_ids = matched_processes_listing
+            .processes
+            .iter()
+            .filter_map(|proc| {
+                let scope = &proc.flow_binding().scope;
+                if scope.scope_type() == FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION {
+                    Some(FlowScopeSubscription::new(scope).subscription_id())
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        if unique_subscription_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // Load related subscriptions
+        let webhook_subscription_event_store =
+            from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionEventStore);
+
+        let subscriptions = kamu_webhooks::WebhookSubscription::load_multi_simple(
+            &unique_subscription_ids,
+            webhook_subscription_event_store.as_ref(),
+        )
+        .await
+        .int_err()?;
+
+        // Organize subscriptions by id
+        let subscriptions_by_id = subscriptions
+            .into_iter()
+            .map(|s| (s.id(), s))
+            .collect::<HashMap<_, _>>();
+
+        Ok(subscriptions_by_id)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlowProcessDatasetCard {
-    dataset_request_state: DatasetRequestStateWithOwner,
-    process_state: fs::FlowProcessState,
-}
-
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
-impl AccountFlowProcessDatasetCard {
-    #[graphql(skip)]
-    pub fn new(
-        account: Account,
-        dataset_handle: odf::DatasetHandle,
-        process_state: fs::FlowProcessState,
-    ) -> Self {
-        Self {
-            dataset_request_state: DatasetRequestState::new(dataset_handle).with_owner(account),
-            process_state,
-        }
-    }
-
-    #[allow(clippy::unused_async)]
-    pub async fn dataset(&self) -> Dataset {
-        Dataset::new_access_checked(
-            self.dataset_request_state.owner().clone(),
-            self.dataset_request_state.dataset_handle().clone(),
-        )
-    }
-
-    #[allow(clippy::unused_async)]
-    pub async fn primary(&self) -> FlowProcess {
-        FlowProcess::new(Cow::Borrowed(&self.process_state))
-    }
+#[derive(Union)]
+pub enum AccountFlowProcessCard {
+    Dataset(DatasetFlowProcess),
+    Webhook(WebhookFlowSubProcess),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(
-    AccountFlowProcessDatasetCard,
-    AccountFlowProcessDatasetCardConnection,
-    AccountFlowProcessDatasetCardEdge
+    AccountFlowProcessCard,
+    AccountFlowProcessCardConnection,
+    AccountFlowProcessCardEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

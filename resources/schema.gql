@@ -123,16 +123,13 @@ input AccountFlowFilters {
 	byProcessType: FlowProcessTypeFilterInput
 }
 
-type AccountFlowProcessDatasetCard {
-	dataset: Dataset!
-	primary: FlowProcess!
-}
+union AccountFlowProcessCard = DatasetFlowProcess | WebhookFlowSubProcess
 
-type AccountFlowProcessDatasetCardConnection {
+type AccountFlowProcessCardConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [AccountFlowProcessDatasetCard!]!
+	nodes: [AccountFlowProcessCard!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -141,16 +138,17 @@ type AccountFlowProcessDatasetCardConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [AccountFlowProcessDatasetCardEdge!]!
+	edges: [AccountFlowProcessCardEdge!]!
 }
 
-type AccountFlowProcessDatasetCardEdge {
-	node: AccountFlowProcessDatasetCard!
+type AccountFlowProcessCardEdge {
+	node: AccountFlowProcessCard!
 }
 
 type AccountFlowProcesses {
 	primaryRollup: FlowProcessGroupRollup!
-	datasetCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessDatasetCardConnection!
+	datasetPrimaryCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): DatasetFlowProcessConnection!
+	allCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessCardConnection!
 }
 
 type AccountFlowRuns {
@@ -1231,8 +1229,34 @@ input DatasetFlowFilters {
 	byProcessType: FlowProcessTypeFilterInput
 }
 
+type DatasetFlowProcess {
+	flowType: DatasetFlowType!
+	dataset: Dataset!
+	summary: FlowProcessSummary!
+}
+
+type DatasetFlowProcessConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [DatasetFlowProcess!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [DatasetFlowProcessEdge!]!
+}
+
+type DatasetFlowProcessEdge {
+	node: DatasetFlowProcess!
+}
+
 type DatasetFlowProcesses {
-	primary: FlowProcess!
+	primary: DatasetFlowProcess!
 	webhooks: WebhookFlowSubProcessGroup!
 }
 
@@ -2427,11 +2451,6 @@ union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
 	preconditions: String!
 	message: String!
-}
-
-type FlowProcess {
-	flowType: DatasetFlowType!
-	summary: FlowProcessSummary!
 }
 
 enum FlowProcessAutoStopReason {

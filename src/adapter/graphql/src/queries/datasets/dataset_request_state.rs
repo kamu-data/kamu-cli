@@ -174,7 +174,7 @@ impl DatasetRequestState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct DatasetRequestStateWithOwner {
     inner: DatasetRequestState,
     owner: Account,

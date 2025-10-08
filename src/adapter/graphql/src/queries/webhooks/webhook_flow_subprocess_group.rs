@@ -100,22 +100,9 @@ impl WebhookFlowSubProcessGroup {
                 .get(&subscription_id)
                 .expect("must be present");
 
-            // Decide on subprocess name
-            let subprocess_name = if webhook_subscription.label().as_ref().is_empty() {
-                webhook_subscription.target_url().to_string()
-            } else {
-                webhook_subscription.label().as_ref().to_string()
-            };
-
             // Precollect subprocesses in a name-ordered map
-            subprocesses.insert(
-                subprocess_name.clone(),
-                WebhookFlowSubProcess::new(
-                    webhook_subscription.id(),
-                    subprocess_name,
-                    process_state,
-                ),
-            );
+            let subprocess = WebhookFlowSubProcess::new(webhook_subscription, process_state);
+            subprocesses.insert(subprocess.name(ctx).await?, subprocess);
         }
 
         // Iterate subprocess states ordered by name
