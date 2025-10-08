@@ -49,7 +49,7 @@ impl PollingIngestServiceImpl {
         metadata_state: Box<DataWriterMetadataState>,
         options: PollingIngestOptions,
         listener: Arc<dyn PollingIngestListener>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
+    ) -> Result<PollingIngestResponse, PollingIngestError> {
         let ctx = ingest_common::new_session_context(
             &self.engine_config,
             self.object_store_registry.clone(),
@@ -69,7 +69,13 @@ impl PollingIngestServiceImpl {
 
             listener.begin();
             listener.success(&result);
-            return Ok(result);
+
+            let res = PollingIngestResponse {
+                result,
+                metadata_state: None,
+            };
+
+            return Ok(res);
         };
 
         let operation_id = get_random_name(None, 10);
@@ -108,7 +114,7 @@ impl PollingIngestServiceImpl {
     async fn ingest_iteration(
         &self,
         args: IngestIterationArgs<'_>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
+    ) -> Result<PollingIngestResponse, PollingIngestError> {
         tracing::info!(
             options = ?args.options,
             "Ingest iteration details",
@@ -119,8 +125,8 @@ impl PollingIngestServiceImpl {
 
         match self.ingest_iteration_inner(args).await {
             Ok(res) => {
-                tracing::info!(result = ?res, "Ingest iteration successful");
-                listener.success(&res);
+                tracing::info!(result = ?res.result, "Ingest iteration successful");
+                listener.success(&res.result);
                 Ok(res)
             }
             Err(err) => {
@@ -134,7 +140,7 @@ impl PollingIngestServiceImpl {
     async fn ingest_iteration_inner(
         &self,
         args: IngestIterationArgs<'_>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
+    ) -> Result<PollingIngestResponse, PollingIngestError> {
         args.listener
             .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
@@ -144,18 +150,24 @@ impl PollingIngestServiceImpl {
 
         if uncacheable && !args.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
-            return Ok(PollingIngestResult::UpToDate {
-                no_source_defined: false,
-                uncacheable,
+            return Ok(PollingIngestResponse {
+                result: PollingIngestResult::UpToDate {
+                    no_source_defined: false,
+                    uncacheable,
+                },
+                metadata_state: None,
             });
         }
 
         let savepoint = match self.fetch(&args).await? {
             FetchStepResult::Updated(savepoint) => savepoint,
             FetchStepResult::UpToDate => {
-                return Ok(PollingIngestResult::UpToDate {
-                    no_source_defined: false,
-                    uncacheable,
+                return Ok(PollingIngestResponse {
+                    result: PollingIngestResult::UpToDate {
+                        no_source_defined: false,
+                        uncacheable,
+                    },
+                    metadata_state: None,
                 });
             }
         };
@@ -246,23 +258,29 @@ impl PollingIngestServiceImpl {
                     TotalSteps::Exact(1),
                 );
 
-                let res = args.data_writer.commit(staged).await?;
+                let writer_res = args.data_writer.commit(staged).await?;
+                let res = PollingIngestResponse {
+                    result: PollingIngestResult::Updated {
+                        old_head: writer_res.old_head,
+                        new_head: writer_res.new_head,
+                        has_more: savepoint.has_more,
+                        uncacheable,
+                    },
+                    metadata_state: Some(Box::new(args.data_writer.as_metadata_state())),
+                };
 
-                Ok(PollingIngestResult::Updated {
-                    old_head: res.old_head,
-                    new_head: res.new_head,
-                    has_more: savepoint.has_more,
-                    uncacheable,
-                    metadata_state: args.data_writer.as_metadata_state(),
-                })
+                Ok(res)
             }
             Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
             Err(StageDataError::IncompatibleSchema(e)) => Err(e.into()),
             Err(StageDataError::MergeError(e)) => Err(e.into()),
             Err(StageDataError::DataValidation(e)) => Err(e.into()),
-            Err(StageDataError::EmptyCommit(_)) => Ok(PollingIngestResult::UpToDate {
-                no_source_defined: false,
-                uncacheable,
+            Err(StageDataError::EmptyCommit(_)) => Ok(PollingIngestResponse {
+                result: PollingIngestResult::UpToDate {
+                    no_source_defined: false,
+                    uncacheable,
+                },
+                metadata_state: None,
             }),
             Err(StageDataError::Internal(e)) => Err(e.into()),
         }
@@ -507,7 +525,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
         metadata_state: Box<DataWriterMetadataState>,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
+    ) -> Result<PollingIngestResponse, PollingIngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPollingIngestListener));
 
         self.ingest_inner(target, metadata_state, options, listener)

@@ -110,11 +110,11 @@ impl UpdateDatasetTaskRunner {
             )
             .await;
         match ingest_response {
-            Ok(ingest_result) => {
+            Ok(ingest_res) => {
                 // Do we have a new HEAD suggestion?
                 if let PollingIngestResult::Updated {
                     old_head, new_head, ..
-                } = &ingest_result
+                } = &ingest_res.result
                 {
                     // Update the reference transactionally
                     self.update_dataset_head(
@@ -127,7 +127,7 @@ impl UpdateDatasetTaskRunner {
 
                 Ok(TaskOutcome::Success(
                     TaskResultDatasetUpdate {
-                        pull_result: ingest_result.into(),
+                        pull_result: ingest_res.result.into(),
                     }
                     .into_task_result(),
                 ))

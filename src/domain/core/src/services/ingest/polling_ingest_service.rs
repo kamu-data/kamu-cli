@@ -35,7 +35,7 @@ pub trait PollingIngestService: Send + Sync {
         metadata_state: Box<DataWriterMetadataState>,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError>;
+    ) -> Result<PollingIngestResponse, PollingIngestError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +77,12 @@ impl Default for SchemaInferenceOpts {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
+pub struct PollingIngestResponse {
+    pub result: PollingIngestResult,
+    pub metadata_state: Option<Box<DataWriterMetadataState>>,
+}
+
+#[derive(Debug)]
 pub enum PollingIngestResult {
     UpToDate {
         no_source_defined: bool,
@@ -87,7 +93,6 @@ pub enum PollingIngestResult {
         new_head: odf::Multihash,
         has_more: bool,
         uncacheable: bool,
-        metadata_state: DataWriterMetadataState,
     },
 }
 

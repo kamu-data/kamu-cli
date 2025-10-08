@@ -361,11 +361,8 @@ impl PullDatasetUseCaseImpl {
             {
                 Ok(ingest_res) => {
                     if let PollingIngestResult::Updated {
-                        old_head,
-                        new_head,
-                        metadata_state,
-                        ..
-                    } = &ingest_res
+                        old_head, new_head, ..
+                    } = &ingest_res.result
                     {
                         Self::update_ref_transactionally(
                             catalog.clone(),
@@ -374,10 +371,10 @@ impl PullDatasetUseCaseImpl {
                             old_head,
                         )
                         .await?;
-                        latest_metadata_state = Box::new(metadata_state.clone());
+                        latest_metadata_state = ingest_res.metadata_state.unwrap();
                     }
 
-                    combined_result = Some(Self::merge_results(combined_result, ingest_res));
+                    combined_result = Some(Self::merge_results(combined_result, ingest_res.result));
 
                     let has_more = match combined_result {
                         Some(PollingIngestResult::UpToDate { .. }) => false,
@@ -581,10 +578,7 @@ impl PullDatasetUseCaseImpl {
             (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
             (
                 Some(PollingIngestResult::Updated {
-                    old_head,
-                    new_head,
-                    metadata_state,
-                    ..
+                    old_head, new_head, ..
                 }),
                 PollingIngestResult::UpToDate { uncacheable, .. },
             ) => PollingIngestResult::Updated {
@@ -592,7 +586,6 @@ impl PullDatasetUseCaseImpl {
                 new_head,
                 has_more: false,
                 uncacheable,
-                metadata_state,
             },
             (
                 Some(PollingIngestResult::Updated {
@@ -603,7 +596,6 @@ impl PullDatasetUseCaseImpl {
                     new_head,
                     has_more,
                     uncacheable,
-                    metadata_state,
                     ..
                 },
             ) => PollingIngestResult::Updated {
@@ -611,7 +603,6 @@ impl PullDatasetUseCaseImpl {
                 new_head,
                 has_more,
                 uncacheable,
-                metadata_state,
             },
         }
     }

@@ -549,10 +549,10 @@ impl WsSmartTransferProtocolClient {
         dataset_handle: &odf::DatasetHandle,
         new_blocks: std::collections::VecDeque<(odf::Multihash, odf::MetadataBlock)>,
         force_update_if_diverged: bool,
-    ) -> Result<odf::Multihash, InternalError> {
+    ) -> Result<Option<odf::Multihash>, InternalError> {
         let transactional_target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
-        let new_head = append_dataset_metadata_batch_use_case
+        append_dataset_metadata_batch_use_case
             .execute(
                 transactional_target.as_ref(),
                 Box::new(new_blocks.into_iter()),
@@ -564,10 +564,7 @@ impl WsSmartTransferProtocolClient {
                 },
             )
             .await
-            .int_err()?
-            .unwrap();
-
-        Ok(new_head)
+            .int_err()
     }
 }
 
@@ -630,6 +627,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         } else {
             None
         };
+
+        let mut new_head = dst_head.clone();
 
         let dataset_pull_result = match self
             .pull_send_request(
@@ -696,6 +695,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     )
                     .await?;
                 assert_eq!(first_hash, create_result.head);
+                new_head = Some(create_result.head);
+
                 (create_result.dataset, create_result.dataset_handle)
             };
 
@@ -751,7 +752,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     new_blocks,
                     transfer_options.force_update_if_diverged,
                 )
-                .await?;
+                .await?
+                .unwrap_or(new_head.clone().unwrap());
 
             SyncResult::Updated {
                 old_head: dst_head,
