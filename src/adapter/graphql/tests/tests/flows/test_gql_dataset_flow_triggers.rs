@@ -628,32 +628,6 @@ async fn test_pause_resume_dataset_flows() {
         );
     }
 
-    async fn check_dataset_all_configs_status(
-        harness: &FlowTriggerHarness,
-        schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &odf::DatasetID,
-        expect_paused: bool,
-    ) {
-        let response = FlowTriggerHarness::all_paused_trigger_query(dataset_id)
-            .execute(schema, &harness.catalog_authorized)
-            .await;
-
-        assert_eq!(
-            response.data,
-            value!({
-                "datasets": {
-                    "byId": {
-                        "flows": {
-                            "triggers": {
-                                "allPaused": expect_paused,
-                            }
-                        }
-                    }
-                }
-            })
-        );
-    }
-
     // Setup initial flow configs for datasets
 
     let harness = FlowTriggerHarness::make().await;
@@ -697,11 +671,6 @@ async fn test_pause_resume_dataset_flows() {
         ),
     ];
 
-    let dataset_cases = [
-        &create_root_result.dataset_handle.id,
-        &create_derived_result.dataset_handle.id,
-    ];
-
     // Ensure all flow configs are not paused
     for ((dataset_id, dataset_flow_type), expect_paused) in
         flow_cases.iter().zip(vec![false, false])
@@ -714,9 +683,6 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
-    }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
     let _response = harness
@@ -740,9 +706,6 @@ async fn test_pause_resume_dataset_flows() {
         )
         .await;
     }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
-    }
 
     // Pause all the root
     let _response = harness
@@ -762,9 +725,6 @@ async fn test_pause_resume_dataset_flows() {
         )
         .await;
     }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![true, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
-    }
 
     // Resume ingestion
     let _response = harness
@@ -783,9 +743,6 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
-    }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
     // Pause derived transform
@@ -809,9 +766,6 @@ async fn test_pause_resume_dataset_flows() {
         )
         .await;
     }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
-    }
 
     // Resume all derived
     let _response = harness
@@ -831,9 +785,6 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
-    }
-    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 }
 
@@ -1216,31 +1167,6 @@ impl FlowTriggerHarness {
             async_graphql::Variables::from_value(value!({
                 "datasetId": dataset_id.to_string(),
                 "datasetFlowType": dataset_flow_type,
-            })),
-        )
-    }
-
-    fn all_paused_trigger_query(dataset_id: &odf::DatasetID) -> GraphQLQueryRequest {
-        let query_code = indoc!(
-            r#"
-            query($datasetId: DatasetID!) {
-                datasets {
-                    byId (datasetId: $datasetId) {
-                        flows {
-                            triggers {
-                                allPaused
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        );
-
-        GraphQLQueryRequest::new(
-            query_code,
-            async_graphql::Variables::from_value(value!({
-                "datasetId": dataset_id.to_string()
             })),
         )
     }

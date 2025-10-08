@@ -96,65 +96,6 @@ pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApi
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuApiServerClient) {
-    kamu_api_server_client.auth().login_as_kamu().await;
-
-    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset_with_data()
-        .await;
-
-    // The query is almost identical to kamu-web-ui, for ease of later edits.
-
-    kamu_api_server_client
-        .graphql_api_call_assert(
-            indoc::indoc!(
-                r#"
-                query datasetAllFlowsPaused() {
-                  datasets {
-                    byId(datasetId: $datasetId) {
-                      flows {
-                        triggers {
-                          allPaused
-                          __typename
-                        }
-                        __typename
-                      }
-
-                      __typename
-                    }
-                    __typename
-                  }
-                }
-                "#
-            )
-            .replace("$datasetId", &format!("\"{dataset_id}\""))
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "__typename": "Datasets",
-                    "byId": {
-                      "__typename": "Dataset",
-                      "flows": {
-                        "__typename": "DatasetFlows",
-                        "triggers": {
-                          "__typename": "DatasetFlowTriggers",
-                          "allPaused": true
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
