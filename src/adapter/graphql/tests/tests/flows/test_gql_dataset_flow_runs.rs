@@ -52,7 +52,8 @@ async fn test_trigger_ingest_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response = FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -82,7 +83,8 @@ async fn test_trigger_ingest_root_dataset() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -150,7 +152,8 @@ async fn test_trigger_ingest_root_dataset() {
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -223,7 +226,8 @@ async fn test_trigger_ingest_root_dataset() {
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -308,7 +312,8 @@ async fn test_trigger_ingest_root_dataset() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -403,13 +408,14 @@ async fn test_trigger_reset_root_dataset_flow() {
         .await
         .unwrap();
 
-    let response = FlowRunsHarness::trigger_reset_flow_mutation(
-        &create_root_result.dataset_handle.id,
-        &root_dataset_blocks[1].0,
-        &root_dataset_blocks[0].0,
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .trigger_reset_flow_mutation(
+            &create_root_result.dataset_handle.id,
+            &root_dataset_blocks[1].0,
+            &root_dataset_blocks[0].0,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -462,7 +468,8 @@ async fn test_trigger_reset_root_dataset_flow() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_root_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_root_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -549,13 +556,14 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let new_invalid_head = odf::Multihash::from_digest_sha3_256(b"new_invalid_head");
     let old_invalid_head = odf::Multihash::from_digest_sha3_256(b"old_invalid_head");
 
-    let response = FlowRunsHarness::trigger_reset_flow_mutation(
-        &create_root_result.dataset_handle.id,
-        &new_invalid_head,
-        &old_invalid_head,
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .trigger_reset_flow_mutation(
+            &create_root_result.dataset_handle.id,
+            &new_invalid_head,
+            &old_invalid_head,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -585,13 +593,14 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         .await
         .unwrap();
 
-    let response = FlowRunsHarness::trigger_reset_flow_mutation(
-        &create_root_result.dataset_handle.id,
-        &root_dataset_blocks[0].0,
-        &root_dataset_blocks[1].0,
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .trigger_reset_flow_mutation(
+            &create_root_result.dataset_handle.id,
+            &root_dataset_blocks[0].0,
+            &root_dataset_blocks[1].0,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -637,10 +646,10 @@ async fn test_trigger_execute_transform_derived_dataset() {
         .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
-    let response =
-        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -668,7 +677,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
-    let response = FlowRunsHarness::list_flows_query(&create_derived_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_derived_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -765,7 +775,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_derived_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_derived_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -863,10 +874,10 @@ async fn test_trigger_compaction_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response =
-        FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -894,7 +905,8 @@ async fn test_trigger_compaction_root_dataset() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -957,7 +969,8 @@ async fn test_trigger_compaction_root_dataset() {
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1025,7 +1038,8 @@ async fn test_trigger_compaction_root_dataset() {
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1107,7 +1121,8 @@ async fn test_trigger_compaction_root_dataset() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1188,10 +1203,10 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response =
-        FlowRunsHarness::trigger_reset_to_metadata_flow_mutation(&create_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_reset_to_metadata_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -1219,7 +1234,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1282,7 +1298,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1350,7 +1367,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1432,7 +1450,8 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1513,11 +1532,13 @@ async fn test_list_flows_with_filters_and_pagination() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
+    harness
+        .trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -1525,9 +1546,9 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let request_code = indoc!(
         r#"
-        {
+        query($datasetId: DatasetID!) {
             datasets {
-                byId (datasetId: "<id>") {
+                byId (datasetId: $datasetId) {
                     flows {
                         runs {
                             listFlows {
@@ -1545,11 +1566,16 @@ async fn test_list_flows_with_filters_and_pagination() {
             }
         }
         "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+    );
 
     let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string()
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1582,12 +1608,11 @@ async fn test_list_flows_with_filters_and_pagination() {
     );
 
     // Split on 2 pages by 1 element
-
     let request_code = indoc!(
         r#"
-        {
+        query($datasetId: DatasetID!) {
             datasets {
-                byId (datasetId: "<id>") {
+                byId (datasetId: $datasetId) {
                     flows {
                         runs {
                             listFlows(perPage: 1, page: 1) {
@@ -1605,11 +1630,16 @@ async fn test_list_flows_with_filters_and_pagination() {
             }
         }
         "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+    );
 
     let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string()
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1642,9 +1672,9 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let request_code = indoc!(
         r#"
-        {
+        query($datasetId: DatasetID!) {
             datasets {
-                byId (datasetId: "<id>") {
+                byId (datasetId: $datasetId) {
                     flows {
                         runs {
                             listFlows(
@@ -1670,11 +1700,16 @@ async fn test_list_flows_with_filters_and_pagination() {
             }
         }
         "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+    );
 
     let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string()
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1707,9 +1742,9 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let request_code = indoc!(
         r#"
-        {
+        query($datasetId: DatasetID!) {
             datasets {
-                byId (datasetId: "<id>") {
+                byId (datasetId: $datasetId) {
                     flows {
                         runs {
                             listFlows(
@@ -1731,12 +1766,14 @@ async fn test_list_flows_with_filters_and_pagination() {
             }
         }
         "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+    );
 
     let response = schema
         .execute(
-            async_graphql::Request::new(request_code.clone())
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string()
+                })))
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
@@ -1774,39 +1811,41 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let request_code = indoc!(
         r#"
-    {
-        datasets {
-            byId (datasetId: "<id>") {
-                flows {
-                    runs {
-                        listFlows(
-                            filters: {
-                                byInitiator: { accounts: ["<account_ids>"]}
-                            }
-                        ) {
-                            nodes {
-                                flowId
-                            }
-                            pageInfo {
-                                currentPage
-                                totalPages
+        query($datasetId: DatasetID!, $accountIds: [AccountID!]) {
+            datasets {
+                byId (datasetId: $datasetId) {
+                    flows {
+                        runs {
+                            listFlows(
+                                filters: {
+                                    byInitiator: { accounts: $accountIds }
+                                }
+                            ) {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
-    "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string())
-    .replace(
-        "<account_ids>",
-        [DEFAULT_ACCOUNT_ID.to_string()].join(",").as_str(),
+        "#
     );
 
     let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "accountIds": [DEFAULT_ACCOUNT_ID.to_string()],
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1840,35 +1879,40 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     let request_code = indoc!(
         r#"
-    {
-        datasets {
-            byId (datasetId: "<id>") {
-                flows {
-                    runs {
-                        listFlows(
-                            filters: {
-                                byInitiator: { system: true }
-                            }
-                        ) {
-                            nodes {
-                                flowId
-                            }
-                            pageInfo {
-                                currentPage
-                                totalPages
+        query($datasetId: DatasetID!) {
+            datasets {
+                byId (datasetId: $datasetId) {
+                    flows {
+                        runs {
+                            listFlows(
+                                filters: {
+                                    byInitiator: { system: true }
+                                }
+                            ) {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
-    "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+        "#
+    );
 
     let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1897,6 +1941,292 @@ async fn test_list_flows_with_filters_and_pagination() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_list_flows_with_webhooks() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dataset_changes_mock: None,
+    })
+    .await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
+
+    let subscription_alpha_id = harness
+        .create_webhook_for_dataset_updates(&create_result.dataset_handle.id, "alpha")
+        .await;
+
+    let subscription_beta_id = harness
+        .create_webhook_for_dataset_updates(&create_result.dataset_handle.id, "beta")
+        .await;
+
+    harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    harness
+        .trigger_webhook_flow(&create_result.dataset_handle.id, subscription_alpha_id)
+        .await;
+    harness
+        .trigger_webhook_flow(&create_result.dataset_handle.id, subscription_beta_id)
+        .await;
+
+    // Pure listing
+
+    let request_code = indoc!(
+        r#"
+        query($datasetId: DatasetID!) {
+            datasets {
+                byId (datasetId: $datasetId) {
+                    flows {
+                        runs {
+                            listFlows {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string()
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "2",
+                                    },
+                                    {
+                                        "flowId": "1",
+                                    },
+                                    {
+                                        "flowId": "0",
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filter by all webhooks
+
+    let request_code = indoc!(
+        r#"
+        query($datasetId: DatasetID!) {
+            datasets {
+                byId (datasetId: $datasetId) {
+                    flows {
+                        runs {
+                            listFlows(
+                                filters: {
+                                    byProcessType: {
+                                        webhooks: {
+                                            subscriptionIds: []
+                                        }
+                                    }
+                                }
+                            ) {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string()
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "2",
+                                    },
+                                    {
+                                        "flowId": "1",
+                                    },
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filter by particular webhook
+
+    let request_code = indoc!(
+        r#"
+        query($datasetId: DatasetID!, $subscriptionId: WebhookSubscriptionID!) {
+            datasets {
+                byId (datasetId: $datasetId) {
+                    flows {
+                        runs {
+                            listFlows(
+                                filters: {
+                                    byProcessType: {
+                                        webhooks: {
+                                            subscriptionIds: [ $subscriptionId ]
+                                        }
+                                    }
+                                }
+                            ) {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+
+    // Alpha first
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "subscriptionId": subscription_alpha_id.to_string(),
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "1",
+                                    },
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Beta second - same query, different variable
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "subscriptionId": subscription_beta_id.to_string(),
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "2",
+                                    },
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_list_flow_initiators() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
@@ -1908,20 +2238,22 @@ async fn test_list_flow_initiators() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
+    harness
+        .trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
     // Pure initiator listing
     let request_code = indoc!(
         r#"
-        {
+        query($datasetId: DatasetID!) {
             datasets {
-                byId (datasetId: "<id>") {
+                byId (datasetId: $datasetId) {
                     flows {
                         runs {
                             listFlowInitiators {
@@ -1939,11 +2271,16 @@ async fn test_list_flow_initiators() {
             }
         }
         "#
-    )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+    );
 
     let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .execute(
+            async_graphql::Request::new(request_code)
+                .variables(async_graphql::Variables::from_value(value!({
+                    "datasetId": create_result.dataset_handle.id.to_string()
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1992,10 +2329,10 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let response =
-        FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2017,10 +2354,10 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let response =
-        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2062,10 +2399,10 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let response =
-        FlowRunsHarness::trigger_transform_flow_mutation(&create_root_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_transform_flow_mutation(&create_root_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2087,10 +2424,10 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let response =
-        FlowRunsHarness::trigger_ingest_flow_mutation(&create_derived_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_derived_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2112,10 +2449,10 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let response =
-        FlowRunsHarness::trigger_compaction_flow_mutation(&create_derived_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_compaction_flow_mutation(&create_derived_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2150,13 +2487,14 @@ async fn test_cancel_ingest_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response = FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response_json = response.data.into_json().unwrap();
     let flow_id =
-        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -2165,10 +2503,10 @@ async fn test_cancel_ingest_root_dataset() {
         .await;
 
     // Cancelation
-    let response =
-        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2216,16 +2554,14 @@ async fn test_cancel_running_transform_derived_dataset() {
         .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
-    let response =
-        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(
-        &response_json,
-        "triggerTransformFlow",
-    );
+    let flow_id =
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerTransformFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -2235,12 +2571,10 @@ async fn test_cancel_running_transform_derived_dataset() {
 
     // cancelation
 
-    let response = FlowRunsHarness::cancel_scheduled_tasks_mutation(
-        &create_derived_result.dataset_handle.id,
-        flow_id,
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_derived_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2283,16 +2617,14 @@ async fn test_cancel_hard_compaction_root_dataset() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response =
-        FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(
-        &response_json,
-        "triggerCompactionFlow",
-    );
+    let flow_id =
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerCompactionFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -2302,10 +2634,10 @@ async fn test_cancel_hard_compaction_root_dataset() {
 
     // cancelation
 
-    let response =
-        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2348,10 +2680,10 @@ async fn test_cancel_wrong_flow_id_fails() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response =
-        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, "5")
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, "5")
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2391,23 +2723,21 @@ async fn test_cancel_foreign_flow_fails() {
         .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
-    let response =
-        FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     let response_json = response.data.into_json().unwrap();
     let flow_id =
-        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
 
     // cancelation of foreign flow
 
-    let response = FlowRunsHarness::cancel_scheduled_tasks_mutation(
-        &create_derived_result.dataset_handle.id,
-        flow_id,
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_derived_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2442,7 +2772,8 @@ async fn test_cancel_waiting_flow() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response = FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -2456,10 +2787,10 @@ async fn test_cancel_waiting_flow() {
 
     // Cancelation
 
-    let response =
-        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2502,7 +2833,8 @@ async fn test_cancel_already_aborted_flow() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response = FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -2520,15 +2852,16 @@ async fn test_cancel_already_aborted_flow() {
 
     // First cancelation
 
-    FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
+    harness
+        .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
     // Apply 2nd time
-    let response =
-        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2571,13 +2904,14 @@ async fn test_cancel_already_succeeded_flow() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response = FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response_json = response.data.into_json().unwrap();
     let flow_id =
-        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -2595,10 +2929,10 @@ async fn test_cancel_already_succeeded_flow() {
 
     // Cancelation
 
-    let response =
-        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -2640,13 +2974,14 @@ async fn test_history_of_completed_ingest_flow() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response = FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response_json = response.data.into_json().unwrap();
     let flow_id =
-        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     harness
@@ -2671,7 +3006,8 @@ async fn test_history_of_completed_ingest_flow() {
         )
         .await;
 
-    let response = FlowRunsHarness::flow_history_query(&create_result.dataset_handle.id, flow_id)
+    let response = harness
+        .flow_history_query(&create_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -2776,15 +3112,14 @@ async fn test_history_of_completed_transform_flow() {
         .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
-    let response = FlowRunsHarness::trigger_transform_flow_mutation(&bar_result.dataset_handle.id)
+    let response = harness
+        .trigger_transform_flow_mutation(&bar_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(
-        &response_json,
-        "triggerTransformFlow",
-    );
+    let flow_id =
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerTransformFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     harness
@@ -2848,7 +3183,8 @@ async fn test_history_of_completed_transform_flow() {
         )
         .await;
 
-    let response = FlowRunsHarness::flow_history_query(&bar_result.dataset_handle.id, flow_id)
+    let response = harness
+        .flow_history_query(&bar_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -2981,13 +3317,14 @@ async fn test_execute_transform_flow_error_after_compaction() {
         .create_derived_dataset(bar_alias, &[foo_alias])
         .await;
 
-    let response = FlowRunsHarness::trigger_compaction_flow_mutation_with_config(
-        &create_root_result.dataset_handle.id,
-        10000,
-        1_000_000,
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .trigger_compaction_flow_mutation_with_config(
+            &create_root_result.dataset_handle.id,
+            10000,
+            1_000_000,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -3043,7 +3380,8 @@ async fn test_execute_transform_flow_error_after_compaction() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_root_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_root_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -3113,10 +3451,10 @@ async fn test_execute_transform_flow_error_after_compaction() {
         })
     );
 
-    let response =
-        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
-            .execute(&schema, &harness.catalog_authorized)
-            .await;
+    let response = harness
+        .trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -3165,7 +3503,8 @@ async fn test_execute_transform_flow_error_after_compaction() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_derived_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_derived_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -3264,12 +3603,9 @@ async fn test_anonymous_operation_fails() {
         .await;
 
     let mutation_requests = [
-        FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id),
-        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id),
-        FlowRunsHarness::cancel_scheduled_tasks_mutation(
-            &create_root_result.dataset_handle.id,
-            "0",
-        ),
+        harness.trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id),
+        harness.trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id),
+        harness.cancel_scheduled_tasks_mutation(&create_root_result.dataset_handle.id, "0"),
     ];
 
     for mutation_request in mutation_requests {
@@ -3302,13 +3638,14 @@ async fn test_config_snapshot_returned_correctly() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness.create_root_dataset(foo_alias).await;
 
-    let response = FlowRunsHarness::trigger_compaction_flow_mutation_with_config(
-        &create_result.dataset_handle.id,
-        10000,
-        1_000_000,
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .trigger_compaction_flow_mutation_with_config(
+            &create_result.dataset_handle.id,
+            10000,
+            1_000_000,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -3336,7 +3673,8 @@ async fn test_config_snapshot_returned_correctly() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -3474,7 +3812,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 
     // Trigger the flow manually
 
-    let response = FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -3523,7 +3862,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         )
         .await;
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -3614,7 +3954,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 
     let next_scheduled_at_1 = complete_time_1 + Duration::minutes(1);
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -3710,12 +4051,10 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         .await;
 
     // Now, let's see flow history with these retries
-    let response = FlowRunsHarness::flow_history_query(
-        &create_result.dataset_handle.id,
-        "0", /* flowId */
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
+    let response = harness
+        .flow_history_query(&create_result.dataset_handle.id, "0" /* flowId */)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
 
     pretty_assertions::assert_eq!(
         response.data,
@@ -3931,7 +4270,8 @@ async fn test_trigger_flow_automatically_via_schedule() {
         })
     );
 
-    let response = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id)
+    let response = harness
+        .list_flows_query(&create_result.dataset_handle.id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -4011,6 +4351,7 @@ impl FlowRunsHarness {
     }
 
     fn extract_flow_id_from_trigger_response<'a>(
+        &self,
         response_json: &'a serde_json::Value,
         trigger_method: &'static str,
     ) -> &'a str {
@@ -4019,7 +4360,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    fn list_flows_query(id: &odf::DatasetID) -> GraphQLQueryRequest {
+    fn list_flows_query(&self, id: &odf::DatasetID) -> GraphQLQueryRequest {
         let query_code = indoc!(
             r#"
             query($datasetId: DatasetID!) {
@@ -4244,7 +4585,7 @@ impl FlowRunsHarness {
         )
     }
 
-    fn flow_history_query(id: &odf::DatasetID, flow_id: &str) -> GraphQLQueryRequest {
+    fn flow_history_query(&self, id: &odf::DatasetID, flow_id: &str) -> GraphQLQueryRequest {
         // Note: avoid extracting time-based properties in test
         let query_code = indoc!(
             r#"
@@ -4317,7 +4658,7 @@ impl FlowRunsHarness {
         )
     }
 
-    fn trigger_ingest_flow_mutation(id: &odf::DatasetID) -> GraphQLQueryRequest {
+    fn trigger_ingest_flow_mutation(&self, id: &odf::DatasetID) -> GraphQLQueryRequest {
         let mutation_code = indoc!(
             r#"
             mutation($datasetId: DatasetID!) {
@@ -4368,7 +4709,7 @@ impl FlowRunsHarness {
         )
     }
 
-    fn trigger_transform_flow_mutation(id: &odf::DatasetID) -> GraphQLQueryRequest {
+    fn trigger_transform_flow_mutation(&self, id: &odf::DatasetID) -> GraphQLQueryRequest {
         let mutation_code = indoc!(
             r#"
             mutation($datasetId: DatasetID!) {
@@ -4426,6 +4767,7 @@ impl FlowRunsHarness {
     }
 
     fn trigger_reset_flow_mutation(
+        &self,
         id: &odf::DatasetID,
         new_head_hash: &odf::Multihash,
         old_head_hash: &odf::Multihash,
@@ -4497,7 +4839,7 @@ impl FlowRunsHarness {
         )
     }
 
-    fn trigger_compaction_flow_mutation(id: &odf::DatasetID) -> GraphQLQueryRequest {
+    fn trigger_compaction_flow_mutation(&self, id: &odf::DatasetID) -> GraphQLQueryRequest {
         let mutation_code = indoc!(
             r#"
             mutation($datasetId: DatasetID!) {
@@ -4549,6 +4891,7 @@ impl FlowRunsHarness {
     }
 
     fn trigger_compaction_flow_mutation_with_config(
+        &self,
         id: &odf::DatasetID,
         max_slice_records: u64,
         max_slice_size: u64,
@@ -4610,7 +4953,7 @@ impl FlowRunsHarness {
         )
     }
 
-    fn trigger_reset_to_metadata_flow_mutation(id: &odf::DatasetID) -> GraphQLQueryRequest {
+    fn trigger_reset_to_metadata_flow_mutation(&self, id: &odf::DatasetID) -> GraphQLQueryRequest {
         let mutation_code = indoc!(
             r#"
             mutation($datasetId: DatasetID!) {
@@ -4661,7 +5004,11 @@ impl FlowRunsHarness {
         )
     }
 
-    fn cancel_scheduled_tasks_mutation(id: &odf::DatasetID, flow_id: &str) -> GraphQLQueryRequest {
+    fn cancel_scheduled_tasks_mutation(
+        &self,
+        id: &odf::DatasetID,
+        flow_id: &str,
+    ) -> GraphQLQueryRequest {
         let mutation_code = indoc!(
             r#"
             mutation($datasetId: DatasetID!, $flowId: String!) {
