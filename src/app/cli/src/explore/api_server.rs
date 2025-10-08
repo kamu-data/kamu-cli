@@ -66,8 +66,6 @@ impl APIServer {
 
         let outbox_agent = cli_catalog.get_one().unwrap();
 
-        let gql_schema = kamu_adapter_graphql::schema();
-
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             port.unwrap_or(0),
@@ -112,6 +110,13 @@ impl APIServer {
             },
         };
 
+        let graphql_router = OpenApiRouter::new()
+            .route("/graphql", axum::routing::post(graphql_handler))
+            .layer(graphql_http::middleware::GraphqlTracingLayer::new(
+                kamu_adapter_graphql::schema(),
+                kamu_adapter_graphql::schema_quiet(),
+            ));
+
         let mut router = OpenApiRouter::with_openapi(
             kamu_adapter_http::openapi::spec_builder(
                 crate::app::VERSION,
@@ -147,7 +152,7 @@ impl APIServer {
                 TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
             },
         )
-        .route("/graphql", axum::routing::post(graphql_handler))
+        .merge(graphql_router)
         .nest(
                 match tenancy_config {
                     TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
@@ -221,7 +226,6 @@ impl APIServer {
 
         let (router, api) = router.split_for_parts();
         let router = router
-            .layer(Extension(gql_schema))
             .layer(Extension(api_server_catalog.clone()))
             .layer(Extension(ui_configuration))
             .layer(Extension(Arc::new(api)));

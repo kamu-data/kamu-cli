@@ -13,6 +13,7 @@ members = [
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
     "src/utils/file-utils",
+    "src/utils/graphql-http",
     "src/utils/http-common",
     "src/utils/init-on-startup",
     "src/utils/internal-error",
@@ -148,6 +149,7 @@ enum-variants = { version = "0.249.1", path = "src/utils/enum-variants", default
 event-sourcing = { version = "0.249.1", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.249.1", path = "src/utils/event-sourcing-macros", default-features = false }
 file-utils = { version = "0.249.1", path = "src/utils/file-utils", default-features = false }
+graphql-http = { version = "0.249.1", path = "src/utils/graphql-http", default-features = false }
 http-common = { version = "0.249.1", path = "src/utils/http-common", default-features = false }
 init-on-startup = { version = "0.249.1", path = "src/utils/init-on-startup", default-features = false }
 internal-error = { version = "0.249.1", path = "src/utils/internal-error", default-features = false }

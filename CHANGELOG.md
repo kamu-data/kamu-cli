@@ -13,9 +13,10 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Changed
-- Discontinued binary releases for MacOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+- Discontinued binary releases for macOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
 - Update `merge` crate version `0.1` -> `0.2`
 - Removed `extra.graphql.enableArchetypeInference` config option that was added for compatibility during data migrations
+- GQL: Apollo Tracing removed from response. To bring it back, add `x-trace-graphql=1` to request headers (#1402).
 
 ## [0.249.1] - 2025-09-25
 ### Fixed
@@ -23,21 +24,21 @@ Recommendation: for ease of reading, use the following order:
 
 ## [0.249.0] - 2025-09-23
 ### Changed
-- (#1372): GQL: Performance improvement via query vectorization for APIs:
+- GQL: Performance improvement via query vectorization for APIs (#1372):
   - `Dataset::by_ids()`;
   - `DatasetMut::by_ids()`;
   - `Account::by_ids()`;
   - `AccountMut::by_ids()`.
 - Improved compatibility with EVM-based sources
 - Upgraded to `datafusion v50`
-- (#1384) `kamu inspect`: speed-up of iteration through the metadata chain.
-- (#1384) `GQL: Dataset::metadata().current_push_sources`: significant speed-up through iteration 
-  over key blocks stored in the database 
-- (#1384) General iteration optimizations based on the dataset type (root, derived). 
-  Ability to disable hints during iteration.
-- (#1384) `SearchActivePushSourcesVisitor`, `SearchActivePollingSourceVisitor`: accounting for the evolution of data 
-  sources.
-- (#1366): Experiment: beginning of `cheap_clone()` integration.
+- `kamu inspect`: speed-up of iteration through the metadata chain (#1384).
+- `GQL: Dataset::metadata().current_push_sources`: significant speed-up through iteration 
+  over key blocks stored in the database (#1384).
+- General iteration optimizations based on the dataset type (root, derived). 
+  Ability to disable hints during iteration (#1384).
+- `SearchActivePushSourcesVisitor`, `SearchActivePollingSourceVisitor`: accounting for the evolution of data 
+  sources (#1384).
+- Experiment: beginning of `cheap_clone()` integration (#1366).
 
 ## [0.248.1] - 2025-09-11
 ### Fixed
@@ -67,15 +68,15 @@ Recommendation: for ease of reading, use the following order:
 - Flows: each input contribution to batching rule is reflected as an update of start condition,
    so that flow history may show how many accumulated records were present at the moment of each update
 - GQL: `Search::query()`: case insensitive search.
-- (#1263): `images/kamu-base-with-data-mt`: make datasets public by default.
+- `images/kamu-base-with-data-mt`: make datasets public by default (#1263).
 ### Fixed
 - Crash when multiple unlabeled webhook subscriptions are defined within the same dataset
 - Restrict dataset creation with duplicate transform inputs.
-- (#1263) `DependencyGraphImmediateListener`: fixed a message processing race condition.
+- `DependencyGraphImmediateListener`: fixed a message processing race condition (#1263).
   - Parallel processing message of one type, in the case of handlers that were dependent on each other, 
     could lead to incorrect formation of the upstream/downstream dependency list 
     when pulling/pushing existing remote datasets. 
-- (#1263) `OsoDatasetAuthorizer::classify_dataset_ids_by_allowance()`.
+-  `OsoDatasetAuthorizer::classify_dataset_ids_by_allowance()` (#1263).
   - Fixed a bug that returned an empty `unresolved_resources` list 
     when there were no dataset entries. This could happen when pulling a dataset 
     that had upstream dependencies but no dependencies itself.
