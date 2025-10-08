@@ -753,7 +753,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     transfer_options.force_update_if_diverged,
                 )
                 .await?
-                .unwrap_or(new_head.clone().unwrap());
+                .unwrap_or_else(|| new_head.clone().unwrap());
 
             SyncResult::Updated {
                 old_head: dst_head,
