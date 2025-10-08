@@ -278,7 +278,7 @@ impl Molecule {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Molecule {
     const DEFAULT_PROJECTS_PER_PAGE: usize = 15;
@@ -827,7 +827,7 @@ impl MoleculeProject {
     }
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[ComplexObject]
 impl MoleculeProject {
     const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
