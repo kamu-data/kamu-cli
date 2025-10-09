@@ -44,9 +44,9 @@ ALTER TABLE flow_events
     ADD COLUMN tx_id xid8 NOT NULL DEFAULT pg_current_xact_id();
 
 -- Note: we will be scanning in (tx_id, event_id) order, so index accordingly
-CREATE INDEX idx_flow_configuration_events_tx_order ON flow_configuration_events (tx_id, event_id);
-CREATE INDEX idx_flow_trigger_events_tx_order ON flow_trigger_events (tx_id, event_id);
-CREATE INDEX idx_flow_events_tx_order ON flow_events (tx_id, event_id);
+CREATE INDEX idx_fce_tx_order ON flow_configuration_events (tx_id, event_id);
+CREATE INDEX idx_fte_tx_order ON flow_trigger_events (tx_id, event_id);
+CREATE INDEX idx_fe_tx_order ON flow_events (tx_id, event_id);
 
 /* ------------------------------ */
 
@@ -59,17 +59,17 @@ BEGIN
     RETURN NULL;
 END $$;
 
-CREATE TRIGGER flow_events_notify
+CREATE TRIGGER fe_notify
     AFTER INSERT ON flow_events
     REFERENCING NEW TABLE AS new_rows
     FOR EACH STATEMENT EXECUTE FUNCTION notify_flow_system_events();
 
-CREATE TRIGGER flow_trigger_events_notify
+CREATE TRIGGER fte_notify
     AFTER INSERT ON flow_trigger_events
     REFERENCING NEW TABLE AS new_rows
     FOR EACH STATEMENT EXECUTE FUNCTION notify_flow_system_events();
 
-CREATE TRIGGER flow_configuration_events_notify
+CREATE TRIGGER fce_notify
     AFTER INSERT ON flow_configuration_events
     REFERENCING NEW TABLE AS new_rows
     FOR EACH STATEMENT EXECUTE FUNCTION notify_flow_system_events();
