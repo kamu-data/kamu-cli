@@ -35,6 +35,7 @@ impl<'a> DatasetFlowProcesses<'a> {
         }
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowProcesses_primary, skip_all)]
     pub async fn primary(&self, ctx: &Context<'_>) -> Result<DatasetFlowProcess> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
 
@@ -80,6 +81,7 @@ impl<'a> DatasetFlowProcesses<'a> {
             FlowScopeSubscription::query_for_subscriptions_of_dataset(
                 self.dataset_request_state.dataset_id(),
             ),
+            self.dataset_request_state,
         ))
     }
 

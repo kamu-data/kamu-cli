@@ -147,7 +147,10 @@ type AccountFlowProcessCardEdge {
 
 type AccountFlowProcesses {
 	primaryRollup: FlowProcessGroupRollup!
-	datasetPrimaryCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): DatasetFlowProcessConnection!
+	webhookRollup: FlowProcessGroupRollup!
+	fullRollup: FlowProcessGroupRollup!
+	primaryCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): DatasetFlowProcessConnection!
+	webhookCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): WebhookFlowSubProcessConnection!
 	allCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessCardConnection!
 }
 
@@ -4445,7 +4448,28 @@ scalar WebhookEventType
 type WebhookFlowSubProcess {
 	id: WebhookSubscriptionID!
 	name: String!
+	parentDataset: Dataset
 	summary: FlowProcessSummary!
+}
+
+type WebhookFlowSubProcessConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [WebhookFlowSubProcess!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [WebhookFlowSubProcessEdge!]!
+}
+
+type WebhookFlowSubProcessEdge {
+	node: WebhookFlowSubProcess!
 }
 
 type WebhookFlowSubProcessGroup {

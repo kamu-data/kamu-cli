@@ -10,22 +10,24 @@
 use {kamu_flow_system as fs, kamu_webhooks as wh};
 
 use crate::prelude::*;
+use crate::queries::{Dataset, DatasetRequestStateWithOwner};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WebhookFlowSubProcess {
     id: wh::WebhookSubscriptionID,
     name: String,
+    parent_dataset_request_state: Option<DatasetRequestStateWithOwner>,
     flow_process_state: fs::FlowProcessState,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl WebhookFlowSubProcess {
     #[graphql(skip)]
     #[allow(dead_code)]
     pub fn new(
         subscription: &wh::WebhookSubscription,
+        parent_dataset_request_state: Option<DatasetRequestStateWithOwner>,
         flow_process_state: fs::FlowProcessState,
     ) -> Self {
         // Decide on subprocess name
@@ -38,18 +40,23 @@ impl WebhookFlowSubProcess {
         Self {
             id: subscription.id(),
             name: subprocess_name,
+            parent_dataset_request_state,
             flow_process_state,
         }
     }
 
-    #[allow(clippy::unused_async)]
     pub async fn id(&self) -> WebhookSubscriptionID {
         self.id.into()
     }
 
-    #[allow(clippy::unused_async)]
     pub async fn name(&self) -> String {
         self.name.clone()
+    }
+
+    pub async fn parent_dataset(&self) -> Option<Dataset> {
+        self.parent_dataset_request_state.as_ref().map(|state| {
+            Dataset::new_access_checked(state.owner().clone(), state.dataset_handle().clone())
+        })
     }
 
     #[allow(clippy::unused_async)]
@@ -57,5 +64,13 @@ impl WebhookFlowSubProcess {
         Ok(self.flow_process_state.clone().into())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+page_based_connection!(
+    WebhookFlowSubProcess,
+    WebhookFlowSubProcessConnection,
+    WebhookFlowSubProcessEdge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
