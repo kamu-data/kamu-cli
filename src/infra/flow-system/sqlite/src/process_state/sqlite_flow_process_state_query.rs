@@ -70,6 +70,7 @@ impl SqliteFlowProcessStateQuery {
 
 #[async_trait::async_trait]
 impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn has_any_process_states(&self) -> Result<bool, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -83,6 +84,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         Ok(has_any)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn try_get_process_state(
         &self,
         flow_binding: &FlowBinding,
@@ -98,6 +100,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn list_processes(
         &self,
         filter: FlowProcessListFilter<'_>,
@@ -304,7 +307,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         })
     }
 
-    /// Compute rollup for matching rows.
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn rollup_by_scope(
         &self,
         flow_scope_query: FlowScopeQuery,

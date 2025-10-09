@@ -201,6 +201,7 @@ impl PostgresFlowEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowState> for PostgresFlowEventStore {
+    #[tracing::instrument(level = "debug", skip_all)]
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
@@ -237,6 +238,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(flow_id = %flow_id))]
     fn get_events(&self, flow_id: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
         let flow_id: i64 = (*flow_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
@@ -275,6 +277,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(flow_ids = ?queries))]
     fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<FlowID, FlowEvent> {
         let flow_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
 
@@ -309,6 +312,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(flow_id = %flow_id))]
     async fn save_events(
         &self,
         flow_id: &FlowID,
@@ -352,6 +356,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
         Ok(last_event_id)
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -375,6 +380,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
 
 #[async_trait::async_trait]
 impl FlowEventStore for PostgresFlowEventStore {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn new_flow_id(&self) -> Result<FlowID, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -392,6 +398,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(FlowID::try_from(flow_id).unwrap())
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn try_get_pending_flow(
         &self,
         flow_binding: &FlowBinding,
@@ -423,6 +430,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(maybe_flow_id.map(|id| FlowID::try_from(id).unwrap()))
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn try_get_all_scope_pending_flows(
         &self,
         flow_scope: &FlowScope,
@@ -451,6 +459,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     }
 
     /// Returns nearest time when one or more flows are scheduled for activation
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
@@ -479,6 +488,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     }
 
     /// Returns flows scheduled for activation at the given time
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_flows_scheduled_for_activation_at(
         &self,
         scheduled_for_activation_at: DateTime<Utc>,
@@ -505,6 +515,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(flow_ids)
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn get_all_flow_ids_matching_scope_query(
         &self,
         flow_scope_query: FlowScopeQuery,
@@ -572,6 +583,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_count_flows_matching_scope_query(
         &self,
         flow_scope_query: &FlowScopeQuery,
@@ -616,6 +628,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(usize::try_from(flows_count).unwrap())
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         let (scope_conditions, _) =
             generate_scope_query_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
@@ -651,6 +664,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn get_all_flow_ids(
         &self,
         filters: &FlowFilters,
@@ -699,6 +713,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -748,6 +763,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn filter_flow_scopes_having_flows(
         &self,
         flow_scopes: &[FlowScope],

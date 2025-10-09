@@ -66,6 +66,7 @@ impl SqliteFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
+    #[tracing::instrument(level = "debug", skip_all, fields(timeout, min_debounce_interval))]
     async fn wait_wake(
         &self,
         timeout: Duration,
@@ -98,6 +99,7 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
     }
 
     /// Fetch next batch for the given projector; order by global id.
+    #[tracing::instrument(level = "debug", skip_all, fields(projector_name))]
     async fn fetch_next_batch(
         &self,
         transaction_catalog: &dill::Catalog,
@@ -157,6 +159,7 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
     }
 
     /// Mark these events as applied for this projector (idempotent).
+    #[tracing::instrument(level = "debug", skip_all, fields(projector_name))]
     async fn mark_applied(
         &self,
         transaction_catalog: &dill::Catalog,

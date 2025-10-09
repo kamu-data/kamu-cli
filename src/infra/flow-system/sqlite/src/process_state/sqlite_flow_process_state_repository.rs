@@ -205,6 +205,7 @@ impl SqliteFlowProcessStateRepository {
 
 #[async_trait::async_trait]
 impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn upsert_process_state_on_trigger_event(
         &self,
         event_id: EventID,
@@ -268,6 +269,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn apply_flow_result(
         &self,
         event_id: EventID,
@@ -311,6 +313,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn on_flow_scheduled(
         &self,
         event_id: EventID,
@@ -353,6 +356,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?scope))]
     async fn delete_process_states_by_scope(
         &self,
         scope: &FlowScope,
