@@ -37,8 +37,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let datasets_dir = tmp_workspace_dir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
@@ -66,8 +66,11 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .add::<DependencyGraphServiceImpl>()
-        .build();
+        .add::<DependencyGraphServiceImpl>();
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+    let catalog = b.build();
 
     let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
     let time_source = catalog.get_one::<dyn SystemTimeSource>().unwrap();

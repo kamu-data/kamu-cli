@@ -11,9 +11,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use console::style as s;
+use database_common_macros::transactional_method1;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
+use odf::DatasetRefUnresolvedError;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -26,8 +28,8 @@ use crate::output::OutputConfig;
 #[dill::interface(dyn Command)]
 pub struct PushCommand {
     tenancy_config: TenancyConfig,
-    dataset_registry: Arc<dyn DatasetRegistry>,
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
+    catalog: dill::Catalog,
 
     #[dill::component(explicit)]
     refs: Vec<odf::DatasetRefPattern>,
@@ -59,39 +61,7 @@ impl PushCommand {
         &self,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
-        let dataset_refs: Vec<_> =
-            filter_datasets_by_local_pattern(self.dataset_registry.as_ref(), self.refs.clone())
-                .map_ok(|dataset_handle| dataset_handle.as_local_ref())
-                .try_collect()
-                .await?;
-
-        let mut dataset_handles = Vec::new();
-        let mut error_responses = Vec::new();
-        // TODO: batch resolution
-        for dataset_ref in &dataset_refs {
-            match self
-                .dataset_registry
-                .resolve_dataset_handle_by_ref(dataset_ref)
-                .await
-            {
-                Ok(hdl) => dataset_handles.push(hdl),
-                Err(e) => {
-                    let push_error = match e {
-                        odf::DatasetRefUnresolvedError::NotFound(e) => PushError::SourceNotFound(e),
-                        odf::DatasetRefUnresolvedError::Internal(e) => PushError::Internal(e),
-                    };
-                    error_responses.push(PushResponse {
-                        local_handle: None,
-                        target: None,
-                        result: Err(push_error),
-                    });
-                }
-            }
-        }
-
-        if !error_responses.is_empty() {
-            return Ok(error_responses);
-        }
+        let dataset_handles = self.get_filtered_datasets().await?;
 
         self.push_dataset_use_case
             .execute_multi(
@@ -123,6 +93,19 @@ impl PushCommand {
         let progress = PrettyPushProgress::new(self.tenancy_config);
         let listener = Arc::new(progress.clone());
         self.do_push(Some(listener.clone())).await
+    }
+
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn get_filtered_datasets(
+        &self,
+    ) -> Result<Vec<odf::DatasetHandle>, DatasetRefUnresolvedError> {
+        if !self.all {
+            filter_datasets_by_local_pattern(dataset_registry.as_ref(), self.refs.clone())
+                .try_collect()
+                .await
+        } else {
+            Ok(vec![])
+        }
     }
 }
 

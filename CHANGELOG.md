@@ -18,6 +18,8 @@ Recommendation: for ease of reading, use the following order:
 - Removed `extra.graphql.enableArchetypeInference` config option that was added for compatibility during data migrations
 - GQL: Apollo Tracing removed from response. To bring it back, add `x-trace-graphql=1` to request headers (#1402).
 ### Fixed
+- `kamu pull`: perform pulling each dataset in separate transaction and allow to interrupt run and some pulls will be saved. 
+  It also helps to keep ingest iterations progress saved even if some iteration failed
 - Investigation: potential unstable ordering of dataset entry listings (#1405).
 
 ## [0.249.1] - 2025-09-25
