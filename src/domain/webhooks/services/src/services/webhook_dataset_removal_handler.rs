@@ -73,7 +73,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for WebhookDatasetRemovalHandler 
 
                 // Load these subscriptions
                 let subscriptions = WebhookSubscription::load_multi_simple(
-                    subscription_ids,
+                    &subscription_ids,
                     self.webhook_subscription_event_store.as_ref(),
                 )
                 .await

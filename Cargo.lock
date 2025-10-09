@@ -1485,6 +1485,7 @@ name = "async-utils"
 version = "0.249.1"
 dependencies = [
  "async-trait",
+ "internal-error",
  "tokio",
 ]
 
@@ -4825,6 +4826,7 @@ dependencies = [
  "event-sourcing-macros",
  "futures",
  "internal-error",
+ "serde",
  "thiserror 2.0.16",
  "tokio",
  "tokio-stream",
@@ -7977,8 +7979,12 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
+ "serde",
+ "serde_json",
+ "strum 0.27.2",
  "test-group",
  "test-log",
+ "time-source",
  "tokio",
  "tracing",
 ]
@@ -7998,10 +8004,13 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
+ "serde",
  "serde_json",
  "sqlx",
  "test-group",
  "test-log",
+ "time-source",
+ "tokio",
  "tracing",
 ]
 
@@ -8010,13 +8019,22 @@ name = "kamu-flow-system-repo-tests"
 version = "0.249.1"
 dependencies = [
  "chrono",
+ "csv",
  "database-common",
  "dill",
+ "event-sourcing",
  "futures",
+ "internal-error",
  "kamu-adapter-flow-dataset",
+ "kamu-adapter-flow-webhook",
  "kamu-flow-system",
  "kamu-task-system",
+ "kamu-webhooks",
  "opendatafabric",
+ "serde",
+ "serde_json",
+ "time-source",
+ "uuid",
 ]
 
 [[package]]
@@ -8025,12 +8043,14 @@ version = "0.249.1"
 dependencies = [
  "async-stream",
  "async-trait",
+ "async-utils",
  "chrono",
  "common-macros",
  "cron",
  "database-common",
  "database-common-macros",
  "dill",
+ "event-sourcing",
  "futures",
  "indoc 2.0.6",
  "init-on-startup",
@@ -8080,6 +8100,8 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "time-source",
+ "tokio",
  "tracing",
 ]
 
@@ -8267,6 +8289,7 @@ name = "kamu-task-system"
 version = "0.249.1"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "enum-variants",
@@ -8338,6 +8361,7 @@ name = "kamu-task-system-services"
 version = "0.249.1"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -9069,6 +9093,7 @@ name = "messaging-outbox"
 version = "0.249.1"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "database-common-macros",

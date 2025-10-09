@@ -205,22 +205,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_dataset_flow_run_stats,
-    harness = SqliteFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_system_flow_run_stats,
-    harness = SqliteFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
     fixture =
         kamu_flow_system_repo_tests::test_flow_event_store::test_pending_flow_dataset_single_type_crud,
     harness = SqliteFlowEventStoreHarness
@@ -311,15 +295,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_flow_through_retry_attempts,
-    harness = SqliteFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture =
-        kamu_flow_system_repo_tests::test_flow_event_store::test_flow_consecutive_failures_count,
     harness = SqliteFlowEventStoreHarness
 );
 

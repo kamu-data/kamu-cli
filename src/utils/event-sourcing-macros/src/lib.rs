@@ -77,7 +77,7 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
 
             #[inline]
             pub async fn load_multi(
-                queries: Vec<<#proj_type as ::event_sourcing::Projection>::Query>,
+                queries: &[<#proj_type as ::event_sourcing::Projection>::Query],
                 event_store: &#store_type,
             ) -> Result<Vec<Result<Self, LoadError<#proj_type>>>, GetEventsError> {
                 let aggs = ::event_sourcing::Aggregate::load_multi(queries, event_store).await?;
@@ -94,7 +94,7 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
 
             #[inline]
             pub async fn load_multi_simple(
-                queries: Vec<<#proj_type as ::event_sourcing::Projection>::Query>,
+                queries: &[<#proj_type as ::event_sourcing::Projection>::Query],
                 event_store: &#store_type,
             ) -> Result<Vec<Self>, GetEventsError> {
                 let aggs = ::event_sourcing::Aggregate::load_multi_simple(queries, event_store).await?;
@@ -162,7 +162,7 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
-            pub fn last_stored_event_id(&self) -> Option<&EventID> {
+            pub fn last_stored_event_id(&self) -> Option<EventID> {
                 self.0.last_stored_event_id()
             }
         }

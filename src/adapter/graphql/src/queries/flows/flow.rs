@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs, kamu_task_system as ts};
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
 use super::{FlowActivationCause, FlowEvent, FlowOutcome, FlowStartCondition};
@@ -20,7 +20,6 @@ use crate::queries::Account;
 
 pub struct Flow {
     flow_state: Box<fs::FlowState>,
-    flow_task_states: Vec<ts::TaskState>,
     maybe_related_flow_trigger_state: Option<Box<fs::FlowTriggerState>>,
     description: FlowDescription,
 }
@@ -38,21 +37,11 @@ impl Flow {
         let mut flow_description_builder =
             FlowDescriptionBuilder::prepare(ctx, &flow_states).await?;
 
-        // Load task states associated with the flows
-        let mut flow_task_states_by_id = Self::load_flow_task_states(&flow_states, ctx).await?;
-
         // Load triggers associated with the flows
         let mut flow_related_trigger_states_by_id =
             Self::load_flow_related_triggers(&flow_states, ctx).await?;
 
         for flow_state in flow_states {
-            // Extract task states associated with the flow
-            let flow_task_states = flow_state
-                .task_ids
-                .iter()
-                .filter_map(|task_id| flow_task_states_by_id.remove(task_id))
-                .collect::<Vec<_>>();
-
             // We could possibly have an associated triger as well
             let maybe_related_flow_trigger_state =
                 flow_related_trigger_states_by_id.remove(&flow_state.flow_binding);
@@ -63,38 +52,12 @@ impl Flow {
             // Finally, compose all values
             result.push(Self {
                 flow_state: Box::new(flow_state),
-                flow_task_states,
                 maybe_related_flow_trigger_state: maybe_related_flow_trigger_state.map(Box::new),
                 description: flow_description,
             });
         }
 
         Ok(result)
-    }
-
-    #[graphql(skip)]
-    async fn load_flow_task_states(
-        flow_states: &[fs::FlowState],
-        ctx: &Context<'_>,
-    ) -> Result<HashMap<ts::TaskID, ts::TaskState>> {
-        let task_event_store = from_catalog_n!(ctx, dyn ts::TaskEventStore);
-
-        let flow_task_ids: Vec<_> = flow_states
-            .iter()
-            .flat_map(|flow_state| flow_state.task_ids.iter().copied())
-            .collect();
-        let flow_task_states: Vec<ts::TaskState> =
-            ts::Task::load_multi_simple(flow_task_ids, task_event_store.as_ref())
-                .await
-                .int_err()?
-                .into_iter()
-                .map(Into::into)
-                .collect::<Vec<_>>();
-
-        Ok(flow_task_states
-            .into_iter()
-            .map(|task_state| (task_state.task_id, task_state))
-            .collect::<HashMap<_, _>>())
     }
 
     #[graphql(skip)]
@@ -113,7 +76,7 @@ impl Flow {
             .collect::<Vec<_>>();
 
         let flow_triggers_res =
-            fs::FlowTrigger::load_multi(unique_bindings, flow_trigger_event_store.as_ref())
+            fs::FlowTrigger::load_multi(&unique_bindings, flow_trigger_event_store.as_ref())
                 .await
                 .map_err(|e| match e {
                     fs::GetEventsError::Internal(e) => e,
@@ -158,18 +121,11 @@ impl Flow {
     /// Outcome of the flow (Finished state only)
     async fn outcome(&self, ctx: &Context<'_>) -> Result<Option<FlowOutcome>> {
         match self.flow_state.outcome {
-            Some(ref outcome) => {
-                let maybe_task_outcome = self
-                    .flow_task_states
-                    .last()
-                    .and_then(|task_state| task_state.outcome.as_ref());
-
-                Ok(Some(
-                    FlowOutcome::from_flow_and_task_outcomes(ctx, outcome, maybe_task_outcome)
-                        .await
-                        .int_err()?,
-                ))
-            }
+            Some(ref outcome) => Ok(Some(
+                FlowOutcome::from_flow_outcome(ctx, outcome)
+                    .await
+                    .int_err()?,
+            )),
             None => Ok(None),
         }
     }
@@ -183,6 +139,7 @@ impl Flow {
             awaiting_executor_since: self.flow_state.timing.awaiting_executor_since,
             running_since: self.flow_state.timing.running_since,
             last_attempt_finished_at: self.flow_state.timing.last_attempt_finished_at,
+            completed_at: self.flow_state.timing.completed_at,
         }
     }
 

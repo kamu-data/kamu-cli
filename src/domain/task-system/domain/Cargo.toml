@@ -24,6 +24,7 @@ doctest = false
 
 
 [dependencies]
+async-utils = { workspace = true }
 database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }

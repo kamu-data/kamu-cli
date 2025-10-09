@@ -9,36 +9,41 @@
 
 use super::{DatasetFlowConfigs, DatasetFlowRuns, DatasetFlowTriggers};
 use crate::prelude::*;
-use crate::queries::DatasetRequestState;
+use crate::queries::{DatasetFlowProcesses, DatasetRequestStateWithOwner};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlows<'a> {
-    dataset_request_state: &'a DatasetRequestState,
+    dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
 #[Object]
 impl<'a> DatasetFlows<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestStateWithOwner) -> Self {
         Self {
             dataset_request_state,
         }
     }
 
     /// Returns interface for flow configurations queries
-    async fn configs(&self) -> DatasetFlowConfigs {
+    pub async fn configs(&self) -> DatasetFlowConfigs {
         DatasetFlowConfigs::new(self.dataset_request_state)
     }
 
     /// Returns interface for flow triggers queries
-    async fn triggers(&self) -> DatasetFlowTriggers {
+    pub async fn triggers(&self) -> DatasetFlowTriggers {
         DatasetFlowTriggers::new(self.dataset_request_state)
     }
 
     /// Returns interface for flow runs queries
-    async fn runs(&self) -> DatasetFlowRuns {
+    pub async fn runs(&self) -> DatasetFlowRuns {
         DatasetFlowRuns::new(self.dataset_request_state)
+    }
+
+    /// Returns interface for flow processes queries
+    pub async fn processes(&self) -> DatasetFlowProcesses {
+        DatasetFlowProcesses::new(self.dataset_request_state)
     }
 }
 

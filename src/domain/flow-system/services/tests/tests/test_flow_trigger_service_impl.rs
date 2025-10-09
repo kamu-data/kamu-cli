@@ -310,7 +310,8 @@ impl FlowTriggerHarness {
             .add::<FlowDatasetsEventBridge>()
             .add::<FlowSensorDispatcherImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
-            .add::<InMemoryFlowEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowProcessState>()
             .add::<SystemTimeSourceDefault>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

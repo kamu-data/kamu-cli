@@ -13,8 +13,6 @@ use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
 use kamu_flow_system::*;
-use messaging_outbox::{Outbox, OutboxExt};
-use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,9 +20,7 @@ use time_source::SystemTimeSource;
 pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
-    flow_trigger_service: Arc<dyn FlowTriggerService>,
-    outbox: Arc<dyn Outbox>,
-    time_source: Arc<dyn SystemTimeSource>,
+    flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
     agent_config: Arc<FlowAgentConfig>,
 }
 
@@ -59,38 +55,64 @@ impl FlowSchedulingHelper {
         Ok(())
     }
 
-    pub(crate) async fn try_schedule_late_flow_activations(
+    pub(crate) async fn schedule_late_flow_activations(
         &self,
-        flow: &FlowState,
+        flow_success_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+        late_activation_causes: &[FlowActivationCause],
     ) -> Result<(), InternalError> {
-        // If there are late activation causes, schedule them
-        if !flow.late_activation_causes.is_empty() {
-            self.trigger_flow_common(
-                &flow.flow_binding,
-                None,
-                flow.late_activation_causes.clone(),
-                None,
-            )
-            .await?;
-        }
+        tracing::info!(
+            ?flow_binding,
+            late_activation_causes = late_activation_causes.len(),
+            "Scheduling late flow activations"
+        );
+
+        // Schedule the next flow immediately
+        self.trigger_flow_common(
+            flow_success_time,
+            flow_binding,
+            None,
+            late_activation_causes.to_vec(),
+            None,
+        )
+        .await?;
 
         Ok(())
     }
 
-    pub(crate) async fn try_schedule_auto_polling_flow_if_enabled(
+    pub(crate) async fn try_schedule_auto_polling_flow_continuation_if_enabled(
         &self,
-        start_time: DateTime<Utc>,
+        flow_finish_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
+        trigger_state: &FlowTriggerState,
     ) -> Result<(), InternalError> {
-        let maybe_active_schedule = self
-            .flow_trigger_service
-            .try_get_flow_active_schedule_rule(flow_binding)
-            .await
-            .int_err()?;
+        // Try locating an active schedule for this flow
+        let maybe_active_schedule = if trigger_state.is_active() {
+            trigger_state.try_get_schedule_rule()
+        } else {
+            None
+        };
 
+        // If there is an active schedule, schedule the next run immediately
         if let Some(active_schedule) = maybe_active_schedule {
-            self.schedule_auto_polling_flow(start_time, flow_binding, &active_schedule)
-                .await?;
+            tracing::info!(
+                ?flow_binding,
+                "Scheduling flow continuation due to active schedule"
+            );
+
+            // Schedule the next flow immediately
+            self.trigger_flow_common(
+                flow_finish_time,
+                flow_binding,
+                Some(FlowTriggerRule::Schedule(active_schedule.clone())),
+                vec![FlowActivationCause::AutoPolling(
+                    FlowActivationCauseAutoPolling {
+                        activation_time: flow_finish_time,
+                    },
+                )],
+                None,
+            )
+            .await?;
         }
 
         Ok(())
@@ -105,6 +127,7 @@ impl FlowSchedulingHelper {
         tracing::trace!(?flow_binding, ?schedule, "Enqueuing scheduled flow");
 
         self.trigger_flow_common(
+            start_time,
             flow_binding,
             Some(FlowTriggerRule::Schedule(schedule.clone())),
             vec![FlowActivationCause::AutoPolling(
@@ -119,8 +142,9 @@ impl FlowSchedulingHelper {
 
     pub(crate) async fn trigger_flow_common(
         &self,
+        trigger_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
-        trigger_rule_maybe: Option<FlowTriggerRule>,
+        maybe_trigger_rule: Option<FlowTriggerRule>,
         activation_causes: Vec<FlowActivationCause>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, InternalError> {
@@ -129,12 +153,6 @@ impl FlowSchedulingHelper {
             "At least one activation cause is required"
         );
 
-        // Query previous runs stats to determine activation time
-        let flow_run_stats = self
-            .flow_event_store
-            .get_flow_run_stats(flow_binding)
-            .await?;
-
         // Flows may not be attempted more frequent than mandatory throttling period.
         // If flow has never run before, let it go without restriction.
         let activation_time = activation_causes
@@ -142,17 +160,25 @@ impl FlowSchedulingHelper {
             .as_ref()
             .unwrap()
             .activation_time();
-        let mut throttling_boundary_time = flow_run_stats
-            .last_attempt_time
-            .map_or(activation_time, |t| {
-                t + self.agent_config.mandatory_throttling_period
-            });
+
+        // Query previous runs stats to determine last attempt time
+        let maybe_flow_process_state = self
+            .flow_process_state_query
+            .try_get_process_state(flow_binding)
+            .await?;
+        let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
+            .as_ref()
+            .and_then(FlowProcessState::last_attempt_at);
+
+        let mut throttling_boundary_time = maybe_last_attempt_time.map_or(activation_time, |t| {
+            t + self.agent_config.mandatory_throttling_period
+        });
         // It's also possible we are waiting for some start condition much longer..
         if throttling_boundary_time < activation_time {
             throttling_boundary_time = activation_time;
         }
 
-        let trigger_context = match &trigger_rule_maybe {
+        let trigger_context = match &maybe_trigger_rule {
             None => FlowTriggerContext::Unconditional,
             Some(rule) => match rule {
                 FlowTriggerRule::Schedule(schedule) => {
@@ -163,194 +189,176 @@ impl FlowSchedulingHelper {
         };
 
         // Is a pending flow present for this config?
-        match self.find_pending_flow(flow_binding).await? {
-            // Already pending flow
-            Some(flow_id) => {
-                // Load, merge triggers, update activation time
-                let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-
-                // Only merge unique triggers, ignore identical
-                for activation_cause in activation_causes {
-                    flow.add_activation_cause_if_unique(self.time_source.now(), activation_cause)
+        let (mut flow, maybe_next_activation_time) =
+            match self.find_pending_flow(flow_binding).await? {
+                // Already pending flow
+                Some(flow_id) => {
+                    // Load, merge triggers, update activation time
+                    let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                        .await
                         .int_err()?;
+
+                    // Only merge unique triggers, ignore identical
+                    for activation_cause in activation_causes {
+                        flow.add_activation_cause_if_unique(trigger_time, activation_cause)
+                            .int_err()?;
+                    }
+
+                    let maybe_next_activation_time = match trigger_context {
+                        FlowTriggerContext::Reactive(reactive_rule) => {
+                            // Is this rule still waited?
+                            if matches!(flow.start_condition, Some(FlowStartCondition::Reactive(_)))
+                            {
+                                self.evaluate_flow_reactive_rule(
+                                    activation_time,
+                                    &mut flow,
+                                    &reactive_rule,
+                                    throttling_boundary_time,
+                                )?
+                            } else {
+                                // Skip, the flow waits for something else
+                                None
+                            }
+                        }
+                        FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
+                            // Evaluate throttling condition: is new time earlier than planned?
+                            // In case of reactive condition and manual trigger,
+                            // there is no planned time, but otherwise compare
+                            if flow.timing.scheduled_for_activation_at.is_none()
+                                || flow.timing.scheduled_for_activation_at.is_some_and(
+                                    |planned_time| throttling_boundary_time < planned_time,
+                                )
+                            {
+                                // Indicate throttling, if applied
+                                if throttling_boundary_time > activation_time {
+                                    self.indicate_throttling_activity(
+                                        trigger_time,
+                                        &mut flow,
+                                        throttling_boundary_time,
+                                        activation_time,
+                                    )?;
+                                }
+
+                                if let Some(config_snapshot) = maybe_forced_flow_config_rule {
+                                    flow.modify_config_snapshot(activation_time, config_snapshot)
+                                        .int_err()?;
+                                }
+
+                                // Schedule the flow earlier than previously planned
+                                Some(throttling_boundary_time)
+                            } else {
+                                None
+                            }
+                        }
+                    };
+
+                    (flow, maybe_next_activation_time)
                 }
 
-                match trigger_context {
-                    FlowTriggerContext::Reactive(reactive_rule) => {
-                        // Is this rule still waited?
-                        if matches!(flow.start_condition, Some(FlowStartCondition::Reactive(_))) {
+                // Otherwise, initiate a new flow and schedule it for activation
+                None => {
+                    // Initiate new flow
+                    let mut flow = self
+                        .make_new_flow(
+                            trigger_time,
+                            self.flow_event_store.as_ref(),
+                            flow_binding.clone(),
+                            activation_causes,
+                            maybe_forced_flow_config_rule,
+                        )
+                        .await?;
+
+                    // Decide when to activate it
+                    let maybe_next_activation_time = match trigger_context {
+                        FlowTriggerContext::Reactive(reactive_rule) => {
+                            // Don't activate if reactive condition not satisfied
                             self.evaluate_flow_reactive_rule(
                                 activation_time,
                                 &mut flow,
                                 &reactive_rule,
                                 throttling_boundary_time,
-                            )
-                            .await?;
-                        } else {
-                            // Skip, the flow waits for something else
+                            )?
                         }
-                    }
-                    FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
-                        // Evaluate throttling condition: is new time earlier than planned?
-                        // In case of reactive condition and manual trigger,
-                        // there is no planned time, but otherwise compare
-                        if flow.timing.scheduled_for_activation_at.is_none()
-                            || flow
-                                .timing
-                                .scheduled_for_activation_at
-                                .is_some_and(|planned_time| throttling_boundary_time < planned_time)
-                        {
-                            // Indicate throttling, if applied
+
+                        FlowTriggerContext::Scheduled(schedule) => {
+                            // Next activation time depends on:
+                            //  - last attempt time, if ever launched
+                            //  - schedule
+
+                            let naive_next_activation_time = schedule
+                                .next_activation_time(activation_time, maybe_last_attempt_time);
+
+                            // Apply throttling boundary
+                            let next_activation_time =
+                                std::cmp::max(throttling_boundary_time, naive_next_activation_time);
+
+                            // Set throttling activity as start condition
+                            if throttling_boundary_time > naive_next_activation_time {
+                                self.indicate_throttling_activity(
+                                    trigger_time,
+                                    &mut flow,
+                                    throttling_boundary_time,
+                                    naive_next_activation_time,
+                                )?;
+                            } else if naive_next_activation_time > activation_time {
+                                // Set waiting according to the schedule
+                                flow.set_relevant_start_condition(
+                                    trigger_time,
+                                    FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                                        wake_up_at: naive_next_activation_time,
+                                    }),
+                                )
+                                .int_err()?;
+                            }
+
+                            Some(next_activation_time)
+                        }
+
+                        FlowTriggerContext::Unconditional => {
+                            // Apply throttling boundary
+                            let next_activation_time =
+                                std::cmp::max(throttling_boundary_time, activation_time);
+
+                            // Set throttling activity as start condition
                             if throttling_boundary_time > activation_time {
                                 self.indicate_throttling_activity(
+                                    trigger_time,
                                     &mut flow,
                                     throttling_boundary_time,
                                     activation_time,
                                 )?;
                             }
 
-                            if let Some(config_snapshot) = maybe_forced_flow_config_rule {
-                                flow.modify_config_snapshot(activation_time, config_snapshot)
-                                    .int_err()?;
-                            }
-
-                            // Schedule the flow earlier than previously planned
-                            self.schedule_flow_for_activation(&mut flow, throttling_boundary_time)
-                                .await?;
+                            Some(next_activation_time)
                         }
-                    }
+                    };
+
+                    (flow, maybe_next_activation_time)
                 }
+            };
 
-                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-                Ok(flow.into())
-            }
-
-            // Otherwise, initiate a new flow and schedule it for activation
-            None => {
-                // Do we have a defined configuration for this flow?
-                let maybe_flow_configuration = self
-                    .flow_configuration_service
-                    .find_configuration(flow_binding)
-                    .await
-                    .int_err()?;
-
-                // Decide on configuration rule snapshot:
-                //  - if forced, use it
-                //  - if not, use the latest configuration rule, if any
-                //  - if no configuration, use default rule
-                let maybe_flow_config_rule_snapshot =
-                    maybe_forced_flow_config_rule.map(Some).unwrap_or_else(|| {
-                        maybe_flow_configuration
-                            .as_ref()
-                            .map(|config| Some(config.rule.clone()))
-                            .unwrap_or_default()
-                    });
-
-                // Decide on retry policy:
-                // - if configuration defines it, use it
-                // - if not, use default retry policy for this flow type, if it's defined
-                let retry_policy = maybe_flow_configuration
-                    .and_then(|config| config.retry_policy)
-                    .or_else(|| {
-                        self.agent_config
-                            .default_retry_policy_by_flow_type
-                            .get(&flow_binding.flow_type)
-                            .copied()
-                    });
-
-                // Initiate new flow
-                let mut flow = self
-                    .make_new_flow(
-                        self.flow_event_store.as_ref(),
-                        flow_binding.clone(),
-                        activation_causes,
-                        maybe_flow_config_rule_snapshot,
-                        retry_policy,
-                    )
-                    .await?;
-
-                match trigger_context {
-                    FlowTriggerContext::Reactive(reactive_rule) => {
-                        // Don't activate if reactive condition not satisfied
-                        self.evaluate_flow_reactive_rule(
-                            activation_time,
-                            &mut flow,
-                            &reactive_rule,
-                            throttling_boundary_time,
-                        )
-                        .await?;
-                    }
-                    FlowTriggerContext::Scheduled(schedule) => {
-                        // Next activation time depends on:
-                        //  - last success time, if ever launched
-                        //  - schedule, if defined
-                        let naive_next_activation_time = schedule.next_activation_time(
-                            activation_time,
-                            flow_run_stats.last_success_time,
-                        );
-
-                        // Apply throttling boundary
-                        let next_activation_time =
-                            std::cmp::max(throttling_boundary_time, naive_next_activation_time);
-
-                        // Set throttling activity as start condition
-                        if throttling_boundary_time > naive_next_activation_time {
-                            self.indicate_throttling_activity(
-                                &mut flow,
-                                throttling_boundary_time,
-                                naive_next_activation_time,
-                            )?;
-                        } else if naive_next_activation_time > activation_time {
-                            // Set waiting according to the schedule
-                            flow.set_relevant_start_condition(
-                                self.time_source.now(),
-                                FlowStartCondition::Schedule(FlowStartConditionSchedule {
-                                    wake_up_at: naive_next_activation_time,
-                                }),
-                            )
-                            .int_err()?;
-                        }
-
-                        // Schedule flow for the decided moment
-                        self.schedule_flow_for_activation(&mut flow, next_activation_time)
-                            .await?;
-                    }
-                    FlowTriggerContext::Unconditional => {
-                        // Apply throttling boundary
-                        let next_activation_time =
-                            std::cmp::max(throttling_boundary_time, activation_time);
-
-                        // Set throttling activity as start condition
-                        if throttling_boundary_time > activation_time {
-                            self.indicate_throttling_activity(
-                                &mut flow,
-                                throttling_boundary_time,
-                                activation_time,
-                            )?;
-                        }
-
-                        // Schedule flow for the decided moment
-                        self.schedule_flow_for_activation(&mut flow, next_activation_time)
-                            .await?;
-                    }
-                }
-
-                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-                Ok(flow.into())
-            }
+        // Schedule for activation, if needed
+        if let Some(next_activation_time) = maybe_next_activation_time
+            && flow.timing.scheduled_for_activation_at != maybe_next_activation_time
+        {
+            flow.schedule_for_activation(trigger_time, next_activation_time)
+                .int_err()?;
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+        } else {
+            // Save flow state, even if not scheduled
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
         }
+
+        Ok(flow.into())
     }
 
-    #[allow(unused_mut)]
-    async fn evaluate_flow_reactive_rule(
+    fn evaluate_flow_reactive_rule(
         &self,
         evaluation_time: DateTime<Utc>,
         flow: &mut Flow,
         reactive_rule: &ReactiveRule,
         throttling_boundary_time: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
         let mut accumulated_records_count = 0;
@@ -393,7 +401,7 @@ impl FlowSchedulingHelper {
 
         // Set reactive condition data always, so that progress can be tracked
         flow.set_relevant_start_condition(
-            self.time_source.now(),
+            evaluation_time,
             FlowStartCondition::Reactive(FlowStartConditionReactive {
                 active_rule: *reactive_rule,
                 batching_deadline,
@@ -418,6 +426,7 @@ impl FlowSchedulingHelper {
                 && throttling_boundary_time > batching_finish_time
             {
                 self.indicate_throttling_activity(
+                    evaluation_time,
                     flow,
                     throttling_boundary_time,
                     batching_finish_time,
@@ -435,22 +444,22 @@ impl FlowSchedulingHelper {
                 None => true,
             };
             if should_activate {
-                self.schedule_flow_for_activation(flow, corrected_finish_time)
-                    .await?;
+                return Ok(Some(corrected_finish_time));
             }
         }
 
-        Ok(())
+        Ok(None)
     }
 
     fn indicate_throttling_activity(
         &self,
+        trigger_time: DateTime<Utc>,
         flow: &mut Flow,
         wake_up_at: DateTime<Utc>,
         shifted_from: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         flow.set_relevant_start_condition(
-            self.time_source.now(),
+            trigger_time,
             FlowStartCondition::Throttling(FlowStartConditionThrottling {
                 interval: self.agent_config.mandatory_throttling_period,
                 wake_up_at,
@@ -472,11 +481,11 @@ impl FlowSchedulingHelper {
 
     async fn make_new_flow(
         &self,
+        trigger_time: DateTime<Utc>,
         flow_event_store: &dyn FlowEventStore,
         flow_binding: FlowBinding,
         mut activation_causes: Vec<FlowActivationCause>,
-        maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
-        retry_policy: Option<RetryPolicy>,
+        maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(?flow_binding, ?activation_causes, "Creating new flow");
 
@@ -488,38 +497,54 @@ impl FlowSchedulingHelper {
         let other_causes = activation_causes.split_off(1);
         let first_cause = activation_causes.into_iter().next().unwrap();
 
+        // Do we have a defined configuration for this flow?
+        let maybe_flow_configuration = self
+            .flow_configuration_service
+            .find_configuration(&flow_binding)
+            .await
+            .int_err()?;
+
+        // Decide on configuration rule snapshot:
+        //  - if forced, use it
+        //  - if not, use the latest configuration rule, if any
+        //  - if no configuration, use default rule
+        let maybe_flow_config_rule_snapshot =
+            maybe_forced_flow_config_rule.map(Some).unwrap_or_else(|| {
+                maybe_flow_configuration
+                    .as_ref()
+                    .map(|config| Some(config.rule.clone()))
+                    .unwrap_or_default()
+            });
+
+        // Decide on retry policy:
+        // - if configuration defines it, use it
+        // - if not, use default retry policy for this flow type, if it's defined
+        let retry_policy = maybe_flow_configuration
+            .and_then(|config| config.retry_policy)
+            .or_else(|| {
+                self.agent_config
+                    .default_retry_policy_by_flow_type
+                    .get(&flow_binding.flow_type)
+                    .copied()
+            });
+
+        // Create the flow
         let mut flow = Flow::new(
-            self.time_source.now(),
+            trigger_time,
             flow_event_store.new_flow_id().await?,
             flow_binding,
             first_cause,
-            maybe_config_rule_snapshot,
+            maybe_flow_config_rule_snapshot,
             retry_policy,
         );
 
         // Register additional activation causes
         for cause in other_causes {
-            flow.add_activation_cause_if_unique(self.time_source.now(), cause)
+            flow.add_activation_cause_if_unique(trigger_time, cause)
                 .int_err()?;
         }
 
         Ok(flow)
-    }
-
-    async fn schedule_flow_for_activation(
-        &self,
-        flow: &mut Flow,
-        activate_at: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
-        flow.schedule_for_activation(self.time_source.now(), activate_at)
-            .int_err()?;
-
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                FlowProgressMessage::scheduled(self.time_source.now(), flow.flow_id, activate_at),
-            )
-            .await
     }
 }
 

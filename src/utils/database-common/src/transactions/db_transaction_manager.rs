@@ -120,8 +120,8 @@ impl DatabaseTransactionRunner {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
-        self.transactional(|transactional_catalog| async move {
-            let catalog_item = transactional_catalog.get_one().int_err()?;
+        self.transactional(|transaction_catalog| async move {
+            let catalog_item = transaction_catalog.get_one().int_err()?;
 
             callback(catalog_item).await
         })
@@ -139,9 +139,9 @@ impl DatabaseTransactionRunner {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
-        self.transactional(|transactional_catalog| async move {
-            let catalog_item1 = transactional_catalog.get_one().int_err()?;
-            let catalog_item2 = transactional_catalog.get_one().int_err()?;
+        self.transactional(|transaction_catalog| async move {
+            let catalog_item1 = transaction_catalog.get_one().int_err()?;
+            let catalog_item2 = transaction_catalog.get_one().int_err()?;
 
             callback(catalog_item1, catalog_item2).await
         })
@@ -160,10 +160,10 @@ impl DatabaseTransactionRunner {
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
-        self.transactional(|transactional_catalog| async move {
-            let catalog_item1 = transactional_catalog.get_one().int_err()?;
-            let catalog_item2 = transactional_catalog.get_one().int_err()?;
-            let catalog_item3 = transactional_catalog.get_one().int_err()?;
+        self.transactional(|transaction_catalog| async move {
+            let catalog_item1 = transaction_catalog.get_one().int_err()?;
+            let catalog_item2 = transaction_catalog.get_one().int_err()?;
+            let catalog_item3 = transaction_catalog.get_one().int_err()?;
 
             callback(catalog_item1, catalog_item2, catalog_item3).await
         })

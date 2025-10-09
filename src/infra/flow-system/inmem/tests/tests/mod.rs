@@ -9,4 +9,5 @@
 
 mod test_inmem_flow_configuration_event_store;
 mod test_inmem_flow_event_store;
+mod test_inmem_flow_process_state;
 mod test_inmem_flow_trigger_event_store;

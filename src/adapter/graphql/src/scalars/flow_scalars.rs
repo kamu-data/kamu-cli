@@ -42,9 +42,11 @@ pub struct FlowTimingRecords {
     /// Recorded start of running (Running state seen at least once)
     pub running_since: Option<DateTime<Utc>>,
 
-    /// Recorded time of finish (successful or failed after retry) or abortion
-    /// (Finished state seen at least once)
+    /// Recorded time of finish of the latest task
     pub last_attempt_finished_at: Option<DateTime<Utc>>,
+
+    /// Recorded time of flow completion (success or failure)
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,13 +80,35 @@ pub enum SystemFlowType {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_dataset_flow_type(dataset_flow_type: DatasetFlowType) -> &'static str {
+pub(crate) fn encode_dataset_flow_type(dataset_flow_type: DatasetFlowType) -> &'static str {
     match dataset_flow_type {
         DatasetFlowType::Ingest => FLOW_TYPE_DATASET_INGEST,
         DatasetFlowType::ExecuteTransform => FLOW_TYPE_DATASET_TRANSFORM,
         DatasetFlowType::HardCompaction => FLOW_TYPE_DATASET_COMPACT,
         DatasetFlowType::Reset => FLOW_TYPE_DATASET_RESET,
         DatasetFlowType::ResetToMetadata => FLOW_TYPE_DATASET_RESET_TO_METADATA,
+    }
+}
+
+pub(crate) fn unpack_all_dataset_flow_types() -> Vec<String> {
+    vec![
+        FLOW_TYPE_DATASET_INGEST.to_string(),
+        FLOW_TYPE_DATASET_TRANSFORM.to_string(),
+        FLOW_TYPE_DATASET_COMPACT.to_string(),
+        FLOW_TYPE_DATASET_RESET.to_string(),
+        FLOW_TYPE_DATASET_RESET_TO_METADATA.to_string(),
+    ]
+}
+
+pub(crate) fn decode_dataset_flow_type(flow_type: &str) -> DatasetFlowType {
+    match flow_type {
+        FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,
+        FLOW_TYPE_DATASET_TRANSFORM => DatasetFlowType::ExecuteTransform,
+        FLOW_TYPE_DATASET_COMPACT => DatasetFlowType::HardCompaction,
+        FLOW_TYPE_DATASET_RESET => DatasetFlowType::Reset,
+        FLOW_TYPE_DATASET_RESET_TO_METADATA => DatasetFlowType::ResetToMetadata,
+
+        _ => panic!("Unexpected flow type [{flow_type}] for dataset flow"),
     }
 }
 

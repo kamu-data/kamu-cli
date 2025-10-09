@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                e.event_id                AS \"event_id!\",\n                e.source_stream           AS \"source_stream!: String\",\n                e.event_time              AS \"occurred_at!: DateTime<Utc>\",\n                e.event_payload           AS \"event_payload!: serde_json::Value\"\n            FROM flow_system_events e\n            WHERE e.event_id > COALESCE(\n                (\n                    SELECT last_event_id\n                    FROM flow_system_projected_offsets\n                    WHERE projector = $1\n                ),\n                0\n            )\n            ORDER BY e.event_id\n            LIMIT $2;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "source_stream!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "occurred_at!: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "event_payload!: serde_json::Value",
+        "ordinal": 3,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "01b2b476d14cec555824d92478467b2961723068dfd3c50b0dd67878274dab6d"
+}

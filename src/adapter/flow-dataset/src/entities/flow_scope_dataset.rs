@@ -38,7 +38,7 @@ impl<'a> FlowScopeDataset<'a> {
     pub fn query_for_single_dataset(dataset_id: &odf::DatasetID) -> fs::FlowScopeQuery {
         fs::FlowScopeQuery {
             attributes: vec![(
-                FLOW_SCOPE_ATTRIBUTE_DATASET_ID.to_string(),
+                FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
                 vec![dataset_id.to_string()],
             )],
         }
@@ -47,9 +47,42 @@ impl<'a> FlowScopeDataset<'a> {
     pub fn query_for_multiple_datasets(dataset_ids: &[&odf::DatasetID]) -> fs::FlowScopeQuery {
         fs::FlowScopeQuery {
             attributes: vec![(
-                FLOW_SCOPE_ATTRIBUTE_DATASET_ID.to_string(),
+                FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
                 dataset_ids.iter().map(ToString::to_string).collect(),
             )],
+        }
+    }
+
+    /// Query for dataset-only processes (excludes webhook subscriptions)
+    pub fn query_for_single_dataset_only(dataset_id: &odf::DatasetID) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
+                    vec![FLOW_SCOPE_TYPE_DATASET.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
+                    vec![dataset_id.to_string()],
+                ),
+            ],
+        }
+    }
+
+    /// Query for dataset-only processes across multiple datasets (excludes
+    /// webhook subscriptions)
+    pub fn query_for_multiple_datasets_only(dataset_ids: &[&odf::DatasetID]) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
+                    vec![FLOW_SCOPE_TYPE_DATASET.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
+                    dataset_ids.iter().map(ToString::to_string).collect(),
+                ),
+            ],
         }
     }
 

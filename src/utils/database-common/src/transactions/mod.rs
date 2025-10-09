@@ -13,7 +13,6 @@ mod mysql_transaction_manager;
 mod no_op_transaction_manager;
 mod postgres_transaction_manager;
 mod sqlite_transaction_manager;
-mod transactional_catalog;
 
 pub use db_transaction::*;
 pub use db_transaction_manager::*;
@@ -21,4 +20,3 @@ pub use mysql_transaction_manager::*;
 pub use no_op_transaction_manager::*;
 pub use postgres_transaction_manager::*;
 pub use sqlite_transaction_manager::*;
-pub use transactional_catalog::*;

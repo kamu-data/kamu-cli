@@ -32,17 +32,25 @@ impl FlowTriggerState {
         self.status.is_active()
     }
 
-    pub fn try_get_schedule_rule(self) -> Option<Schedule> {
-        match self.rule {
+    pub fn is_alive(&self) -> bool {
+        !self.status.is_dead()
+    }
+
+    pub fn is_dead(&self) -> bool {
+        self.status.is_dead()
+    }
+
+    pub fn try_get_schedule_rule(&self) -> Option<&Schedule> {
+        match &self.rule {
             FlowTriggerRule::Schedule(schedule) => Some(schedule),
             FlowTriggerRule::Reactive(_) => None,
         }
     }
 
-    pub fn try_get_reactive_rule(self) -> Option<ReactiveRule> {
+    pub fn try_take_schedule_rule(self) -> Option<Schedule> {
         match self.rule {
-            FlowTriggerRule::Reactive(reactive) => Some(reactive),
-            FlowTriggerRule::Schedule(_) => None,
+            FlowTriggerRule::Schedule(schedule) => Some(schedule),
+            FlowTriggerRule::Reactive(_) => None,
         }
     }
 }

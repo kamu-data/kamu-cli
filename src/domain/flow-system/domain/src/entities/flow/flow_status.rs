@@ -9,8 +9,12 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, strum::Display)]
-#[sqlx(type_name = "flow_status_type", rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
+#[cfg_attr(
+    feature = "sqlx",
+    derive(sqlx::Type),
+    sqlx(type_name = "flow_status_type", rename_all = "lowercase")
+)]
 pub enum FlowStatus {
     Waiting,
     Running,

@@ -49,6 +49,7 @@ impl FlowRunService for FlowRunServiceImpl {
 
         self.flow_scheduling_helper
             .trigger_flow_common(
+                activation_time,
                 flow_binding,
                 None,
                 vec![FlowActivationCause::Manual(FlowActivationCauseManual {
@@ -63,15 +64,24 @@ impl FlowRunService for FlowRunServiceImpl {
 
     /// Triggers the specified flow with custom trigger instance,
     /// unless it's already waiting
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(?flow_binding)
+    )]
     async fn run_flow_automatically(
         &self,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         activation_causes: Vec<FlowActivationCause>,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError> {
+        let activation_time = self.agent_config.round_time(activation_time)?;
+
         self.flow_scheduling_helper
             .trigger_flow_common(
+                activation_time,
                 flow_binding,
                 maybe_flow_trigger_rule,
                 activation_causes,
@@ -112,7 +122,7 @@ impl FlowRunService for FlowRunServiceImpl {
         // Find a trigger and pause it if it's periodic
         let maybe_active_schedule = self
             .flow_trigger_service
-            .try_get_flow_active_schedule_rule(&flow.flow_binding)
+            .try_take_flow_active_schedule_rule(&flow.flow_binding)
             .await?;
         if maybe_active_schedule.is_some() {
             // TODO: avoid double-loading the trigger

@@ -39,6 +39,7 @@ pub trait FlowRunService: Sync + Send {
     /// unless it's already waiting
     async fn run_flow_automatically(
         &self,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         activation_causes: Vec<FlowActivationCause>,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,

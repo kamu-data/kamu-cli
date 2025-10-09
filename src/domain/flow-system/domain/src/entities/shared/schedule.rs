@@ -116,15 +116,15 @@ impl Schedule {
     pub fn next_activation_time(
         &self,
         now: DateTime<Utc>,
-        maybe_last_success_time: Option<DateTime<Utc>>,
+        maybe_last_attempt_time: Option<DateTime<Utc>>,
     ) -> DateTime<Utc> {
         match self {
             // For TimeDelta, take the last activation time into account, if any recorded.
             // If we know, the last run was a long time ago or even never happened - no need to
             // wait.
             Schedule::TimeDelta(td) => {
-                if let Some(last_success_time) = maybe_last_success_time {
-                    let planned_activation_time = last_success_time + td.every;
+                if let Some(last_attempt_time) = maybe_last_attempt_time {
+                    let planned_activation_time = last_attempt_time + td.every;
                     if planned_activation_time < now {
                         now
                     } else {

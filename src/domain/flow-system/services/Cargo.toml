@@ -22,9 +22,11 @@ doctest = false
 
 
 [dependencies]
+async-utils = { workspace = true }
 common-macros = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
+event-sourcing = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-datasets = { workspace = true }
@@ -40,6 +42,7 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }
 futures = "0.3"
+serde_json = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = [] }
 tracing = { version = "0.1", default-features = false }
 
