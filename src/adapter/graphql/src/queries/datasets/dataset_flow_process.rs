@@ -19,7 +19,6 @@ pub struct DatasetFlowProcess {
     process_state: fs::FlowProcessState,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl DatasetFlowProcess {
     #[graphql(skip)]

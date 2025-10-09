@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
 
 use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 use kamu_flow_system::{
@@ -16,26 +16,36 @@ use kamu_flow_system::{
     FlowProcessStateQuery,
     FlowScopeQuery,
 };
-use kamu_webhooks::{WebhookSubscription, WebhookSubscriptionEventStore};
 
 use crate::prelude::*;
-use crate::queries::WebhookFlowSubProcess;
+use crate::queries::{
+    DatasetRequestStateWithOwner,
+    WebhookFlowSubProcess,
+    build_webhook_id_subscription_mapping_from_processes_listing,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct WebhookFlowSubProcessGroup {
+pub struct WebhookFlowSubProcessGroup<'a> {
     scope_query: FlowScopeQuery,
+    parent_dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl WebhookFlowSubProcessGroup {
+impl<'a> WebhookFlowSubProcessGroup<'a> {
     #[graphql(skip)]
-    pub fn new(scope_query: FlowScopeQuery) -> Self {
-        Self { scope_query }
+    pub fn new(
+        scope_query: FlowScopeQuery,
+        parent_dataset_request_state: &'a DatasetRequestStateWithOwner,
+    ) -> Self {
+        Self {
+            scope_query,
+            parent_dataset_request_state,
+        }
     }
 
-    #[allow(clippy::unused_async)]
+    #[tracing::instrument(level = "info", name = WebhookFlowSubProcessGroup_rollup, skip_all)]
     pub async fn rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
         let rollup = flow_process_state_query
@@ -49,13 +59,9 @@ impl WebhookFlowSubProcessGroup {
         Ok(rollup.into())
     }
 
-    #[allow(clippy::unused_async)]
+    #[tracing::instrument(level = "info", name = WebhookFlowSubProcessGroup_subprocesses, skip_all)]
     pub async fn subprocesses(&self, ctx: &Context<'_>) -> Result<Vec<WebhookFlowSubProcess>> {
-        let (flow_process_state_query, webhook_subscription_event_store) = from_catalog_n!(
-            ctx,
-            dyn FlowProcessStateQuery,
-            dyn WebhookSubscriptionEventStore
-        );
+        let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
 
         // Load all webhooks processes matching the scope of this group
         let webhook_processes_listing = flow_process_state_query
@@ -67,28 +73,18 @@ impl WebhookFlowSubProcessGroup {
             )
             .await?;
 
+        // Short-circuit if no processes found
+        if webhook_processes_listing.processes.is_empty() {
+            return Ok(vec![]);
+        }
+
         // Collect unique subscription ids from the processes
-        let unique_subscription_ids = webhook_processes_listing
-            .processes
-            .iter()
-            .map(|p| FlowScopeSubscription::new(&p.flow_binding().scope).subscription_id())
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        // Load related subscriptions
-        let subscriptions = WebhookSubscription::load_multi_simple(
-            &unique_subscription_ids,
-            webhook_subscription_event_store.as_ref(),
-        )
-        .await
-        .int_err()?;
-
-        // Organize subscriptions by id
-        let subscriptions_by_id = subscriptions
-            .into_iter()
-            .map(|s| (s.id(), s))
-            .collect::<HashMap<_, _>>();
+        let webhook_subscriptions_by_id =
+            build_webhook_id_subscription_mapping_from_processes_listing(
+                ctx,
+                &webhook_processes_listing,
+            )
+            .await?;
 
         // Prepare processes as GQL objects
         let mut subprocesses = BTreeMap::new();
@@ -96,12 +92,16 @@ impl WebhookFlowSubProcessGroup {
             // Get matching subscription
             let subscription_id =
                 FlowScopeSubscription::new(&process_state.flow_binding().scope).subscription_id();
-            let webhook_subscription = subscriptions_by_id
+            let webhook_subscription = webhook_subscriptions_by_id
                 .get(&subscription_id)
                 .expect("must be present");
 
             // Precollect subprocesses in a name-ordered map
-            let subprocess = WebhookFlowSubProcess::new(webhook_subscription, process_state);
+            let subprocess = WebhookFlowSubProcess::new(
+                webhook_subscription,
+                Some(self.parent_dataset_request_state.clone()),
+                process_state,
+            );
             subprocesses.insert(subprocess.name(ctx).await?, subprocess);
         }
 

@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
@@ -18,12 +17,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowScopeDataset,
 };
-use kamu_adapter_flow_webhook::{
-    FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION,
-    FLOW_TYPE_WEBHOOK_DELIVER,
-    FlowScopeSubscription,
-};
-use kamu_core::DatasetRegistry;
+use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system as fs;
 
@@ -34,6 +28,9 @@ use crate::queries::{
     DatasetFlowProcessConnection,
     DatasetRequestState,
     WebhookFlowSubProcess,
+    WebhookFlowSubProcessConnection,
+    build_dataset_id_handle_mapping_from_processes_listing,
+    build_webhook_id_subscription_mapping_from_processes_listing,
 };
 use crate::scalars::FlowProcessGroupRollup;
 
@@ -53,7 +50,7 @@ impl<'a> AccountFlowProcesses<'a> {
         Self { account }
     }
 
-    #[allow(clippy::unused_async)]
+    #[tracing::instrument(level = "info", name = AccountFlowProcesses_primary_rollup, skip_all)]
     pub async fn primary_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
         let scope_query = self.build_scope_query(ctx).await?;
 
@@ -69,8 +66,32 @@ impl<'a> AccountFlowProcesses<'a> {
         Ok(rollup.into())
     }
 
-    #[tracing::instrument(level = "info", name = AccountFlowProcesses_dataset_primary_cards, skip_all, fields(?page, ?per_page))]
-    pub async fn dataset_primary_cards(
+    #[tracing::instrument(level = "info", name = AccountFlowProcesses_webhook_rollup, skip_all)]
+    pub async fn webhook_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
+        let scope_query = self.build_scope_query(ctx).await?;
+
+        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
+        let rollup = flow_process_state_query
+            .rollup_by_scope(scope_query, Some(&[FLOW_TYPE_WEBHOOK_DELIVER]), None)
+            .await?;
+
+        Ok(rollup.into())
+    }
+
+    #[tracing::instrument(level = "info", name = AccountFlowProcesses_full_rollup, skip_all)]
+    pub async fn full_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
+        let scope_query = self.build_scope_query(ctx).await?;
+
+        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
+        let rollup = flow_process_state_query
+            .rollup_by_scope(scope_query, None, None)
+            .await?;
+
+        Ok(rollup.into())
+    }
+
+    #[tracing::instrument(level = "info", name = AccountFlowProcesses_primary_cards, skip_all, fields(?page, ?per_page))]
+    pub async fn primary_cards(
         &self,
         ctx: &Context<'_>,
         filters: Option<FlowProcessFilters>,
@@ -92,33 +113,64 @@ impl<'a> AccountFlowProcesses<'a> {
             )
             .await?;
 
-        let dataset_handles_by_id = self.build_dataset_id_handle_mapping(ctx, &listing).await?;
-
-        let account = Account::new(
-            self.account.id.clone().into(),
-            self.account.account_name.clone().into(),
-        );
+        let listing_state = self
+            .form_shared_state_from_listing(ctx, &listing, true /* skip webhooks */)
+            .await?;
 
         let dataset_cards: Vec<_> = listing
             .processes
             .into_iter()
-            .map(|process_state| {
-                let dataset_id =
-                    FlowScopeDataset::new(&process_state.flow_binding().scope).dataset_id();
-                let hdl = dataset_handles_by_id
-                    .get(&dataset_id)
-                    .expect("Inconsistent state: all datasets with flows must exist")
-                    .clone();
-
-                DatasetFlowProcess::new(
-                    DatasetRequestState::new(hdl).with_owner(account.clone()),
-                    process_state,
-                )
-            })
+            .map(|process_state| listing_state.build_dataset_card(process_state))
             .collect();
 
         Ok(DatasetFlowProcessConnection::new(
             dataset_cards,
+            page,
+            per_page,
+            listing.total_count,
+        ))
+    }
+
+    #[tracing::instrument(level = "info", name = AccountFlowProcesses_webhook_cards, skip_all, fields(?page, ?per_page))]
+    pub async fn webhook_cards(
+        &self,
+        ctx: &Context<'_>,
+        filters: Option<FlowProcessFilters>,
+        ordering: Option<FlowProcessOrdering>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<WebhookFlowSubProcessConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+        let pagination = PaginationOpts::from_page(page, per_page);
+
+        let listing = self
+            .get_process_state_listing(
+                ctx,
+                &[FLOW_TYPE_WEBHOOK_DELIVER],
+                filters,
+                ordering,
+                pagination,
+            )
+            .await?;
+
+        let listing_state = self
+            .form_shared_state_from_listing(ctx, &listing, false /* skip webhooks */)
+            .await?;
+
+        let webhook_cards: Vec<_> = listing
+            .processes
+            .into_iter()
+            .map(
+                |process_state| match process_state.flow_binding().flow_type.as_str() {
+                    FLOW_TYPE_WEBHOOK_DELIVER => listing_state.build_webhook_card(process_state),
+                    _ => unreachable!("Unsupported flow type"),
+                },
+            )
+            .collect();
+
+        Ok(WebhookFlowSubProcessConnection::new(
+            webhook_cards,
             page,
             per_page,
             listing.total_count,
@@ -152,16 +204,9 @@ impl<'a> AccountFlowProcesses<'a> {
             )
             .await?;
 
-        let dataset_handles_by_id = self.build_dataset_id_handle_mapping(ctx, &listing).await?;
-
-        let webhook_subscriptions_by_id = self
-            .build_webhook_id_subscription_mapping(ctx, &listing)
+        let listing_state = self
+            .form_shared_state_from_listing(ctx, &listing, false /* skip webhooks */)
             .await?;
-
-        let account = Account::new(
-            self.account.id.clone().into(),
-            self.account.account_name.clone().into(),
-        );
 
         let flat_cards: Vec<_> = listing
             .processes
@@ -169,34 +214,13 @@ impl<'a> AccountFlowProcesses<'a> {
             .map(
                 |process_state| match process_state.flow_binding().flow_type.as_str() {
                     FLOW_TYPE_DATASET_INGEST | FLOW_TYPE_DATASET_TRANSFORM => {
-                        let dataset_id =
-                            FlowScopeDataset::new(&process_state.flow_binding().scope).dataset_id();
-                        let hdl = dataset_handles_by_id
-                            .get(&dataset_id)
-                            .expect("Inconsistent state: all datasets with flows must exist")
-                            .clone();
-
-                        let dataset_flow_process = DatasetFlowProcess::new(
-                            DatasetRequestState::new(hdl).with_owner(account.clone()),
-                            process_state,
-                        );
-
-                        AccountFlowProcessCard::Dataset(dataset_flow_process)
+                        let dataset_card = listing_state.build_dataset_card(process_state);
+                        AccountFlowProcessCard::Dataset(dataset_card)
                     }
 
                     FLOW_TYPE_WEBHOOK_DELIVER => {
-                        let scope = &process_state.flow_binding().scope;
-                        let subscription_id = FlowScopeSubscription::new(scope).subscription_id();
-                        let webhook_subscription =
-                            webhook_subscriptions_by_id.get(&subscription_id).expect(
-                                "Inconsistent state: all webhook subscriptions with flows must \
-                                 exist",
-                            );
-
-                        let webhook_flow_subprocess =
-                            WebhookFlowSubProcess::new(webhook_subscription, process_state);
-
-                        AccountFlowProcessCard::Webhook(webhook_flow_subprocess)
+                        let webhook_card = listing_state.build_webhook_card(process_state);
+                        AccountFlowProcessCard::Webhook(webhook_card)
                     }
 
                     _ => unreachable!("Unsupported flow type"),
@@ -255,6 +279,39 @@ impl<'a> AccountFlowProcesses<'a> {
     }
 
     #[graphql(skip)]
+    async fn form_shared_state_from_listing(
+        &self,
+        ctx: &Context<'_>,
+        matched_processes_listing: &fs::FlowProcessStateListing,
+        skip_webhooks: bool,
+    ) -> Result<FlowProcessListingState> {
+        let account = Account::new(
+            self.account.id.clone().into(),
+            self.account.account_name.clone().into(),
+        );
+
+        let dataset_handles_by_id =
+            build_dataset_id_handle_mapping_from_processes_listing(ctx, matched_processes_listing)
+                .await?;
+
+        let webhook_subscriptions_by_id = if skip_webhooks {
+            HashMap::new()
+        } else {
+            build_webhook_id_subscription_mapping_from_processes_listing(
+                ctx,
+                matched_processes_listing,
+            )
+            .await?
+        };
+
+        Ok(FlowProcessListingState {
+            account,
+            dataset_handles_by_id,
+            webhook_subscriptions_by_id,
+        })
+    }
+
+    #[graphql(skip)]
     async fn build_scope_query(&self, ctx: &Context<'_>) -> Result<fs::FlowScopeQuery> {
         let dataset_entry_service = from_catalog_n!(ctx, dyn DatasetEntryService);
 
@@ -281,104 +338,6 @@ impl<'a> AccountFlowProcesses<'a> {
                 },
             })
             .unwrap_or_else(fs::FlowProcessOrder::recent)
-    }
-
-    #[graphql(skip)]
-    async fn build_dataset_id_handle_mapping(
-        &self,
-        ctx: &Context<'_>,
-        matched_processes_listing: &fs::FlowProcessStateListing,
-    ) -> Result<HashMap<odf::DatasetID, odf::DatasetHandle>> {
-        if matched_processes_listing.processes.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-
-        let unique_dataset_ids = matched_processes_listing
-            .processes
-            .iter()
-            .filter_map(|proc| {
-                FlowScopeDataset::maybe_dataset_id_in_scope(&proc.flow_binding().scope)
-            })
-            .map(Cow::Owned)
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        if unique_dataset_ids.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        let dataset_handles_resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&unique_dataset_ids)
-            .await
-            .int_err()?;
-
-        if !dataset_handles_resolution.unresolved_datasets.is_empty() {
-            tracing::error!(
-                "Some datasets with flows could not be resolved: {:?}",
-                dataset_handles_resolution.unresolved_datasets
-            );
-            unreachable!("Inconsistent state: all datasets with flows must exist");
-        }
-
-        Ok(dataset_handles_resolution
-            .resolved_handles
-            .into_iter()
-            .map(|hdl| (hdl.id.clone(), hdl))
-            .collect::<HashMap<_, _>>())
-    }
-
-    #[graphql(skip)]
-    async fn build_webhook_id_subscription_mapping(
-        &self,
-        ctx: &Context<'_>,
-        matched_processes_listing: &fs::FlowProcessStateListing,
-    ) -> Result<HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>>
-    {
-        if matched_processes_listing.processes.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        // Collect unique subscription ids from the processes
-        let unique_subscription_ids = matched_processes_listing
-            .processes
-            .iter()
-            .filter_map(|proc| {
-                let scope = &proc.flow_binding().scope;
-                if scope.scope_type() == FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION {
-                    Some(FlowScopeSubscription::new(scope).subscription_id())
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        if unique_subscription_ids.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        // Load related subscriptions
-        let webhook_subscription_event_store =
-            from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionEventStore);
-
-        let subscriptions = kamu_webhooks::WebhookSubscription::load_multi_simple(
-            &unique_subscription_ids,
-            webhook_subscription_event_store.as_ref(),
-        )
-        .await
-        .int_err()?;
-
-        // Organize subscriptions by id
-        let subscriptions_by_id = subscriptions
-            .into_iter()
-            .map(|s| (s.id(), s))
-            .collect::<HashMap<_, _>>();
-
-        Ok(subscriptions_by_id)
     }
 }
 
@@ -455,6 +414,58 @@ pub enum FlowProcessOrderField {
 
     /// By flow type
     FlowType,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct FlowProcessListingState {
+    account: Account,
+    dataset_handles_by_id: HashMap<odf::DatasetID, odf::DatasetHandle>,
+    webhook_subscriptions_by_id:
+        HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>,
+}
+
+impl FlowProcessListingState {
+    fn build_dataset_card(&self, process_state: fs::FlowProcessState) -> DatasetFlowProcess {
+        let dataset_id = FlowScopeDataset::new(&process_state.flow_binding().scope).dataset_id();
+        let hdl = self
+            .dataset_handles_by_id
+            .get(&dataset_id)
+            .expect("Inconsistent state: all datasets with flows must exist")
+            .clone();
+
+        DatasetFlowProcess::new(
+            DatasetRequestState::new(hdl).with_owner(self.account.clone()),
+            process_state,
+        )
+    }
+
+    fn build_webhook_card(&self, process_state: fs::FlowProcessState) -> WebhookFlowSubProcess {
+        let scope = &process_state.flow_binding().scope;
+        let subscription_id = FlowScopeSubscription::new(scope).subscription_id();
+        let webhook_subscription = self
+            .webhook_subscriptions_by_id
+            .get(&subscription_id)
+            .expect("Inconsistent state: all webhook subscriptions with flows must exist");
+
+        let parent_dataset_request_state =
+            if let Some(dataset_id) = webhook_subscription.dataset_id() {
+                let hdl = self
+                    .dataset_handles_by_id
+                    .get(dataset_id)
+                    .expect("Inconsistent state: all datasets with flows must exist")
+                    .clone();
+                Some(DatasetRequestState::new(hdl).with_owner(self.account.clone()))
+            } else {
+                None
+            };
+
+        WebhookFlowSubProcess::new(
+            webhook_subscription,
+            parent_dataset_request_state,
+            process_state,
+        )
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
