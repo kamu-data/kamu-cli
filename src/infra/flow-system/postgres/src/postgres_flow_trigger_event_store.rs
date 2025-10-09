@@ -283,14 +283,14 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
             SELECT EXISTS (
                 SELECT 1
                 FROM (
-                    SELECT DISTINCT ON (scope_data, flow_type)
+                    SELECT DISTINCT ON (flow_type, scope_data)
                         scope_data,
                         event_type,
                         event_payload
                     FROM flow_trigger_events
                     WHERE
                         scope_data = ANY($1)
-                    ORDER BY scope_data, flow_type, event_time DESC
+                    ORDER BY flow_type, scope_data, event_time DESC
                 ) AS latest_events
                 WHERE event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (

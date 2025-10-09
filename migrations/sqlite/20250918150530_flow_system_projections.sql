@@ -51,7 +51,7 @@ CREATE TABLE flow_trigger_events (
 );
 
 -- Assign global event_id from shared counter on insert
-CREATE TRIGGER flow_trigger_events_assign_event_id
+CREATE TRIGGER fte_assign_event_id
     AFTER INSERT ON flow_trigger_events
 BEGIN
     UPDATE flow_event_global_counter SET val = val + 1 WHERE name = 'global';
@@ -62,11 +62,11 @@ END;
 
 -- Recover indices
 
-CREATE INDEX idx_flow_trigger_events_dataset_scope
+CREATE INDEX idx_fte_dataset_scope
     ON flow_trigger_events (flow_type, json_extract(scope_data, '$.dataset_id'))
     WHERE json_extract(scope_data, '$.type') = 'Dataset';
 
-CREATE INDEX idx_flow_trigger_events_system_scope
+CREATE INDEX idx_fte_system_scope
     ON flow_trigger_events (flow_type)
     WHERE json_extract(scope_data, '$.type') = 'System';    
 
@@ -84,7 +84,7 @@ CREATE TABLE flow_configuration_events (
 );
 
 -- Assign global event_id from shared counter on insert
-CREATE TRIGGER flow_configuration_events_assign_event_id
+CREATE TRIGGER fce_assign_event_id
     AFTER INSERT ON flow_configuration_events
 BEGIN
     UPDATE flow_event_global_counter SET val = val + 1 WHERE name = 'global';
@@ -95,11 +95,11 @@ END;
 
 -- Recover indices
 
-CREATE INDEX idx_flow_configuration_events_dataset_scope
+CREATE INDEX idx_fce_dataset_scope
     ON flow_configuration_events (flow_type, json_extract(scope_data, '$.dataset_id'))
     WHERE json_extract(scope_data, '$.type') = 'Dataset';
 
-CREATE INDEX idx_flow_configuration_events_system_scope
+CREATE INDEX idx_fce_system_scope
     ON flow_configuration_events (flow_type)
     WHERE json_extract(scope_data, '$.type') = 'System';
 
@@ -117,7 +117,7 @@ CREATE TABLE flow_events
 );
 
 -- Assign global event_id from shared counter on insert
-CREATE TRIGGER flow_events_assign_event_id
+CREATE TRIGGER fe_assign_event_id
     AFTER INSERT ON flow_events
 BEGIN
     UPDATE flow_event_global_counter SET val = val + 1 WHERE name = 'global';
@@ -128,7 +128,7 @@ END;
 
 -- Recover indices
 
-CREATE INDEX idx_flow_events_flow_id ON flow_events (flow_id);
+CREATE INDEX idx_fe_flow_id ON flow_events (flow_id);
 
 /* ------------------------------ */
 
