@@ -62,17 +62,14 @@ impl InMemoryFlowConfigurationEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?opts))]
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowConfigurationEvent> {
         self.inner.get_all_events(opts)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
     fn get_events(
         &self,
         query: &FlowBinding,
@@ -81,7 +78,6 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
         self.inner.get_events(query, opts)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]
     async fn save_events(
         &self,
         query: &FlowBinding,
@@ -120,7 +116,6 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -143,7 +138,6 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
         Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
     async fn all_bindings_for_scope(
         &self,
         flow_scope: &FlowScope,

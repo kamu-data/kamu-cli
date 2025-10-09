@@ -430,6 +430,7 @@ pub struct RunStatsRow {
 
 #[async_trait::async_trait]
 impl FlowEventStore for SqliteFlowEventStore {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn new_flow_id(&self) -> Result<FlowID, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -450,6 +451,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(FlowID::try_from(result.flow_id).unwrap())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn try_get_pending_flow(
         &self,
         flow_binding: &FlowBinding,
@@ -483,6 +485,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_flow_id.map(|id| FlowID::try_from(id).unwrap()))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
     async fn try_get_all_scope_pending_flows(
         &self,
         flow_scope: &FlowScope,
@@ -511,6 +514,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(flow_ids)
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
@@ -545,6 +549,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_activation_time)
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_flows_scheduled_for_activation_at(
         &self,
         scheduled_for_activation_at: DateTime<Utc>,
@@ -571,6 +576,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(flow_ids)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(flow_scope_query))]
     fn get_all_flow_ids_matching_scope_query(
         &self,
         flow_scope_query: FlowScopeQuery,
@@ -654,6 +660,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query))]
     async fn get_count_flows_matching_scope_query(
         &self,
         flow_scope_query: &FlowScopeQuery,
@@ -735,6 +742,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(usize::try_from(flows_count).unwrap())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query))]
     fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -766,6 +774,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn get_all_flow_ids(
         &self,
         filters: &FlowFilters,
@@ -842,6 +851,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -928,6 +938,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn filter_flow_scopes_having_flows(
         &self,
         flow_scopes: &[FlowScope],

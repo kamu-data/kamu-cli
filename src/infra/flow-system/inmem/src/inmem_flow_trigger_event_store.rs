@@ -62,17 +62,14 @@ impl InMemoryFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?opts))]
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
         self.inner.get_all_events(opts)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
     fn get_events(
         &self,
         query: &FlowBinding,
@@ -81,7 +78,6 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
         self.inner.get_events(query, opts)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]
     async fn save_events(
         &self,
         query: &FlowBinding,
@@ -117,7 +113,6 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
-    #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -148,7 +143,6 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
     async fn all_trigger_bindings_for_scope(
         &self,
         flow_scope: &FlowScope,
@@ -172,7 +166,6 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         Ok(bindings)
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
     async fn has_active_triggers_for_scopes(
         &self,
         scopes: &[FlowScope],

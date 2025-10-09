@@ -64,6 +64,11 @@ impl FlowRunService for FlowRunServiceImpl {
 
     /// Triggers the specified flow with custom trigger instance,
     /// unless it's already waiting
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(?flow_binding)
+    )]
     async fn run_flow_automatically(
         &self,
         activation_time: DateTime<Utc>,

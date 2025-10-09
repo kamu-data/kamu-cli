@@ -25,6 +25,7 @@ pub struct PostgresFlowConfigurationEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore {
+    #[tracing::instrument(level = "debug", skip_all)]
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowConfigurationEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
@@ -61,6 +62,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     fn get_events(
         &self,
         flow_binding: &FlowBinding,
@@ -107,6 +109,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn save_events(
         &self,
         flow_binding: &FlowBinding,
@@ -153,6 +156,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         Ok(EventID::new(last_event_id))
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

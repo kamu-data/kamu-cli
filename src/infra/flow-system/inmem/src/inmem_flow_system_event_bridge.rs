@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Temporary:
-#![allow(dead_code)]
-
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -51,29 +48,6 @@ impl InMemoryFlowSystemEventBridge {
         }
     }
 
-    pub(crate) fn get_events_count(&self) -> usize {
-        let state = self.state.lock().unwrap();
-        state.events.len()
-    }
-
-    pub(crate) fn get_all_events(&self) -> Vec<FlowSystemEvent> {
-        let state = self.state.lock().unwrap();
-        state.events.clone()
-    }
-
-    pub(crate) fn get_all_events_after(&self, after_event_id: EventID) -> Vec<FlowSystemEvent> {
-        let state = self.state.lock().unwrap();
-
-        let after_idx = usize::try_from(after_event_id.into_inner()).unwrap() - 1;
-        assert!(
-            after_idx < state.events.len() || state.events.is_empty(),
-            "Invalid after_event_id: {}",
-            after_event_id.into_inner()
-        );
-
-        state.events.iter().skip(after_idx + 1).cloned().collect()
-    }
-
     pub(crate) fn save_events(
         &self,
         source_type: FlowSystemEventSourceType,
@@ -85,7 +59,6 @@ impl InMemoryFlowSystemEventBridge {
             return EventID::new(i64::try_from(state.events.len()).unwrap());
         }
 
-        // TODO: revise event IDs
         for (occurred_at, payload) in source_events {
             let event_id = state.events.len() + 1;
             let event = FlowSystemEvent {
