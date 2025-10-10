@@ -7,22 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use async_graphql::value;
 use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::*;
-use kamu_datasets::*;
-use kamu_datasets_services::testing::{
-    FakeDependencyGraphIndexer,
-    MockDatasetIncrementQueryService,
-};
-use kamu_flow_system::FlowAgentConfig;
-use kamu_task_system_inmem::InMemoryTaskEventStore;
-use kamu_task_system_services::TaskSchedulerImpl;
 
-use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness};
+use crate::utils::{BaseGQLFlowRunsHarness, GraphQLQueryRequest};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,32 +21,22 @@ async fn test_list_account_flows() {
     let foo_dataset_alias =
         odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
-    let harness = FlowTriggerHarness::new().await;
+    let harness = AccountFlowsTriggerHarness::new().await;
 
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let request_code =
-        FlowTriggerHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
 
     // Should return list of flows for account
-    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .list_flows_query(&DEFAULT_ACCOUNT_NAME)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -107,7 +86,7 @@ async fn test_list_account_flows() {
 
 #[test_log::test(tokio::test)]
 async fn test_list_datasets_with_flow() {
-    let harness = FlowTriggerHarness::new().await;
+    let harness = AccountFlowsTriggerHarness::new().await;
 
     let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
@@ -120,28 +99,16 @@ async fn test_list_datasets_with_flow() {
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let _bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
-    let ingest_mutation_code =
-        FlowTriggerHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
-    let compaction_mutation_code =
-        FlowTriggerHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
-
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let response = schema
-        .execute(
-            async_graphql::Request::new(ingest_mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(response.is_ok(), "{response:?}");
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(compaction_mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    harness
+        .trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-    assert!(response.is_ok(), "{response:?}");
 
     // Pure datasets listing
     let request_code = indoc!(
@@ -220,31 +187,20 @@ async fn test_account_triggers_all_paused() {
         odf::DatasetName::new_unchecked("bar"),
     );
 
-    let harness = FlowTriggerHarness::new().await;
+    let harness = AccountFlowsTriggerHarness::new().await;
 
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
-    let request_code =
-        FlowTriggerHarness::trigger_ingest_flow_mutation(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    harness
+        .trigger_ingest_flow_mutation(&foo_create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
-
-    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .list_flows_query(&DEFAULT_ACCOUNT_NAME)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -300,15 +256,11 @@ async fn test_account_triggers_all_paused() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -324,15 +276,10 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .pause_account_flows(&DEFAULT_ACCOUNT_NAME)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -348,15 +295,10 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -372,15 +314,10 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let mutation_code = FlowTriggerHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .resume_account_flows(&DEFAULT_ACCOUNT_NAME)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -396,15 +333,10 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME)
+        .execute(&schema, &harness.catalog_authorized)
         .await;
-
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -423,291 +355,178 @@ async fn test_account_triggers_all_paused() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseGQLFlowHarness, base_gql_flow_harness)]
-struct FlowTriggerHarness {
-    base_gql_flow_harness: BaseGQLFlowHarness,
+#[oop::extend(BaseGQLFlowRunsHarness, base_gql_flow_runs_harness)]
+struct AccountFlowsTriggerHarness {
+    base_gql_flow_runs_harness: BaseGQLFlowRunsHarness,
 }
 
-impl FlowTriggerHarness {
+impl AccountFlowsTriggerHarness {
     async fn new() -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(TenancyConfig::SingleTenant)
-            .build();
-
-        let base_gql_flow_catalog =
-            BaseGQLFlowHarness::make_base_gql_flow_catalog(base_gql_harness.catalog());
-
-        let account_triggers_catalog = {
-            let mut b = dill::CatalogBuilder::new_chained(&base_gql_flow_catalog);
-
-            b.add_value(MockDatasetIncrementQueryService::default())
-                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-                .add_value(FlowAgentConfig::test_default())
-                .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>()
-                .add::<FakeDependencyGraphIndexer>();
-
-            kamu_flow_system_services::register_dependencies(&mut b);
-
-            b.build()
-        };
-
-        let base_gql_flow_harness =
-            BaseGQLFlowHarness::new(base_gql_harness, account_triggers_catalog).await;
-
+        let base_gql_flow_runs_harness =
+            BaseGQLFlowRunsHarness::with_overrides(Default::default()).await;
         Self {
-            base_gql_flow_harness,
+            base_gql_flow_runs_harness,
         }
     }
 
-    fn list_flows_query(account_name: &odf::AccountName) -> String {
-        indoc!(
+    fn list_flows_query(&self, account_name: &odf::AccountName) -> GraphQLQueryRequest {
+        let request_code = indoc!(
             r#"
-        {
-            accounts {
-                byName (name: "<accountName>") {
-                    flows {
-                        runs {
-                            listFlows {
-                                nodes {
-                                    flowId
-                                    datasetId
-                                    description {
-                                        __typename
-                                        ... on FlowDescriptionDatasetHardCompaction {
-                                            compactionResult {
-                                                ... on FlowDescriptionReorganizationSuccess {
-                                                    originalBlocksCount
-                                                    resultingBlocksCount
-                                                    newHead
-                                                }
-                                                ... on FlowDescriptionReorganizationNothingToDo {
-                                                    message
-                                                }
-                                            }
-                                        }
-                                        ... on FlowDescriptionDatasetExecuteTransform {
-                                            transformResult {
-                                                __typename
-                                                ... on FlowDescriptionUpdateResultUpToDate {
-                                                    uncacheable
-                                                }
-                                                ... on FlowDescriptionUpdateResultSuccess {
-                                                    numBlocks
-                                                    numRecords
+            query($accountName: AccountName!) {
+                accounts {
+                    byName (name: $accountName) {
+                        flows {
+                            runs {
+                                listFlows {
+                                    nodes {
+                                        flowId
+                                        datasetId
+                                        description {
+                                            __typename
+                                            ... on FlowDescriptionDatasetHardCompaction {
+                                                compactionResult {
+                                                    ... on FlowDescriptionReorganizationSuccess {
+                                                        originalBlocksCount
+                                                        resultingBlocksCount
+                                                        newHead
+                                                    }
+                                                    ... on FlowDescriptionReorganizationNothingToDo {
+                                                        message
+                                                    }
                                                 }
                                             }
-                                        }
-                                        ... on FlowDescriptionDatasetPollingIngest {
-                                            ingestResult {
-                                                __typename
-                                                ... on FlowDescriptionUpdateResultUpToDate {
-                                                    uncacheable
-                                                }
-                                                ... on FlowDescriptionUpdateResultSuccess {
-                                                    numBlocks
-                                                    numRecords
-                                                }
-                                            }
-                                        }
-                                        ... on FlowDescriptionDatasetPushIngest {
-                                            sourceName
-                                            ingestResult {
-                                                __typename
-                                                ... on FlowDescriptionUpdateResultUpToDate {
-                                                    uncacheable
-                                                }
-                                                ... on FlowDescriptionUpdateResultSuccess {
-                                                    numBlocks
-                                                    numRecords
+                                            ... on FlowDescriptionDatasetExecuteTransform {
+                                                transformResult {
+                                                    __typename
+                                                    ... on FlowDescriptionUpdateResultUpToDate {
+                                                        uncacheable
+                                                    }
+                                                    ... on FlowDescriptionUpdateResultSuccess {
+                                                        numBlocks
+                                                        numRecords
+                                                    }
                                                 }
                                             }
-                                        }
-                                    }
-                                    status
-                                    outcome {
-                                        ...on FlowSuccessResult {
-                                            message
-                                        }
-                                        ...on FlowAbortedResult {
-                                            message
-                                        }
-                                        ...on FlowFailedError {
-                                            reason {
-                                                ...on TaskFailureReasonGeneral {
-                                                    message
-                                                    recoverable
+                                            ... on FlowDescriptionDatasetPollingIngest {
+                                                ingestResult {
+                                                    __typename
+                                                    ... on FlowDescriptionUpdateResultUpToDate {
+                                                        uncacheable
+                                                    }
+                                                    ... on FlowDescriptionUpdateResultSuccess {
+                                                        numBlocks
+                                                        numRecords
+                                                    }
                                                 }
-                                                ...on TaskFailureReasonInputDatasetCompacted {
-                                                    message
-                                                    inputDataset {
-                                                        id
+                                            }
+                                            ... on FlowDescriptionDatasetPushIngest {
+                                                sourceName
+                                                ingestResult {
+                                                    __typename
+                                                    ... on FlowDescriptionUpdateResultUpToDate {
+                                                        uncacheable
+                                                    }
+                                                    ... on FlowDescriptionUpdateResultSuccess {
+                                                        numBlocks
+                                                        numRecords
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                    timing {
-                                        awaitingExecutorSince
-                                        runningSince
-                                        lastAttemptFinishedAt
-                                    }
-                                    taskIds
-                                    primaryActivationCause {
-                                        __typename
-                                        ... on FlowActivationCauseDatasetUpdate {
-                                            dataset {
-                                                id
-                                                name
+                                        status
+                                        outcome {
+                                            ...on FlowSuccessResult {
+                                                message
                                             }
-                                        }
-                                    }
-                                    startCondition {
-                                        __typename
-                                        ... on FlowStartConditionReactive {
-                                            accumulatedRecordsCount
-                                            activeBatchingRule {
-                                                __typename
-                                                ... on FlowTriggerBatchingRuleBuffering {
-                                                    minRecordsToAwait
-                                                    maxBatchingInterval {
-                                                        every
-                                                        unit
+                                            ...on FlowAbortedResult {
+                                                message
+                                            }
+                                            ...on FlowFailedError {
+                                                reason {
+                                                    ...on TaskFailureReasonGeneral {
+                                                        message
+                                                        recoverable
+                                                    }
+                                                    ...on TaskFailureReasonInputDatasetCompacted {
+                                                        message
+                                                        inputDataset {
+                                                            id
+                                                        }
                                                     }
                                                 }
                                             }
-                                            watermarkModified
-                                            forBreakingChange
                                         }
-                                        ... on FlowStartConditionThrottling {
-                                            intervalSec
-                                            wakeUpAt
-                                            shiftedFrom
+                                        timing {
+                                            awaitingExecutorSince
+                                            runningSince
+                                            lastAttemptFinishedAt
                                         }
-                                        ... on FlowStartConditionExecutor {
-                                            taskId
+                                        taskIds
+                                        primaryActivationCause {
+                                            __typename
+                                            ... on FlowActivationCauseDatasetUpdate {
+                                                dataset {
+                                                    id
+                                                    name
+                                                }
+                                            }
+                                        }
+                                        startCondition {
+                                            __typename
+                                            ... on FlowStartConditionReactive {
+                                                accumulatedRecordsCount
+                                                activeBatchingRule {
+                                                    __typename
+                                                    ... on FlowTriggerBatchingRuleBuffering {
+                                                        minRecordsToAwait
+                                                        maxBatchingInterval {
+                                                            every
+                                                            unit
+                                                        }
+                                                    }
+                                                }
+                                                watermarkModified
+                                                forBreakingChange
+                                            }
+                                            ... on FlowStartConditionThrottling {
+                                                intervalSec
+                                                wakeUpAt
+                                                shiftedFrom
+                                            }
+                                            ... on FlowStartConditionExecutor {
+                                                taskId
+                                            }
                                         }
                                     }
-                                }
-                                pageInfo {
-                                    hasPreviousPage
-                                    hasNextPage
-                                    currentPage
-                                    totalPages
+                                    pageInfo {
+                                        hasPreviousPage
+                                        hasNextPage
+                                        currentPage
+                                        totalPages
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
           "#
+        );
+
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_json(serde_json::json!({
+                "accountName": account_name,
+            })),
         )
-        .replace("<accountName>", account_name.as_ref())
     }
 
-    fn trigger_ingest_flow_mutation(id: &odf::DatasetID) -> String {
-        indoc!(
+    fn pause_account_flows(&self, account_name: &odf::AccountName) -> GraphQLQueryRequest {
+        let request_code = indoc!(
             r#"
-          mutation {
-              datasets {
-                  byId (datasetId: "<id>") {
-                      flows {
-                          runs {
-                              triggerIngestFlow {
-                                  __typename,
-                                  message
-                                  ... on TriggerFlowSuccess {
-                                      flow {
-                                          __typename
-                                          flowId
-                                          status
-                                          outcome {
-                                              ...on FlowSuccessResult {
-                                                  message
-                                              }
-                                              ...on FlowAbortedResult {
-                                                  message
-                                              }
-                                              ...on FlowFailedError {
-                                                  reason {
-                                                    ...on TaskFailureReasonGeneral {
-                                                        message
-                                                        recoverable
-                                                    }
-                                                    ...on TaskFailureReasonInputDatasetCompacted {
-                                                          message
-                                                          inputDataset {
-                                                              id
-                                                          }
-                                                      }
-                                                  }
-                                              }
-                                          }
-                                      }
-                                  }
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-          "#
-        )
-        .replace("<id>", &id.to_string())
-    }
-
-    fn trigger_compaction_flow_mutation(id: &odf::DatasetID) -> String {
-        indoc!(
-            r#"
-          mutation {
-              datasets {
-                  byId (datasetId: "<id>") {
-                      flows {
-                          runs {
-                              triggerCompactionFlow {
-                                  __typename,
-                                  message
-                                  ... on TriggerFlowSuccess {
-                                      flow {
-                                          __typename
-                                          flowId
-                                          status
-                                          outcome {
-                                              ...on FlowSuccessResult {
-                                                  message
-                                              }
-                                              ...on FlowAbortedResult {
-                                                  message
-                                              }
-                                              ...on FlowFailedError {
-                                                  reason {
-                                                    ...on TaskFailureReasonGeneral {
-                                                        message
-                                                        recoverable
-                                                    }
-                                                  }
-                                              }
-                                          }
-                                      }
-                                  }
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-          "#
-        )
-        .replace("<id>", &id.to_string())
-    }
-
-    fn pause_account_flows(account_name: &odf::AccountName) -> String {
-        indoc!(
-            r#"
-            mutation {
+            mutation($accountName: AccountName!) {
                 accounts {
-                    byName (accountName: "<name>") {
+                    byName (accountName: $accountName) {
                         flows {
                             triggers {
                                 pauseAccountDatasetFlows
@@ -717,16 +536,22 @@ impl FlowTriggerHarness {
                 }
             }
         "#
+        );
+
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_json(serde_json::json!({
+                "accountName": account_name,
+            })),
         )
-        .replace("<name>", account_name.as_ref())
     }
 
-    fn resume_account_flows(account_name: &odf::AccountName) -> String {
-        indoc!(
+    fn resume_account_flows(&self, account_name: &odf::AccountName) -> GraphQLQueryRequest {
+        let request_code = indoc!(
             r#"
-            mutation {
+            mutation($accountName: AccountName!) {
                 accounts {
-                    byName (accountName: "<name>") {
+                    byName (accountName: $accountName) {
                         flows {
                             triggers {
                                 resumeAccountDatasetFlows
@@ -736,16 +561,25 @@ impl FlowTriggerHarness {
                 }
             }
         "#
+        );
+
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_json(serde_json::json!({
+                "accountName": account_name,
+            })),
         )
-        .replace("<name>", account_name.as_ref())
     }
 
-    fn all_paused_account_triggers_query(account_name: &odf::AccountName) -> String {
-        indoc!(
+    fn all_paused_account_triggers_query(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> GraphQLQueryRequest {
+        let request_code = indoc!(
             r#"
-            {
+            query($accountName: AccountName!) {
                 accounts {
-                    byName (name: "<account_name>") {
+                    byName (name: $accountName) {
                         flows {
                             triggers {
                                 allPaused
@@ -755,8 +589,14 @@ impl FlowTriggerHarness {
                 }
             }
             "#
+        );
+
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_json(serde_json::json!({
+                "accountName": account_name,
+            })),
         )
-        .replace("<account_name>", account_name)
     }
 }
 
