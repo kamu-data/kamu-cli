@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::Utc;
 use dill::{component, interface};
 use kamu_webhooks::{
@@ -16,6 +18,7 @@ use kamu_webhooks::{
     WebhookSendError,
     WebhookSendFailedToConnectError,
     WebhookSender,
+    WebhooksConfig,
 };
 
 use crate::KAMU_WEBHOOK_USER_AGENT;
@@ -30,9 +33,9 @@ pub struct WebhookSenderImpl {
 #[component(pub)]
 #[interface(dyn WebhookSender)]
 impl WebhookSenderImpl {
-    pub fn new() -> Self {
-        // TODO: externalize configuration of the timeout
-        let timeout_setting = std::time::Duration::from_secs(10);
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(webhook_config: Arc<WebhooksConfig>) -> Self {
+        let timeout_setting = webhook_config.delivery_timeout.to_std().unwrap();
 
         Self {
             timeout_setting,

@@ -9,19 +9,24 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use chrono::Duration;
+
 pub const DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES: u32 = 5;
+pub const DEFAULT_WEBHOOK_REQUEST_TIMEOUT: u32 = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct WebhooksConfig {
     pub max_consecutive_failures: u32,
+    pub delivery_timeout: Duration,
 }
 
 impl WebhooksConfig {
-    pub fn new(max_consecutive_failures: u32) -> Self {
+    pub fn new(max_consecutive_failures: u32, delivery_timeout: Duration) -> Self {
         Self {
             max_consecutive_failures,
+            delivery_timeout,
         }
     }
 }
@@ -30,6 +35,7 @@ impl Default for WebhooksConfig {
     fn default() -> Self {
         Self {
             max_consecutive_failures: DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES,
+            delivery_timeout: Duration::seconds(i64::from(DEFAULT_WEBHOOK_REQUEST_TIMEOUT)),
         }
     }
 }
