@@ -284,6 +284,18 @@ impl Datasets {
             Ok(DatasetConnection::new(vec![], page, per_page, 0))
         }
     }
+
+    // Federation
+
+    #[tracing::instrument(level = "info", name = Datasets_find_entity_by_id, skip_all, fields(%dataset_id))]
+    #[graphql(entity)]
+    async fn find_entity_by_id(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(key)] dataset_id: DatasetID<'_>,
+    ) -> Result<Option<Dataset>> {
+        self.by_id(ctx, dataset_id).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

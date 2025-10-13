@@ -127,6 +127,18 @@ impl Accounts {
 
         Ok(accounts)
     }
+
+    // Federation
+
+    #[tracing::instrument(level = "info", name = Accounts_find_entity_by_id, skip_all, fields(%account_id))]
+    #[graphql(entity)]
+    async fn find_entity_by_id(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(key)] account_id: AccountID<'_>,
+    ) -> Result<Option<Account>> {
+        self.by_id(ctx, account_id).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
