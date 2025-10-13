@@ -122,6 +122,10 @@ impl Mutation {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub type SchemaBuilder = async_graphql::SchemaBuilder<Query, Mutation, EmptySubscription>;
 
@@ -135,10 +139,16 @@ pub fn schema() -> Schema {
     schema_builder()
         .extension(Tracing)
         .extension(extensions::ApolloTracing)
+        .enable_federation()
         .finish()
 }
 
 /// Returns schema preconfigured schema without apollo tracing extension
 pub fn schema_quiet() -> Schema {
-    schema_builder().extension(Tracing).finish()
+    schema_builder()
+        .extension(Tracing)
+        .enable_federation()
+        .finish()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
