@@ -3491,6 +3491,7 @@ type Query {
 	Temporary: Molecule-specific functionality group
 	"""
 	molecule: Molecule!
+	_service: _Service!
 }
 
 enum QueryDialect {
@@ -4804,6 +4805,16 @@ type Webhooks {
 	List of supported event types
 	"""
 	eventTypes: [String!]!
+}
+
+"""
+The `_Any` scalar is used to pass representations of entities from external
+services into the root `_entities` field for execution.
+"""
+scalar _Any
+
+type _Service {
+	sdl: String
 }
 
 """
