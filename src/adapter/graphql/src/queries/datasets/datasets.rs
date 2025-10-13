@@ -128,7 +128,11 @@ impl Datasets {
 impl Datasets {
     /// Returns a dataset by its ID, if found
     #[tracing::instrument(level = "info", name = Datasets_by_id, skip_all, fields(%dataset_id))]
-    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID<'_>) -> Result<Option<Dataset>> {
+    pub async fn by_id(
+        &self,
+        ctx: &Context<'_>,
+        dataset_id: DatasetID<'_>,
+    ) -> Result<Option<Dataset>> {
         let dataset_id: odf::DatasetID = dataset_id.into();
 
         self.by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
@@ -283,18 +287,6 @@ impl Datasets {
 
             Ok(DatasetConnection::new(vec![], page, per_page, 0))
         }
-    }
-
-    // Federation
-
-    #[tracing::instrument(level = "info", name = Datasets_find_entity_by_id, skip_all, fields(%dataset_id))]
-    #[graphql(entity)]
-    async fn find_entity_by_id(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(key)] dataset_id: DatasetID<'_>,
-    ) -> Result<Option<Dataset>> {
-        self.by_id(ctx, dataset_id).await
     }
 }
 

@@ -18,6 +18,7 @@ use crate::queries::*;
 
 pub struct Query;
 
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Query {
     /// Returns the version of the GQL API
@@ -77,6 +78,28 @@ impl Query {
     /// Temporary: Molecule-specific functionality group
     async fn molecule(&self) -> Molecule {
         Molecule
+    }
+
+    // Federation
+
+    #[graphql(entity)]
+    #[tracing::instrument(level = "info", name = Query_find_account_by_id, skip_all, fields(%account_id))]
+    async fn find_account_by_id(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID<'_>,
+    ) -> Result<Option<Account>> {
+        Accounts.by_id(ctx, account_id).await
+    }
+
+    #[graphql(entity)]
+    #[tracing::instrument(level = "info", name = Query_find_dataset_by_id, skip_all, fields(%dataset_id))]
+    async fn find_dataset_by_id(
+        &self,
+        ctx: &Context<'_>,
+        dataset_id: DatasetID<'_>,
+    ) -> Result<Option<Dataset>> {
+        Datasets.by_id(ctx, dataset_id).await
     }
 }
 
