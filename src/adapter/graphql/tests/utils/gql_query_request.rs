@@ -9,14 +9,14 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct GraphQLQueryRequest {
+pub(crate) struct GraphQLQueryRequest {
     request_code: String,
     variables: async_graphql::Variables,
     expect_success: bool,
 }
 
 impl GraphQLQueryRequest {
-    pub fn new(request_code: &str, variables: async_graphql::Variables) -> Self {
+    pub(crate) fn new(request_code: &str, variables: async_graphql::Variables) -> Self {
         Self {
             request_code: request_code.to_string(),
             variables,
@@ -24,12 +24,12 @@ impl GraphQLQueryRequest {
         }
     }
 
-    pub fn expect_error(mut self) -> Self {
+    pub(crate) fn expect_error(mut self) -> Self {
         self.expect_success = false;
         self
     }
 
-    pub async fn execute(
+    pub(crate) async fn execute(
         self,
         schema: &kamu_adapter_graphql::Schema,
         catalog: &dill::Catalog,
@@ -50,6 +50,46 @@ impl GraphQLQueryRequest {
 
         response
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn get_gql_value_property<'a>(
+    value: &'a async_graphql::Value,
+    key: &str,
+) -> Option<&'a async_graphql::Value> {
+    if let async_graphql::Value::Object(obj) = value {
+        obj.get(key)
+    } else {
+        None
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn get_gql_value_string_property(
+    value: &async_graphql::Value,
+    key: &str,
+) -> Option<String> {
+    get_gql_value_property(value, key)
+        .and_then(|v| match v {
+            async_graphql::Value::String(s) => Some(s.as_str()),
+            async_graphql::Value::Enum(e) => Some(e.as_str()),
+            _ => None,
+        })
+        .map(ToString::to_string)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn get_gql_value_i64_property(value: &async_graphql::Value, key: &str) -> Option<i64> {
+    get_gql_value_property(value, key).and_then(|v| {
+        if let async_graphql::Value::Number(n) = v {
+            n.as_i64()
+        } else {
+            None
+        }
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -489,7 +489,7 @@ impl BaseGQLFlowRunsHarness {
         result.subscription_id
     }
 
-    pub async fn pause_webhook_subscription(&self, subscription_id: &WebhookSubscriptionID) {
+    pub async fn pause_webhook_subscription(&self, subscription_id: WebhookSubscriptionID) {
         let pause_webhook_uc = self
             .catalog_authorized
             .get_one::<dyn PauseWebhookSubscriptionUseCase>()

@@ -20,19 +20,13 @@ use kamu_task_system::*;
 use kamu_webhooks::*;
 use uuid::Uuid;
 
-use crate::utils::{
-    BaseGQLDatasetHarness,
-    BaseGQLFlowHarness,
-    BaseGQLFlowRunsHarness,
-    FlowRunsHarnessOverrides,
-    GraphQLQueryRequest,
-};
+use crate::utils::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_basic_process_state_actions_root_dataset() {
-    let harness = FlowProcessesHarness::new().await;
+    let harness = DatasetFlowProcessesHarness::new().await;
 
     // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -151,7 +145,7 @@ async fn test_basic_process_state_actions_root_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_basic_process_state_actions_derived_dataset() {
-    let harness = FlowProcessesHarness::new().await;
+    let harness = DatasetFlowProcessesHarness::new().await;
 
     // Create datasets
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -272,7 +266,7 @@ async fn test_basic_process_state_actions_derived_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_ingest_process_several_runs() {
-    let harness = FlowProcessesHarness::new().await;
+    let harness = DatasetFlowProcessesHarness::new().await;
 
     // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -426,7 +420,7 @@ async fn test_ingest_process_several_runs() {
 
 #[test_log::test(tokio::test)]
 async fn test_ingest_process_reach_auto_stop_via_failures_count() {
-    let harness = FlowProcessesHarness::new().await;
+    let harness = DatasetFlowProcessesHarness::new().await;
 
     // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -494,7 +488,7 @@ async fn test_ingest_process_reach_auto_stop_via_failures_count() {
 
 #[test_log::test(tokio::test)]
 async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
-    let harness = FlowProcessesHarness::new().await;
+    let harness = DatasetFlowProcessesHarness::new().await;
 
     // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -544,7 +538,7 @@ async fn test_ingest_process_reach_auto_stop_via_unrecoverable_failure() {
 
 #[test_log::test(tokio::test)]
 async fn test_ingest_process_with_multiple_webhooks() {
-    let harness = FlowProcessesHarness::new().await;
+    let harness = DatasetFlowProcessesHarness::new().await;
 
     // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -627,7 +621,7 @@ async fn test_ingest_process_with_multiple_webhooks() {
     harness
         .mimic_webhook_flow_failure(&foo_result.dataset_handle.id, *alpha_id, false)
         .await;
-    harness.pause_webhook_subscription(beta_id).await;
+    harness.pause_webhook_subscription(*beta_id).await;
     harness
         .mimic_webhook_flow_failure(&foo_result.dataset_handle.id, *gamma_id, true)
         .await;
@@ -723,7 +717,7 @@ async fn test_ingest_process_with_multiple_webhooks() {
 
 #[test_log::test(tokio::test)]
 async fn test_access_flow_process_state_anonymous() {
-    let harness = FlowProcessesHarness::new().await;
+    let harness = DatasetFlowProcessesHarness::new().await;
 
     // Create root dataset
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -750,12 +744,12 @@ async fn test_access_flow_process_state_anonymous() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLFlowRunsHarness, base_gql_flow_runs_harness)]
-struct FlowProcessesHarness {
+struct DatasetFlowProcessesHarness {
     base_gql_flow_runs_harness: BaseGQLFlowRunsHarness,
     flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
 }
 
-impl FlowProcessesHarness {
+impl DatasetFlowProcessesHarness {
     async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
@@ -888,23 +882,23 @@ impl FlowProcessesHarness {
         response: &async_graphql::Value,
     ) -> FlowPrimaryProcessSummary {
         // Navigate through the nested structure more compactly
-        get_property(response, "datasets")
-            .and_then(|v| get_property(v, "byId"))
-            .and_then(|v| get_property(v, "flows"))
-            .and_then(|v| get_property(v, "processes"))
-            .and_then(|v| get_property(v, "primary"))
+        get_gql_value_property(response, "datasets")
+            .and_then(|v| get_gql_value_property(v, "byId"))
+            .and_then(|v| get_gql_value_property(v, "flows"))
+            .and_then(|v| get_gql_value_property(v, "processes"))
+            .and_then(|v| get_gql_value_property(v, "primary"))
             .map(FlowPrimaryProcessSummary::from)
             .unwrap_or_else(|| panic!("Invalid GraphQL response structure"))
     }
 
     fn extract_webhooks_rollup(&self, response: &async_graphql::Value) -> async_graphql::Value {
         // Navigate through the nested structure more compactly
-        get_property(response, "datasets")
-            .and_then(|v| get_property(v, "byId"))
-            .and_then(|v| get_property(v, "flows"))
-            .and_then(|v| get_property(v, "processes"))
-            .and_then(|v| get_property(v, "webhooks"))
-            .and_then(|v| get_property(v, "rollup"))
+        get_gql_value_property(response, "datasets")
+            .and_then(|v| get_gql_value_property(v, "byId"))
+            .and_then(|v| get_gql_value_property(v, "flows"))
+            .and_then(|v| get_gql_value_property(v, "processes"))
+            .and_then(|v| get_gql_value_property(v, "webhooks"))
+            .and_then(|v| get_gql_value_property(v, "rollup"))
             .cloned()
             .unwrap_or_else(|| panic!("Invalid GraphQL response structure"))
     }
@@ -914,12 +908,12 @@ impl FlowProcessesHarness {
         response: &async_graphql::Value,
     ) -> Vec<FlowWebhookSubprocessSummary> {
         // Navigate through the nested structure more compactly
-        let subprocesses_value = get_property(response, "datasets")
-            .and_then(|v| get_property(v, "byId"))
-            .and_then(|v| get_property(v, "flows"))
-            .and_then(|v| get_property(v, "processes"))
-            .and_then(|v| get_property(v, "webhooks"))
-            .and_then(|v| get_property(v, "subprocesses"))
+        let subprocesses_value = get_gql_value_property(response, "datasets")
+            .and_then(|v| get_gql_value_property(v, "byId"))
+            .and_then(|v| get_gql_value_property(v, "flows"))
+            .and_then(|v| get_gql_value_property(v, "processes"))
+            .and_then(|v| get_gql_value_property(v, "webhooks"))
+            .and_then(|v| get_gql_value_property(v, "subprocesses"))
             .and_then(|v| {
                 if let async_graphql::Value::List(list) = v {
                     Some(list.clone())
@@ -947,12 +941,13 @@ struct FlowProcessSummaryBasic {
 
 impl From<&async_graphql::Value> for FlowProcessSummaryBasic {
     fn from(value: &async_graphql::Value) -> Self {
-        let effective_state = get_string_property(value, "effectiveState").unwrap();
+        let effective_state = get_gql_value_string_property(value, "effectiveState").unwrap();
 
         let consecutive_failures =
-            i32::try_from(get_i64_property(value, "consecutiveFailures").unwrap()).unwrap();
+            i32::try_from(get_gql_value_i64_property(value, "consecutiveFailures").unwrap())
+                .unwrap();
 
-        let maybe_auto_stop_reason = get_string_property(value, "autoStoppedReason");
+        let maybe_auto_stop_reason = get_gql_value_string_property(value, "autoStoppedReason");
 
         Self {
             effective_state,
@@ -972,9 +967,10 @@ struct FlowPrimaryProcessSummary {
 
 impl From<&async_graphql::Value> for FlowPrimaryProcessSummary {
     fn from(value: &async_graphql::Value) -> Self {
-        let flow_type = get_string_property(value, "flowType").unwrap();
+        let flow_type = get_gql_value_string_property(value, "flowType").unwrap();
 
-        let summary = FlowProcessSummaryBasic::from(get_property(value, "summary").unwrap());
+        let summary =
+            FlowProcessSummaryBasic::from(get_gql_value_property(value, "summary").unwrap());
 
         Self { flow_type, summary }
     }
@@ -992,53 +988,17 @@ struct FlowWebhookSubprocessSummary {
 impl From<&async_graphql::Value> for FlowWebhookSubprocessSummary {
     fn from(value: &async_graphql::Value) -> Self {
         let id = WebhookSubscriptionID::new(
-            Uuid::parse_str(&get_string_property(value, "id").unwrap())
+            Uuid::parse_str(&get_gql_value_string_property(value, "id").unwrap())
                 .expect("Invalid UUID in webhook subprocess id"),
         );
 
-        let name = get_string_property(value, "name").unwrap();
+        let name = get_gql_value_string_property(value, "name").unwrap();
 
-        let summary = FlowProcessSummaryBasic::from(get_property(value, "summary").unwrap());
+        let summary =
+            FlowProcessSummaryBasic::from(get_gql_value_property(value, "summary").unwrap());
 
         Self { id, name, summary }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn get_property<'a>(
-    value: &'a async_graphql::Value,
-    key: &str,
-) -> Option<&'a async_graphql::Value> {
-    if let async_graphql::Value::Object(obj) = value {
-        obj.get(key)
-    } else {
-        None
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn get_string_property(value: &async_graphql::Value, key: &str) -> Option<String> {
-    get_property(value, key)
-        .and_then(|v| match v {
-            async_graphql::Value::String(s) => Some(s.as_str()),
-            async_graphql::Value::Enum(e) => Some(e.as_str()),
-            _ => None,
-        })
-        .map(ToString::to_string)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn get_i64_property(value: &async_graphql::Value, key: &str) -> Option<i64> {
-    get_property(value, key).and_then(|v| {
-        if let async_graphql::Value::Number(n) = v {
-            n.as_i64()
-        } else {
-            None
-        }
-    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

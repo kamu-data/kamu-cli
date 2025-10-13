@@ -225,16 +225,8 @@ impl InMemoryFlowProcessState {
                         }
                     }
 
-                    // Tie-breaker 2: Flow type - skip if it's the primary field
-                    if !matches!(order.field, FlowProcessOrderField::FlowType) {
-                        let flow_type_ordering =
-                            a.flow_binding().flow_type.cmp(&b.flow_binding().flow_type);
-                        if flow_type_ordering != Ordering::Equal {
-                            return flow_type_ordering;
-                        }
-                    }
-
-                    Ordering::Equal
+                    // Tie-breaker 2: Last update event ID
+                    a.last_applied_event_id().cmp(&b.last_applied_event_id())
                 }
                 primary_order => primary_order,
             }

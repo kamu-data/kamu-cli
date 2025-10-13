@@ -322,7 +322,7 @@ impl<'a> AccountFlowProcesses<'a> {
 
         let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
 
-        Ok(FlowScopeDataset::query_for_multiple_datasets_only(
+        Ok(FlowScopeDataset::query_for_multiple_datasets(
             &owned_dataset_id_refs,
         ))
     }

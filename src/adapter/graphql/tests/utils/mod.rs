@@ -17,4 +17,4 @@ pub use auth_utils::*;
 pub use base_gql_dataset_harness::*;
 pub use base_gql_flow_harness::*;
 pub use base_gql_flow_runs_harness::*;
-pub use gql_query_request::*;
+pub(crate) use gql_query_request::*;

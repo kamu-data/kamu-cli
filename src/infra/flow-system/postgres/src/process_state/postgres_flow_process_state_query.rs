@@ -28,11 +28,15 @@ pub struct PostgresFlowProcessStateQuery {
 impl PostgresFlowProcessStateQuery {
     fn generate_ordering_predicate(order: FlowProcessOrder) -> String {
         let direction = if order.desc { "DESC" } else { "ASC" };
-        let default_tiebreaker = "last_attempt_at DESC NULLS LAST, flow_type ASC";
+        let default_tiebreaker =
+            "last_attempt_at DESC NULLS LAST, last_applied_flow_system_event_id DESC NULLS LAST";
 
         match order.field {
             FlowProcessOrderField::LastAttemptAt => {
-                format!("last_attempt_at {direction} NULLS LAST, flow_type ASC",)
+                format!(
+                    "last_attempt_at {direction} NULLS LAST, last_applied_flow_system_event_id \
+                     DESC NULLS LAST",
+                )
             }
             FlowProcessOrderField::NextPlannedAt => {
                 format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}",)
@@ -47,7 +51,7 @@ impl PostgresFlowProcessStateQuery {
                 format!("effective_state {direction}, {default_tiebreaker}",)
             }
             FlowProcessOrderField::FlowType => {
-                format!("flow_type {direction}, last_attempt_at DESC NULLS LAST",)
+                format!("flow_type {direction}, {default_tiebreaker}",)
             }
         }
     }
