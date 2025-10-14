@@ -13,14 +13,14 @@ use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use kamu_flow_system::*;
 
-use crate::{FlowAbortHelper, FlowSchedulingHelper};
+use crate::{FlowAbortHelper, FlowSchedulingServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn FlowRunService)]
 pub struct FlowRunServiceImpl {
-    flow_scheduling_helper: Arc<FlowSchedulingHelper>,
+    flow_scheduling_service: Arc<FlowSchedulingServiceImpl>,
     flow_abort_helper: Arc<FlowAbortHelper>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
     flow_event_store: Arc<dyn FlowEventStore>,
@@ -47,7 +47,7 @@ impl FlowRunService for FlowRunServiceImpl {
     ) -> Result<FlowState, RunFlowError> {
         let activation_time = self.agent_config.round_time(activation_time)?;
 
-        self.flow_scheduling_helper
+        self.flow_scheduling_service
             .trigger_flow_common(
                 activation_time,
                 flow_binding,
@@ -79,7 +79,7 @@ impl FlowRunService for FlowRunServiceImpl {
     ) -> Result<FlowState, RunFlowError> {
         let activation_time = self.agent_config.round_time(activation_time)?;
 
-        self.flow_scheduling_helper
+        self.flow_scheduling_service
             .trigger_flow_common(
                 activation_time,
                 flow_binding,

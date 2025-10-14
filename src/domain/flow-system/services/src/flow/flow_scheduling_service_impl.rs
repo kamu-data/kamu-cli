@@ -10,21 +10,24 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use dill::component;
+use dill::{component, interface};
 use internal_error::InternalError;
 use kamu_flow_system::*;
+
+use crate::FlowSchedulingService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
-pub(crate) struct FlowSchedulingHelper {
+#[interface(dyn FlowSchedulingService)]
+pub(crate) struct FlowSchedulingServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_process_state_query: Arc<dyn FlowProcessStateQuery>,
     agent_config: Arc<FlowAgentConfig>,
 }
 
-impl FlowSchedulingHelper {
+impl FlowSchedulingServiceImpl {
     pub(crate) async fn activate_flow_trigger(
         &self,
         target_catalog: &dill::Catalog,
@@ -50,69 +53,6 @@ impl FlowSchedulingHelper {
                 self.schedule_auto_polling_flow(activation_time, flow_binding, schedule_rule)
                     .await?;
             }
-        }
-
-        Ok(())
-    }
-
-    pub(crate) async fn schedule_late_flow_activations(
-        &self,
-        flow_success_time: DateTime<Utc>,
-        flow_binding: &FlowBinding,
-        late_activation_causes: &[FlowActivationCause],
-    ) -> Result<(), InternalError> {
-        tracing::info!(
-            ?flow_binding,
-            late_activation_causes = late_activation_causes.len(),
-            "Scheduling late flow activations"
-        );
-
-        // Schedule the next flow immediately
-        self.trigger_flow_common(
-            flow_success_time,
-            flow_binding,
-            None,
-            late_activation_causes.to_vec(),
-            None,
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    pub(crate) async fn try_schedule_auto_polling_flow_continuation_if_enabled(
-        &self,
-        flow_finish_time: DateTime<Utc>,
-        flow_binding: &FlowBinding,
-        trigger_state: &FlowTriggerState,
-    ) -> Result<(), InternalError> {
-        // Try locating an active schedule for this flow
-        let maybe_active_schedule = if trigger_state.is_active() {
-            trigger_state.try_get_schedule_rule()
-        } else {
-            None
-        };
-
-        // If there is an active schedule, schedule the next run immediately
-        if let Some(active_schedule) = maybe_active_schedule {
-            tracing::info!(
-                ?flow_binding,
-                "Scheduling flow continuation due to active schedule"
-            );
-
-            // Schedule the next flow immediately
-            self.trigger_flow_common(
-                flow_finish_time,
-                flow_binding,
-                Some(FlowTriggerRule::Schedule(active_schedule.clone())),
-                vec![FlowActivationCause::AutoPolling(
-                    FlowActivationCauseAutoPolling {
-                        activation_time: flow_finish_time,
-                    },
-                )],
-                None,
-            )
-            .await?;
         }
 
         Ok(())
@@ -545,6 +485,74 @@ impl FlowSchedulingHelper {
         }
 
         Ok(flow)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FlowSchedulingService for FlowSchedulingServiceImpl {
+    async fn schedule_late_flow_activations(
+        &self,
+        flow_success_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+        late_activation_causes: &[FlowActivationCause],
+    ) -> Result<(), InternalError> {
+        tracing::info!(
+            ?flow_binding,
+            late_activation_causes = late_activation_causes.len(),
+            "Scheduling late flow activations"
+        );
+
+        // Schedule the next flow immediately
+        self.trigger_flow_common(
+            flow_success_time,
+            flow_binding,
+            None,
+            late_activation_causes.to_vec(),
+            None,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn try_schedule_auto_polling_flow_continuation_if_enabled(
+        &self,
+        flow_finish_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+        trigger_state: &FlowTriggerState,
+    ) -> Result<(), InternalError> {
+        // Try locating an active schedule for this flow
+        let maybe_active_schedule = if trigger_state.is_active() {
+            trigger_state.try_get_schedule_rule()
+        } else {
+            None
+        };
+
+        // If there is an active schedule, schedule the next run immediately
+        if let Some(active_schedule) = maybe_active_schedule {
+            tracing::info!(
+                ?flow_binding,
+                "Scheduling flow continuation due to active schedule"
+            );
+
+            // Schedule the next flow immediately
+            self.trigger_flow_common(
+                flow_finish_time,
+                flow_binding,
+                Some(FlowTriggerRule::Schedule(active_schedule.clone())),
+                vec![FlowActivationCause::AutoPolling(
+                    FlowActivationCauseAutoPolling {
+                        activation_time: flow_finish_time,
+                    },
+                )],
+                None,
+            )
+            .await?;
+        }
+
+        Ok(())
     }
 }
 

@@ -385,7 +385,9 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             existing
                 .update_trigger_state(event_id, self.time_source.now(), paused_manual, stop_policy)
                 .int_err()?;
-            Ok(existing.clone())
+            let state = existing.clone();
+            existing.take_pending_events();
+            Ok(state)
         } else {
             let user_intent = if paused_manual {
                 FlowProcessUserIntent::Paused
@@ -426,7 +428,9 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             .on_flow_outcome(event_id, self.time_source.now(), event_time, flow_outcome)
             .int_err()?;
 
-        Ok(process_state.clone())
+        let result = process_state.clone();
+        process_state.take_pending_events();
+        Ok(result)
     }
 
     async fn on_flow_scheduled(
@@ -448,7 +452,9 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
             .on_scheduled(event_id, self.time_source.now(), planned_at)
             .int_err()?;
 
-        Ok(process_state.clone())
+        let result = process_state.clone();
+        process_state.take_pending_events();
+        Ok(result)
     }
 
     async fn delete_process_states_by_scope(

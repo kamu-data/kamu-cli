@@ -26,7 +26,7 @@ use messaging_outbox::*;
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
-use crate::{FlowAbortHelper, FlowSchedulingHelper};
+use crate::{FlowAbortHelper, FlowSchedulingServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -123,7 +123,9 @@ impl FlowAgentImpl {
     ) -> Result<(), InternalError> {
         // Extract necessary dependencies
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        let scheduling_service = target_catalog
+            .get_one::<FlowSchedulingServiceImpl>()
+            .unwrap();
 
         // How many waiting flows do we have?
         let waiting_filters = FlowFilters {
@@ -157,7 +159,7 @@ impl FlowAgentImpl {
             while let Some(flow) = state_stream.try_next().await? {
                 // We need to re-evaluate reactive conditions only
                 if let Some(FlowStartCondition::Reactive(b)) = &flow.start_condition {
-                    scheduling_helper
+                    scheduling_service
                         .trigger_flow_common(
                             start_time,
                             &flow.flow_binding,
@@ -197,7 +199,9 @@ impl FlowAgentImpl {
             .into_iter()
             .partition(|config| matches!(config.rule, FlowTriggerRule::Schedule(_)));
 
-        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        let scheduling_service = target_catalog
+            .get_one::<FlowSchedulingServiceImpl>()
+            .unwrap();
 
         // Activate all configs, ensuring schedule configs precedes non-schedule configs
         // (this i.e. forces all root datasets to be updated earlier than the derived)
@@ -213,7 +217,7 @@ impl FlowAgentImpl {
                 .try_get_pending_flow(&enabled_trigger.flow_binding)
                 .await?;
             if maybe_pending_flow_id.is_none() {
-                scheduling_helper
+                scheduling_service
                     .activate_flow_trigger(
                         target_catalog,
                         start_time,
@@ -587,8 +591,10 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
 
         // Active trigger => activate it
         if message.trigger_status.is_active() {
-            let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
-            scheduling_helper
+            let scheduling_service = target_catalog
+                .get_one::<FlowSchedulingServiceImpl>()
+                .unwrap();
+            scheduling_service
                 .activate_flow_trigger(
                     target_catalog,
                     self.agent_config.round_time(message.event_time)?,

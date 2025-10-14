@@ -12,7 +12,7 @@ use std::sync::Arc;
 use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::FlowSchedulingHelper;
+use crate::FlowSchedulingService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ use crate::FlowSchedulingHelper;
 pub struct FlowProcessStateProjector {
     flow_process_state_repository: Arc<dyn FlowProcessStateRepository>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
-    flow_scheduling_helper: Arc<FlowSchedulingHelper>,
+    flow_scheduling_service: Arc<dyn FlowSchedulingService>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -218,7 +218,7 @@ impl FlowProcessStateProjector {
         {
             // Schedule next flow immediately, if we had any late activation cause
             if !completed_event.late_activation_causes.is_empty() {
-                self.flow_scheduling_helper
+                self.flow_scheduling_service
                     .schedule_late_flow_activations(
                         flow_event.event_time(),
                         flow_event.flow_binding(),
@@ -232,7 +232,7 @@ impl FlowProcessStateProjector {
         if let Some(trigger_state) = &impact.maybe_latest_trigger_state {
             // We don't care whether we failed or succeeded,
             // as long as the trigger is still active.
-            self.flow_scheduling_helper
+            self.flow_scheduling_service
                 .try_schedule_auto_polling_flow_continuation_if_enabled(
                     flow_event.event_time(),
                     flow_event.flow_binding(),
@@ -368,6 +368,7 @@ impl FlowSystemEventProjector for FlowProcessStateProjector {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 struct FlowProcessEventsImpact {
     maybe_latest_trigger_state: Option<FlowTriggerState>,
 }
