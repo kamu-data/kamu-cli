@@ -302,17 +302,17 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
             struct EventRow {
-                pub flow_id: FlowID,
+                pub flow_id: i64,
                 pub event_id: i64,
-                pub event_payload: sqlx::types::JsonValue
+                pub event_payload: serde_json::Value,
             }
 
             let query_str = format!(
                 r#"
                 SELECT
-                    flow_id as "flow_id: _",
-                    event_id as "event_id: _",
-                    event_payload as "event_payload: _"
+                    flow_id,
+                    event_id,
+                    event_payload
                 FROM flow_events
                     WHERE flow_id IN ({})
                     ORDER BY event_id
@@ -323,29 +323,22 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 )
             );
 
-            let mut query = sqlx::query(&query_str);
-            for task_id in queries {
-                let task_id: i64 = task_id.try_into().unwrap();
-                query = query.bind(task_id);
+            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            for flow_id in queries {
+                let flow_id: i64 = flow_id.try_into().unwrap();
+                query = query.bind(flow_id);
             }
 
-            use sqlx::Row;
-
             let mut query_stream = query
-                .try_map(|row: sqlx::sqlite::SqliteRow| {
-                    let flow_id: u64 = row.get(0);
-                    let event_id: i64 = row.get(1);
-                    let event_payload: sqlx::types::JsonValue = row.get(2);
-
-                    let event = serde_json::from_value::<FlowEvent>(event_payload)
-                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-
-                    Ok((FlowID::new(flow_id), EventID::new(event_id), event))
-                })
                 .fetch(connection_mut)
                 .map_err(|e| GetEventsError::Internal(e.int_err()));
 
-            while let Some((flow_id, event_id, event)) = query_stream.try_next().await? {
+            while let Some(row) = query_stream.try_next().await? {
+                let flow_id = FlowID::new(u64::try_from(row.flow_id).unwrap());
+                let event_id = EventID::new(row.event_id);
+                let event = serde_json::from_value::<FlowEvent>(row.event_payload)
+                    .map_err(|e| GetEventsError::Internal(e.int_err()))?;
+
                 yield Ok((flow_id, event_id, event));
             }
         })

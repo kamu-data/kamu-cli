@@ -197,17 +197,17 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
             struct EventRow {
-                pub task_d: TaskID,
+                pub task_id: i64,
                 pub event_id: i64,
-                pub event_payload: sqlx::types::JsonValue
+                pub event_payload: serde_json::Value,
             }
 
             let query_str = format!(
                 r#"
                 SELECT
-                    task_id as "task_id: _",
-                    event_id as "event_id: _",
-                    event_payload as "event_payload: _"
+                    task_id,
+                    event_id,
+                    event_payload
                 FROM task_events
                     WHERE task_id IN ({})
                     ORDER BY event_id
@@ -218,29 +218,22 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
                 )
             );
 
-            let mut query = sqlx::query(&query_str);
+            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
             for task_id in queries {
                 let task_id: i64 = task_id.try_into().unwrap();
                 query = query.bind(task_id);
             }
 
-            use sqlx::Row;
-
             let mut query_stream = query
-                .try_map(|row: sqlx::sqlite::SqliteRow| {
-                    let task_id: u64 = row.get(0);
-                    let event_id: i64 = row.get(1);
-                    let event_payload: sqlx::types::JsonValue = row.get(2);
-
-                    let event = serde_json::from_value::<TaskEvent>(event_payload)
-                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-
-                    Ok((TaskID::new(task_id), EventID::new(event_id), event))
-                })
                 .fetch(connection_mut)
                 .map_err(|e| GetEventsError::Internal(e.int_err()));
 
-            while let Some((task_id, event_id, event)) = query_stream.try_next().await? {
+            while let Some(event_row) = query_stream.try_next().await? {
+                let task_id = TaskID::new(u64::try_from(event_row.task_id).unwrap());
+                let event_id = EventID::new(event_row.event_id);
+                let event = serde_json::from_value::<TaskEvent>(event_row.event_payload)
+                    .map_err(|e| GetEventsError::Internal(e.int_err()))?;
+
                 yield Ok((task_id, event_id, event));
             }
         })
