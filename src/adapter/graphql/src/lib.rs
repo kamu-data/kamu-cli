@@ -12,6 +12,8 @@
 #![feature(let_chains)]
 
 pub mod config;
+pub mod dataloader;
+mod dependencies;
 pub mod extensions;
 pub mod guards;
 pub(crate) mod mutations;
@@ -26,6 +28,7 @@ pub mod traits;
 pub(crate) mod utils;
 
 pub use config::*;
+pub use dependencies::*;
 pub use guards::*;
 pub use root::*;
 
