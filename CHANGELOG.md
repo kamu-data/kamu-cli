@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.250.0] - 2025-10-14
 ### Added
 - New `delivery_timeout` configuration for `webhooks_config`
 ### Changed
