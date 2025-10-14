@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT task_id FROM tasks\n                WHERE task_status = 'queued'\n                ORDER BY task_id\n                LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f296cc2cce6d3cbd1e8411f217022ee69edce519db7d6ed89e6e2debbf02d37e"
+}

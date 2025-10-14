@@ -254,7 +254,7 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
                     WHERE subscription_id = $1
                          AND (cast($2 as INT8) IS NULL or event_id > $2)
                          AND (cast($3 as INT8) IS NULL or event_id <= $3)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 subscription_id,
                 maybe_from_id,
@@ -293,7 +293,7 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
                     subscription_id, event_id, event_payload
                 FROM webhook_subscription_events
                     WHERE subscription_id = ANY($1)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 &subscription_ids,
             ).try_map(|event_row| {

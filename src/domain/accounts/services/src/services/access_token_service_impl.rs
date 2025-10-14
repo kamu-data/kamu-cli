@@ -47,7 +47,6 @@ pub struct AccessTokenServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[interface(dyn AccessTokenService)]
 impl AccessTokenServiceImpl {
     async fn notify_access_token_created(
         &self,

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT event_id, event_payload\n                FROM flow_events\n                WHERE flow_id = $1\n                    AND (cast($2 as INT8) IS NULL OR event_id > $2)\n                    AND (cast($3 as INT8) IS NULL OR event_id <= $3)\n                ORDER BY event_id ASC\n                ",
+  "query": "\n                SELECT event_id, event_payload\n                FROM flow_events\n                WHERE flow_id = $1\n                    AND (cast($2 as INT8) IS NULL OR event_id > $2)\n                    AND (cast($3 as INT8) IS NULL OR event_id <= $3)\n                ORDER BY event_id\n                ",
   "describe": {
     "columns": [
       {
@@ -26,5 +26,5 @@
       false
     ]
   },
-  "hash": "4fe6140fe57e34250cd77e7d28a6f1a071848bba40901c834747b68592ff2fb8"
+  "hash": "d28a059fa4553ab8c9e8be4c1db4f409c4a2addcb2f3b94ea14e12df32cb373d"
 }

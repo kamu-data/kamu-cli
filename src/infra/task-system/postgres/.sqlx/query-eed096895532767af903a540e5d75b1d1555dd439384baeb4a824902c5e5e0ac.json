@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT event_id, event_payload FROM task_events\n                    WHERE task_id = $1\n                         AND (cast($2 as INT8) IS NULL or event_id > $2)\n                         AND (cast($3 as INT8) IS NULL or event_id <= $3)\n                    ORDER BY event_id ASC\n                ",
+  "query": "\n                SELECT event_id, event_payload FROM task_events\n                    WHERE task_id = $1\n                         AND (cast($2 as INT8) IS NULL or event_id > $2)\n                         AND (cast($3 as INT8) IS NULL or event_id <= $3)\n                    ORDER BY event_id\n                ",
   "describe": {
     "columns": [
       {
@@ -26,5 +26,5 @@
       false
     ]
   },
-  "hash": "4728e19ed95adfd6b51ed469d781f248ce8263a55c4a8d1fe264ebac53bc4cc0"
+  "hash": "eed096895532767af903a540e5d75b1d1555dd439384baeb4a824902c5e5e0ac"
 }

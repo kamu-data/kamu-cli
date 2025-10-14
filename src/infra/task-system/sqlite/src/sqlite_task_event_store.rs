@@ -166,7 +166,7 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
                     WHERE task_id = $1
                          AND (cast($2 as INT8) IS NULL or event_id > $2)
                          AND (cast($3 as INT8) IS NULL or event_id <= $3)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 task_id,
                 maybe_from_id,
@@ -210,7 +210,7 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
                     event_payload as "event_payload: _"
                 FROM task_events
                     WHERE task_id IN ({})
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 sqlite_generate_placeholders_list(
                     queries.len(),
@@ -341,7 +341,7 @@ impl TaskEventStore for SqliteTaskEventStore {
             r#"
             SELECT task_id FROM tasks
                 WHERE task_status = 'queued'
-                ORDER BY task_id ASC
+                ORDER BY task_id
                 LIMIT 1
             "#,
         )
@@ -370,7 +370,7 @@ impl TaskEventStore for SqliteTaskEventStore {
                 r#"
                 SELECT task_id FROM tasks
                     WHERE task_status == 'running'
-                    ORDER BY task_id ASC
+                    ORDER BY task_id
                     LIMIT $1 OFFSET $2
                 "#,
                 limit,

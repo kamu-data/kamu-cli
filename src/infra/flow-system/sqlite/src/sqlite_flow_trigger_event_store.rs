@@ -60,7 +60,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
                     AND scope_data = $2
                     AND (cast($3 as INT8) IS NULL or event_id > $3)
                     AND (cast($4 as INT8) IS NULL or event_id <= $4)
-                ORDER BY event_id ASC
+                ORDER BY event_id
                 "#,
                 flow_type,
                 scope_json_str,

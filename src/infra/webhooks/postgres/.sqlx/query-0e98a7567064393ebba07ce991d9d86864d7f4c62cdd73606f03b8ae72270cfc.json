@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT event_id, event_payload FROM webhook_subscription_events\n                    WHERE subscription_id = $1\n                         AND (cast($2 as INT8) IS NULL or event_id > $2)\n                         AND (cast($3 as INT8) IS NULL or event_id <= $3)\n                    ORDER BY event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_payload",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0e98a7567064393ebba07ce991d9d86864d7f4c62cdd73606f03b8ae72270cfc"
+}

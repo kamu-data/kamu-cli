@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT flow_id, event_id, event_payload\n                FROM flow_events\n                WHERE flow_id = ANY($1)\n                ORDER BY event_id ASC\n                ",
+  "query": "\n                SELECT flow_id, event_id, event_payload\n                FROM flow_events\n                WHERE flow_id = ANY($1)\n                ORDER BY event_id\n                ",
   "describe": {
     "columns": [
       {
@@ -30,5 +30,5 @@
       false
     ]
   },
-  "hash": "ffff8fcd2b8ba38101e39fae7f226d466f20c5178f979303dd9974d008524e83"
+  "hash": "d3ce5abe7799efb6f8d1a1337f97fba8f7dd88cce3a0774d93d1fa596ba4dcf8"
 }

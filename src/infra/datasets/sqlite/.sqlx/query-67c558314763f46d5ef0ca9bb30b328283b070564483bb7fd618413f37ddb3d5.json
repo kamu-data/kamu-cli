@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    dataset_id   as \"id: _\",\n                    owner_id     as \"owner_id: _\",\n                    owner_name,\n                    dataset_name as name,\n                    created_at   as \"created_at: _\",\n                    kind         as \"kind: _\"\n                FROM dataset_entries\n                ORDER BY owner_name, dataset_name ASC\n                LIMIT $1 OFFSET $2\n                ",
+  "query": "\n                SELECT\n                    dataset_id   as \"id: _\",\n                    owner_id     as \"owner_id: _\",\n                    owner_name,\n                    dataset_name as name,\n                    created_at   as \"created_at: _\",\n                    kind         as \"kind: _\"\n                FROM dataset_entries\n                ORDER BY owner_name, dataset_name\n                LIMIT $1 OFFSET $2\n                ",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "1682d31abf224e141e4e3630668b3508807161bca691e1be2b7b2697ef7794f1"
+  "hash": "67c558314763f46d5ef0ca9bb30b328283b070564483bb7fd618413f37ddb3d5"
 }
