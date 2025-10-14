@@ -16,7 +16,7 @@ use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_webhooks::{DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES, DEFAULT_WEBHOOK_REQUEST_TIMEOUT};
+use kamu_webhooks::{DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES, DEFAULT_WEBHOOK_DELIVERY_TIMEOUT};
 use merge::Merge;
 use merge::option::overwrite_none;
 use serde::{Deserialize, Serialize};
@@ -1463,7 +1463,7 @@ impl Default for WebhooksConfig {
     fn default() -> Self {
         Self {
             max_consecutive_failures: Some(DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES),
-            delivery_timeout: Some(DEFAULT_WEBHOOK_REQUEST_TIMEOUT),
+            delivery_timeout: Some(DEFAULT_WEBHOOK_DELIVERY_TIMEOUT),
         }
     }
 }

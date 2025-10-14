@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use dill::*;
 use internal_error::InternalError;
 use kamu_accounts::{
     AccessToken,
@@ -38,8 +37,8 @@ pub const ENCODED_ACCESS_TOKEN_LENGTH: usize = 61;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn AccessTokenService)]
+#[dill::component]
+#[dill::interface(dyn AccessTokenService)]
 pub struct AccessTokenServiceImpl {
     access_token_repository: Arc<dyn AccessTokenRepository>,
     time_source: Arc<dyn SystemTimeSource>,

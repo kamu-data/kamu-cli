@@ -12,7 +12,7 @@
 use chrono::Duration;
 
 pub const DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES: u32 = 5;
-pub const DEFAULT_WEBHOOK_REQUEST_TIMEOUT: u32 = 10;
+pub const DEFAULT_WEBHOOK_DELIVERY_TIMEOUT: u32 = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +35,7 @@ impl Default for WebhooksConfig {
     fn default() -> Self {
         Self {
             max_consecutive_failures: DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES,
-            delivery_timeout: Duration::seconds(i64::from(DEFAULT_WEBHOOK_REQUEST_TIMEOUT)),
+            delivery_timeout: Duration::seconds(i64::from(DEFAULT_WEBHOOK_DELIVERY_TIMEOUT)),
         }
     }
 }
