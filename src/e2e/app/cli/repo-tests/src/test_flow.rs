@@ -96,6 +96,99 @@ pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApi
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_gql_dataset_flow_processes(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+
+    // The query is almost identical to kamu-web-ui, for ease of later edits.
+
+    kamu_api_server_client
+        .graphql_api_call_assert(
+            indoc::indoc!(
+                r#"
+                query datasetFlowProcesses() {
+                  datasets {
+                    byId(datasetId: $datasetId) {
+                      flows {
+                        processes {
+                          primary {
+                            __typename
+                            	flowType
+	                            dataset {
+                                alias
+                              }
+                              summary {
+                                effectiveState
+                                consecutiveFailures
+                              }
+                          }
+                          webhooks {
+                            __typename
+                            rollup {
+                              __typename
+                              total
+                            }
+                          }
+                          __typename
+                        }
+                        __typename
+                      }
+
+                      __typename
+                    }
+                    __typename
+                  }
+                }
+                "#
+            )
+            .replace("$datasetId", &format!("\"{dataset_id}\""))
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "__typename": "Datasets",
+                    "byId": {
+                      "__typename": "Dataset",
+                      "flows": {
+                        "__typename": "DatasetFlows",
+                        "processes": {
+                          "__typename": "DatasetFlowProcesses",
+                          "primary": {
+                            "__typename": "DatasetFlowProcess",
+                            "dataset": {
+                              "alias": "player-scores"
+                            },
+                            "flowType": "INGEST",
+                            "summary": {
+                              "consecutiveFailures": 0,
+                              "effectiveState": "UNCONFIGURED"
+                            }
+                          },
+                          "webhooks": {
+                            "__typename": "WebhookFlowSubProcessGroup",
+                            "rollup": {
+                              "__typename": "FlowProcessGroupRollup",
+                              "total": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
