@@ -247,7 +247,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
                 WHERE flow_id = $1
                     AND (cast($2 as INT8) IS NULL OR event_id > $2)
                     AND (cast($3 as INT8) IS NULL OR event_id <= $3)
-                ORDER BY event_id ASC
+                ORDER BY event_id
                 "#,
                 flow_id,
                 maybe_from_id,
@@ -281,7 +281,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
                 SELECT flow_id, event_id, event_payload
                 FROM flow_events
                 WHERE flow_id = ANY($1)
-                ORDER BY event_id ASC
+                ORDER BY event_id
                 "#,
                 &flow_ids,
             ).try_map(|event_row| {
@@ -568,7 +568,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 WHERE
                     f.scheduled_for_activation_at IS NOT NULL AND
                     (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
-                ORDER BY f.scheduled_for_activation_at ASC
+                ORDER BY f.scheduled_for_activation_at
                 LIMIT 1
             "#,
         )
@@ -599,7 +599,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 WHERE
                     f.scheduled_for_activation_at = $1 AND
                     (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
-                ORDER BY f.flow_id ASC
+                ORDER BY f.flow_id
             "#,
             scheduled_for_activation_at,
         )

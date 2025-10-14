@@ -272,7 +272,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 WHERE flow_id = $1
                     AND (cast($2 as INT8) IS NULL OR event_id > $2)
                     AND (cast($3 as INT8) IS NULL OR event_id <= $3)
-                ORDER BY event_id ASC
+                ORDER BY event_id
                 "#,
                 flow_id,
                 maybe_from_id,
@@ -315,7 +315,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                     event_payload as "event_payload: _"
                 FROM flow_events
                     WHERE flow_id IN ({})
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 sqlite_generate_placeholders_list(
                     queries.len(),
@@ -650,7 +650,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 WHERE
                     f.scheduled_for_activation_at IS NOT NULL AND
                     (f.flow_status = 'waiting' OR f.flow_status = 'retrying')
-                ORDER BY f.scheduled_for_activation_at ASC
+                ORDER BY f.scheduled_for_activation_at
                 LIMIT 1
             "#,
         )
@@ -680,7 +680,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 WHERE
                     f.scheduled_for_activation_at = $1 AND
                     (f.flow_status = 'waiting' OR f.flow_status = 'retrying')
-                ORDER BY f.flow_id ASC
+                ORDER BY f.flow_id
             "#,
             scheduled_for_activation_at,
         )

@@ -94,7 +94,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ?
-            ORDER BY sequence_number ASC
+            ORDER BY sequence_number
             "#,
             dataset_id_str,
             block_ref_str,

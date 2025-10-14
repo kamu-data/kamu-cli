@@ -267,7 +267,7 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
                     WHERE subscription_id = $1
                          AND (cast($2 as INT8) IS NULL or event_id > $2)
                          AND (cast($3 as INT8) IS NULL or event_id <= $3)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 subscription_id,
                 maybe_from_id,
@@ -316,7 +316,7 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
                     event_payload as "event_payload: _"
                 FROM webhook_subscription_events
                     WHERE subscription_id IN ({})
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 sqlite_generate_placeholders_list(
                     subscription_ids.len(),
