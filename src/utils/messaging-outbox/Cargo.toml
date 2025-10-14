@@ -20,6 +20,9 @@ workspace = true
 [lib]
 doctest = false
 
+[features]
+default = []
+sqlx = ["dep:sqlx"]
 
 [dependencies]
 database-common = { workspace = true }
@@ -42,6 +45,12 @@ thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
+
+# Optional
+sqlx = { optional = true, version = "0.8", default-features = false, features = [
+    "macros",
+] }
+
 
 [dev-dependencies]
 kamu-messaging-outbox-inmem = { workspace = true }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                    SELECT\n                        consumer_name, producer_name, last_consumed_message_id\n                    FROM outbox_message_consumptions\n                ",
+  "query": "\n                SELECT\n                    consumer_name, producer_name, last_consumed_message_id\n                FROM outbox_message_consumptions\n                ",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       false
     ]
   },
-  "hash": "a00e0b9831fc78664e606f8f6b2316cbd7ef346b7bbcd9c0e8aaa26fe0a2d95a"
+  "hash": "2756adcb011760fb903466580bd823ec9ad22989d5974435081c7a3e1924cb21"
 }

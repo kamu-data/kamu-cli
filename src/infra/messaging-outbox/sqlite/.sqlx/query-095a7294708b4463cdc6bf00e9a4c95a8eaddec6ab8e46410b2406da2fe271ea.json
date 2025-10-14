@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    producer_name,\n                    IFNULL(MAX(message_id), 0) AS max_message_id\n                FROM outbox_messages\n                GROUP BY producer_name\n            ",
+  "query": "\n            SELECT\n                producer_name,\n                IFNULL(MAX(message_id), 0) AS max_message_id\n            FROM outbox_messages\n            GROUP BY producer_name\n            ",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "ddc1e8352acde4e016fcba702e93edd26d01ff0ae4926d38936e47ba538f2635"
+  "hash": "095a7294708b4463cdc6bf00e9a4c95a8eaddec6ab8e46410b2406da2fe271ea"
 }
