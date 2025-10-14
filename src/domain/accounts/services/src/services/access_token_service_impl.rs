@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use dill::*;
 use internal_error::InternalError;
 use kamu_accounts::{
     AccessToken,
@@ -38,6 +37,8 @@ pub const ENCODED_ACCESS_TOKEN_LENGTH: usize = 61;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn AccessTokenService)]
 pub struct AccessTokenServiceImpl {
     access_token_repository: Arc<dyn AccessTokenRepository>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -46,22 +47,7 @@ pub struct AccessTokenServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AccessTokenService)]
 impl AccessTokenServiceImpl {
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn new(
-        access_token_repository: Arc<dyn AccessTokenRepository>,
-        time_source: Arc<dyn SystemTimeSource>,
-        outbox: Arc<dyn Outbox>,
-    ) -> Self {
-        Self {
-            access_token_repository,
-            time_source,
-            outbox,
-        }
-    }
-
     async fn notify_access_token_created(
         &self,
         token_name: String,

@@ -1003,7 +1003,10 @@ pub fn register_config_in_catalog(
             max_consecutive_failures > 0,
             "Webhooks max_consecutive_failures must be > 0"
         );
-        catalog_builder.add_value(kamu_webhooks::WebhooksConfig::new(max_consecutive_failures));
+        catalog_builder.add_value(kamu_webhooks::WebhooksConfig::new(
+            max_consecutive_failures,
+            Duration::seconds(i64::from(webhooks_config.delivery_timeout.unwrap())),
+        ));
     }
 
     // Search configuration

@@ -16,6 +16,7 @@ use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_webhooks::{DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES, DEFAULT_WEBHOOK_DELIVERY_TIMEOUT};
 use merge::Merge;
 use merge::option::overwrite_none;
 use serde::{Deserialize, Serialize};
@@ -1449,6 +1450,7 @@ impl Default for TaskAgentConfig {
 #[merge(strategy = overwrite_none)]
 pub struct WebhooksConfig {
     pub max_consecutive_failures: Option<u32>,
+    pub delivery_timeout: Option<u32>,
 }
 
 impl WebhooksConfig {
@@ -1460,7 +1462,8 @@ impl WebhooksConfig {
 impl Default for WebhooksConfig {
     fn default() -> Self {
         Self {
-            max_consecutive_failures: Some(5),
+            max_consecutive_failures: Some(DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES),
+            delivery_timeout: Some(DEFAULT_WEBHOOK_DELIVERY_TIMEOUT),
         }
     }
 }

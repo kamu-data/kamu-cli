@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- New `delivery_timeout` configuration for `webhooks_config`
 ### Changed
 - Discontinued binary releases for macOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
 - Update `merge` crate version `0.1` -> `0.2`
