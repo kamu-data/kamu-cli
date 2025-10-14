@@ -12,7 +12,40 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
-### Fixed
+### Added
+- Flow process state projection model and GQL API (individual flow badges, dashboard cards):
+   - Flow process is a sequence of flow runs, and it's state is automatically projected
+   - Flow badges are statuses of flow processes (primary process + associated webhook channels)
+   - Flow dashboards are sortable and filterable card lists with pagination support
+       that represent multiple automated flow runs and facilitate
+       effective monitoring and triaging activities for the platform
+   - Unaffected with manual launches, only represent automated processes
+   - Higher level integration events model, which replaces `FlowProgressMessage`:
+      - Notify about detected flow failure
+      - Notify about change of flow process effective state
+      - Notify separately about automatic stops (too high failure rate or unrecoverable error)
+   - Projection decides on auto-stopping triggers and whether to schedule next periodic flows
+   - Flow agent only invokes success propagation on task completion, and does not interfeer with scheduling logic.
+   - Introduced `FlowEventCompleted` event that wraps the flow, and transports outcome + late activation causes
+- Internal event-sourcing projection mechanism within the flow system:
+   - Follows changes of 3 original event streams (flow configs, triggers, and runs)
+   - Shared event identifiers between events of the source streams
+   - Union-based view of merged flow stream (without physical copying)
+   - Synchronizes projections based on the merged event stream
+   - Postgres:
+      - guaranteeing proper event ordering via transaction identifiers tracking
+      - utilized LISTEN/NOTIFY mechanism to propagate changes
+   - Sqlite: incremental listening timeout approach, no risk of event ordering issues
+   - In-memory: using broadcast signals to notify about new events
+   - Flow agent tests are now based on the similar projection mechanism instead of query snapshots
+- Introduced abstraction for background agents: API server creates a collection of Tokio tasks
+    instead of directly listing particular agents.
+- Introduced automated outbox wiping procedure in Postgres   
+### Changed
+- Optimized database indices after large flow system refactoring
+- Removed obsolete "allPaused" operation from triggers at dataset level
+- Tests: refactoring - extracted common GQL harnesses for all flow tests
+### Fixed    
 - SQLX: avoid using untyped row interfaces like sqlx::Row|SqliteRow|PgRow
 
 ## [0.250.0] - 2025-10-14
