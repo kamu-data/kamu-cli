@@ -333,7 +333,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                     kind         as "kind: _"
                 FROM dataset_entries
                 WHERE owner_id = $1
-                ORDER BY dataset_name ASC
+                ORDER BY dataset_name
                 LIMIT $2 OFFSET $3
                 "#,
                 owner_id_as_str,
