@@ -24,8 +24,7 @@ pub struct Datasets;
 impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
 
-    async fn by_dataset_ref(
-        &self,
+    pub async fn by_dataset_ref(
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Dataset>> {
@@ -132,7 +131,7 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let dataset_id: odf::DatasetID = dataset_id.into();
 
-        self.by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
+        Self::by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
     }
 
     /// Returns multiple datasets by their IDs
@@ -160,7 +159,7 @@ impl Datasets {
         ctx: &Context<'_>,
         dataset_ref: DatasetRef<'_>,
     ) -> Result<Option<Dataset>> {
-        self.by_dataset_ref(ctx, &dataset_ref).await
+        Self::by_dataset_ref(ctx, &dataset_ref).await
     }
 
     /// Returns multiple datasets by their IDs or aliases
@@ -190,8 +189,7 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
-        self.by_dataset_ref(ctx, &dataset_alias.into_local_ref())
-            .await
+        Self::by_dataset_ref(ctx, &dataset_alias.into_local_ref()).await
     }
 
     #[graphql(skip)]
