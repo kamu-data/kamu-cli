@@ -14,21 +14,29 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::AccountService;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 
-use crate::data_loader::EntityLoader;
+use crate::data_loader::{AccountEntityLoader, DatasetHandleLoader};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type EntityDataLoader = DataLoader<EntityLoader>;
+pub type AccountEntityDataLoader = DataLoader<AccountEntityLoader>;
+pub type DatasetHandleDataLoader = DataLoader<DatasetHandleLoader>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn data_loader(catalog: &dill::Catalog) -> EntityDataLoader {
+// Public only for tests
+pub fn account_entity_data_loader(catalog: &dill::Catalog) -> AccountEntityDataLoader {
     let account_service = catalog.get_one::<dyn AccountService>().unwrap();
+
+    DataLoader::new(AccountEntityLoader::new(account_service), tokio::spawn)
+}
+
+// Public only for tests
+pub fn dataset_handle_data_loader(catalog: &dill::Catalog) -> DatasetHandleDataLoader {
     let rebac_dataset_registry_facade =
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
     DataLoader::new(
-        EntityLoader::new(account_service, rebac_dataset_registry_facade),
+        DatasetHandleLoader::new(rebac_dataset_registry_facade),
         tokio::spawn,
     )
 }
