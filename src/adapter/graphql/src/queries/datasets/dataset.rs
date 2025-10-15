@@ -253,7 +253,7 @@ impl Dataset {
         DatasetCollaboration::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
-    /// Access to the dataset's webhooks management functionality
+    /// Access to the dataset's webhook management functionality
     async fn webhooks(&self) -> DatasetWebhooks {
         DatasetWebhooks::new(&self.dataset_request_state)
     }

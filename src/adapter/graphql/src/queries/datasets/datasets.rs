@@ -157,7 +157,7 @@ impl Datasets {
         self.by_dataset_refs(ctx, dataset_refs, skip_missing).await
     }
 
-    /// Returns a dataset by a ID or alias, if found
+    /// Returns a dataset by an ID or alias, if found
     #[tracing::instrument(level = "info", name = Datasets_by_ref, skip_all, fields(%dataset_ref))]
     async fn by_ref(
         &self,
