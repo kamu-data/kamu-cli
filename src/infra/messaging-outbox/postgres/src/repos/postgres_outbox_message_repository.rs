@@ -18,22 +18,17 @@ use crate::domain::*;
 
 #[component]
 #[interface(dyn OutboxMessageRepository)]
-pub struct SqliteOutboxMessageRepository {
-    transaction: TransactionRefT<sqlx::Sqlite>,
+pub struct PostgresOutboxMessageRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[async_trait::async_trait]
-impl OutboxMessageRepository for SqliteOutboxMessageRepository {
+impl OutboxMessageRepository for PostgresOutboxMessageRepository {
     async fn push_message(&self, message: NewOutboxMessage) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-
-        let message_content_json = message.content_json;
-        let message_version: i32 = message
-            .version
-            .try_into()
-            .expect("Version out of range for i32");
+        let message_version: i32 = message.version.try_into().unwrap();
 
         sqlx::query!(
             r#"
@@ -41,7 +36,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                 VALUES ($1, $2, $3, $4)
             "#,
             message.producer_name,
-            message_content_json,
+            &message.content_json,
             message.occurred_on,
             message_version,
         )
@@ -57,63 +52,57 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
     ) -> OutboxMessageStream {
-        let unfiltered = above_boundaries_by_producer.is_empty();
-
-        let json_bounds = serde_json::to_string(
-            &above_boundaries_by_producer
-                .into_iter()
-                .map(|(p, id)| serde_json::json!({"p": p, "id": id.into_inner()}))
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
+        let (producers, above_ids): (Vec<String>, Vec<i64>) = above_boundaries_by_producer
+            .into_iter()
+            .map(|(p, v)| (p, v.into_inner()))
+            .unzip();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-            let batch_size = i64::try_from(batch_size).unwrap();
-
-            let mut stream = if unfiltered {
+            let mut stream = if producers.is_empty() {
                 sqlx::query_as!(
                     OutboxMessageRow,
                     r#"
                     SELECT
                         message_id,
                         producer_name,
-                        content_json as "content_json: _",
-                        occurred_on as "occurred_on: _",
+                        content_json,
+                        occurred_on,
                         version as "version!"
                     FROM outbox_messages
                     ORDER BY message_id
                     LIMIT $1
                     "#,
-                    batch_size,
-                ).fetch(connection_mut)
+                    i64::try_from(batch_size).unwrap()
+                )
+                .fetch(connection_mut)
             } else {
                 sqlx::query_as!(
                     OutboxMessageRow,
                     r#"
                     WITH bounds AS (
-                        SELECT
-                            json_extract(value, '$.p')  AS producer_name,
-                            json_extract(value, '$.id') AS above_id
-                        FROM json_each($1)
+                        SELECT *
+                        FROM UNNEST($1::text[], $2::bigint[]) AS b(producer_name, above_id)
                     )
                     SELECT
                         m.message_id,
                         m.producer_name,
-                        m.content_json as "content_json: _",
-                        m.occurred_on as "occurred_on: _",
+                        m.content_json,
+                        m.occurred_on,
                         m.version as "version!"
                     FROM outbox_messages AS m
                     JOIN bounds AS b
                         ON m.producer_name = b.producer_name AND m.message_id > b.above_id
                     ORDER BY m.message_id
-                    LIMIT $2
+                    LIMIT $3
                     "#,
-                    json_bounds,
-                    batch_size
-                ).fetch(connection_mut)
+                    &producers,
+                    &above_ids,
+                    i64::try_from(batch_size).unwrap()
+                )
+                .fetch(connection_mut)
             };
 
             while let Some(message_row) = stream.try_next().await.map_err(ErrorIntoInternal::int_err)? {
@@ -133,7 +122,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
             r#"
             SELECT
                 producer_name,
-                IFNULL(MAX(message_id), 0) AS max_message_id
+                max(message_id) AS max_message_id
             FROM outbox_messages
             GROUP BY producer_name
             "#,
@@ -146,8 +135,8 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
             .into_iter()
             .map(|r| {
                 (
-                    r.producer_name.unwrap(),
-                    OutboxMessageID::new(r.max_message_id),
+                    r.producer_name,
+                    OutboxMessageID::new(r.max_message_id.unwrap_or(0)),
                 )
             })
             .collect())

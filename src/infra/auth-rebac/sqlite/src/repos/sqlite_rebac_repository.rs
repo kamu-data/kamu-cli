@@ -12,10 +12,9 @@ use std::num::NonZeroUsize;
 
 use database_common::{TransactionRefT, sqlite_generate_placeholders_tuple_list_2};
 use dill::{component, interface};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::*;
-use sqlx::sqlite::SqliteRow;
-use sqlx::{QueryBuilder, Row};
+use sqlx::QueryBuilder;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,21 +22,6 @@ use sqlx::{QueryBuilder, Row};
 #[interface(dyn RebacRepository)]
 pub struct SqliteRebacRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-}
-
-impl SqliteRebacRepository {
-    fn map_entity_row(row: &SqliteRow) -> Result<EntitiesWithRelation<'static>, InternalError> {
-        let raw_entity = EntitiesWithRelationRowModel {
-            subject_entity_type: row.get(0),
-            subject_entity_id: row.get(1),
-            relationship: row.get(2),
-            object_entity_type: row.get(3),
-            object_entity_id: row.get(4),
-        };
-        let entity = raw_entity.try_into()?;
-
-        Ok(entity)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -211,25 +195,20 @@ impl RebacRepository for SqliteRebacRepository {
             )
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_as::<_, EntityPropertyRowModel>(&query_str);
         for entity in entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
         }
 
-        let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
-        let entity_properties = raw_rows
+        let rows = query.fetch_all(connection_mut).await.int_err()?;
+        let entity_properties = rows
             .into_iter()
             .map(|row| {
-                let entity_type = row.get(0);
-                let entity_id = row.get::<String, _>(1);
-                let property_name = row.get::<String, _>(2).parse()?;
-                let property_value = Cow::Owned(row.get(3));
-
                 Ok((
-                    Entity::new(entity_type, entity_id),
-                    property_name,
-                    property_value,
+                    Entity::new(row.entity_type, row.entity_id),
+                    row.property_name.parse()?,
+                    Cow::Owned(row.property_value),
                 ))
             })
             .collect::<Result<Vec<_>, _>>()
@@ -374,7 +353,7 @@ impl RebacRepository for SqliteRebacRepository {
             )
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
         for entity in object_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -382,8 +361,8 @@ impl RebacRepository for SqliteRebacRepository {
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
         let rows = raw_rows
-            .iter()
-            .map(Self::map_entity_row)
+            .into_iter()
+            .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetObjectEntityRelationsError::Internal)?;
 
@@ -421,7 +400,7 @@ impl RebacRepository for SqliteRebacRepository {
             )
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
         for entity in subject_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -429,8 +408,8 @@ impl RebacRepository for SqliteRebacRepository {
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
         let rows = raw_rows
-            .iter()
-            .map(Self::map_entity_row)
+            .into_iter()
+            .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetObjectEntityRelationsError::Internal)?;
 

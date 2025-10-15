@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH input_pairs AS (\n                SELECT * FROM UNNEST($1::rebac_entity_type[], $2::text[]) AS t(entity_type, entity_id)\n            )\n            SELECT\n                p.entity_type as \"entity_type: _\",\n                p.entity_id,\n                p.property_name,\n                p.property_value\n            FROM auth_rebac_properties AS p\n                JOIN input_pairs AS i ON\n                    p.entity_type = i.entity_type AND\n                    p.entity_id   = i.entity_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_type: _",
+        "type_info": {
+          "Custom": {
+            "name": "rebac_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "property_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "property_value",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "rebac_entity_type",
+                  "kind": {
+                    "Enum": [
+                      "account",
+                      "dataset"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "05a539f96279304cbc03eee635aa3d1f4f78947077b6b874d5c9b98aa4fd03a5"
+}

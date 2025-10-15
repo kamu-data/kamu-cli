@@ -156,7 +156,14 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
 
             let connection_mut = tr.connection_mut().await?;
 
-            let mut rows = sqlx::query(
+            #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+            struct FlowBindingRow {
+                pub flow_type: String,
+                pub scope_data: serde_json::Value,
+            }
+
+            let mut rows = sqlx::query_as!(
+                FlowBindingRow,
                 r#"
                 WITH latest_events AS (
                     SELECT
@@ -170,7 +177,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                         ) AS row_num
                     FROM flow_trigger_events
                 )
-                SELECT flow_type, scope_data
+                SELECT flow_type, scope_data as "scope_data: _"
                 FROM latest_events
                 WHERE row_num = 1
                 AND event_type != 'FlowTriggerEventDatasetRemoved'
@@ -184,15 +191,11 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
             .fetch(connection_mut);
 
             use futures::StreamExt;
-            use sqlx::Row;
             while let Some(row_result) = rows.next().await {
-                let row = row_result.int_err()?;
-                let flow_type: String = row.try_get("flow_type").int_err()?;
-                let scope_data_json: String = row.try_get("scope_data").unwrap();
-                let scope = serde_json::from_str(&scope_data_json).int_err()?;
+                let row: FlowBindingRow = row_result.int_err()?;
                 let flow_binding = FlowBinding {
-                    flow_type,
-                    scope,
+                    flow_type: row.flow_type,
+                    scope: FlowScope::new(row.scope_data),
                 };
                 yield Ok(flow_binding);
             }

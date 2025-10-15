@@ -33,9 +33,9 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
             let mut query_stream = sqlx::query_as!(
                 OutboxMessageConsumptionBoundary,
                 r#"
-                    SELECT
-                        consumer_name, producer_name, last_consumed_message_id
-                    FROM outbox_message_consumptions
+                SELECT
+                    consumer_name, producer_name, last_consumed_message_id
+                FROM outbox_message_consumptions
                 "#,
             )
             .fetch(connection_mut)
@@ -60,10 +60,10 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
         sqlx::query_as!(
             OutboxMessageConsumptionBoundary,
             r#"
-                SELECT
-                    consumer_name, producer_name, last_consumed_message_id
-                FROM outbox_message_consumptions
-                WHERE consumer_name = $1 and producer_name = $2
+            SELECT
+                consumer_name, producer_name, last_consumed_message_id
+            FROM outbox_message_consumptions
+            WHERE consumer_name = $1 and producer_name = $2
             "#,
             consumer_name,
             producer_name,
@@ -85,8 +85,8 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
 
         sqlx::query!(
             r#"
-                INSERT INTO outbox_message_consumptions (consumer_name, producer_name, last_consumed_message_id)
-                    VALUES ($1, $2, $3)
+            INSERT INTO outbox_message_consumptions (consumer_name, producer_name, last_consumed_message_id)
+                VALUES ($1, $2, $3)
             "#,
             boundary.consumer_name,
             boundary.producer_name,
@@ -124,8 +124,8 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
 
         let res = sqlx::query!(
             r#"
-                UPDATE outbox_message_consumptions SET last_consumed_message_id = $3
-                    WHERE consumer_name = $1 and producer_name = $2 and last_consumed_message_id < $3
+            UPDATE outbox_message_consumptions SET last_consumed_message_id = $3
+                WHERE consumer_name = $1 and producer_name = $2 and last_consumed_message_id < $3
             "#,
             boundary.consumer_name,
             boundary.producer_name,

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                WITH latest_events AS (\n                    SELECT\n                        flow_type,\n                        scope_data,\n                        event_type,\n                        event_payload,\n                        ROW_NUMBER() OVER (\n                            PARTITION BY flow_type, scope_data\n                            ORDER BY event_time DESC\n                        ) AS row_num\n                    FROM flow_trigger_events\n                )\n                SELECT flow_type, scope_data as \"scope_data: _\"\n                FROM latest_events\n                WHERE row_num = 1\n                AND event_type != 'FlowTriggerEventDatasetRemoved'\n                AND (\n                    (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)\n                    OR\n                    (event_type = 'FlowTriggerEventModified' AND json_extract(event_payload, '$.Modified.paused') = false)\n                )\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_type",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "scope_data: _",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "32febe30d5038bbeb7c59faf53fca81d502a83ef90ea94ee57f2612278c70de0"
+}

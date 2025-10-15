@@ -14,8 +14,7 @@ use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placehold
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::sqlite::SqliteRow;
-use sqlx::{FromRow, QueryBuilder, Row, Sqlite};
+use sqlx::{FromRow, QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -302,17 +301,17 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
             struct EventRow {
-                pub flow_id: FlowID,
+                pub flow_id: i64,
                 pub event_id: i64,
-                pub event_payload: sqlx::types::JsonValue
+                pub event_payload: serde_json::Value,
             }
 
             let query_str = format!(
                 r#"
                 SELECT
-                    flow_id as "flow_id: _",
-                    event_id as "event_id: _",
-                    event_payload as "event_payload: _"
+                    flow_id,
+                    event_id,
+                    event_payload
                 FROM flow_events
                     WHERE flow_id IN ({})
                     ORDER BY event_id
@@ -323,29 +322,22 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 )
             );
 
-            let mut query = sqlx::query(&query_str);
-            for task_id in queries {
-                let task_id: i64 = task_id.try_into().unwrap();
-                query = query.bind(task_id);
+            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            for flow_id in queries {
+                let flow_id: i64 = flow_id.try_into().unwrap();
+                query = query.bind(flow_id);
             }
 
-            use sqlx::Row;
-
             let mut query_stream = query
-                .try_map(|row: sqlx::sqlite::SqliteRow| {
-                    let flow_id: u64 = row.get(0);
-                    let event_id: i64 = row.get(1);
-                    let event_payload: sqlx::types::JsonValue = row.get(2);
-
-                    let event = serde_json::from_value::<FlowEvent>(event_payload)
-                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-
-                    Ok((FlowID::new(flow_id), EventID::new(event_id), event))
-                })
                 .fetch(connection_mut)
                 .map_err(|e| GetEventsError::Internal(e.int_err()));
 
-            while let Some((flow_id, event_id, event)) = query_stream.try_next().await? {
+            while let Some(row) = query_stream.try_next().await? {
+                let flow_id = FlowID::new(u64::try_from(row.flow_id).unwrap());
+                let event_id = EventID::new(row.event_id);
+                let event = serde_json::from_value::<FlowEvent>(row.event_payload)
+                    .map_err(|e| GetEventsError::Internal(e.int_err()))?;
+
                 yield Ok((flow_id, event_id, event));
             }
         })
@@ -733,7 +725,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .unwrap_or_default(),
             );
 
-            let mut query = sqlx::query(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
                 .bind(maybe_by_flow_type)
                 .bind(maybe_by_flow_status)
                 .bind(i32::from(maybe_initiators.is_some()))
@@ -750,12 +742,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 }
             }
 
-            let mut query_stream = query
-                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
-                .fetch(connection_mut);
-
+            let mut query_stream = query.fetch(connection_mut);
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
-                yield Ok(flow_id);
+                yield Ok(FlowID::new(u64::try_from(flow_id).unwrap()));
             }
         })
     }
@@ -800,7 +789,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
             .bind(maybe_filters_by_flow_type)
             .bind(maybe_filters_by_flow_status)
             .bind(i32::from(maybe_initiators.is_some()));
@@ -817,9 +806,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             }
         }
 
-        let query_result = query.fetch_one(connection_mut).await.int_err()?;
-        let flows_count: i64 = query_result.get(0);
-
+        let flows_count = query.fetch_one(connection_mut).await.int_err()?;
         Ok(usize::try_from(flows_count).unwrap())
     }
 
@@ -842,20 +829,14 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query(&query_str);
+            let mut query = sqlx::query_scalar::<_, String>(&query_str);
             for value in scope_values {
                 query = query.bind(value);
             }
 
-            let mut query_stream = query
-                .try_map(|event_row: SqliteRow| {
-                    let initiator: String = event_row.get("initiator");
-                    Ok(odf::AccountID::from_did_str(&initiator).unwrap())
-                })
-                .fetch(connection_mut);
-
-            while let Some(initiator) = query_stream.try_next().await.int_err()? {
-                yield Ok(initiator);
+            let mut query_stream = query.fetch(connection_mut);
+            while let Some(initiator_id_str) = query_stream.try_next().await.int_err()? {
+                yield Ok(odf::AccountID::from_did_str(&initiator_id_str).unwrap());
             }
         })
     }
@@ -897,7 +878,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .unwrap_or_default()
             );
 
-            let mut query = sqlx::query(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
                 .bind(maybe_by_flow_type)
                 .bind(maybe_by_flow_status)
                 .bind(i32::from(maybe_initiators.is_some()))
@@ -910,12 +891,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 }
             }
 
-            let mut query_stream = query
-                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
-                .fetch(connection_mut);
-
+            let mut query_stream = query.fetch(connection_mut);
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
-                yield Ok(flow_id);
+                yield Ok(FlowID::new(u64::try_from(flow_id).unwrap()));
             }
         })
     }
@@ -953,7 +931,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
             .bind(maybe_by_flow_type)
             .bind(maybe_by_flow_status)
             .bind(i32::from(maybe_initiators.is_some()));
@@ -964,9 +942,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             }
         }
 
-        let query_result = query.fetch_one(connection_mut).await.int_err()?;
-        let flows_count: i64 = query_result.get(0);
-
+        let flows_count = query.fetch_one(connection_mut).await.int_err()?;
         Ok(usize::try_from(flows_count).unwrap())
     }
 
@@ -1011,19 +987,18 @@ impl FlowEventStore for SqliteFlowEventStore {
             )
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_scalar::<_, serde_json::Value>(&query_str);
 
         for scope_json in scope_json_parts {
             query = query.bind(scope_json);
         }
 
-        let filtered_flow_scopes = query
-            .map(|flow_row: SqliteRow| {
-                serde_json::from_value::<FlowScope>(flow_row.get("scope_data")).unwrap()
-            })
-            .fetch_all(connection_mut)
-            .await
-            .int_err()?;
+        let scope_data_vec = query.fetch_all(connection_mut).await.int_err()?;
+
+        let filtered_flow_scopes = scope_data_vec
+            .into_iter()
+            .map(|scope_data| serde_json::from_value::<FlowScope>(scope_data).unwrap())
+            .collect::<Vec<_>>();
 
         Ok(filtered_flow_scopes)
     }

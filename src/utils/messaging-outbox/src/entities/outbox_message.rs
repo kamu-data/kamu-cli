@@ -24,6 +24,31 @@ pub struct OutboxMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "sqlx")]
+#[derive(sqlx::FromRow)]
+pub struct OutboxMessageRow {
+    pub message_id: i64,
+    pub producer_name: String,
+    pub content_json: serde_json::Value,
+    pub occurred_on: DateTime<Utc>,
+    pub version: i64,
+}
+
+#[cfg(feature = "sqlx")]
+impl From<OutboxMessageRow> for OutboxMessage {
+    fn from(row: OutboxMessageRow) -> Self {
+        OutboxMessage {
+            message_id: OutboxMessageID::new(row.message_id),
+            producer_name: row.producer_name,
+            content_json: row.content_json,
+            occurred_on: row.occurred_on,
+            version: row.version.try_into().unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub struct NewOutboxMessage {
     pub producer_name: String,

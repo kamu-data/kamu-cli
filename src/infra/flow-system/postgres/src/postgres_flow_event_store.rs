@@ -12,7 +12,6 @@ use database_common::{PaginationOpts, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -653,7 +652,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
                 .bind(by_flow_type)
                 .bind(by_flow_status as Option<FlowStatus>)
                 .bind(maybe_initiators as Option<Vec<String>>)
@@ -664,15 +663,9 @@ impl FlowEventStore for PostgresFlowEventStore {
                 query = query.bind(values);
             }
 
-            use sqlx::Row;
-            let mut query_stream = query
-                .try_map(|event_row: PgRow| {
-                    let flow_id: i64 = event_row.get(0);
-                    Ok(FlowID::new(u64::try_from(flow_id).unwrap()))
-                })
-                .fetch(connection_mut);
-
+            let mut query_stream = query.fetch(connection_mut);
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
+                let flow_id = FlowID::try_from(flow_id).unwrap();
                 yield Ok(flow_id);
             }
         })
@@ -706,7 +699,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             "#,
         );
 
-        let mut query = sqlx::query(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
             .bind(filters.by_flow_type.clone())
             .bind(filters.by_flow_status as Option<FlowStatus>)
             .bind(maybe_initiators as Option<Vec<String>>);
@@ -715,10 +708,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             query = query.bind(values);
         }
 
-        let query_result = query.fetch_one(connection_mut).await.int_err()?;
-
-        use sqlx::Row;
-        let flows_count: i64 = query_result.get(0);
+        let flows_count = query.fetch_one(connection_mut).await.int_err()?;
         Ok(usize::try_from(flows_count).unwrap())
     }
 
@@ -741,17 +731,15 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query(&query_str);
+            let mut query = sqlx::query_scalar::<_, String>(&query_str);
             for values in scope_values {
                 query = query.bind(values);
             }
 
             let mut query_stream = query.fetch(connection_mut);
 
-            use sqlx::Row;
-            while let Some(event_row) = query_stream.try_next().await.int_err()? {
-                let initiator_id_str: &str = event_row.get("initiator");
-                let initiator_id = odf::AccountID::from_did_str(initiator_id_str).unwrap();
+            while let Some(initiator_id_str) = query_stream.try_next().await.int_err()? {
+                let initiator_id = odf::AccountID::from_did_str(&initiator_id_str).unwrap();
                 yield Ok(initiator_id);
             }
         })
