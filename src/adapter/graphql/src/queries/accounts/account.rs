@@ -10,7 +10,6 @@
 use kamu_accounts::{
     AccountNotFoundByIdError,
     AccountService,
-    AccountServiceExt,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
@@ -62,17 +61,21 @@ impl Account {
         ctx: &Context<'_>,
         account_id: odf::AccountID,
     ) -> Result<Self, InternalError> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
+        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
 
-        let account_name = account_service
-            .find_account_name_by_id(&account_id)
-            .await?
-            .ok_or_else(|| AccountNotFoundByIdError {
+        let maybe_account = data_loader
+            .load_one(account_id.clone())
+            .await
+            .map_err(|e| e.reason().int_err())?;
+
+        if let Some(account) = maybe_account {
+            Ok(Self::from_account(account))
+        } else {
+            Err(AccountNotFoundByIdError {
                 account_id: account_id.clone(),
-            })
-            .int_err()?;
-
-        Ok(Self::new(account_id.into(), account_name.into()))
+            }
+            .int_err())
+        }
     }
 
     pub(crate) async fn from_account_name(
@@ -114,13 +117,15 @@ impl Account {
     }
 
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
+        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
 
-        let maybe_account_info = account_service
-            .try_get_account_by_id(&self.account_id)
-            .await?;
+        let account_id: odf::AccountID = self.account_id.clone().into();
+        let maybe_account = data_loader
+            .load_one(account_id)
+            .await
+            .map_err(|e| e.reason().int_err())?;
 
-        maybe_account_info.ok_or_else(|| {
+        maybe_account.ok_or_else(|| {
             GqlError::Gql(
                 Error::new("Account not resolved")
                     .extend_with(|_, eev| eev.set("id", self.account_id.to_string())),

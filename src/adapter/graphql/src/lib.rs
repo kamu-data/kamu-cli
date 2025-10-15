@@ -12,7 +12,7 @@
 #![feature(let_chains)]
 
 pub mod config;
-pub mod dataloader;
+pub mod data_loader;
 mod dependencies;
 pub mod extensions;
 pub mod guards;

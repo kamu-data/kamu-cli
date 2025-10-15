@@ -42,13 +42,15 @@ impl Accounts {
         ctx: &Context<'_>,
         account_id: AccountID<'_>,
     ) -> Result<Option<Account>> {
-        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account_name = account_service.find_account_name_by_id(&account_id).await?;
+        let maybe_account = data_loader
+            .load_one(account_id.clone())
+            .await
+            .map_err(|e| e.reason().int_err())?;
 
-        Ok(maybe_account_name
-            .map(|account_name| Account::new(account_id.into(), account_name.into())))
+        Ok(maybe_account.map(Account::from_account))
     }
 
     /// Returns accounts by their IDs
