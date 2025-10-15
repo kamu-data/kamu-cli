@@ -9,7 +9,6 @@
 
 use kamu_accounts::{
     AccountNotFoundByIdError,
-    AccountService,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
@@ -82,9 +81,12 @@ impl Account {
         ctx: &Context<'_>,
         account_name: odf::AccountName,
     ) -> Result<Option<Self>, InternalError> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
+        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
 
-        let maybe_account = account_service.account_by_name(&account_name).await?;
+        let maybe_account = data_loader
+            .load_one(account_name)
+            .await
+            .map_err(|e| e.reason().int_err())?;
 
         Ok(maybe_account.map(Self::from_account))
     }
