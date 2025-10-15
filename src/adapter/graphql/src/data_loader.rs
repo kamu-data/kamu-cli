@@ -25,6 +25,10 @@ pub struct EntityLoader {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// odf::AccountID
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl Loader<odf::AccountID> for EntityLoader {
     type Value = Account;
     type Error = Arc<InternalError>;
@@ -46,6 +50,36 @@ impl Loader<odf::AccountID> for EntityLoader {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// odf::AccountName
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Loader<odf::AccountName> for EntityLoader {
+    type Value = Account;
+    type Error = Arc<InternalError>;
+
+    async fn load(
+        &self,
+        keys: &[odf::AccountName],
+    ) -> Result<HashMap<odf::AccountName, Self::Value>, Self::Error> {
+        let key_refs: Vec<&odf::AccountName> = keys.iter().collect();
+
+        let lookup = self
+            .account_service
+            .get_accounts_by_names(&key_refs)
+            .await?;
+
+        let mut result = HashMap::with_capacity(lookup.found.len());
+        for account in lookup.found {
+            result.insert(account.account_name.clone(), account);
+        }
+
+        Ok(result)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// odf::DatasetID
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Loader<odf::DatasetID> for EntityLoader {

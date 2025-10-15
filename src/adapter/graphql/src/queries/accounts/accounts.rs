@@ -46,7 +46,7 @@ impl Accounts {
 
         let account_id: odf::AccountID = account_id.into();
         let maybe_account = data_loader
-            .load_one(account_id.clone())
+            .load_one(account_id)
             .await
             .map_err(|e| e.reason().int_err())?;
 
@@ -91,11 +91,14 @@ impl Accounts {
     /// Returns an account by its name, if found
     #[tracing::instrument(level = "info", name = Accounts_by_name, skip_all, fields(%name))]
     async fn by_name(&self, ctx: &Context<'_>, name: AccountName<'_>) -> Result<Option<Account>> {
-        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
 
         let account_name: odf::AccountName = name.into();
+        let maybe_account = data_loader
+            .load_one(account_name)
+            .await
+            .map_err(|e| e.reason().int_err())?;
 
-        let maybe_account = account_service.account_by_name(&account_name).await?;
         Ok(maybe_account.map(Account::from_account))
     }
 
