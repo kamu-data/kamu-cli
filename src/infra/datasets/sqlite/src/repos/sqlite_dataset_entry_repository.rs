@@ -16,7 +16,6 @@ use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placehold
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use sqlx::Row;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -176,27 +175,14 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_as::<_, DatasetEntryRowModel>(&query_str);
         for dataset_id in dataset_ids {
             query = query.bind(dataset_id.to_string());
         }
 
         let dataset_rows = query.fetch_all(connection_mut).await.int_err()?;
 
-        let resolved_entries: Vec<_> = dataset_rows
-            .into_iter()
-            .map(|row| {
-                let entry_row = DatasetEntryRowModel {
-                    id: row.get(0),
-                    owner_id: row.get(1),
-                    owner_name: row.get(2),
-                    name: row.get(3),
-                    created_at: row.get(4),
-                    kind: row.get(5),
-                };
-                DatasetEntry::from(entry_row)
-            })
-            .collect();
+        let resolved_entries: Vec<_> = dataset_rows.into_iter().map(DatasetEntry::from).collect();
 
         let resolved_dataset_ids: HashSet<_> = resolved_entries
             .iter()
