@@ -20,7 +20,7 @@ use tokio::sync::OnceCell;
 use super::AccountFlows;
 use crate::prelude::*;
 use crate::queries::{AccountAccessTokens, Dataset, DatasetConnection};
-use crate::utils::check_logged_account_id_match;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,7 +60,7 @@ impl Account {
         ctx: &Context<'_>,
         account_id: odf::AccountID,
     ) -> Result<Self, InternalError> {
-        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
+        let data_loader = utils::get_entity_data_loader(ctx);
 
         let maybe_account = data_loader
             .load_one(account_id.clone())
@@ -81,7 +81,7 @@ impl Account {
         ctx: &Context<'_>,
         account_name: odf::AccountName,
     ) -> Result<Option<Self>, InternalError> {
-        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
+        let data_loader = utils::get_entity_data_loader(ctx);
 
         let maybe_account = data_loader
             .load_one(account_name)
@@ -119,7 +119,7 @@ impl Account {
     }
 
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
-        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
+        let data_loader = utils::get_entity_data_loader(ctx);
 
         let account_id: odf::AccountID = self.account_id.clone().into();
         let maybe_account = data_loader
@@ -199,7 +199,7 @@ impl Account {
 
     /// Email address
     async fn email(&self, ctx: &Context<'_>) -> Result<&str> {
-        check_logged_account_id_match(ctx, &self.account_id)?;
+        utils::check_logged_account_id_match(ctx, &self.account_id)?;
 
         let full_account_info = self.get_full_account_info(ctx).await?;
 

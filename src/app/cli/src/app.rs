@@ -529,8 +529,6 @@ pub fn configure_base_catalog(
 
     b.add::<DatabaseTransactionRunner>();
 
-    kamu_adapter_graphql::register_dependencies(&mut b);
-
     b.add::<kamu_adapter_flight_sql::SessionAuthAnonymous>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCaching>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCachingState>();
