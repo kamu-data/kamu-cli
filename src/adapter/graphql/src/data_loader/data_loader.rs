@@ -34,6 +34,7 @@ pub fn data_loader(catalog: &dill::Catalog) -> EntityDataLoader {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[expect(clippy::needless_pass_by_value)]
 pub fn data_loader_error_mapper(e: Arc<InternalError>) -> InternalError {
     e.reason().int_err()
 }
