@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod data_loader;
-mod entity_loader;
+mod entity_loaders;
 
 pub use data_loader::*;
-pub use entity_loader::*;
+pub use entity_loaders::*;

@@ -28,6 +28,7 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
 };
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;
@@ -319,7 +320,11 @@ async fn graphql_handler(
     Extension(catalog): Extension<Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
-    let graphql_request = req.into_inner().data(catalog);
+    let graphql_request = req
+        .into_inner()
+        .data(account_entity_data_loader(&catalog))
+        .data(dataset_handle_data_loader(&catalog))
+        .data(catalog);
     let graphql_response = schema.execute(graphql_request).await.into();
 
     Ok(graphql_response)

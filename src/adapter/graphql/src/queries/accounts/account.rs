@@ -60,9 +60,9 @@ impl Account {
         ctx: &Context<'_>,
         account_id: odf::AccountID,
     ) -> Result<Self, InternalError> {
-        let data_loader = utils::get_entity_data_loader(ctx);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let maybe_account = data_loader
+        let maybe_account = account_entity_data_loader
             .load_one(account_id.clone())
             .await
             .map_err(data_loader_error_mapper)?;
@@ -81,9 +81,9 @@ impl Account {
         ctx: &Context<'_>,
         account_name: odf::AccountName,
     ) -> Result<Option<Self>, InternalError> {
-        let data_loader = utils::get_entity_data_loader(ctx);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let maybe_account = data_loader
+        let maybe_account = account_entity_data_loader
             .load_one(account_name)
             .await
             .map_err(data_loader_error_mapper)?;
@@ -119,10 +119,10 @@ impl Account {
     }
 
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
-        let data_loader = utils::get_entity_data_loader(ctx);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
         let account_id: odf::AccountID = self.account_id.clone().into();
-        let maybe_account = data_loader
+        let maybe_account = account_entity_data_loader
             .load_one(account_id)
             .await
             .map_err(data_loader_error_mapper)?;

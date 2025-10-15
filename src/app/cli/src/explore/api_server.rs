@@ -21,7 +21,7 @@ use http_common::ApiError;
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
-use kamu_adapter_graphql::data_loader::data_loader;
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_adapter_http::e2e::e2e_router;
 use observability::axum::{panic_handler, unknown_fallback_handler};
@@ -332,7 +332,11 @@ async fn graphql_handler(
     Extension(catalog): Extension<dill::Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
-    let graphql_request = req.into_inner().data(data_loader(&catalog)).data(catalog);
+    let graphql_request = req
+        .into_inner()
+        .data(account_entity_data_loader(&catalog))
+        .data(dataset_handle_data_loader(&catalog))
+        .data(catalog);
     let graphql_response = schema.execute(graphql_request).await.into();
 
     Ok(graphql_response)

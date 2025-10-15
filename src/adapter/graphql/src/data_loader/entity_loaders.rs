@@ -19,28 +19,26 @@ use kamu_core::auth;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // https://async-graphql.github.io/async-graphql/en/dataloader.html
-pub struct EntityLoader {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AccountEntityLoader
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct AccountEntityLoader {
     account_service: Arc<dyn AccountService>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
-impl EntityLoader {
-    pub fn new(
-        account_service: Arc<dyn AccountService>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    ) -> Self {
-        Self {
-            account_service,
-            rebac_dataset_registry_facade,
-        }
+impl AccountEntityLoader {
+    pub fn new(account_service: Arc<dyn AccountService>) -> Self {
+        Self { account_service }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// odf::AccountID -> Account
+// AccountEntityLoader: odf::AccountID -> Account
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Loader<odf::AccountID> for EntityLoader {
+impl Loader<odf::AccountID> for AccountEntityLoader {
     type Value = Account;
     type Error = Arc<InternalError>;
 
@@ -62,10 +60,10 @@ impl Loader<odf::AccountID> for EntityLoader {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// odf::AccountName -> Account
+// AccountEntityLoader: odf::AccountName -> Account
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Loader<odf::AccountName> for EntityLoader {
+impl Loader<odf::AccountName> for AccountEntityLoader {
     type Value = Account;
     type Error = Arc<InternalError>;
 
@@ -90,10 +88,26 @@ impl Loader<odf::AccountName> for EntityLoader {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// odf::DatasetRef (Read) -> odf::DatasetHandle
+// DatasetHandleLoader
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Loader<odf::DatasetRef> for EntityLoader {
+pub struct DatasetHandleLoader {
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+}
+
+impl DatasetHandleLoader {
+    pub fn new(rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>) -> Self {
+        Self {
+            rebac_dataset_registry_facade,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetHandleLoader: odf::DatasetRef (Read) -> odf::DatasetHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Loader<odf::DatasetRef> for DatasetHandleLoader {
     type Value = odf::DatasetHandle;
     type Error = Arc<InternalError>;
 

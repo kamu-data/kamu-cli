@@ -28,9 +28,9 @@ impl Datasets {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Dataset>> {
-        let data_loader = utils::get_entity_data_loader(ctx);
+        let dataset_handle_data_loader = utils::get_dataset_handle_data_loader(ctx);
 
-        let maybe_handle = data_loader
+        let maybe_handle = dataset_handle_data_loader
             .load_one(dataset_ref.clone())
             .await
             .map_err(data_loader_error_mapper)?;
@@ -242,10 +242,10 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let data_loader = utils::get_entity_data_loader(ctx);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account = data_loader
+        let maybe_account = account_entity_data_loader
             .load_one(account_id)
             .await
             .map_err(data_loader_error_mapper)?;

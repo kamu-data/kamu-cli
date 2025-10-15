@@ -43,10 +43,10 @@ impl Accounts {
         ctx: &Context<'_>,
         account_id: AccountID<'_>,
     ) -> Result<Option<Account>> {
-        let data_loader = utils::get_entity_data_loader(ctx);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account = data_loader
+        let maybe_account = account_entity_data_loader
             .load_one(account_id)
             .await
             .map_err(data_loader_error_mapper)?;
@@ -94,10 +94,10 @@ impl Accounts {
     /// Returns an account by its name, if found
     #[tracing::instrument(level = "info", name = Accounts_by_name, skip_all, fields(%name))]
     async fn by_name(&self, ctx: &Context<'_>, name: AccountName<'_>) -> Result<Option<Account>> {
-        let data_loader = utils::get_entity_data_loader(ctx);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
         let account_name: odf::AccountName = name.into();
-        let maybe_account = data_loader
+        let maybe_account = account_entity_data_loader
             .load_one(account_name)
             .await
             .map_err(data_loader_error_mapper)?;
