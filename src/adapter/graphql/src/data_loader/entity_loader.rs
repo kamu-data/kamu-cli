@@ -19,10 +19,21 @@ use kamu_datasets::{DatasetEntry, DatasetEntryService};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // https://async-graphql.github.io/async-graphql/en/dataloader.html
-#[dill::component]
 pub struct EntityLoader {
     account_service: Arc<dyn AccountService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
+}
+
+impl EntityLoader {
+    pub fn new(
+        account_service: Arc<dyn AccountService>,
+        dataset_entry_service: Arc<dyn DatasetEntryService>,
+    ) -> Self {
+        Self {
+            account_service,
+            dataset_entry_service,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

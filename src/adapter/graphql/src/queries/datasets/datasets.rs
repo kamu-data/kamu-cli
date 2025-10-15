@@ -13,6 +13,7 @@ use kamu_core::auth::{self, DatasetActionAuthorizer, DatasetActionAuthorizerExt}
 
 use crate::prelude::*;
 use crate::queries::*;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -247,7 +248,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
+        let data_loader = utils::get_entity_data_loader(ctx);
 
         let account_id: odf::AccountID = account_id.into();
         let maybe_account = data_loader
