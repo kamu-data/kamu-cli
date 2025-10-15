@@ -81,6 +81,7 @@ fn test_parse_property() {
         "dataset/allows_anonymous_read",
         "dataset/allows_public_read",
         "account/is_admin",
+        "account/can_provision_accounts",
     ];
 
     for input in inputs {

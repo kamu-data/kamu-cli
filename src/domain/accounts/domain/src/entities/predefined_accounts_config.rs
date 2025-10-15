@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use email_utils::Email;
-use kamu_auth_rebac::AccountPropertyName;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -79,6 +78,17 @@ impl PredefinedAccountsConfig {
 
         None
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// NOTE: Our config uses camelCase
+#[serde(rename_all = "camelCase")]
+pub enum AccountPropertyName {
+    CanProvisionAccounts,
+    #[serde(rename = "admin")]
+    IsAdmin,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
