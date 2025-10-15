@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use async_graphql::dataloader::DataLoader;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::AccountService;
 use kamu_datasets::DatasetEntryService;
 
@@ -27,6 +30,12 @@ pub fn data_loader(catalog: &dill::Catalog) -> EntityDataLoader {
         EntityLoader::new(account_service, dataset_entry_service),
         tokio::spawn,
     )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn data_loader_error_mapper(e: Arc<InternalError>) -> InternalError {
+    e.reason().int_err()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
