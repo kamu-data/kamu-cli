@@ -117,10 +117,41 @@ type AccountFieldNonUnique implements CreateAccountResult {
 }
 
 input AccountFlowFilters {
-	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
 	byInitiator: InitiatorFilterInput
 	byDatasetIds: [DatasetID!]!
+	byProcessType: FlowProcessTypeFilterInput
+}
+
+union AccountFlowProcessCard = DatasetFlowProcess | WebhookFlowSubProcess
+
+type AccountFlowProcessCardConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [AccountFlowProcessCard!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [AccountFlowProcessCardEdge!]!
+}
+
+type AccountFlowProcessCardEdge {
+	node: AccountFlowProcessCard!
+}
+
+type AccountFlowProcesses {
+	primaryRollup: FlowProcessGroupRollup!
+	webhookRollup: FlowProcessGroupRollup!
+	fullRollup: FlowProcessGroupRollup!
+	primaryCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): DatasetFlowProcessConnection!
+	webhookCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): WebhookFlowSubProcessConnection!
+	allCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessCardConnection!
 }
 
 type AccountFlowRuns {
@@ -141,6 +172,10 @@ type AccountFlowTriggersMut {
 }
 
 type AccountFlows {
+	"""
+	Returns interface for flow processes summary queries
+	"""
+	processes: AccountFlowProcesses!
 	"""
 	Returns interface for flow runs queries
 	"""
@@ -1192,9 +1227,40 @@ type DatasetFlowConfigsMut {
 }
 
 input DatasetFlowFilters {
-	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
 	byInitiator: InitiatorFilterInput
+	byProcessType: FlowProcessTypeFilterInput
+}
+
+type DatasetFlowProcess {
+	flowType: DatasetFlowType!
+	dataset: Dataset!
+	summary: FlowProcessSummary!
+}
+
+type DatasetFlowProcessConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [DatasetFlowProcess!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [DatasetFlowProcessEdge!]!
+}
+
+type DatasetFlowProcessEdge {
+	node: DatasetFlowProcess!
+}
+
+type DatasetFlowProcesses {
+	primary: DatasetFlowProcess!
+	webhooks: WebhookFlowSubProcessGroup!
 }
 
 type DatasetFlowRuns {
@@ -1217,10 +1283,6 @@ type DatasetFlowTriggers {
 	Returns defined trigger for a flow of specified type
 	"""
 	byType(datasetFlowType: DatasetFlowType!): FlowTrigger
-	"""
-	Checks if all triggers of this dataset are disabled
-	"""
-	allPaused: Boolean!
 }
 
 type DatasetFlowTriggersMut {
@@ -1252,6 +1314,10 @@ type DatasetFlows {
 	Returns interface for flow runs queries
 	"""
 	runs: DatasetFlowRuns!
+	"""
+	Returns interface for flow processes queries
+	"""
+	processes: DatasetFlowProcesses!
 }
 
 type DatasetFlowsMut {
@@ -2314,6 +2380,11 @@ type FlowEventActivationCauseAdded implements FlowEvent {
 	activationCause: FlowActivationCause!
 }
 
+type FlowEventCompleted implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+}
+
 type FlowEventInitiated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
@@ -2383,6 +2454,118 @@ union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
 	preconditions: String!
 	message: String!
+}
+
+enum FlowProcessAutoStopReason {
+	STOP_POLICY
+	UNRECOVERABLE_FAILURE
+}
+
+enum FlowProcessEffectiveState {
+	UNCONFIGURED
+	ACTIVE
+	FAILING
+	PAUSED_MANUAL
+	STOPPED_AUTO
+}
+
+input FlowProcessFilters {
+	"""
+	State filter
+	"""
+	effectiveStateIn: [FlowProcessEffectiveState!]
+	"""
+	All processes with last attempt between these times, inclusive
+	"""
+	lastAttemptBetween: FlowProcessFiltersTimeRange
+	"""
+	All processes with last failure since this time, inclusive
+	"""
+	lastFailureSince: DateTime
+	"""
+	All processes with next planned before this time, inclusive
+	"""
+	nextPlannedBefore: DateTime
+	"""
+	All processes with next planned after this time, inclusive
+	"""
+	nextPlannedAfter: DateTime
+	"""
+	Minimum number of consecutive failures
+	"""
+	minConsecutiveFailures: Int
+}
+
+input FlowProcessFiltersTimeRange {
+	start: DateTime!
+	end: DateTime!
+}
+
+type FlowProcessGroupRollup {
+	total: Int!
+	active: Int!
+	failing: Int!
+	paused: Int!
+	unconfigured: Int!
+	stopped: Int!
+	worstConsecutiveFailures: Int!
+}
+
+enum FlowProcessOrderField {
+	"""
+	Default for “recent activity”.
+	"""
+	LAST_ATTEMPT_AT
+	"""
+	“What’s next”
+	"""
+	NEXT_PLANNED_AT
+	"""
+	Triage hot spots.
+	"""
+	LAST_FAILURE_AT
+	"""
+	Chronic issues first.
+	"""
+	CONSECUTIVE_FAILURES
+	"""
+	Severity bucketing
+	"""
+	EFFECTIVE_STATE
+	"""
+	By flow type
+	"""
+	FLOW_TYPE
+}
+
+input FlowProcessOrdering {
+	field: FlowProcessOrderField!
+	direction: OrderingDirection!
+}
+
+type FlowProcessSummary {
+	effectiveState: FlowProcessEffectiveState!
+	consecutiveFailures: Int!
+	stopPolicy: FlowTriggerStopPolicy!
+	lastSuccessAt: DateTime
+	lastAttemptAt: DateTime
+	lastFailureAt: DateTime
+	nextPlannedAt: DateTime
+	autoStoppedReason: FlowProcessAutoStopReason
+	autoStoppedAt: DateTime
+}
+
+input FlowProcessTypeFilterInput @oneOf {
+	primary: FlowProcessTypePrimaryFilterInput
+	webhooks: FlowProcessTypeWebhooksFilterInput
+}
+
+input FlowProcessTypePrimaryFilterInput {
+	byFlowTypes: [DatasetFlowType!]
+}
+
+input FlowProcessTypeWebhooksFilterInput {
+	subscriptionIds: [WebhookSubscriptionID!]
 }
 
 enum FlowRetryBackoffType {
@@ -2461,10 +2644,13 @@ type FlowTimingRecords {
 	"""
 	runningSince: DateTime
 	"""
-	Recorded time of finish (successful or failed after retry) or abortion
-	(Finished state seen at least once)
+	Recorded time of finish of the latest task
 	"""
 	lastAttemptFinishedAt: DateTime
+	"""
+	Recorded time of flow completion (success or failure)
+	"""
+	completedAt: DateTime
 }
 
 type FlowTrigger {
@@ -2924,6 +3110,11 @@ type OffsetInterval {
 	End of the closed interval [start; end].
 	"""
 	end: Int!
+}
+
+enum OrderingDirection {
+	ASC
+	DESC
 }
 
 type PageBasedInfo {
@@ -4253,6 +4444,38 @@ type WebSocketProtocolDesc {
 }
 
 scalar WebhookEventType
+
+type WebhookFlowSubProcess {
+	id: WebhookSubscriptionID!
+	name: String!
+	parentDataset: Dataset
+	summary: FlowProcessSummary!
+}
+
+type WebhookFlowSubProcessConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [WebhookFlowSubProcess!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [WebhookFlowSubProcessEdge!]!
+}
+
+type WebhookFlowSubProcessEdge {
+	node: WebhookFlowSubProcess!
+}
+
+type WebhookFlowSubProcessGroup {
+	rollup: FlowProcessGroupRollup!
+	subprocesses: [WebhookFlowSubProcess!]!
+}
 
 type WebhookSubscription {
 	"""

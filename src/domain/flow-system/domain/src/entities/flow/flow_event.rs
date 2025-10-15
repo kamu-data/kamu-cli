@@ -34,6 +34,8 @@ pub enum FlowEvent {
     TaskRunning(FlowEventTaskRunning),
     /// Finished task
     TaskFinished(FlowEventTaskFinished),
+    /// Completed flow
+    Completed(FlowEventCompleted),
     /// Aborted flow (not by user)
     Aborted(FlowEventAborted),
 }
@@ -49,6 +51,7 @@ impl FlowEvent {
             FlowEvent::TaskScheduled(_) => "FlowEventTaskScheduled",
             FlowEvent::TaskRunning(_) => "FlowEventTaskRunning",
             FlowEvent::TaskFinished(_) => "FlowEventTaskFinished",
+            FlowEvent::Completed(_) => "FlowEventCompleted",
             FlowEvent::Aborted(_) => "FlowEventAborted",
         }
     }
@@ -72,6 +75,7 @@ pub struct FlowEventInitiated {
 pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub start_condition: FlowStartCondition,
     pub last_activation_cause_index: usize,
 }
@@ -82,6 +86,7 @@ pub struct FlowEventStartConditionUpdated {
 pub struct FlowEventActivationCauseAdded {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub activation_cause: FlowActivationCause,
 }
 
@@ -91,6 +96,7 @@ pub struct FlowEventActivationCauseAdded {
 pub struct FlowConfigSnapshotModified {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub config_snapshot: FlowConfigurationRule,
 }
 
@@ -100,6 +106,7 @@ pub struct FlowConfigSnapshotModified {
 pub struct FlowEventScheduledForActivation {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub scheduled_for_activation_at: DateTime<Utc>,
 }
 
@@ -109,6 +116,7 @@ pub struct FlowEventScheduledForActivation {
 pub struct FlowEventTaskScheduled {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub task_id: TaskID,
 }
 
@@ -118,6 +126,7 @@ pub struct FlowEventTaskScheduled {
 pub struct FlowEventTaskRunning {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub task_id: TaskID,
 }
 
@@ -127,6 +136,7 @@ pub struct FlowEventTaskRunning {
 pub struct FlowEventTaskFinished {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
     pub task_id: TaskID,
     pub task_outcome: TaskOutcome,
     #[serde(default)]
@@ -136,9 +146,21 @@ pub struct FlowEventTaskFinished {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowEventCompleted {
+    pub event_time: DateTime<Utc>,
+    pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
+    pub outcome: FlowOutcome,
+    pub late_activation_causes: Vec<FlowActivationCause>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventAborted {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,10 +176,25 @@ impl FlowEvent {
             FlowEvent::TaskScheduled(e) => e.flow_id,
             FlowEvent::TaskRunning(e) => e.flow_id,
             FlowEvent::TaskFinished(e) => e.flow_id,
+            FlowEvent::Completed(e) => e.flow_id,
             FlowEvent::Aborted(e) => e.flow_id,
         }
     }
 
+    pub fn flow_binding(&self) -> &FlowBinding {
+        match self {
+            FlowEvent::Initiated(e) => &e.flow_binding,
+            FlowEvent::StartConditionUpdated(e) => &e.flow_binding,
+            FlowEvent::ConfigSnapshotModified(e) => &e.flow_binding,
+            FlowEvent::ActivationCauseAdded(e) => &e.flow_binding,
+            FlowEvent::ScheduledForActivation(e) => &e.flow_binding,
+            FlowEvent::TaskScheduled(e) => &e.flow_binding,
+            FlowEvent::TaskRunning(e) => &e.flow_binding,
+            FlowEvent::TaskFinished(e) => &e.flow_binding,
+            FlowEvent::Completed(e) => &e.flow_binding,
+            FlowEvent::Aborted(e) => &e.flow_binding,
+        }
+    }
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             FlowEvent::Initiated(e) => e.event_time,
@@ -168,6 +205,7 @@ impl FlowEvent {
             FlowEvent::TaskScheduled(e) => e.event_time,
             FlowEvent::TaskRunning(e) => e.event_time,
             FlowEvent::TaskFinished(e) => e.event_time,
+            FlowEvent::Completed(e) => e.event_time,
             FlowEvent::Aborted(e) => e.event_time,
         }
     }
@@ -185,10 +223,10 @@ impl FlowEvent {
                 if e.next_attempt_at.is_some() {
                     Some(FlowStatus::Retrying)
                 } else {
-                    Some(FlowStatus::Finished)
+                    None
                 }
             }
-            FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
+            FlowEvent::Completed(_) | FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
         }
     }
 }
@@ -211,6 +249,7 @@ impl_enum_variant!(FlowEvent::ScheduledForActivation(
 impl_enum_variant!(FlowEvent::TaskScheduled(FlowEventTaskScheduled));
 impl_enum_variant!(FlowEvent::TaskRunning(FlowEventTaskRunning));
 impl_enum_variant!(FlowEvent::TaskFinished(FlowEventTaskFinished));
+impl_enum_variant!(FlowEvent::Completed(FlowEventCompleted));
 impl_enum_variant!(FlowEvent::Aborted(FlowEventAborted));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

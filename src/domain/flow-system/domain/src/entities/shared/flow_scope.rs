@@ -50,11 +50,20 @@ impl FlowScope {
         self.0.get(key)
     }
 
+    pub fn add_attribute(mut self, key: &'static str, value: impl serde::Serialize) -> Self {
+        let value = serde_json::to_value(value).unwrap();
+        self.0
+            .as_object_mut()
+            .unwrap()
+            .insert(key.to_string(), value);
+        self
+    }
+
     pub fn matches_query(&self, query: &FlowScopeQuery) -> bool {
         if let Some((_, type_values)) = query
             .attributes
             .iter()
-            .find(|(key, _)| key == FLOW_SCOPE_ATTRIBUTE_TYPE)
+            .find(|(key, _)| *key == FLOW_SCOPE_ATTRIBUTE_TYPE)
             && !type_values.iter().any(|v| v == self.scope_type())
         {
             return false;
@@ -63,7 +72,7 @@ impl FlowScope {
         query
             .attributes
             .iter()
-            .filter(|(key, _)| key != FLOW_SCOPE_ATTRIBUTE_TYPE)
+            .filter(|(key, _)| *key != FLOW_SCOPE_ATTRIBUTE_TYPE)
             .all(|(key, values)| {
                 self.get_attribute(key)
                     .and_then(|value| value.as_str())
@@ -77,14 +86,18 @@ impl FlowScope {
 
 #[derive(Debug, Clone)]
 pub struct FlowScopeQuery {
-    pub attributes: Vec<(String, Vec<String>)>,
+    pub attributes: Vec<(&'static str, Vec<String>)>,
 }
 
 impl FlowScopeQuery {
+    pub fn all() -> Self {
+        Self { attributes: vec![] }
+    }
+
     pub fn build_for_system_scope() -> Self {
         Self {
             attributes: vec![(
-                FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
+                FLOW_SCOPE_ATTRIBUTE_TYPE,
                 vec![FLOW_SCOPE_TYPE_SYSTEM.to_string()],
             )],
         }
@@ -112,10 +125,7 @@ mod tests {
         assert!(scope.matches_query(&query));
 
         let non_matching_query = FlowScopeQuery {
-            attributes: vec![(
-                FLOW_SCOPE_ATTRIBUTE_TYPE.to_string(),
-                vec!["NonSystem".to_string()],
-            )],
+            attributes: vec![(FLOW_SCOPE_ATTRIBUTE_TYPE, vec!["NonSystem".to_string()])],
         };
         assert!(!scope.matches_query(&non_matching_query));
     }

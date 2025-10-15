@@ -367,6 +367,7 @@ async fn test_subscription_marked_unreachable_on_trigger_stop() {
             MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
             FlowTriggerUpdatedMessage {
                 event_time: Utc::now(),
+                event_id: EventID::new(175),
                 flow_binding: webhook_deliver_binding(
                     subscription_id,
                     &WebhookEventTypeCatalog::dataset_ref_updated(),
@@ -376,6 +377,7 @@ async fn test_subscription_marked_unreachable_on_trigger_stop() {
                 rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
                     every: Duration::days(1),
                 })),
+                stop_policy: FlowTriggerStopPolicy::default(),
             },
         )
         .await
@@ -572,7 +574,8 @@ impl TestWebhooksEventBridgeHarness {
         mock_flow_run_service
             .expect_run_flow_automatically()
             .withf(
-                move |flow_binding: &kamu_flow_system::FlowBinding,
+                move |_,
+                      flow_binding: &kamu_flow_system::FlowBinding,
                       _,
                       maybe_flow_trigger_rule,
                       maybe_forced_flow_config_rule| {
@@ -586,7 +589,7 @@ impl TestWebhooksEventBridgeHarness {
                         && webhook_scope.subscription_id() == subscription_id
                 },
             )
-            .returning(move |_, _, _, _| {
+            .returning(move |_, _, _, _, _| {
                 let now = Utc::now();
 
                 Ok(FlowState {
@@ -611,6 +614,7 @@ impl TestWebhooksEventBridgeHarness {
                         running_since: None,
                         awaiting_executor_since: None,
                         last_attempt_finished_at: None,
+                        completed_at: None,
                     },
                     config_snapshot: None,
                     retry_policy: None,

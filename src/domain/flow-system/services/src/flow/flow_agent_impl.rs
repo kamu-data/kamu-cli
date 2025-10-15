@@ -11,6 +11,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use async_utils::BackgroundAgent;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use database_common_macros::transactional_method;
@@ -21,19 +22,11 @@ use internal_error::InternalError;
 use kamu_datasets::JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER;
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use messaging_outbox::{
-    InitialConsumerBoundary,
-    MessageConsumer,
-    MessageConsumerMeta,
-    MessageConsumerT,
-    MessageDeliveryMechanism,
-    Outbox,
-    OutboxExt,
-};
+use messaging_outbox::*;
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
-use crate::{FlowAbortHelper, FlowSchedulingHelper};
+use crate::{FlowAbortHelper, FlowSchedulingServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,12 +34,21 @@ pub struct FlowAgentImpl {
     catalog: Catalog,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
-    agent_started: Arc<Mutex<bool>>,
+    state: Arc<Mutex<State>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct State {
+    agent_started: bool,
+    loop_synchronizer: Option<Arc<dyn FlowAgentLoopSynchronizer>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn BackgroundAgent)]
 #[interface(dyn FlowAgent)]
 #[interface(dyn FlowAgentTestDriver)]
 #[interface(dyn MessageConsumer)]
@@ -80,18 +82,18 @@ impl FlowAgentImpl {
             catalog,
             time_source,
             agent_config,
-            agent_started: Arc::new(Mutex::new(false)),
+            state: Arc::new(Mutex::new(State::default())),
         }
     }
 
     fn has_agent_started(&self) -> bool {
-        let engine_started = self.agent_started.lock().unwrap();
-        *engine_started
+        let state = self.state.lock().unwrap();
+        state.agent_started
     }
 
     fn mark_engine_as_started(&self) {
-        let mut engine_started = self.agent_started.lock().unwrap();
-        *engine_started = true;
+        let mut state = self.state.lock().unwrap();
+        state.agent_started = true;
     }
 
     #[transactional_method]
@@ -110,18 +112,6 @@ impl FlowAgentImpl {
         self.restore_auto_polling_flows_from_triggers(&transaction_catalog, start_time)
             .await?;
 
-        // Publish progress event
-        let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
-        outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-                FlowAgentUpdatedMessage {
-                    update_time: start_time,
-                    update_details: FlowAgentUpdateDetails::Loaded,
-                },
-            )
-            .await?;
-
         Ok(())
     }
 
@@ -133,11 +123,13 @@ impl FlowAgentImpl {
     ) -> Result<(), InternalError> {
         // Extract necessary dependencies
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        let scheduling_service = target_catalog
+            .get_one::<FlowSchedulingServiceImpl>()
+            .unwrap();
 
         // How many waiting flows do we have?
         let waiting_filters = FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         };
@@ -167,8 +159,9 @@ impl FlowAgentImpl {
             while let Some(flow) = state_stream.try_next().await? {
                 // We need to re-evaluate reactive conditions only
                 if let Some(FlowStartCondition::Reactive(b)) = &flow.start_condition {
-                    scheduling_helper
+                    scheduling_service
                         .trigger_flow_common(
+                            start_time,
                             &flow.flow_binding,
                             Some(FlowTriggerRule::Reactive(b.active_rule)),
                             vec![FlowActivationCause::AutoPolling(
@@ -206,7 +199,9 @@ impl FlowAgentImpl {
             .into_iter()
             .partition(|config| matches!(config.rule, FlowTriggerRule::Schedule(_)));
 
-        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        let scheduling_service = target_catalog
+            .get_one::<FlowSchedulingServiceImpl>()
+            .unwrap();
 
         // Activate all configs, ensuring schedule configs precedes non-schedule configs
         // (this i.e. forces all root datasets to be updated earlier than the derived)
@@ -222,7 +217,7 @@ impl FlowAgentImpl {
                 .try_get_pending_flow(&enabled_trigger.flow_binding)
                 .await?;
             if maybe_pending_flow_id.is_none() {
-                scheduling_helper
+                scheduling_service
                     .activate_flow_trigger(
                         target_catalog,
                         start_time,
@@ -253,6 +248,9 @@ impl FlowAgentImpl {
             return Ok(());
         }
 
+        // Synchronize with other agents if needed
+        self.synchronize_execution_loop().await?;
+
         self.run_flows_for_timeslot(
             nearest_flow_activation_moment,
             flow_event_store,
@@ -262,11 +260,21 @@ impl FlowAgentImpl {
         .await
     }
 
+    async fn synchronize_execution_loop(&self) -> Result<(), InternalError> {
+        if let Some(synchronizer) = {
+            let state = self.state.lock().unwrap();
+            state.loop_synchronizer.clone()
+        } {
+            synchronizer.synchronize_execution_loop().await?;
+        }
+        Ok(())
+    }
+
     async fn run_flows_for_timeslot(
         &self,
         activation_moment: DateTime<Utc>,
         flow_event_store: Arc<dyn FlowEventStore>,
-        transaction_catalog: dill::Catalog,
+        transaction_catalog: Catalog,
     ) -> Result<(), InternalError> {
         let planned_flow_ids: Vec<_> = flow_event_store
             .get_flows_scheduled_for_activation_at(activation_moment)
@@ -309,18 +317,6 @@ impl FlowAgentImpl {
                     "Scheduling flow failed"
                 );
             });
-
-        // Publish progress event
-        let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
-        outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-                FlowAgentUpdatedMessage {
-                    update_time: activation_moment,
-                    update_details: FlowAgentUpdateDetails::ExecutedTimeslot,
-                },
-            )
-            .await?;
 
         Ok(())
     }
@@ -385,7 +381,30 @@ impl FlowAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowAgent for FlowAgentImpl {
+impl InitOnStartup for FlowAgentImpl {
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        // Run recovery procedure
+        let start_time = self.agent_config.round_time(self.time_source.now())?;
+        self.recover_initial_flows_state(start_time).await?;
+
+        // Synchronize with other agents if needed
+        self.synchronize_execution_loop().await?;
+
+        // Mark the agent as started
+        self.mark_engine_as_started();
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl BackgroundAgent for FlowAgentImpl {
+    fn agent_name(&self) -> &'static str {
+        "dev.kamu.domain.flow-system.FlowAgent"
+    }
+
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
         // Main scanning loop
@@ -404,17 +423,7 @@ impl FlowAgent for FlowAgentImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-impl InitOnStartup for FlowAgentImpl {
-    async fn run_initialization(&self) -> Result<(), InternalError> {
-        let start_time = self.agent_config.round_time(self.time_source.now())?;
-        self.recover_initial_flows_state(start_time).await?;
-
-        self.mark_engine_as_started();
-
-        Ok(())
-    }
-}
+impl FlowAgent for FlowAgentImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -439,6 +448,15 @@ impl FlowAgentTestDriver for FlowAgentImpl {
             .await?;
 
         Ok(task_id)
+    }
+
+    async fn set_loop_synchronizer(
+        &self,
+        synchronizer: Arc<dyn FlowAgentLoopSynchronizer>,
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.lock().unwrap();
+        state.loop_synchronizer = Some(synchronizer);
+        Ok(())
     }
 }
 
@@ -472,14 +490,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         flow.on_task_running(message.event_time, message.task_id)
                             .int_err()?;
                         flow.save(flow_event_store.as_ref()).await.int_err()?;
-
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                        outbox
-                            .post_message(
-                                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                FlowProgressMessage::running(message.event_time, flow_id),
-                            )
-                            .await?;
                     } else {
                         tracing::info!(
                             flow_id = %flow.flow_id,
@@ -507,40 +517,9 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         .int_err()?;
                         flow.save(flow_event_store.as_ref()).await.int_err()?;
 
-                        let scheduling_helper =
-                            target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
-
-                        let finish_time = self.agent_config.round_time(message.event_time)?;
-
-                        // In case of success:
-                        //  - execute follow-up method
-                        if let Some(task_result) = flow.try_task_result_as_ref()
-                            && !task_result.is_empty()
-                        {
-                            let flow_controller = get_flow_controller_from_catalog(
-                                target_catalog,
-                                &flow.flow_binding.flow_type,
-                            )?;
-
-                            flow_controller
-                                .propagate_success(&flow, task_result, finish_time)
-                                .await
-                                .int_err()?;
-                        }
-
-                        // In case of success:
-                        //  - schedule next flow, if we had any late activation cause
-                        if message.outcome.is_success() {
-                            scheduling_helper
-                                .try_schedule_late_flow_activations(&flow)
-                                .await?;
-                        }
-
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
-                        if let Some(flow_outcome) = flow.outcome.as_ref() {
+                        if flow.outcome.is_some() {
                             // Handle flow failure if it reached a terminal state
                             if message.outcome.is_failure() {
                                 let recoverable = message.outcome.is_recoverable_failure();
@@ -555,54 +534,22 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                         "Flow has reached a failed state after unrecoverable failure"
                                     );
                                 }
-
-                                // Trigger should make a decision about auto-stopping
-                                let flow_trigger_service =
-                                    target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
-                                flow_trigger_service
-                                    .evaluate_trigger_on_failure(
-                                        finish_time,
-                                        &flow.flow_binding,
-                                        !recoverable,
-                                    )
-                                    .await?;
                             }
 
-                            // Try to schedule auto-polling flow, if applicable.
-                            // We don't care whether we failed or succeeded,
-                            // that is determined with the stop policy in the trigger.
-                            scheduling_helper
-                                .try_schedule_auto_polling_flow_if_enabled(
-                                    finish_time,
-                                    &flow.flow_binding,
-                                )
-                                .await?;
+                            // In case of success: propagate success and dispatch sensitive events
+                            if let Some(task_result) = flow.try_task_result_as_ref()
+                                && !task_result.is_empty()
+                            {
+                                let flow_controller = get_flow_controller_from_catalog(
+                                    target_catalog,
+                                    &flow.flow_binding.flow_type,
+                                )?;
 
-                            // Notify about finished flow
-                            outbox
-                                .post_message(
-                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                    FlowProgressMessage::finished(
-                                        message.event_time,
-                                        flow_id,
-                                        flow_outcome.clone(),
-                                    ),
-                                )
-                                .await?;
-                        } else {
-                            // Notify about scheduled retry
-                            outbox
-                                .post_message(
-                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                    FlowProgressMessage::retry_scheduled(
-                                        message.event_time,
-                                        flow_id,
-                                        flow.timing
-                                            .scheduled_for_activation_at
-                                            .expect("Flow must have scheduled activation time"),
-                                    ),
-                                )
-                                .await?;
+                                flow_controller
+                                    .propagate_success(&flow, task_result, message.event_time)
+                                    .await
+                                    .int_err()?;
+                            }
                         }
                     } else {
                         tracing::info!(
@@ -644,8 +591,10 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
 
         // Active trigger => activate it
         if message.trigger_status.is_active() {
-            let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
-            scheduling_helper
+            let scheduling_service = target_catalog
+                .get_one::<FlowSchedulingServiceImpl>()
+                .unwrap();
+            scheduling_service
                 .activate_flow_trigger(
                     target_catalog,
                     self.agent_config.round_time(message.event_time)?,

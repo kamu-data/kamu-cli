@@ -37,7 +37,7 @@ impl WebhookSubscriptionQueryService for WebhookSubscriptionQueryServiceImpl {
             })?;
 
         let subscriptions = kamu_webhooks::WebhookSubscription::load_multi(
-            subscription_ids,
+            &subscription_ids,
             self.subscription_event_store.as_ref(),
         )
         .await

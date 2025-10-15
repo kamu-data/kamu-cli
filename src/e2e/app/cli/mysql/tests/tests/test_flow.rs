@@ -14,15 +14,13 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_gql_get_dataset_list_flows,
-    extra_test_groups = "containerized, engine, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
-    fixture = kamu_cli_e2e_repo_tests::test_gql_dataset_all_flows_paused,
-    extra_test_groups = "containerized, engine, transform, datafusion"
+    fixture = kamu_cli_e2e_repo_tests::test_gql_dataset_flow_processes
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +28,6 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_gql_dataset_flows_initiators,
-    extra_test_groups = "containerized, engine, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

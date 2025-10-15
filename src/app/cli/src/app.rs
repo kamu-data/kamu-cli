@@ -27,7 +27,7 @@ use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
 use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
@@ -304,7 +304,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         if is_outbox_processing_required {
             // Process the Outbox messages while they are present
             let outbox_agent = cli_catalog
-                .get_one::<messaging_outbox::OutboxAgent>()
+                .get_one::<dyn messaging_outbox::OutboxAgent>()
                 .int_err()?;
             outbox_agent
                 .run_while_has_tasks()
@@ -380,7 +380,7 @@ where
         let transaction_runner = DatabaseTransactionRunner::new(catalog);
 
         transaction_runner
-            .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
+            .transactional(|transaction_catalog| async move { f(transaction_catalog).await })
             .await
     }
 }
@@ -546,7 +546,7 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-    b.add::<messaging_outbox::OutboxAgent>();
+    b.add::<messaging_outbox::OutboxAgentImpl>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
@@ -652,10 +652,6 @@ pub fn configure_server_catalog(
 
     b.add::<UploadServiceLocal>();
 
-    register_message_dispatcher::<kamu_flow_system::FlowProgressMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-    );
     register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -663,6 +659,10 @@ pub fn configure_server_catalog(
     register_message_dispatcher::<kamu_flow_system::FlowTriggerUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
+    );
+    register_message_dispatcher::<kamu_flow_system::FlowProcessLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
     );
     register_message_dispatcher::<kamu_task_system::TaskProgressMessage>(
         &mut b,
@@ -989,6 +989,20 @@ pub fn register_config_in_catalog(
             HashMap::new()
         },
     ));
+
+    let flow_system_event_agent = kamu_flow_system_config
+        .flow_system_event_agent
+        .as_ref()
+        .unwrap();
+    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig {
+        min_debounce_interval: std::time::Duration::from_millis(u64::from(
+            flow_system_event_agent.min_debounce_interval_ms.unwrap(),
+        )),
+        max_listening_timeout: std::time::Duration::from_millis(u64::from(
+            flow_system_event_agent.max_listening_timeout_ms.unwrap(),
+        )),
+        batch_size: flow_system_event_agent.batch_size.unwrap(),
+    });
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(

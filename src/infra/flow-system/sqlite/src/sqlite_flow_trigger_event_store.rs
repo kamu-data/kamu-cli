@@ -9,12 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{
-    EventModel,
-    ReturningEventModel,
-    TransactionRefT,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{EventModel, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -32,6 +27,46 @@ pub struct SqliteFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
+    #[tracing::instrument(level = "debug", skip_all)]
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query_as!(
+                EventModel,
+                r#"
+                SELECT event_id, event_payload as "event_payload: _"
+                FROM flow_trigger_events
+                WHERE
+                    (cast($1 as INT8) IS NULL or event_id > $1) AND
+                    (cast($2 as INT8) IS NULL or event_id <= $2)
+                ORDER BY event_id ASC
+                "#,
+                maybe_from_id,
+                maybe_to_id,
+            )
+            .try_map(|event_row| {
+                let event = serde_json::from_value::<FlowTriggerEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     fn get_events(
         &self,
         flow_binding: &FlowBinding,
@@ -82,6 +117,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn save_events(
         &self,
         flow_binding: &FlowBinding,
@@ -93,7 +129,6 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
         }
 
         let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
 
         let mut query_builder = QueryBuilder::<Sqlite>::new(
             r#"
@@ -112,19 +147,25 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
             b.push_bind(serde_json::to_value(event).unwrap());
         });
 
-        query_builder.push("RETURNING event_id");
-
-        let rows = query_builder
-            .build_query_as::<ReturningEventModel>()
-            .fetch_all(connection_mut)
+        // Execute the insert - triggers will assign proper event_ids
+        let connection_mut = tr.connection_mut().await?;
+        query_builder
+            .build()
+            .execute(connection_mut)
             .await
             .int_err()?;
 
-        let last_event_id = rows.last().unwrap().event_id;
+        let connection_mut = tr.connection_mut().await?;
+        let actual_last_event_id =
+            sqlx::query_scalar!("SELECT val FROM flow_event_global_counter WHERE name = 'global'")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
 
-        Ok(EventID::new(last_event_id))
+        Ok(EventID::new(actual_last_event_id))
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

@@ -11,6 +11,7 @@ use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_accounts_services::{CreateAccountUseCaseImpl, UpdateAccountUseCaseImpl};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
@@ -122,6 +123,15 @@ impl BaseGQLDatasetHarness {
 
     pub fn catalog(&self) -> &Catalog {
         &self.catalog
+    }
+
+    pub fn logged_account_from_catalog(&self, catalog: &dill::Catalog) -> LoggedAccount {
+        let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+        if let CurrentAccountSubject::Logged(logged) = current_account_subject.as_ref() {
+            logged.clone()
+        } else {
+            panic!("Expected logged current user");
+        }
     }
 }
 

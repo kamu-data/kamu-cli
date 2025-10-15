@@ -96,7 +96,7 @@ pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApi
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_gql_dataset_flow_processes(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
@@ -110,12 +110,29 @@ pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuA
         .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
-                query datasetAllFlowsPaused() {
+                query datasetFlowProcesses() {
                   datasets {
                     byId(datasetId: $datasetId) {
                       flows {
-                        triggers {
-                          allPaused
+                        processes {
+                          primary {
+                            __typename
+                            	flowType
+	                            dataset {
+                                alias
+                              }
+                              summary {
+                                effectiveState
+                                consecutiveFailures
+                              }
+                          }
+                          webhooks {
+                            __typename
+                            rollup {
+                              __typename
+                              total
+                            }
+                          }
                           __typename
                         }
                         __typename
@@ -139,9 +156,26 @@ pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuA
                       "__typename": "Dataset",
                       "flows": {
                         "__typename": "DatasetFlows",
-                        "triggers": {
-                          "__typename": "DatasetFlowTriggers",
-                          "allPaused": true
+                        "processes": {
+                          "__typename": "DatasetFlowProcesses",
+                          "primary": {
+                            "__typename": "DatasetFlowProcess",
+                            "dataset": {
+                              "alias": "player-scores"
+                            },
+                            "flowType": "INGEST",
+                            "summary": {
+                              "consecutiveFailures": 0,
+                              "effectiveState": "UNCONFIGURED"
+                            }
+                          },
+                          "webhooks": {
+                            "__typename": "WebhookFlowSubProcessGroup",
+                            "rollup": {
+                              "__typename": "FlowProcessGroupRollup",
+                              "total": 0
+                            }
+                          }
                         }
                       }
                     }
@@ -1550,7 +1584,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
                   tiles: listFlows(
                     page: 0
                     perPage: $perPageTiles
-                    filters: { byFlowType: null, byStatus: null, byInitiator: null }
+                    filters: { byProcessType: null, byStatus: null, byInitiator: null }
                   ) {
                     ...FlowConnectionWidgetData
                     __typename

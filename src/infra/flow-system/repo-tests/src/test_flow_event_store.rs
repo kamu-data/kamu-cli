@@ -144,7 +144,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
     let cases = vec![
         (
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 ..Default::default()
             },
             vec![
@@ -155,7 +155,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
         ),
         (
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_COMPACT.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_COMPACT.to_string()]),
                 ..Default::default()
             },
             vec![
@@ -166,7 +166,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
         ),
         (
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_TRANSFORM.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_TRANSFORM.to_string()]),
                 ..Default::default()
             },
             vec![],
@@ -318,7 +318,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
         (
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 by_initiator: Some(InitiatorFilter::System),
             },
             vec![foo_cases.ingest_flow_ids.flow_id_finished],
@@ -326,7 +326,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
         (
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: Some(FLOW_TYPE_DATASET_COMPACT.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_COMPACT.to_string()]),
                 by_initiator: Some(InitiatorFilter::Account(petya_filter)),
             },
             vec![foo_cases.compaction_flow_ids.flow_id_waiting],
@@ -334,7 +334,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
         (
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 by_initiator: Some(InitiatorFilter::System),
             },
             vec![],
@@ -615,7 +615,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
                 limit: 2,
             },
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 ..Default::default()
             },
             3,
@@ -719,7 +719,7 @@ pub async fn test_system_flows_filtered_by_flow_type(catalog: &Catalog) {
 
     let cases = vec![(
         FlowFilters {
-            by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+            by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
             ..Default::default()
         },
         vec![
@@ -853,7 +853,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
                 by_initiator: Some(InitiatorFilter::System),
-                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
             },
             vec![system_case.gc_flow_ids.flow_id_finished],
         ),
@@ -861,7 +861,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
             FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(petya_filter)),
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: None,
+                by_flow_types: None,
             },
             vec![system_case.gc_flow_ids.flow_id_waiting],
         ),
@@ -869,7 +869,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
             FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
                 by_initiator: Some(InitiatorFilter::System),
-                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
             },
             vec![],
         ),
@@ -960,7 +960,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
                 limit: 2,
             },
             FlowFilters {
-                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
+                by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
                 ..Default::default()
             },
             3,
@@ -1118,7 +1118,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         },
@@ -1138,7 +1138,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Running),
             by_initiator: None,
         },
@@ -1158,7 +1158,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters {
-            by_flow_type: None,
+            by_flow_types: None,
             by_flow_status: Some(FlowStatus::Finished),
             by_initiator: None,
         },
@@ -1174,243 +1174,6 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
         ],
     )
     .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const EMPTY_STATS: FlowRunStats = FlowRunStats {
-    last_attempt_time: None,
-    last_success_time: None,
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
-    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-
-    let binding_ingest = ingest_dataset_binding(&dataset_id);
-
-    // No stats initially
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_ingest)
-        .await
-        .unwrap();
-    assert_eq!(stats, EMPTY_STATS);
-
-    // Schedule flow
-
-    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
-    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-        activation_time: Utc::now(),
-    });
-
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Waiting,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-
-    // Stats hasn't changed
-
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_ingest)
-        .await
-        .unwrap();
-    assert_eq!(stats, EMPTY_STATS);
-
-    // Flow starts running
-    flow_generator.start_running_flow(flow_id).await;
-
-    // still no change
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_ingest)
-        .await
-        .unwrap();
-    assert_eq!(stats, EMPTY_STATS);
-
-    // Flow successeds
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
-        .await;
-
-    // Finally, stats got updated
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_ingest)
-        .await
-        .unwrap();
-    assert_matches!(
-        stats,
-        FlowRunStats {
-            last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
-        } if success_time == attempt_time
-    );
-
-    // Make another flow of the same type with the same dataset
-
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Waiting,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-
-    // Still storing old stats
-    let new_stats = flow_event_store
-        .get_flow_run_stats(&binding_ingest)
-        .await
-        .unwrap();
-    assert_eq!(new_stats, stats);
-
-    // Flow starts running
-    flow_generator.start_running_flow(flow_id).await;
-
-    // Still storing old stats
-    let new_stats = flow_event_store
-        .get_flow_run_stats(&binding_ingest)
-        .await
-        .unwrap();
-    assert_eq!(new_stats, stats);
-
-    // Now finish the flow with failure
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    // Stats got updated: success stayed as previously, attempt refreshed
-    let new_stats = flow_event_store
-        .get_flow_run_stats(&binding_ingest)
-        .await
-        .unwrap();
-    assert_matches!(
-        new_stats,
-        FlowRunStats {
-            last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
-        } if success_time < attempt_time && success_time == stats.last_attempt_time.unwrap()
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_system_flow_run_stats(catalog: &Catalog) {
-    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
-
-    // No stats initially
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_gc)
-        .await
-        .unwrap();
-    assert_eq!(stats, EMPTY_STATS);
-
-    // Schedule flow
-
-    let flow_generator = SystemFlowGenerator::new(flow_event_store.clone());
-    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-        activation_time: Utc::now(),
-    });
-
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_SYSTEM_GC,
-            FlowStatus::Waiting,
-            automatic_cause.clone(),
-            None,
-        )
-        .await;
-
-    // Stats hasn't changed
-
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_gc)
-        .await
-        .unwrap();
-    assert_eq!(stats, EMPTY_STATS);
-
-    // Flow starts running
-    flow_generator.start_running_flow(flow_id).await;
-
-    // still no change
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_gc)
-        .await
-        .unwrap();
-    assert_eq!(stats, EMPTY_STATS);
-
-    // Flow successeds
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
-        .await;
-
-    // Finally, stats got updated
-    let stats = flow_event_store
-        .get_flow_run_stats(&binding_gc)
-        .await
-        .unwrap();
-    assert_matches!(
-        stats,
-        FlowRunStats {
-            last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
-        } if success_time == attempt_time
-    );
-
-    // Make another flow of the same type
-
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_SYSTEM_GC,
-            FlowStatus::Waiting,
-            automatic_cause.clone(),
-            None,
-        )
-        .await;
-
-    // Still storing old stats
-    let new_stats = flow_event_store
-        .get_flow_run_stats(&binding_gc)
-        .await
-        .unwrap();
-    assert_eq!(new_stats, stats);
-
-    // Flow starts running
-    flow_generator.start_running_flow(flow_id).await;
-
-    // Still storing old stats
-    let new_stats = flow_event_store
-        .get_flow_run_stats(&binding_gc)
-        .await
-        .unwrap();
-    assert_eq!(new_stats, stats);
-
-    // Now finish the flow with failure
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    // Stats got updated: success stayed as previously, attempt refreshed
-    let new_stats = flow_event_store
-        .get_flow_run_stats(&binding_gc)
-        .await
-        .unwrap();
-    assert_matches!(
-        new_stats,
-        FlowRunStats {
-            last_success_time: Some(success_time),
-            last_attempt_time: Some(attempt_time)
-        } if success_time < attempt_time && success_time == stats.last_attempt_time.unwrap()
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1800,7 +1563,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: Utc::now(),
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                     flow_id,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1825,6 +1588,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 FlowEventAborted {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                 }
                 .into(),
             ],
@@ -1841,6 +1605,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 FlowEventAborted {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                 }
                 .into(),
             ],
@@ -1857,6 +1622,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 FlowEventAborted {
                     event_time: Utc::now(),
                     flow_id,
+                    flow_binding,
                 }
                 .into(),
             ],
@@ -1886,7 +1652,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                     flow_id,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -1912,6 +1678,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventStartConditionUpdated {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment,
@@ -1941,6 +1708,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventScheduledForActivation {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment,
                 }
@@ -1967,6 +1735,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventTaskScheduled {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: activation_moment + Duration::milliseconds(100),
                     task_id: TaskID::new(1),
                 }
@@ -1993,6 +1762,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventTaskRunning {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: activation_moment + Duration::milliseconds(500),
                     task_id: TaskID::new(1),
                 }
@@ -2019,6 +1789,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventTaskFinished {
                     flow_id,
+                    flow_binding,
                     event_time: activation_moment + Duration::milliseconds(1500),
                     task_id: TaskID::new(1),
                     task_outcome: TaskOutcome::Success(TaskResult::empty()),
@@ -2051,7 +1822,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding,
+                    flow_binding: flow_binding.clone(),
                     flow_id,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -2064,6 +1835,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment,
@@ -2073,6 +1845,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id,
+                    flow_binding: flow_binding.clone(),
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment,
                 }
@@ -2100,6 +1873,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                 FlowEventAborted {
                     event_time: abortion_moment,
                     flow_id,
+                    flow_binding,
                 }
                 .into(),
             ],
@@ -2146,7 +1920,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding: flow_binding_foo,
+                    flow_binding: flow_binding_foo.clone(),
                     flow_id: flow_id_foo,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -2159,6 +1933,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id: flow_id_foo,
+                    flow_binding: flow_binding_foo.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_1,
@@ -2168,6 +1943,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id: flow_id_foo,
+                    flow_binding: flow_binding_foo,
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment_1,
                 }
@@ -2184,7 +1960,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding: flow_binding_bar,
+                    flow_binding: flow_binding_bar.clone(),
                     flow_id: flow_id_bar,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -2197,6 +1973,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id: flow_id_bar,
+                    flow_binding: flow_binding_bar.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_1,
@@ -2206,6 +1983,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id: flow_id_bar,
+                    flow_binding: flow_binding_bar,
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment_1,
                 }
@@ -2222,7 +2000,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_binding: flow_binding_baz,
+                    flow_binding: flow_binding_baz.clone(),
                     flow_id: flow_id_baz,
                     activation_cause: FlowActivationCause::AutoPolling(
                         FlowActivationCauseAutoPolling {
@@ -2235,6 +2013,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventStartConditionUpdated {
                     flow_id: flow_id_baz,
+                    flow_binding: flow_binding_baz.clone(),
                     event_time: Utc::now(),
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_2,
@@ -2244,6 +2023,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                 .into(),
                 FlowEventScheduledForActivation {
                     flow_id: flow_id_baz,
+                    flow_binding: flow_binding_baz,
                     event_time: Utc::now(),
                     scheduled_for_activation_at: activation_moment_2,
                 }
@@ -2492,177 +2272,6 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(pending_flows.is_empty());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_flow_consecutive_failures_count(catalog: &Catalog) {
-    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-    // Create a dataset
-    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let flow_binding = ingest_dataset_binding(&dataset_id);
-
-    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
-    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-        activation_time: Utc::now(),
-    });
-
-    // Initially we are not failing
-    assert_eq!(
-        0,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Have a successful flow
-    flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Finished,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-
-    // Still no failures, after success
-    assert_eq!(
-        0,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Fail once
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        1,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Fail one more time
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        2,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Abort the next flow - should not count as failure
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator.abort_flow(flow_id).await;
-
-    assert_eq!(
-        2,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Have another failure
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        3,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Finally have a success - should reset the count
-    flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Finished,
-            automatic_cause.clone(),
-            None,
-            None,
-        )
-        .await;
-
-    assert_eq!(
-        0,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
-
-    // Fail again - should be counted from zero
-    let flow_id = flow_generator
-        .make_new_flow(
-            FLOW_TYPE_DATASET_INGEST,
-            FlowStatus::Running,
-            automatic_cause,
-            None,
-            None,
-        )
-        .await;
-    flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty_recoverable()))
-        .await;
-
-    assert_eq!(
-        1,
-        flow_event_store
-            .get_current_consecutive_flow_failures_count(&flow_binding)
-            .await
-            .unwrap()
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2966,6 +2575,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         flow
     }
 
+    #[allow(dead_code)]
     async fn abort_flow(&self, flow_id: FlowID) {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
             .await
@@ -3071,6 +2681,12 @@ fn drive_flow_to_status(flow: &mut Flow, expected_status: FlowStatus) {
         // Derived task id from flow id just to ensure unique values
         let flow_id: u64 = flow.flow_id.into();
         let task_id = TaskID::new(flow_id * 2 + 1);
+
+        flow.set_relevant_start_condition(
+            start_moment + Duration::minutes(5),
+            FlowStartCondition::Executor(FlowStartConditionExecutor { task_id }),
+        )
+        .unwrap();
 
         flow.on_task_scheduled(start_moment + Duration::minutes(5), task_id)
             .unwrap();

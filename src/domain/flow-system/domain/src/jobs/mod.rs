@@ -11,4 +11,7 @@
 
 pub const JOB_KAMU_FLOW_AGENT_RECOVERY: &str = "dev.kamu.domain.flow-system.FlowAgentRecovery";
 
+pub const JOB_KAMU_FLOW_PROCESS_STATE_INDEXER: &str =
+    "dev.kamu.domain.flow-system.FlowProcessStateIndexer";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
