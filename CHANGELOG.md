@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- SQLX: avoid using untyped row interfaces like sqlx::Row|SqliteRow|PgRow
+
 ## [0.250.0] - 2025-10-14
 ### Added
 - New `delivery_timeout` configuration for `webhooks_config`

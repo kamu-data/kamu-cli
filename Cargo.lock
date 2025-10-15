@@ -8223,7 +8223,6 @@ dependencies = [
  "database-common-macros",
  "dill",
  "futures",
- "indoc 2.0.6",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
  "messaging-outbox",
