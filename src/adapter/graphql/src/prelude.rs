@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub(crate) use async_graphql::dataloader::DataLoader;
 pub(crate) use async_graphql::*;
 pub(crate) use internal_error::*;
 
+pub(crate) use crate::data_loader::EntityLoader;
 pub(crate) use crate::guards::*;
 pub(crate) use crate::scalars::{TimeUnit, *};
 pub(crate) use crate::utils::{GqlError, from_catalog_n};

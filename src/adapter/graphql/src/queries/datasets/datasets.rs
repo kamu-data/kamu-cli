@@ -247,19 +247,17 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+        let data_loader = ctx.data_unchecked::<DataLoader<EntityLoader>>();
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account_name = account_service.find_account_name_by_id(&account_id).await?;
-
-        if let Some(account_name) = maybe_account_name {
-            self.by_account_impl(
-                ctx,
-                Account::new(account_id.into(), account_name.into()),
-                page,
-                per_page,
-            )
+        let maybe_account = data_loader
+            .load_one(account_id)
             .await
+            .map_err(|e| e.reason().int_err())?;
+
+        if let Some(account) = maybe_account {
+            self.by_account_impl(ctx, Account::from_account(account), page, per_page)
+                .await
         } else {
             let page = page.unwrap_or(0);
             let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);

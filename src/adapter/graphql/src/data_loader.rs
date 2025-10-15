@@ -17,18 +17,15 @@ use kamu_accounts::{Account, AccountService};
 use kamu_datasets::{DatasetEntry, DatasetEntryService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DataLoader
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// https://async-graphql.github.io/async-graphql/en/dataloader.html
 #[dill::component]
-pub struct DataLoader {
+pub struct EntityLoader {
     account_service: Arc<dyn AccountService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
-// NOTE: async_graphql has the "boxed-trait" feature, but it prevents library
-//       compilation due to an internal error. So we have to return impl Future.
-impl Loader<odf::AccountID> for DataLoader {
+impl Loader<odf::AccountID> for EntityLoader {
     type Value = Account;
     type Error = Arc<InternalError>;
 
@@ -51,7 +48,7 @@ impl Loader<odf::AccountID> for DataLoader {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Loader<odf::DatasetID> for DataLoader {
+impl Loader<odf::DatasetID> for EntityLoader {
     type Value = DatasetEntry;
     type Error = Arc<InternalError>;
 
