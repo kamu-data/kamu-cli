@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_graphql::dataloader::DataLoader;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::AccountService;
-use kamu_datasets::DatasetEntryService;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
 
 use crate::data_loader::EntityLoader;
 
@@ -24,10 +24,11 @@ pub type EntityDataLoader = DataLoader<EntityLoader>;
 
 pub fn data_loader(catalog: &dill::Catalog) -> EntityDataLoader {
     let account_service = catalog.get_one::<dyn AccountService>().unwrap();
-    let dataset_entry_service = catalog.get_one::<dyn DatasetEntryService>().unwrap();
+    let rebac_dataset_registry_facade =
+        catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
     DataLoader::new(
-        EntityLoader::new(account_service, dataset_entry_service),
+        EntityLoader::new(account_service, rebac_dataset_registry_facade),
         tokio::spawn,
     )
 }

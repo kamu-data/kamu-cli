@@ -29,28 +29,22 @@ impl Datasets {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Dataset>> {
-        let rebac_dataset_registry_facade =
-            from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacDatasetRegistryFacade);
+        let data_loader = utils::get_entity_data_loader(ctx);
 
-        let resolve_res = rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Read)
-            .await;
-        let handle = match resolve_res {
-            Ok(handle) => Ok(handle),
-            Err(e) => {
-                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+        let maybe_handle = data_loader
+            .load_one(dataset_ref.clone())
+            .await
+            .map_err(data_loader_error_mapper)?;
 
-                match e {
-                    E::NotFound(_) | E::Access(_) => return Ok(None),
-                    e @ E::Internal(_) => Err(e.int_err()),
-                }
-            }
-        }?;
-        let account = Account::from_dataset_alias(ctx, &handle.alias)
-            .await?
-            .expect("Account must exist");
+        if let Some(handle) = maybe_handle {
+            let account = Account::from_dataset_alias(ctx, &handle.alias)
+                .await?
+                .expect("Account must exist");
 
-        Ok(Some(Dataset::new_access_checked(account, handle)))
+            Ok(Some(Dataset::new_access_checked(account, handle)))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn by_dataset_refs(
@@ -59,6 +53,8 @@ impl Datasets {
         dataset_refs: Vec<odf::DatasetRef>,
         skip_missing: bool,
     ) -> Result<Vec<Dataset>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let (rebac_dataset_registry_facade, account_service, current_account_subject) = from_catalog_n!(
             ctx,
             dyn kamu_auth_rebac::RebacDatasetRegistryFacade,
