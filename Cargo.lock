@@ -7385,6 +7385,7 @@ dependencies = [
  "internal-error",
  "kamu-auth-rebac",
  "kamu-auth-rebac-repo-tests",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
