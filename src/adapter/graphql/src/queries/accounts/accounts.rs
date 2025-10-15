@@ -66,6 +66,8 @@ impl Accounts {
         )]
         skip_missing: bool,
     ) -> Result<Vec<Account>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let domain_account_ids = account_ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
@@ -115,6 +117,8 @@ impl Accounts {
         )]
         skip_missing: bool,
     ) -> Result<Vec<Account>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let domain_account_names = account_names.iter().map(AsRef::as_ref).collect::<Vec<_>>();

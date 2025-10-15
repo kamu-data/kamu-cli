@@ -7,37 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_graphql::dataloader::Loader;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{Account, AccountService};
-use kamu_datasets::{DatasetEntry, DatasetEntryService};
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_core::auth;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // https://async-graphql.github.io/async-graphql/en/dataloader.html
 pub struct EntityLoader {
     account_service: Arc<dyn AccountService>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
 impl EntityLoader {
     pub fn new(
         account_service: Arc<dyn AccountService>,
-        dataset_entry_service: Arc<dyn DatasetEntryService>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     ) -> Self {
         Self {
             account_service,
-            dataset_entry_service,
+            rebac_dataset_registry_facade,
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// odf::AccountID
+// odf::AccountID -> Account
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Loader<odf::AccountID> for EntityLoader {
@@ -62,7 +62,7 @@ impl Loader<odf::AccountID> for EntityLoader {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// odf::AccountName
+// odf::AccountName -> Account
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Loader<odf::AccountName> for EntityLoader {
@@ -90,28 +90,28 @@ impl Loader<odf::AccountName> for EntityLoader {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// odf::DatasetID
+// odf::DatasetRef (Read) -> odf::DatasetHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Loader<odf::DatasetID> for EntityLoader {
-    type Value = DatasetEntry;
+impl Loader<odf::DatasetRef> for EntityLoader {
+    type Value = odf::DatasetHandle;
     type Error = Arc<InternalError>;
 
     async fn load(
         &self,
-        keys: &[odf::DatasetID],
-    ) -> Result<HashMap<odf::DatasetID, Self::Value>, Self::Error> {
-        let key_cows: Vec<Cow<odf::DatasetID>> = keys.iter().map(Cow::Borrowed).collect();
+        keys: &[odf::DatasetRef],
+    ) -> Result<HashMap<odf::DatasetRef, Self::Value>, Self::Error> {
+        let dataset_refs: Vec<&odf::DatasetRef> = keys.iter().collect();
 
         let resolution = self
-            .dataset_entry_service
-            .get_multiple_entries(&key_cows)
+            .rebac_dataset_registry_facade
+            .classify_dataset_refs_by_allowance(&dataset_refs, auth::DatasetAction::Read)
             .await
             .int_err()?;
 
-        let mut result = HashMap::with_capacity(resolution.resolved_entries.len());
-        for entry in resolution.resolved_entries {
-            result.insert(entry.id.clone(), entry);
+        let mut result = HashMap::with_capacity(resolution.accessible_resolved_refs.len());
+        for (dataset_ref, dataset_handle) in resolution.accessible_resolved_refs {
+            result.insert(dataset_ref, dataset_handle);
         }
 
         Ok(result)
