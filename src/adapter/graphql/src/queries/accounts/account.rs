@@ -65,7 +65,7 @@ impl Account {
         let maybe_account = data_loader
             .load_one(account_id.clone())
             .await
-            .map_err(|e| e.reason().int_err())?;
+            .map_err(data_loader_error_mapper)?;
 
         if let Some(account) = maybe_account {
             Ok(Self::from_account(account))
@@ -86,7 +86,7 @@ impl Account {
         let maybe_account = data_loader
             .load_one(account_name)
             .await
-            .map_err(|e| e.reason().int_err())?;
+            .map_err(data_loader_error_mapper)?;
 
         Ok(maybe_account.map(Self::from_account))
     }
@@ -125,7 +125,7 @@ impl Account {
         let maybe_account = data_loader
             .load_one(account_id)
             .await
-            .map_err(|e| e.reason().int_err())?;
+            .map_err(data_loader_error_mapper)?;
 
         maybe_account.ok_or_else(|| {
             GqlError::Gql(

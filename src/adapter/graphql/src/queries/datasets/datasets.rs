@@ -254,7 +254,7 @@ impl Datasets {
         let maybe_account = data_loader
             .load_one(account_id)
             .await
-            .map_err(|e| e.reason().int_err())?;
+            .map_err(data_loader_error_mapper)?;
 
         if let Some(account) = maybe_account {
             self.by_account_impl(ctx, Account::from_account(account), page, per_page)

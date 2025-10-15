@@ -49,7 +49,7 @@ impl Accounts {
         let maybe_account = data_loader
             .load_one(account_id)
             .await
-            .map_err(|e| e.reason().int_err())?;
+            .map_err(data_loader_error_mapper)?;
 
         Ok(maybe_account.map(Account::from_account))
     }
@@ -98,7 +98,7 @@ impl Accounts {
         let maybe_account = data_loader
             .load_one(account_name)
             .await
-            .map_err(|e| e.reason().int_err())?;
+            .map_err(data_loader_error_mapper)?;
 
         Ok(maybe_account.map(Account::from_account))
     }
