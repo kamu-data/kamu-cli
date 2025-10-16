@@ -12,6 +12,7 @@
 #![feature(let_chains)]
 
 pub mod config;
+pub mod data_loader;
 pub mod extensions;
 pub mod guards;
 pub(crate) mod mutations;

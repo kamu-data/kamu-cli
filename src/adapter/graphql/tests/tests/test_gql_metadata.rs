@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
+use async_graphql::value;
 use indoc::indoc;
 use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
@@ -27,14 +28,10 @@ async fn test_current_push_sources() {
     let harness = DatasetMetadataHarness::new().await;
     let create_result = harness.create_root_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_push_sources_request(
-                &create_result.dataset_handle.id.to_string(),
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_push_sources_request(
+            &create_result.dataset_handle.id.to_string(),
+        ))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -83,13 +80,10 @@ async fn test_current_push_sources() {
         .await
         .unwrap();
 
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_push_sources_request(
-                &create_result.dataset_handle.id.to_string(),
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_push_sources_request(
+            &create_result.dataset_handle.id.to_string(),
+        ))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -124,16 +118,12 @@ async fn test_current_push_source_blocks() {
     let harness = DatasetMetadataHarness::new().await;
     let create_result = harness.create_root_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
-                &create_result.dataset_handle.id.to_string(),
-                &["ADD_PUSH_SOURCE"],
-                None,
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+            &create_result.dataset_handle.id.to_string(),
+            &["ADD_PUSH_SOURCE"],
+            None,
+        ))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -182,15 +172,12 @@ async fn test_current_push_source_blocks() {
         .await
         .unwrap();
 
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
-                &create_result.dataset_handle.id.to_string(),
-                &["ADD_PUSH_SOURCE"],
-                None,
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+            &create_result.dataset_handle.id.to_string(),
+            &["ADD_PUSH_SOURCE"],
+            None,
+        ))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -254,13 +241,11 @@ async fn test_current_polling_source() {
         .await
         .unwrap();
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             DatasetMetadataHarness::get_dataset_polling_source_metadata_request(
                 create_result.dataset_handle.id.to_string().as_str(),
-            )
-            .data(harness.catalog_authorized.clone()),
+            ),
         )
         .await;
 
@@ -306,16 +291,12 @@ async fn test_current_polling_source_block() {
         .await
         .unwrap();
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
-                create_result.dataset_handle.id.to_string().as_str(),
-                &["SET_POLLING_SOURCE"],
-                None,
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+            create_result.dataset_handle.id.to_string().as_str(),
+            &["SET_POLLING_SOURCE"],
+            None,
+        ))
         .await;
 
     assert_eq!(
@@ -349,13 +330,11 @@ async fn test_current_set_transform() {
     let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             DatasetMetadataHarness::get_dataset_set_transform_metadata_request(
                 create_derived_result.dataset_handle.id.to_string().as_str(),
-            )
-            .data(harness.catalog_authorized.clone()),
+            ),
         )
         .await;
 
@@ -387,16 +366,12 @@ async fn test_current_set_transform_block() {
     let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
-                create_derived_result.dataset_handle.id.to_string().as_str(),
-                &["SET_TRANSFORM"],
-                None,
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+            create_derived_result.dataset_handle.id.to_string().as_str(),
+            &["SET_TRANSFORM"],
+            None,
+        ))
         .await;
 
     assert_eq!(
@@ -462,16 +437,12 @@ async fn test_multiple_metadata_block() {
         .await
         .unwrap();
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
-                create_result.dataset_handle.id.to_string().as_str(),
-                &["SEED", "ADD_PUSH_SOURCE"],
-                None,
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+            create_result.dataset_handle.id.to_string().as_str(),
+            &["SEED", "ADD_PUSH_SOURCE"],
+            None,
+        ))
         .await;
 
     assert_eq!(
@@ -556,16 +527,12 @@ async fn test_metadata_blocks_in_range() {
         .await
         .unwrap();
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
-                create_result.dataset_handle.id.to_string().as_str(),
-                &["SEED", "ADD_PUSH_SOURCE"],
-                Some(&last_commit_result.old_head.unwrap().to_string()),
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(DatasetMetadataHarness::get_dataset_metadata_blocks_request(
+            create_result.dataset_handle.id.to_string().as_str(),
+            &["SEED", "ADD_PUSH_SOURCE"],
+            Some(&last_commit_result.old_head.unwrap().to_string()),
+        ))
         .await;
 
     // It will return seed and only the first push source
@@ -632,6 +599,21 @@ impl DatasetMetadataHarness {
             base_gql_harness,
             catalog_authorized,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {

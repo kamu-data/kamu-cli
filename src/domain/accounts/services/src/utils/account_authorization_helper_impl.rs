@@ -9,12 +9,10 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     CurrentAccountSubject,
-    CurrentAccountSubjectExt,
     DeleteAccountError,
-    LoggedAccountExt,
     ModifyAccountPasswordError,
     ModifyAccountPasswordWithConfirmationError,
 };
@@ -63,9 +61,17 @@ pub struct AccountAuthorizationHelperImpl {
 #[async_trait::async_trait]
 impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
     async fn is_admin(&self) -> Result<bool, InternalError> {
-        self.current_account_subject
-            .is_admin(self.rebac_service.as_ref())
-            .await
+        match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => Ok(false),
+            CurrentAccountSubject::Logged(l) => {
+                use kamu_auth_rebac::RebacServiceExt;
+
+                self.rebac_service
+                    .is_account_admin(&l.account_id)
+                    .await
+                    .int_err()
+            }
+        }
     }
 
     async fn can_modify_account(
@@ -75,7 +81,14 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => Ok(false),
             CurrentAccountSubject::Logged(l) if l.account_name == *account_name => Ok(true),
-            CurrentAccountSubject::Logged(l) => l.is_admin(self.rebac_service.as_ref()).await,
+            CurrentAccountSubject::Logged(l) => {
+                use kamu_auth_rebac::RebacServiceExt;
+
+                self.rebac_service
+                    .is_account_admin(&l.account_id)
+                    .await
+                    .int_err()
+            }
         }
     }
 

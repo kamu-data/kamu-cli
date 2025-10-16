@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-
 #[cfg(any(feature = "testing", test))]
 use crate::DEFAULT_ACCOUNT_ID;
 use crate::DEFAULT_ACCOUNT_NAME;
@@ -107,55 +105,6 @@ impl CurrentAccountSubject {
             dataset_alias.account_name.as_ref().unwrap().clone()
         } else {
             self.account_name_or_default().clone()
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-pub trait LoggedAccountExt {
-    async fn is_admin(
-        &self,
-        rebac_service: &dyn kamu_auth_rebac::RebacService,
-    ) -> Result<bool, InternalError>;
-}
-
-#[async_trait::async_trait]
-impl LoggedAccountExt for LoggedAccount {
-    async fn is_admin(
-        &self,
-        rebac_service: &dyn kamu_auth_rebac::RebacService,
-    ) -> Result<bool, InternalError> {
-        use internal_error::ResultIntoInternal;
-        use kamu_auth_rebac::RebacServiceExt;
-
-        rebac_service
-            .is_account_admin(&self.account_id)
-            .await
-            .int_err()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-pub trait CurrentAccountSubjectExt {
-    async fn is_admin(
-        &self,
-        rebac_service: &dyn kamu_auth_rebac::RebacService,
-    ) -> Result<bool, InternalError>;
-}
-
-#[async_trait::async_trait]
-impl CurrentAccountSubjectExt for CurrentAccountSubject {
-    async fn is_admin(
-        &self,
-        rebac_service: &dyn kamu_auth_rebac::RebacService,
-    ) -> Result<bool, InternalError> {
-        match self {
-            CurrentAccountSubject::Anonymous(_) => Ok(false),
-            CurrentAccountSubject::Logged(l) => l.is_admin(rebac_service).await,
         }
     }
 }

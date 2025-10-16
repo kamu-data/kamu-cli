@@ -10,6 +10,7 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
+use kamu_adapter_graphql::data_loader::dataset_handle_data_loader;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_flow_system_inmem::{
@@ -19,6 +20,7 @@ use kamu_flow_system_inmem::{
 };
 use kamu_flow_system_services::FlowTriggerServiceImpl;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
@@ -63,12 +65,8 @@ async fn test_crud_time_delta_root_dataset() {
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -94,11 +92,8 @@ async fn test_crud_time_delta_root_dataset() {
         "DAYS",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -137,11 +132,8 @@ async fn test_crud_time_delta_root_dataset() {
         "HOURS",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -182,8 +174,6 @@ async fn test_time_delta_validation() {
 
     let create_result = harness.create_root_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     // These cases exceed unit boundary, but must return the same "every" & "unit"
     for test_case in [
         (63, "MINUTES"),
@@ -199,11 +189,8 @@ async fn test_time_delta_validation() {
             test_case.1,
         );
 
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_authorized.clone()),
-            )
+        let response = harness
+            .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
             .await;
         assert!(response.is_ok(), "{response:?}");
 
@@ -227,11 +214,8 @@ async fn test_time_delta_validation() {
             test_case.1,
         );
 
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_authorized.clone()),
-            )
+        let response = harness
+            .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
             .await;
         assert!(response.is_ok(), "{response:?}");
 
@@ -280,12 +264,8 @@ async fn test_crud_cron_root_dataset() {
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -310,11 +290,8 @@ async fn test_crud_cron_root_dataset() {
         "*/2 * * * *",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -351,11 +328,8 @@ async fn test_crud_cron_root_dataset() {
         "0 */1 * * *",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -394,11 +368,8 @@ async fn test_crud_cron_root_dataset() {
         invalid_cron_expression,
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -427,11 +398,8 @@ async fn test_crud_cron_root_dataset() {
         past_cron_expression,
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -499,12 +467,8 @@ async fn test_crud_reactive_buffering_derived_dataset() {
     )
     .replace("<id>", &create_derived_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -531,11 +495,8 @@ async fn test_crud_reactive_buffering_derived_dataset() {
         "NO_ACTION",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -614,12 +575,8 @@ async fn test_crud_reactive_immediate_derived_dataset() {
     )
     .replace("<id>", &create_derived_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -644,11 +601,8 @@ async fn test_crud_reactive_immediate_derived_dataset() {
         "NO_ACTION",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -692,8 +646,6 @@ async fn test_reactive_buffering_trigger_validation() {
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     for test_case in [
         (
             1,
@@ -722,11 +674,8 @@ async fn test_reactive_buffering_trigger_validation() {
             "NO_ACTION",
         );
 
-        let response = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_authorized.clone()),
-            )
+        let response = harness
+            .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
             .await;
         assert!(response.is_ok(), "{response:?}");
         assert_eq!(
@@ -755,15 +704,14 @@ async fn test_reactive_buffering_trigger_validation() {
 async fn test_pause_resume_dataset_flows() {
     async fn check_flow_config_status(
         harness: &FlowTriggerHarness,
-        schema: &kamu_adapter_graphql::Schema,
         dataset_id: &odf::DatasetID,
         dataset_flow_type: &str,
         expect_paused: bool,
     ) {
         let query = FlowTriggerHarness::quick_flow_trigger_query(dataset_id, dataset_flow_type);
 
-        let res = schema
-            .execute(async_graphql::Request::new(query).data(harness.catalog_authorized.clone()))
+        let res = harness
+            .execute_authorized_query(async_graphql::Request::new(query))
             .await;
         assert!(res.is_ok(), "{res:?}");
         assert_eq!(
@@ -787,14 +735,13 @@ async fn test_pause_resume_dataset_flows() {
 
     async fn check_dataset_all_configs_status(
         harness: &FlowTriggerHarness,
-        schema: &kamu_adapter_graphql::Schema,
         dataset_id: &odf::DatasetID,
         expect_paused: bool,
     ) {
         let query = FlowTriggerHarness::all_paused_trigger_query(dataset_id);
 
-        let res = schema
-            .execute(async_graphql::Request::new(query).data(harness.catalog_authorized.clone()))
+        let res = harness
+            .execute_authorized_query(async_graphql::Request::new(query))
             .await;
         assert!(res.is_ok(), "{res:?}");
         assert_eq!(
@@ -820,8 +767,6 @@ async fn test_pause_resume_dataset_flows() {
     let create_root_result = harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     let mutation_set_ingest = FlowTriggerHarness::set_time_delta_trigger_mutation(
         &create_root_result.dataset_handle.id,
         "INGEST",
@@ -829,11 +774,8 @@ async fn test_pause_resume_dataset_flows() {
         "DAYS",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_set_ingest)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_set_ingest))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -845,11 +787,8 @@ async fn test_pause_resume_dataset_flows() {
         "RECOVER",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_set_transform)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_set_transform))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -870,17 +809,10 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         flow_cases.iter().zip(vec![false, false])
     {
-        check_flow_config_status(
-            &harness,
-            &schema,
-            dataset_id,
-            dataset_flow_type,
-            expect_paused,
-        )
-        .await;
+        check_flow_config_status(&harness, dataset_id, dataset_flow_type, expect_paused).await;
     }
     for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
+        check_dataset_all_configs_status(&harness, dataset_id, expect_paused).await;
     }
 
     let mutation_pause_root_compaction = FlowTriggerHarness::pause_flow_mutation(
@@ -888,11 +820,8 @@ async fn test_pause_resume_dataset_flows() {
         "EXECUTE_TRANSFORM",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_pause_root_compaction)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_pause_root_compaction))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -900,73 +829,46 @@ async fn test_pause_resume_dataset_flows() {
 
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
-        check_flow_config_status(
-            &harness,
-            &schema,
-            dataset_id,
-            dataset_flow_type,
-            expect_paused,
-        )
-        .await;
+        check_flow_config_status(&harness, dataset_id, dataset_flow_type, expect_paused).await;
     }
     for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
+        check_dataset_all_configs_status(&harness, dataset_id, expect_paused).await;
     }
 
     // Pause all the root
     let mutation_pause_all_root =
         FlowTriggerHarness::pause_all_flows_mutation(&create_root_result.dataset_handle.id);
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_pause_all_root)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_pause_all_root))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
     // Root flows should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![true, true])
     {
-        check_flow_config_status(
-            &harness,
-            &schema,
-            dataset_id,
-            dataset_flow_type,
-            expect_paused,
-        )
-        .await;
+        check_flow_config_status(&harness, dataset_id, dataset_flow_type, expect_paused).await;
     }
     for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![true, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
+        check_dataset_all_configs_status(&harness, dataset_id, expect_paused).await;
     }
 
     // Resume ingestion
     let mutation_resume_ingest =
         FlowTriggerHarness::resume_flow_mutation(&create_root_result.dataset_handle.id, "INGEST");
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_resume_ingest)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_resume_ingest))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
     // Only transform of deriving should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
-        check_flow_config_status(
-            &harness,
-            &schema,
-            dataset_id,
-            dataset_flow_type,
-            expect_paused,
-        )
-        .await;
+        check_flow_config_status(&harness, dataset_id, dataset_flow_type, expect_paused).await;
     }
     for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
+        check_dataset_all_configs_status(&harness, dataset_id, expect_paused).await;
     }
 
     // Pause derived transform
@@ -975,39 +877,28 @@ async fn test_pause_resume_dataset_flows() {
         "EXECUTE_TRANSFORM",
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_pause_derived_transform)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(
+            mutation_pause_derived_transform,
+        ))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
     // Observe status change
     for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
     {
-        check_flow_config_status(
-            &harness,
-            &schema,
-            dataset_id,
-            dataset_flow_type,
-            expect_paused,
-        )
-        .await;
+        check_flow_config_status(&harness, dataset_id, dataset_flow_type, expect_paused).await;
     }
     for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
+        check_dataset_all_configs_status(&harness, dataset_id, expect_paused).await;
     }
 
     // Resume all derived
     let mutation_resume_derived_all =
         FlowTriggerHarness::resume_all_flows_mutation(&create_derived_result.dataset_handle.id);
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_resume_derived_all)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_resume_derived_all))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -1015,17 +906,10 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         flow_cases.iter().zip(vec![false, false])
     {
-        check_flow_config_status(
-            &harness,
-            &schema,
-            dataset_id,
-            dataset_flow_type,
-            expect_paused,
-        )
-        .await;
+        check_flow_config_status(&harness, dataset_id, dataset_flow_type, expect_paused).await;
     }
     for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
-        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
+        check_dataset_all_configs_status(&harness, dataset_id, expect_paused).await;
     }
 }
 
@@ -1048,13 +932,8 @@ async fn test_conditions_not_met_for_flows() {
         "RECOVER",
     );
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1084,13 +963,8 @@ async fn test_conditions_not_met_for_flows() {
         "0 */2 * * *",
     );
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1164,13 +1038,8 @@ async fn test_stop_policies() {
         )
         .replace("<id>", &create_root_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1238,11 +1107,8 @@ async fn test_stop_policies() {
     )
     .replace("<id>", &create_root_result.dataset_handle.id.to_string());
 
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1311,13 +1177,8 @@ async fn test_stop_policies_validation() {
     )
     .replace("<id>", &create_root_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -1355,13 +1216,9 @@ async fn test_anonymous_setters_fail() {
         "MINUTES",
     )];
 
-    let schema = kamu_adapter_graphql::schema_quiet();
     for mutation_code in mutation_codes {
-        let res = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_anonymous.clone()),
-            )
+        let res = harness
+            .execute_anonymous_query(async_graphql::Request::new(mutation_code.clone()))
             .await;
 
         expect_anonymous_access_error(res);
@@ -1404,6 +1261,29 @@ impl FlowTriggerHarness {
             catalog_anonymous,
             catalog_authorized,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(
+                query
+                    .into()
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await
+    }
+
+    pub async fn execute_anonymous_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(query.into().data(self.catalog_anonymous.clone()))
+            .await
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {

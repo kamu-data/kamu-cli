@@ -127,7 +127,7 @@ impl DeleteAccountUseCaseImplHarness {
             let mut p = PredefinedAccountsConfig::new();
             p.predefined = vec![
                 AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                    .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
+                    .set_properties(vec![AccountPropertyName::IsAdmin]),
                 AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
             ];
             p

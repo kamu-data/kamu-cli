@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - GQL: `BigInt` scalar
+- GQL: Activation of federation mechanisms to use GQL API as a subgraph (#1410).
 ### Changed
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
@@ -21,6 +22,7 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `Search::query()`: case insensitive search.
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 - Discontinued binary releases for MacOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+- GQL: Optimization: apply DataLoader to solve N+1 problem for federation entity resolvers (#1410).
 ### Fixed
 - Investigation: potential unstable ordering of dataset entry listings
 

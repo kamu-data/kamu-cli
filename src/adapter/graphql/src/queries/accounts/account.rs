@@ -9,8 +9,6 @@
 
 use kamu_accounts::{
     AccountNotFoundByIdError,
-    AccountService,
-    AccountServiceExt,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
@@ -22,7 +20,7 @@ use tokio::sync::OnceCell;
 use super::AccountFlows;
 use crate::prelude::*;
 use crate::queries::{AccountAccessTokens, Dataset, DatasetConnection};
-use crate::utils::check_logged_account_id_match;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,26 +60,33 @@ impl Account {
         ctx: &Context<'_>,
         account_id: odf::AccountID,
     ) -> Result<Self, InternalError> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let account_name = account_service
-            .find_account_name_by_id(&account_id)
-            .await?
-            .ok_or_else(|| AccountNotFoundByIdError {
+        let maybe_account = account_entity_data_loader
+            .load_one(account_id.clone())
+            .await
+            .map_err(data_loader_error_mapper)?;
+
+        if let Some(account) = maybe_account {
+            Ok(Self::from_account(account))
+        } else {
+            Err(AccountNotFoundByIdError {
                 account_id: account_id.clone(),
-            })
-            .int_err()?;
-
-        Ok(Self::new(account_id.into(), account_name.into()))
+            }
+            .int_err())
+        }
     }
 
     pub(crate) async fn from_account_name(
         ctx: &Context<'_>,
         account_name: odf::AccountName,
     ) -> Result<Option<Self>, InternalError> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let maybe_account = account_service.account_by_name(&account_name).await?;
+        let maybe_account = account_entity_data_loader
+            .load_one(account_name)
+            .await
+            .map_err(data_loader_error_mapper)?;
 
         Ok(maybe_account.map(Self::from_account))
     }
@@ -114,13 +119,15 @@ impl Account {
     }
 
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let maybe_account_info = account_service
-            .try_get_account_by_id(&self.account_id)
-            .await?;
+        let account_id: odf::AccountID = self.account_id.clone().into();
+        let maybe_account = account_entity_data_loader
+            .load_one(account_id)
+            .await
+            .map_err(data_loader_error_mapper)?;
 
-        maybe_account_info.ok_or_else(|| {
+        maybe_account.ok_or_else(|| {
             GqlError::Gql(
                 Error::new("Account not resolved")
                     .extend_with(|_, eev| eev.set("id", self.account_id.to_string())),
@@ -192,7 +199,7 @@ impl Account {
 
     /// Email address
     async fn email(&self, ctx: &Context<'_>) -> Result<&str> {
-        check_logged_account_id_match(ctx, &self.account_id)?;
+        utils::check_logged_account_id_match(ctx, &self.account_id)?;
 
         let full_account_info = self.get_full_account_info(ctx).await?;
 
