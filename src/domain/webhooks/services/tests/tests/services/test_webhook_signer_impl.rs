@@ -7,16 +7,49 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
-use kamu_webhooks::{WebhookSigner, WebhookSubscriptionSecret};
+use kamu_webhooks::{WebhookSigner, WebhookSubscriptionSecret, WebhooksConfig};
 use kamu_webhooks_services::WebhookSignerImpl;
+use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_sign_dataset_ref_updated_webhook() {
-    let webhook_signer = WebhookSignerImpl::new();
+async fn test_sign_dataset_ref_updated_webhook_with_unencrypted_secret() {
+    let webhook_signer = WebhookSignerImpl::new(Arc::new(WebhooksConfig::default()));
+    let webhook_secret =
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("test_secret")).unwrap();
 
+    test_sign_dataset_ref_updated_webhook(&webhook_signer, &webhook_secret);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_sign_dataset_ref_updated_webhook_with_encrypted_secret() {
+    let config = WebhooksConfig::sample();
+    let webhook_signer = WebhookSignerImpl::new(Arc::new(config.clone()));
+    let encryption_key = config
+        .secret_encryption_key
+        .as_ref()
+        .map(|key| SecretString::from(key.to_string()));
+    let webhook_secret = WebhookSubscriptionSecret::try_new(
+        encryption_key.as_ref(),
+        &SecretString::from("test_secret"),
+    )
+    .unwrap();
+
+    test_sign_dataset_ref_updated_webhook(&webhook_signer, &webhook_secret);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn test_sign_dataset_ref_updated_webhook(
+    webhook_signer: &WebhookSignerImpl,
+    webhook_secret: &WebhookSubscriptionSecret,
+) {
     let payload = serde_json::json!({
       "version": "1",
       "datasetId": odf::DatasetID::new_seeded_ed25519(b"test_dataset_id").to_string(),
@@ -33,7 +66,7 @@ async fn test_sign_dataset_ref_updated_webhook() {
         .with_timezone(&Utc);
 
     let headers = webhook_signer.generate_rfc9421_headers(
-        &WebhookSubscriptionSecret::try_new("test_secret".to_string()).unwrap(),
+        webhook_secret,
         webhook_created_at,
         &payload_bytes,
         &url::Url::parse("https://example.com/webhook").unwrap(),
@@ -58,5 +91,3 @@ async fn test_sign_dataset_ref_updated_webhook() {
         "sha-256=:BA2bN3rMDmEBxxu0hmTrkJjzPOVTtU1Co6fM1L+8tDg=:"
     );
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

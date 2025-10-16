@@ -30,7 +30,7 @@ pub trait CreateWebhookSubscriptionUseCase: Send + Sync {
 #[derive(Debug)]
 pub struct CreateWebhookSubscriptionResult {
     pub subscription_id: WebhookSubscriptionID,
-    pub secret: WebhookSubscriptionSecret,
+    pub secret: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

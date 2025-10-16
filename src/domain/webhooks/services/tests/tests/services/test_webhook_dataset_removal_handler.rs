@@ -13,7 +13,7 @@ use dill::*;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
-use kamu_webhooks_services::WebhookDatasetRemovalHandler;
+use kamu_webhooks_services::{WebhookDatasetRemovalHandler, WebhookSecretGeneratorImpl};
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,8 +32,10 @@ async fn test_subscriptions_removed_with_dataset() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-            WebhookSubscriptionSecret::try_new("secret_1_1").unwrap(),
         );
+        subscription_id_1_1
+            .create_secret(harness.webhook_secret_generator.generate_secret().unwrap())
+            .unwrap();
         subscription_id_1_1
             .save(harness.event_store.as_ref())
             .await
@@ -47,8 +49,10 @@ async fn test_subscriptions_removed_with_dataset() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-            WebhookSubscriptionSecret::try_new("secret_1_2").unwrap(),
         );
+        subscription_id_1_2
+            .create_secret(harness.webhook_secret_generator.generate_secret().unwrap())
+            .unwrap();
         subscription_id_1_2
             .save(harness.event_store.as_ref())
             .await
@@ -62,8 +66,10 @@ async fn test_subscriptions_removed_with_dataset() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_2.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-            WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
         );
+        subscription_id_2
+            .create_secret(harness.webhook_secret_generator.generate_secret().unwrap())
+            .unwrap();
         subscription_id_2
             .save(harness.event_store.as_ref())
             .await
@@ -108,6 +114,7 @@ async fn test_subscriptions_removed_with_dataset() {
 
 struct TestWebhookDatasetRemovalHandlerHarness {
     event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -115,6 +122,8 @@ impl TestWebhookDatasetRemovalHandlerHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
         b.add::<WebhookDatasetRemovalHandler>()
+            .add::<WebhookSecretGeneratorImpl>()
+            .add_value(WebhooksConfig::default())
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
@@ -131,6 +140,7 @@ impl TestWebhookDatasetRemovalHandlerHarness {
 
         Self {
             event_store: catalog.get_one().unwrap(),
+            webhook_secret_generator: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
         }
     }

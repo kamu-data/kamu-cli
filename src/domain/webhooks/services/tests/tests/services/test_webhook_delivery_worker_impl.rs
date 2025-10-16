@@ -272,6 +272,7 @@ struct TestWebhookDeliveryWorkerHarness {
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>,
     webhook_delivery_worker: Arc<dyn WebhookDeliveryWorker>,
+    webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
 }
 
 impl TestWebhookDeliveryWorkerHarness {
@@ -279,6 +280,8 @@ impl TestWebhookDeliveryWorkerHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add::<WebhookDeliveryWorkerImpl>()
             .add::<WebhookSignerImpl>()
+            .add::<WebhookSecretGeneratorImpl>()
+            .add_value(WebhooksConfig::default())
             .add_value(mock_sender)
             .bind::<dyn WebhookSender, MockWebhookSender>()
             .add::<InMemoryWebhookSubscriptionEventStore>()
@@ -292,6 +295,7 @@ impl TestWebhookDeliveryWorkerHarness {
             webhook_subscription_event_store: catalog.get_one().unwrap(),
             webhook_delivery_repo: catalog.get_one().unwrap(),
             webhook_delivery_worker: catalog.get_one().unwrap(),
+            webhook_secret_generator: catalog.get_one().unwrap(),
         }
     }
 
@@ -302,8 +306,10 @@ impl TestWebhookDeliveryWorkerHarness {
             WebhookSubscriptionLabel::try_new("test".to_string()).unwrap(),
             None,
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionSecret::try_new("some-secret").unwrap(),
         );
+        subscription
+            .create_secret(self.webhook_secret_generator.generate_secret().unwrap())
+            .unwrap();
 
         subscription
             .save(self.webhook_subscription_event_store.as_ref())

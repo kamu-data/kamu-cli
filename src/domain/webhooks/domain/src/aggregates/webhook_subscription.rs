@@ -25,7 +25,6 @@ impl WebhookSubscription {
         label: WebhookSubscriptionLabel,
         dataset_id: Option<odf::DatasetID>,
         event_types: Vec<WebhookEventType>,
-        secret: WebhookSubscriptionSecret,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -37,7 +36,6 @@ impl WebhookSubscription {
                     label,
                     event_types,
                     target_url,
-                    secret,
                 },
             )
             .unwrap(),
@@ -91,6 +89,17 @@ impl WebhookSubscription {
             new_target_url: target_url,
             new_label: label,
             new_event_types: event_types,
+        })
+    }
+
+    pub fn create_secret(
+        &mut self,
+        secret: WebhookSubscriptionSecret,
+    ) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
+        self.apply(WebhookSubscriptionEventSecretCreated {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+            secret,
         })
     }
 

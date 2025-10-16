@@ -7,21 +7,40 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use base64::Engine as _;
 use base64::engine::general_purpose;
 use chrono::{DateTime, Utc};
-use dill::*;
-use kamu_webhooks::{WebhookRFC9421Headers, WebhookSigner, WebhookSubscriptionSecret};
+use kamu_webhooks::{
+    WebhookRFC9421Headers,
+    WebhookSigner,
+    WebhookSubscriptionSecret,
+    WebhooksConfig,
+};
+use secrecy::SecretString;
 
 use crate::{HEADER_CONTENT_DIGEST, HEADER_WEBHOOK_TIMESTAMP, KAMU_WEBHOOK_KEY_ID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn WebhookSigner)]
-pub struct WebhookSignerImpl {}
+pub struct WebhookSignerImpl {
+    webhook_secret_encryption_key: Option<SecretString>,
+}
 
+#[dill::component(pub)]
+#[dill::interface(dyn WebhookSigner)]
 impl WebhookSignerImpl {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(webhooks_config: Arc<WebhooksConfig>) -> Self {
+        Self {
+            webhook_secret_encryption_key: webhooks_config
+                .secret_encryption_key
+                .as_ref()
+                .map(|key| SecretString::from(key.clone())),
+        }
+    }
+
     fn canonicalize_field(
         field: &SigningField,
         headers: &http::HeaderMap,
@@ -179,10 +198,12 @@ impl WebhookSigner for WebhookSignerImpl {
             .parse::<http::Uri>()
             .expect("Failed to parse URL");
 
-        let secret = secret.as_ref().as_bytes();
+        let secret = secret
+            .get_exposed_value(self.webhook_secret_encryption_key.as_ref())
+            .unwrap();
 
         Self::generate_rfc9421_headers_impl(
-            secret,
+            secret.as_slice(),
             &http::Method::POST,
             &uri,
             payload_bytes,

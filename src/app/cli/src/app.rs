@@ -1017,9 +1017,36 @@ pub fn register_config_in_catalog(
             max_consecutive_failures > 0,
             "Webhooks max_consecutive_failures must be > 0"
         );
+
+        match webhooks_config.secret_encryption_key.as_ref() {
+            None => match &webhooks_config.secret_encryption_enabled.as_ref() {
+                None => {
+                    warn!(
+                        "Webhook encryption configuration is missing. Secrets will not be \
+                         encrypted"
+                    );
+                }
+                Some(true) => panic!("Webhook secrets encryption key is required"),
+                _ => {}
+            },
+            Some(encryption_key) => {
+                if let Some(enabled) = &webhooks_config.secret_encryption_enabled
+                    && !enabled
+                {
+                    warn!("Webhook encryption will be disabled");
+                } else {
+                    assert!(
+                        AesGcmEncryptor::try_new(encryption_key).is_ok(),
+                        "Invalid webhook secrets encryption key",
+                    );
+                }
+            }
+        }
+
         catalog_builder.add_value(kamu_webhooks::WebhooksConfig::new(
             max_consecutive_failures,
             Duration::seconds(i64::from(webhooks_config.delivery_timeout.unwrap())),
+            webhooks_config.secret_encryption_key,
         ));
     }
 

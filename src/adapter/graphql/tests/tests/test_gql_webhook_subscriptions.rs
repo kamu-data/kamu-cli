@@ -18,6 +18,7 @@ use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use kamu_webhooks_services::*;
 use odf::metadata::testing::MetadataFactory;
+use secrecy::SecretString;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -1300,8 +1301,11 @@ impl WebhookSubscriptionsHarness {
             .tenancy_config(TenancyConfig::MultiTenant)
             .build();
 
+        let fixed_webhook_secret =
+            WebhookSubscriptionSecret::try_new(None, &SecretString::from(FIXED_SECRET.to_string()))
+                .unwrap();
         let mock_secret_generator =
-            WebhookSubscriptionsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+            WebhookSubscriptionsHarness::make_mock_secret_generator(fixed_webhook_secret);
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
@@ -1313,6 +1317,7 @@ impl WebhookSubscriptionsHarness {
             b.add::<PauseWebhookSubscriptionUseCaseImpl>();
             b.add::<RemoveWebhookSubscriptionUseCaseImpl>();
             b.add::<WebhookSubscriptionQueryServiceImpl>();
+            b.add_value(WebhooksConfig::default());
             b.add_value(mock_secret_generator);
             b.bind::<dyn WebhookSecretGenerator, MockWebhookSecretGenerator>();
             b.add::<InMemoryWebhookSubscriptionEventStore>();
@@ -1329,11 +1334,13 @@ impl WebhookSubscriptionsHarness {
         }
     }
 
-    fn make_mock_secret_generator(with_secret: String) -> MockWebhookSecretGenerator {
+    fn make_mock_secret_generator(
+        with_secret: WebhookSubscriptionSecret,
+    ) -> MockWebhookSecretGenerator {
         let mut mock_secret_generator = MockWebhookSecretGenerator::new();
         mock_secret_generator
             .expect_generate_secret()
-            .returning(move || WebhookSubscriptionSecret::try_new(&with_secret).unwrap());
+            .returning(move || Ok(with_secret.clone()));
         mock_secret_generator
     }
 

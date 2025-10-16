@@ -24,6 +24,7 @@ pub enum WebhookSubscriptionEvent {
     MarkedUnreachable(WebhookSubscriptionEventMarkedUnreachable),
     Reactivated(WebhookSubscriptionEventReactivated),
     Modified(WebhookSubscriptionEventModified),
+    SecretCreated(WebhookSubscriptionEventSecretCreated),
     SecretRotated(WebhookSubscriptionEventSecretRotated),
     Removed(WebhookSubscriptionEventRemoved),
 }
@@ -37,7 +38,6 @@ pub struct WebhookSubscriptionEventCreated {
     pub dataset_id: Option<odf::DatasetID>,
     pub event_types: Vec<WebhookEventType>,
     pub target_url: url::Url,
-    pub secret: WebhookSubscriptionSecret,
     pub label: WebhookSubscriptionLabel,
 }
 
@@ -104,6 +104,15 @@ pub struct WebhookSubscriptionEventSecretRotated {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebhookSubscriptionEventSecretCreated {
+    pub event_time: DateTime<Utc>,
+    pub subscription_id: WebhookSubscriptionID,
+    pub secret: WebhookSubscriptionSecret,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventRemoved {
     pub event_time: DateTime<Utc>,
     pub subscription_id: WebhookSubscriptionID,
@@ -121,6 +130,7 @@ impl WebhookSubscriptionEvent {
             Self::MarkedUnreachable(_) => "WebhookSubscriptionEventMarkedUnreachable",
             Self::Reactivated(_) => "WebhookSubscriptionEventReactivated",
             Self::Modified(_) => "WebhookSubscriptionEventUpdated",
+            Self::SecretCreated(_) => "WebhookSubscriptionEventSecretCreated",
             Self::SecretRotated(_) => "WebhookSubscriptionEventSecretRotated",
             Self::Removed(_) => "WebhookSubscriptionEventRemoved",
         }
@@ -135,6 +145,7 @@ impl WebhookSubscriptionEvent {
             Self::MarkedUnreachable(e) => &e.subscription_id,
             Self::Reactivated(e) => &e.subscription_id,
             Self::Modified(e) => &e.subscription_id,
+            Self::SecretCreated(e) => &e.subscription_id,
             Self::SecretRotated(e) => &e.subscription_id,
             Self::Removed(e) => &e.subscription_id,
         }
@@ -149,6 +160,7 @@ impl WebhookSubscriptionEvent {
             Self::MarkedUnreachable(e) => e.event_time,
             Self::Reactivated(e) => e.event_time,
             Self::Modified(e) => e.event_time,
+            Self::SecretCreated(e) => e.event_time,
             Self::SecretRotated(e) => e.event_time,
             Self::Removed(e) => e.event_time,
         }
@@ -162,7 +174,7 @@ impl WebhookSubscriptionEvent {
             }
             Self::Paused(_) => WebhookSubscriptionStatus::Paused,
             Self::MarkedUnreachable(_) => WebhookSubscriptionStatus::Unreachable,
-            Self::Modified(_) | Self::SecretRotated(_) => old_status,
+            Self::Modified(_) | Self::SecretCreated(_) | Self::SecretRotated(_) => old_status,
             Self::Removed(_) => WebhookSubscriptionStatus::Removed,
         }
     }
@@ -191,6 +203,9 @@ impl_enum_variant!(WebhookSubscriptionEvent::Reactivated(
 ));
 impl_enum_variant!(WebhookSubscriptionEvent::Modified(
     WebhookSubscriptionEventModified
+));
+impl_enum_variant!(WebhookSubscriptionEvent::SecretCreated(
+    WebhookSubscriptionEventSecretCreated
 ));
 impl_enum_variant!(WebhookSubscriptionEvent::SecretRotated(
     WebhookSubscriptionEventSecretRotated

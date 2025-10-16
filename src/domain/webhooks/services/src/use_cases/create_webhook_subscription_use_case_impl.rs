@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_webhooks::*;
 use messaging_outbox::{Outbox, OutboxExt};
+use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,6 +21,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub struct CreateWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
+    webhooks_config: Arc<WebhooksConfig>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -70,7 +72,7 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 }
             })?;
 
-            let secret = self.webhook_secret_generator.generate_secret();
+            let secret = self.webhook_secret_generator.generate_secret().int_err()?;
 
             let subscription_id = kamu_webhooks::WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
@@ -80,10 +82,12 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 label,
                 Some(dataset_id.clone()),
                 event_types,
-                secret.clone(),
             );
             subscription
                 .enable()
+                .map_err(|e| CreateWebhookSubscriptionError::Internal(e.int_err()))?;
+            subscription
+                .create_secret(secret.clone())
                 .map_err(|e| CreateWebhookSubscriptionError::Internal(e.int_err()))?;
 
             subscription
@@ -104,9 +108,18 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                     .await?;
             }
 
+            let encryption_key = self
+                .webhooks_config
+                .secret_encryption_key
+                .as_ref()
+                .map(|key| SecretString::from(key.to_owned()));
+            let exposed_secret = secret
+                .get_exposed_value(encryption_key.as_ref())
+                .int_err()?;
+
             return Ok(CreateWebhookSubscriptionResult {
                 subscription_id: subscription.id(),
-                secret,
+                secret: String::from_utf8(exposed_secret).expect("Invalid secret value"),
             });
         }
 

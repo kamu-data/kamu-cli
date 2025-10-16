@@ -61,7 +61,7 @@ impl<'a> DatasetWebhooksMut<'a> {
             Ok(res) => Ok(CreateWebhookSubscriptionResult::Success(
                 CreateWebhookSubscriptionResultSuccess {
                     subscription_id: res.subscription_id.to_string(),
-                    secret: res.secret.to_string(),
+                    secret: res.secret,
                 },
             )),
 
