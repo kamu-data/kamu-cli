@@ -9,11 +9,13 @@
 
 use async_graphql::value;
 use indoc::indoc;
+use kamu_adapter_graphql::data_loader::dataset_handle_data_loader;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
@@ -31,13 +33,8 @@ async fn test_create_and_get_dataset_env_var() {
         true,
     );
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert_eq!(
@@ -58,11 +55,8 @@ async fn test_create_and_get_dataset_env_var() {
     let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
         created_dataset.dataset_handle.id.to_string().as_str(),
     );
-    let res = schema
-        .execute(
-            async_graphql::Request::new(query_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
         .await;
 
     assert_eq!(
@@ -88,11 +82,8 @@ async fn test_create_and_get_dataset_env_var() {
     let query_code = DatasetEnvVarsHarness::get_dataset_env_vars_with_id(
         created_dataset.dataset_handle.id.to_string().as_str(),
     );
-    let res = schema
-        .execute(
-            async_graphql::Request::new(query_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
         .await;
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
@@ -103,11 +94,8 @@ async fn test_create_and_get_dataset_env_var() {
         created_dataset.dataset_handle.id.to_string().as_str(),
         created_dataset_env_var_id.to_string().as_str(),
     );
-    let res = schema
-        .execute(
-            async_graphql::Request::new(query_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
         .await;
     assert_eq!(
         res.data,
@@ -137,13 +125,8 @@ async fn test_delete_dataset_env_var() {
         true,
     );
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert_eq!(
@@ -164,11 +147,8 @@ async fn test_delete_dataset_env_var() {
     let query_code = DatasetEnvVarsHarness::get_dataset_env_vars_with_id(
         created_dataset.dataset_handle.id.to_string().as_str(),
     );
-    let res = schema
-        .execute(
-            async_graphql::Request::new(query_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
         .await;
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
@@ -180,11 +160,8 @@ async fn test_delete_dataset_env_var() {
         &created_dataset_env_var_id.to_string(),
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert_eq!(
@@ -217,13 +194,8 @@ async fn test_modify_dataset_env_var() {
         true,
     );
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert_eq!(
@@ -248,11 +220,8 @@ async fn test_modify_dataset_env_var() {
         false,
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert_eq!(
@@ -273,11 +242,8 @@ async fn test_modify_dataset_env_var() {
     let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
         created_dataset.dataset_handle.id.to_string().as_str(),
     );
-    let res = schema
-        .execute(
-            async_graphql::Request::new(query_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
         .await;
 
     assert_eq!(
@@ -332,6 +298,20 @@ impl DatasetEnvVarsHarness {
             base_gql_harness,
             catalog_authorized,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(
+                query
+                    .into()
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await
     }
 
     async fn create_dataset(&self) -> CreateDatasetResult {

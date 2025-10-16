@@ -9,14 +9,16 @@
 
 use std::sync::Arc;
 
-use async_graphql::*;
+use async_graphql::value;
 use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
@@ -125,9 +127,8 @@ async fn test_metadata_chain_events() {
     )
     .replace("<id>", &dataset_id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -240,15 +241,13 @@ async fn metadata_chain_append_event() {
     .replace("<id>", &dataset_id.to_string())
     .replace("<content>", &event_yaml.escape_default().to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_anonymous))
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(request_code.clone()))
         .await;
     expect_anonymous_access_error(res);
 
-    let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -292,8 +291,6 @@ async fn metadata_update_readme_new() {
         .unwrap()
         .dataset_handle;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     /////////////////////////////////////
     // Add new readme
     /////////////////////////////////////
@@ -315,19 +312,13 @@ async fn metadata_update_readme_new() {
     )
     .replace("<id>", &foo_handle.id.to_string());
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(new_readme_request_code.clone())
-                .data(harness.catalog_anonymous.clone()),
-        )
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(new_readme_request_code.clone()))
         .await;
     expect_anonymous_access_error(res);
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(new_readme_request_code)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(new_readme_request_code))
         .await;
 
     let assert_result = |res: async_graphql::Response, expected: &str| {
@@ -367,11 +358,10 @@ async fn metadata_update_readme_new() {
     // Removes readme
     /////////////////////////////////////
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(
+            indoc!(
+                r#"
                     mutation {
                         datasets {
                             byId (datasetId: "<id>") {
@@ -384,11 +374,9 @@ async fn metadata_update_readme_new() {
                         }
                     }
                     "#
-                )
-                .replace("<id>", &foo_handle.id.to_string()),
             )
-            .data(harness.catalog_authorized.clone()),
-        )
+            .replace("<id>", &foo_handle.id.to_string()),
+        ))
         .await;
 
     assert_result(res, "CommitResultSuccess");
@@ -407,11 +395,10 @@ async fn metadata_update_readme_new() {
     // Detects no-op changes
     /////////////////////////////////////
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(
+            indoc!(
+                r#"
                     mutation {
                         datasets {
                             byId (datasetId: "<id>") {
@@ -424,11 +411,9 @@ async fn metadata_update_readme_new() {
                         }
                     }
                     "#
-                )
-                .replace("<id>", &foo_handle.id.to_string()),
             )
-            .data(harness.catalog_authorized.clone()),
-        )
+            .replace("<id>", &foo_handle.id.to_string()),
+        ))
         .await;
 
     assert_result(res, "NoChanges");
@@ -463,11 +448,10 @@ async fn metadata_update_readme_new() {
         .await
         .unwrap();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(
+            indoc!(
+                r#"
                     mutation {
                         datasets {
                             byId (datasetId: "<id>") {
@@ -480,11 +464,9 @@ async fn metadata_update_readme_new() {
                         }
                     }
                     "#
-                )
-                .replace("<id>", &foo_handle.id.to_string()),
             )
-            .data(harness.catalog_authorized.clone()),
-        )
+            .replace("<id>", &foo_handle.id.to_string()),
+        ))
         .await;
 
     assert_result(res, "CommitResultSuccess");
@@ -580,9 +562,8 @@ async fn test_metadata_chain_set_transform_event() {
     )
     .replace("<id>", &derived_id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -650,6 +631,30 @@ impl GraphQLMetadataChainHarness {
             catalog_authorized,
             did_generator,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await
+    }
+
+    pub async fn execute_anonymous_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(query.into().data(self.catalog_anonymous.clone()))
+            .await
     }
 
     async fn create_root_dataset(

@@ -11,6 +11,7 @@ use base64::Engine;
 use bon::bon;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_core::*;
 use kamu_datasets_services::*;
@@ -731,7 +732,13 @@ impl GraphQLDatasetsHarness {
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
         kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_authorized.clone()))
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
             .await
     }
 

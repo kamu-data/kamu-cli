@@ -12,8 +12,10 @@ use bon::bon;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
+use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs_ext};
@@ -104,7 +106,7 @@ async fn test_molecule_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
         json!([]),
     );
@@ -129,7 +131,7 @@ async fn test_molecule_provision_project() {
     let announcements_did = res["project"]["announcements"]["id"].as_str().unwrap();
     assert_ne!(project_account_id, harness.molecule_account_id.to_string());
     assert_eq!(project_account_name, "molecule.vitafast");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         *res,
         json!({
             "isSuccess": true,
@@ -178,7 +180,7 @@ async fn test_molecule_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"],
         json!({
             "account": {
@@ -198,7 +200,7 @@ async fn test_molecule_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
         json!([{
             "ipnftSymbol": "vitafast",
@@ -219,7 +221,7 @@ async fn test_molecule_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["createProject"],
         json!({
             "isSuccess": false,
@@ -241,7 +243,7 @@ async fn test_molecule_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["createProject"],
         json!({
             "isSuccess": false,
@@ -264,7 +266,7 @@ async fn test_molecule_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["createProject"]["isSuccess"],
         json!(true),
     );
@@ -275,7 +277,7 @@ async fn test_molecule_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
         json!([
             {
@@ -364,7 +366,7 @@ async fn test_molecule_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
         json!({
             "isSuccess": true,
@@ -406,7 +408,7 @@ async fn test_molecule_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"],
         json!({
             "isSuccess": true,
@@ -451,7 +453,7 @@ async fn test_molecule_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["dataRoom"]["asCollection"]["latest"]
             ["entry"],
         json!({
@@ -530,7 +532,7 @@ async fn test_molecule_announcements_operations() {
         .unwrap()
         .to_string();
     let content: serde_json::Value = serde_json::from_str(&content).unwrap();
-    pretty_assertions::assert_eq!(content, json!([]));
+    assert_eq!(content, json!([]));
 
     // Create a few versioned files to use as attachments
     let res = harness
@@ -611,7 +613,7 @@ async fn test_molecule_announcements_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
         json!({
             "isSuccess": true,
@@ -634,7 +636,7 @@ async fn test_molecule_announcements_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
         json!({
             "isSuccess": true,
@@ -657,7 +659,7 @@ async fn test_molecule_announcements_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
         json!({
             "isSuccess": true,
@@ -680,7 +682,7 @@ async fn test_molecule_announcements_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
         json!({
             "isSuccess": false,
@@ -703,7 +705,7 @@ async fn test_molecule_announcements_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
         json!({
             "isSuccess": false,
@@ -734,7 +736,7 @@ async fn test_molecule_announcements_operations() {
         obj["event_time"] = any.to_string().into();
         obj["announcement_id"] = any.to_string().into();
     });
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         content,
         json!(
             [
@@ -869,7 +871,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
         json!({
             "isSuccess": true,
@@ -887,7 +889,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
         json!({
             "isSuccess": true,
@@ -929,7 +931,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"],
         json!({
             "isSuccess": true,
@@ -953,7 +955,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"],
         json!({
             "isSuccess": true,
@@ -989,7 +991,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["moveEntry"],
         json!({
             "isSuccess": true,
@@ -1028,7 +1030,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["moveEntry"],
         json!({
             "isSuccess": true,
@@ -1079,7 +1081,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
         json!({
             "isSuccess": true,
@@ -1098,7 +1100,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
         json!({
             "isSuccess": true,
@@ -1133,7 +1135,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["removeEntry"],
         json!({
             "isSuccess": true,
@@ -1198,7 +1200,7 @@ async fn test_molecule_activity() {
     nodes[1]["announcement"]["system_time"] = any.clone();
     nodes[1]["announcement"]["event_time"] = any.clone();
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         *nodes,
         json!([
             {
@@ -1305,7 +1307,7 @@ async fn test_molecule_activity() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
         json!({
             "isSuccess": true,
@@ -1369,7 +1371,7 @@ async fn test_molecule_activity() {
     nodes[1]["announcement"]["event_time"] = any.clone();
 
     // NOTE: Only announcements are currently supported
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         *nodes,
         json!([
             {
@@ -1491,7 +1493,13 @@ impl GraphQLDatasetsHarness {
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
         kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_authorized.clone()))
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
             .await
     }
 }
