@@ -111,29 +111,6 @@ impl WebhookSubscriptionUseCaseHarness {
             .returning(|_, _, _| Ok(()));
     }
 
-    pub(crate) fn expect_webhook_secret_rotated_message(
-        mock_outbox: &mut MockOutbox,
-        times: usize,
-    ) {
-        use mockall::predicate::{eq, function};
-
-        mock_outbox
-            .expect_post_message_as_json()
-            .times(times)
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SECRET_CHANGES_SERVICE),
-                function(move |message_as_json: &serde_json::Value| {
-                    let message: Result<
-                        WebhookSubscriptionSecretChangesMessage,
-                        serde_json::Error,
-                    > = serde_json::from_value(message_as_json.clone());
-                    message.is_ok()
-                }),
-                eq(1),
-            )
-            .returning(|_, _, _| Ok(()));
-    }
-
     pub(crate) fn expect_webhook_event_disabled_message(
         mock_outbox: &mut MockOutbox,
         event_type: &WebhookEventType,

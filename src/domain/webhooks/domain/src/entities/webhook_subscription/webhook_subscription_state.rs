@@ -22,7 +22,7 @@ pub struct WebhookSubscriptionState {
     dataset_id: Option<odf::DatasetID>,
     status: WebhookSubscriptionStatus,
     event_types: Vec<WebhookEventType>,
-    secret: Option<WebhookSubscriptionSecret>,
+    secret: WebhookSubscriptionSecret,
     created_at: DateTime<Utc>,
 }
 
@@ -56,9 +56,7 @@ impl WebhookSubscriptionState {
     }
 
     pub fn secret(&self) -> &WebhookSubscriptionSecret {
-        // Secret creation event will always follow up webhook subscription creation
-        // unwrapping here is safe
-        self.secret.as_ref().unwrap()
+        &self.secret
     }
 }
 
@@ -80,6 +78,7 @@ impl Projection for WebhookSubscriptionState {
                     event_types,
                     label,
                     target_url,
+                    secret,
                     ..
                 }) => Ok(Self {
                     id: subscription_id,
@@ -87,9 +86,9 @@ impl Projection for WebhookSubscriptionState {
                     event_types,
                     label,
                     target_url,
-                    secret: None,
                     status: WebhookSubscriptionStatus::Unverified,
                     created_at: event_time,
+                    secret,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -147,23 +146,12 @@ impl Projection for WebhookSubscriptionState {
                         _ => Err(ProjectionError::new(Some(s), event)),
                     },
 
-                    E::SecretCreated(WebhookSubscriptionEventSecretCreated { secret, .. }) => {
-                        if s.status != WebhookSubscriptionStatus::Removed {
-                            Ok(WebhookSubscriptionState {
-                                secret: Some(secret.clone()),
-                                ..s
-                            })
-                        } else {
-                            Err(ProjectionError::new(Some(s), event))
-                        }
-                    }
-
                     E::SecretRotated(WebhookSubscriptionEventSecretRotated {
                         new_secret, ..
                     }) => {
                         if s.status != WebhookSubscriptionStatus::Removed {
                             Ok(WebhookSubscriptionState {
-                                secret: Some(new_secret.clone()),
+                                secret: new_secret.clone(),
                                 ..s
                             })
                         } else {

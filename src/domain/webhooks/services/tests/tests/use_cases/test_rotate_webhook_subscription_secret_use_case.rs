@@ -25,10 +25,7 @@ use super::WebhookSubscriptionUseCaseHarness;
 async fn test_rotate_secret() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let mut mock_outbox = MockOutbox::new();
-    WebhookSubscriptionUseCaseHarness::expect_webhook_secret_rotated_message(&mut mock_outbox, 1);
-
-    let harness = RotateWebhookSubscriptionSecretUseCaseHarness::new(mock_outbox);
+    let harness = RotateWebhookSubscriptionSecretUseCaseHarness::new(MockOutbox::new());
     let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
     subscription.enable().unwrap();
     let old_secret = subscription.secret().clone();

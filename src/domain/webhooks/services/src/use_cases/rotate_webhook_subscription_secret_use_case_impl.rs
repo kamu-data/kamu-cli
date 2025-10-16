@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_webhooks::*;
-use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +19,6 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub struct RotateWebhookSubscriptionSecretUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
-    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,16 +44,6 @@ impl RotateWebhookSubscriptionSecretUseCase for RotateWebhookSubscriptionSecretU
             .save(self.subscription_event_store.as_ref())
             .await
             .int_err()?;
-
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SECRET_CHANGES_SERVICE,
-                WebhookSubscriptionSecretChangesMessage::secret_rotated(
-                    subscription.id(),
-                    secret.clone(),
-                ),
-            )
-            .await?;
 
         Ok(secret)
     }

@@ -27,30 +27,21 @@ impl WebhookSubscription {
         event_types: Vec<WebhookEventType>,
         secret: WebhookSubscriptionSecret,
     ) -> Self {
-        let mut result = Aggregate::new(
-            subscription_id,
-            WebhookSubscriptionEventCreated {
-                event_time: chrono::Utc::now(),
+        Self(
+            Aggregate::new(
                 subscription_id,
-                dataset_id,
-                label,
-                event_types,
-                target_url,
-            },
-        )
-        .unwrap();
-        result
-            .apply(
-                WebhookSubscriptionEventSecretCreated {
+                WebhookSubscriptionEventCreated {
                     event_time: chrono::Utc::now(),
                     subscription_id,
+                    dataset_id,
+                    label,
+                    event_types,
+                    target_url,
                     secret,
-                }
-                .into(),
+                },
             )
-            .unwrap();
-
-        Self(result)
+            .unwrap(),
+        )
     }
 
     pub fn enable(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
