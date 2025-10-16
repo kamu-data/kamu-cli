@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- GQL: Added new `webhookSubscription::rotateSecret()` method to replace current secret
+### Changed
+- Webhook subscription secrets are now stored encrypted in the database
+
 ## [0.251.0] - 2025-10-16
 ### Added
 - Flow process state projection model and GQL API (individual flow badges, dashboard cards):
