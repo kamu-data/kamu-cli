@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.251.0] - 2025-10-16
 ### Added
 - Flow process state projection model and GQL API (individual flow badges, dashboard cards):
    - Flow process is a sequence of flow runs, and it's state is automatically projected
