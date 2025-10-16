@@ -12,7 +12,6 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_webhooks::*;
 use messaging_outbox::{Outbox, OutboxExt};
-use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +20,6 @@ use secrecy::SecretString;
 pub struct CreateWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
-    webhooks_config: Arc<WebhooksConfig>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -106,18 +104,9 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                     .await?;
             }
 
-            let encryption_key = self
-                .webhooks_config
-                .secret_encryption_key
-                .as_ref()
-                .map(|key| SecretString::from(key.to_owned()));
-            let exposed_secret = secret
-                .get_exposed_value(encryption_key.as_ref())
-                .int_err()?;
-
             return Ok(CreateWebhookSubscriptionResult {
                 subscription_id: subscription.id(),
-                secret: String::from_utf8(exposed_secret).expect("Invalid secret value"),
+                secret,
             });
         }
 

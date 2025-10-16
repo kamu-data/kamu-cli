@@ -15,37 +15,17 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait CreateWebhookSubscriptionUseCase: Send + Sync {
+pub trait RotateWebhookSubscriptionSecretUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_id: Option<odf::DatasetID>,
-        target_url: url::Url,
-        event_types: Vec<WebhookEventType>,
-        label: WebhookSubscriptionLabel,
-    ) -> Result<CreateWebhookSubscriptionResult, CreateWebhookSubscriptionError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct CreateWebhookSubscriptionResult {
-    pub subscription_id: WebhookSubscriptionID,
-    pub secret: WebhookSubscriptionSecret,
+        subscription: &mut WebhookSubscription,
+    ) -> Result<WebhookSubscriptionSecret, RotateWebhookSubscriptionSecretError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum CreateWebhookSubscriptionError {
-    #[error(transparent)]
-    InvalidTargetUrl(#[from] WebhookSubscriptionInvalidTargetUrlError),
-
-    #[error(transparent)]
-    NoEventTypesProvided(#[from] WebhookSubscriptionNoEventTypesProvidedError),
-
-    #[error(transparent)]
-    DuplicateLabel(#[from] WebhookSubscriptionDuplicateLabelError),
-
+pub enum RotateWebhookSubscriptionSecretError {
     #[error(transparent)]
     Internal(
         #[from]

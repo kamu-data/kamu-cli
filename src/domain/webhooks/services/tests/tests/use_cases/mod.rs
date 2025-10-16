@@ -13,6 +13,7 @@ mod test_pause_webhook_subscription_use_case;
 mod test_reactivate_webhook_subscription_use_case;
 mod test_remove_webhook_subscription_use_case;
 mod test_resume_webhook_subscription_use_case;
+mod test_rotate_webhook_subscription_secret_use_case;
 mod test_update_webhook_subscription_use_case;
 
 mod webhook_subscription_use_case_harness;

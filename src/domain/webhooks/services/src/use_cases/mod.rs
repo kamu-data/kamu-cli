@@ -14,6 +14,7 @@ mod pause_webhook_subscription_use_case_impl;
 mod reactivate_webhook_subscription_use_case_impl;
 mod remove_webhook_subscription_use_case_impl;
 mod resume_webhook_subscription_use_case_impl;
+mod rotate_webhook_subscription_secret_use_case_impl;
 mod update_webhook_subscription_use_case_impl;
 
 pub use create_webhook_subscription_use_case_impl::*;
@@ -22,4 +23,5 @@ pub use pause_webhook_subscription_use_case_impl::*;
 pub use reactivate_webhook_subscription_use_case_impl::*;
 pub use remove_webhook_subscription_use_case_impl::*;
 pub use resume_webhook_subscription_use_case_impl::*;
+pub use rotate_webhook_subscription_secret_use_case_impl::*;
 pub use update_webhook_subscription_use_case_impl::*;

@@ -3590,6 +3590,15 @@ type RevokeResultSuccess implements RevokeResult {
 	message: String!
 }
 
+interface RotateWebhookSubscriptionSecretResult {
+	message: String!
+}
+
+type RotateWebhookSubscriptionSecretSuccess implements RotateWebhookSubscriptionSecretResult {
+	newSecret: String!
+	message: String!
+}
+
 type Search {
 	"""
 	This endpoint uses heuristics to infer whether the query string is a DSL
@@ -4530,6 +4539,7 @@ type WebhookSubscriptionMut {
 	pause: PauseWebhookSubscriptionResult!
 	resume: ResumeWebhookSubscriptionResult!
 	reactivate: ReactivateWebhookSubscriptionResult!
+	rotateSecret: RotateWebhookSubscriptionSecretResult!
 	remove: RemoveWebhookSubscriptionResult!
 }
 

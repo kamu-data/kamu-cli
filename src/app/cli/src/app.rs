@@ -682,6 +682,10 @@ pub fn configure_server_catalog(
         &mut b,
         kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
     );
+    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionEventChangesMessage>(
+        &mut b,
+        kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SECRET_CHANGES_SERVICE,
+    );
 
     b
 }
