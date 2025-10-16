@@ -16,6 +16,7 @@ use chrono::Duration;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::testing::{
@@ -31,6 +32,7 @@ use kamu_flow_system_inmem::{
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
@@ -45,26 +47,19 @@ async fn test_list_account_flows() {
     let harness = FlowTriggerHarness::new().await;
 
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let request_code =
         FlowTriggerHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
 
     // Should return list of flows for account
     let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -135,21 +130,15 @@ async fn test_list_datasets_with_flow() {
     let compaction_mutation_code =
         FlowTriggerHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(ingest_mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(ingest_mutation_code.clone()))
         .await;
     assert!(response.is_ok(), "{response:?}");
 
-    let response = schema
-        .execute(
-            async_graphql::Request::new(compaction_mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(
+            compaction_mutation_code.clone(),
+        ))
         .await;
     assert!(response.is_ok(), "{response:?}");
 
@@ -179,8 +168,10 @@ async fn test_list_datasets_with_flow() {
     )
     .replace("<account_name>", DEFAULT_ACCOUNT_NAME_STR);
 
-    let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+    let response = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()),
+        )
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -214,8 +205,6 @@ async fn test_list_datasets_with_flow() {
 
 #[test_log::test(tokio::test)]
 async fn test_pause_resume_account_flows() {
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     let foo_dataset_alias = odf::DatasetAlias::new(
         Some(DEFAULT_ACCOUNT_NAME.clone()),
         odf::DatasetName::new_unchecked("foo"),
@@ -227,21 +216,15 @@ async fn test_pause_resume_account_flows() {
 
     let request_code =
         FlowTriggerHarness::trigger_ingest_flow_mutation(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
 
     let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -295,21 +278,15 @@ async fn test_pause_resume_account_flows() {
         1,
         "DAYS",
     );
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
 
     let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -330,11 +307,8 @@ async fn test_pause_resume_account_flows() {
 
     let request_code =
         FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -354,11 +328,8 @@ async fn test_pause_resume_account_flows() {
     );
 
     let mutation_code = FlowTriggerHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -379,11 +350,8 @@ async fn test_pause_resume_account_flows() {
 
     let request_code =
         FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -407,8 +375,6 @@ async fn test_pause_resume_account_flows() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_triggers_all_paused() {
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     let foo_dataset_alias = odf::DatasetAlias::new(
         Some(DEFAULT_ACCOUNT_NAME.clone()),
         odf::DatasetName::new_unchecked("foo"),
@@ -425,21 +391,15 @@ async fn test_account_triggers_all_paused() {
 
     let request_code =
         FlowTriggerHarness::trigger_ingest_flow_mutation(&foo_create_result.dataset_handle.id);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
 
     let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -494,21 +454,15 @@ async fn test_account_triggers_all_paused() {
         1,
         "DAYS",
     );
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
 
     let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -528,11 +482,8 @@ async fn test_account_triggers_all_paused() {
     );
 
     let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -552,11 +503,8 @@ async fn test_account_triggers_all_paused() {
     );
 
     let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let response = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(response.is_ok(), "{response:?}");
@@ -620,6 +568,21 @@ impl FlowTriggerHarness {
             base_gql_harness,
             catalog_authorized,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await
     }
 
     async fn create_root_dataset(&self, dataset_alias: odf::DatasetAlias) -> CreateDatasetResult {

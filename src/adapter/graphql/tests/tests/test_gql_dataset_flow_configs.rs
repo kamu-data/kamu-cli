@@ -10,11 +10,13 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
+use kamu_adapter_graphql::data_loader::dataset_handle_data_loader;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
@@ -56,9 +58,8 @@ async fn test_crud_ingest_root_dataset() {
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(request_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
@@ -83,8 +84,8 @@ async fn test_crud_ingest_root_dataset() {
     let mutation_code =
         FlowConfigHarness::set_ingest_config_mutation(&create_result.dataset_handle.id, false);
 
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
@@ -119,8 +120,8 @@ async fn test_crud_ingest_root_dataset() {
     let mutation_code =
         FlowConfigHarness::set_ingest_config_mutation(&create_result.dataset_handle.id, true);
 
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
@@ -187,9 +188,8 @@ async fn test_crud_compaction_root_dataset() {
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(request_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
@@ -217,8 +217,8 @@ async fn test_crud_compaction_root_dataset() {
         10000,
     );
 
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
@@ -260,8 +260,6 @@ async fn test_compaction_config_validation() {
     // ToDo#Separate check compaction for derivative
     let create_root_result = harness.create_root_dataset().await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     for test_case in [
         (0, 1_000_000, "Maximum slice size must be a positive number"),
         (
@@ -276,8 +274,8 @@ async fn test_compaction_config_validation() {
             test_case.1,
         );
 
-        let response = schema
-            .execute(
+        let response = harness
+            .execute_authorized_query(
                 async_graphql::Request::new(mutation_code.clone())
                     .data(harness.catalog_authorized.clone()),
             )
@@ -314,15 +312,13 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     let mutation_code = FlowConfigHarness::set_ingest_config_mutation(
         &create_derived_result.dataset_handle.id,
         false,
     );
 
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
@@ -355,8 +351,8 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         1000,
     );
 
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
@@ -394,13 +390,9 @@ async fn test_anonymous_setters_fail() {
         false,
     )];
 
-    let schema = kamu_adapter_graphql::schema_quiet();
     for mutation_code in mutation_codes {
-        let res = schema
-            .execute(
-                async_graphql::Request::new(mutation_code.clone())
-                    .data(harness.catalog_anonymous.clone()),
-            )
+        let res = harness
+            .execute_anonymous_query(async_graphql::Request::new(mutation_code.clone()))
             .await;
 
         expect_anonymous_access_error(res);
@@ -441,6 +433,29 @@ impl FlowConfigHarness {
             catalog_anonymous,
             catalog_authorized,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(
+                query
+                    .into()
+                    .data(dataset_handle_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await
+    }
+
+    pub async fn execute_anonymous_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(query.into().data(self.catalog_anonymous.clone()))
+            .await
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {

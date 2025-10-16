@@ -23,14 +23,12 @@ pub type DatasetHandleDataLoader = DataLoader<DatasetHandleLoader>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Public only for tests
 pub fn account_entity_data_loader(catalog: &dill::Catalog) -> AccountEntityDataLoader {
     let account_service = catalog.get_one::<dyn AccountService>().unwrap();
 
     DataLoader::new(AccountEntityLoader::new(account_service), tokio::spawn)
 }
 
-// Public only for tests
 pub fn dataset_handle_data_loader(catalog: &dill::Catalog) -> DatasetHandleDataLoader {
     let rebac_dataset_registry_facade =
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
