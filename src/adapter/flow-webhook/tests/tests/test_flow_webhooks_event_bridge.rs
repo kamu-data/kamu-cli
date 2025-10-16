@@ -193,10 +193,8 @@ async fn test_subscription_non_matching_event_type() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::test()],
+            harness.webhook_secret_generator.generate_secret().unwrap(),
         );
-        subscription
-            .create_secret(harness.webhook_secret_generator.generate_secret().unwrap())
-            .unwrap();
         subscription
             .save(harness.subscription_event_store.as_ref())
             .await
@@ -495,10 +493,8 @@ impl TestWebhooksEventBridgeHarness {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+            self.webhook_secret_generator.generate_secret().unwrap(),
         );
-        subscription
-            .create_secret(self.webhook_secret_generator.generate_secret().unwrap())
-            .unwrap();
         if enabled {
             subscription.enable().unwrap();
         }

@@ -32,10 +32,8 @@ async fn test_subscriptions_removed_with_dataset() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+            harness.webhook_secret_generator.generate_secret().unwrap(),
         );
-        subscription_id_1_1
-            .create_secret(harness.webhook_secret_generator.generate_secret().unwrap())
-            .unwrap();
         subscription_id_1_1
             .save(harness.event_store.as_ref())
             .await
@@ -49,10 +47,8 @@ async fn test_subscriptions_removed_with_dataset() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+            harness.webhook_secret_generator.generate_secret().unwrap(),
         );
-        subscription_id_1_2
-            .create_secret(harness.webhook_secret_generator.generate_secret().unwrap())
-            .unwrap();
         subscription_id_1_2
             .save(harness.event_store.as_ref())
             .await
@@ -66,10 +62,8 @@ async fn test_subscriptions_removed_with_dataset() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_2.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+            harness.webhook_secret_generator.generate_secret().unwrap(),
         );
-        subscription_id_2
-            .create_secret(harness.webhook_secret_generator.generate_secret().unwrap())
-            .unwrap();
         subscription_id_2
             .save(harness.event_store.as_ref())
             .await

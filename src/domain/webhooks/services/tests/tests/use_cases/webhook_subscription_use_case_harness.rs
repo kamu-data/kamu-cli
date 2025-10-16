@@ -62,13 +62,9 @@ impl WebhookSubscriptionUseCaseHarness {
             label.unwrap_or_else(|| WebhookSubscriptionLabel::try_new("test_label").unwrap()),
             Some(dataset_id),
             vec![WebhookEventTypeCatalog::test()],
+            WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
         );
 
-        subscription
-            .create_secret(
-                WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
-            )
-            .unwrap();
         subscription.save(self.event_store.as_ref()).await.unwrap();
         subscription
     }

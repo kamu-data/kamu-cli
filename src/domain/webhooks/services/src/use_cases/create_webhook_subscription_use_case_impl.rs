@@ -82,12 +82,10 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 label,
                 Some(dataset_id.clone()),
                 event_types,
+                secret.clone(),
             );
             subscription
                 .enable()
-                .map_err(|e| CreateWebhookSubscriptionError::Internal(e.int_err()))?;
-            subscription
-                .create_secret(secret.clone())
                 .map_err(|e| CreateWebhookSubscriptionError::Internal(e.int_err()))?;
 
             subscription

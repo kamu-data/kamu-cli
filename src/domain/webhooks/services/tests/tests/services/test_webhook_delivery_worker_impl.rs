@@ -306,10 +306,8 @@ impl TestWebhookDeliveryWorkerHarness {
             WebhookSubscriptionLabel::try_new("test".to_string()).unwrap(),
             None,
             vec![WebhookEventTypeCatalog::test()],
+            self.webhook_secret_generator.generate_secret().unwrap(),
         );
-        subscription
-            .create_secret(self.webhook_secret_generator.generate_secret().unwrap())
-            .unwrap();
 
         subscription
             .save(self.webhook_subscription_event_store.as_ref())
