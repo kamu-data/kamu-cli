@@ -80,7 +80,9 @@ impl Query {
         Molecule
     }
 
-    // Federation
+    // Federation:
+    // - These methods must be in Query root.
+    // - Methods won't be shown in the GQL schema.
 
     #[graphql(entity)]
     #[tracing::instrument(level = "info", name = Query_find_account_by_id, skip_all, fields(%account_id))]
