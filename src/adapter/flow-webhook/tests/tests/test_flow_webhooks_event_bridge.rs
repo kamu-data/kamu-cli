@@ -193,7 +193,7 @@ async fn test_subscription_non_matching_event_type() {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionSecret::try_new("secret").unwrap(),
+            harness.webhook_secret_generator.generate_secret().unwrap(),
         );
         subscription
             .save(harness.subscription_event_store.as_ref())
@@ -405,6 +405,7 @@ struct TestWebhooksEventBridgeHarness {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     outbox: Arc<dyn Outbox>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
+    webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
 }
 
 #[derive(Default)]
@@ -463,6 +464,7 @@ impl TestWebhooksEventBridgeHarness {
             subscription_event_store: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
+            webhook_secret_generator: catalog.get_one().unwrap(),
             catalog,
         }
     }
@@ -491,7 +493,7 @@ impl TestWebhooksEventBridgeHarness {
             WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-            WebhookSubscriptionSecret::try_new("secret").unwrap(),
+            self.webhook_secret_generator.generate_secret().unwrap(),
         );
         if enabled {
             subscription.enable().unwrap();

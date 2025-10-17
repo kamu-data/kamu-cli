@@ -10,6 +10,8 @@
 use std::sync::Arc;
 
 use async_graphql::Object;
+use kamu_webhooks::WebhooksConfig;
+use secrecy::SecretString;
 
 use crate::mutations::*;
 use crate::prelude::*;
@@ -182,6 +184,45 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    pub async fn rotate_secret(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<RotateWebhookSubscriptionSecretResult> {
+        let (rotate_webhook_subscription_secret_use_case, webhook_config) = from_catalog_n!(
+            ctx,
+            dyn kamu_webhooks::RotateWebhookSubscriptionSecretUseCase,
+            WebhooksConfig
+        );
+
+        let mut subscription = self.webhook_subscription.lock().await;
+
+        match rotate_webhook_subscription_secret_use_case
+            .execute(&mut subscription)
+            .await
+        {
+            Ok(secret) => {
+                let encryption_key = webhook_config
+                    .secret_encryption_key
+                    .as_ref()
+                    .map(|key| SecretString::from(key.clone()));
+                Ok(RotateWebhookSubscriptionSecretResult::Success(
+                    RotateWebhookSubscriptionSecretSuccess {
+                        new_secret: String::from_utf8(
+                            secret
+                                .get_exposed_value(encryption_key.as_ref())
+                                .int_err()?,
+                        )
+                        .int_err()?,
+                    },
+                ))
+            }
+
+            Err(kamu_webhooks::RotateWebhookSubscriptionSecretError::Internal(e)) => {
+                Err(GqlError::Internal(e))
+            }
+        }
+    }
+
     pub async fn remove(&self, ctx: &Context<'_>) -> Result<RemoveWebhookSubscriptionResult> {
         let remove_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::RemoveWebhookSubscriptionUseCase);
@@ -343,6 +384,27 @@ pub struct ReactivateWebhookSubscriptionResultUnexpected {
 impl ReactivateWebhookSubscriptionResultUnexpected {
     async fn message(&self) -> String {
         "Reactivating webhook subscription is unexpected at this state".to_string()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum RotateWebhookSubscriptionSecretResult {
+    Success(RotateWebhookSubscriptionSecretSuccess),
+}
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct RotateWebhookSubscriptionSecretSuccess {
+    new_secret: String,
+}
+
+#[ComplexObject]
+impl RotateWebhookSubscriptionSecretSuccess {
+    async fn message(&self) -> String {
+        "Success".to_string()
     }
 }
 

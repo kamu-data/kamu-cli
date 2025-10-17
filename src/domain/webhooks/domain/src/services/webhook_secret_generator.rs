@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crypto_utils::EncryptionError;
+
 use crate::WebhookSubscriptionSecret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg_attr(feature = "testing", mockall::automock)]
 pub trait WebhookSecretGenerator: Send + Sync {
-    fn generate_secret(&self) -> WebhookSubscriptionSecret;
+    fn generate_secret(&self) -> Result<WebhookSubscriptionSecret, EncryptionError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

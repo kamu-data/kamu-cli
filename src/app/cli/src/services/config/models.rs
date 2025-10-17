@@ -1485,6 +1485,21 @@ impl Default for TaskAgentConfig {
 pub struct WebhooksConfig {
     pub max_consecutive_failures: Option<u32>,
     pub delivery_timeout: Option<u32>,
+    pub secret_encryption_enabled: Option<bool>,
+    /// Represents the encryption key for the webhooks secret. This field is
+    /// required if `secret_encryption_enabled` is `true` or `None`.
+    ///
+    /// The encryption key must be a 32-character alphanumeric string, which
+    /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
+    /// digits (0-9).
+    ///
+    /// # Example
+    /// let config = WebhooksConfig {
+    ///     ...
+    ///     secret_encryption_enabled: Some(true),
+    ///     encryption_key:
+    /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) }; ```
+    pub secret_encryption_key: Option<String>,
 }
 
 impl WebhooksConfig {
@@ -1498,6 +1513,8 @@ impl Default for WebhooksConfig {
         Self {
             max_consecutive_failures: Some(DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES),
             delivery_timeout: Some(DEFAULT_WEBHOOK_DELIVERY_TIMEOUT),
+            secret_encryption_enabled: Some(false),
+            secret_encryption_key: None,
         }
     }
 }

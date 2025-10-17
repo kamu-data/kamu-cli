@@ -7,27 +7,43 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::{component, interface};
-use kamu_webhooks::{WebhookSecretGenerator, WebhookSubscriptionSecret};
+use std::sync::Arc;
+
+use crypto_utils::EncryptionError;
+use kamu_webhooks::{WebhookSecretGenerator, WebhookSubscriptionSecret, WebhooksConfig};
+use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn WebhookSecretGenerator)]
-pub struct WebhookSecretGeneratorImpl {}
+pub struct WebhookSecretGeneratorImpl {
+    webhook_secret_encryption_key: Option<SecretString>,
+}
+
+#[dill::component(pub)]
+#[dill::interface(dyn WebhookSecretGenerator)]
+impl WebhookSecretGeneratorImpl {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(webhooks_config: Arc<WebhooksConfig>) -> Self {
+        Self {
+            webhook_secret_encryption_key: webhooks_config
+                .secret_encryption_key
+                .as_ref()
+                .map(|key| SecretString::from(key.clone())),
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl WebhookSecretGenerator for WebhookSecretGeneratorImpl {
-    fn generate_secret(&self) -> WebhookSubscriptionSecret {
+    fn generate_secret(&self) -> Result<WebhookSubscriptionSecret, EncryptionError> {
         use rand::RngCore;
 
         let mut bytes = [0u8; 32]; // 32 bytes = 256 bits
         rand::rngs::OsRng.fill_bytes(&mut bytes);
-        let raw_secret = hex::encode(bytes);
+        let raw_secret = SecretString::from(hex::encode(bytes));
 
-        WebhookSubscriptionSecret::try_new(raw_secret)
-            .expect("Failed to create WebhookSubscriptionSecret")
+        WebhookSubscriptionSecret::try_new(self.webhook_secret_encryption_key.as_ref(), &raw_secret)
     }
 }
 

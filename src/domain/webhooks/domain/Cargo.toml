@@ -26,6 +26,7 @@ sqlx = ["dep:sqlx"]
 testing = ["dep:mockall"]
 
 [dependencies]
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
@@ -38,6 +39,7 @@ bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 http = { version = "1", default-features = false }
 nutype = { version = "0.6", default-features = false, features = ["serde"] }
+secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false }

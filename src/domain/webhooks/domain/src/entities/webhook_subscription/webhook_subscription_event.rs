@@ -37,8 +37,8 @@ pub struct WebhookSubscriptionEventCreated {
     pub dataset_id: Option<odf::DatasetID>,
     pub event_types: Vec<WebhookEventType>,
     pub target_url: url::Url,
-    pub secret: WebhookSubscriptionSecret,
     pub label: WebhookSubscriptionLabel,
+    pub secret: WebhookSubscriptionSecret,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
