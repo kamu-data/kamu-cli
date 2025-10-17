@@ -174,6 +174,10 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
         self.inner.len().await
     }
 
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<WebhookSubscriptionEvent> {
+        self.inner.get_all_events(opts)
+    }
+
     fn get_events(
         &self,
         subscription_id: &WebhookSubscriptionID,

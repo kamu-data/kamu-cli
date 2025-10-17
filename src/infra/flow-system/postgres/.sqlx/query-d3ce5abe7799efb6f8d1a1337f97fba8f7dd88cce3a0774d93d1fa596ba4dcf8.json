@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT flow_id, event_id, event_payload\n                FROM flow_events\n                WHERE flow_id = ANY($1)\n                ORDER BY event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "event_payload",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d3ce5abe7799efb6f8d1a1337f97fba8f7dd88cce3a0774d93d1fa596ba4dcf8"
+}

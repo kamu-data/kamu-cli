@@ -12,11 +12,13 @@ mod flow_agent_impl;
 mod flow_controller_system_gc;
 mod flow_query_service_impl;
 mod flow_run_service_impl;
-mod flow_scheduling_helper;
+mod flow_scheduling_service;
+mod flow_scheduling_service_impl;
 
 pub(crate) use flow_abort_helper::*;
 pub use flow_agent_impl::*;
 pub use flow_controller_system_gc::*;
 pub use flow_query_service_impl::*;
 pub use flow_run_service_impl::*;
-pub(crate) use flow_scheduling_helper::*;
+pub use flow_scheduling_service::*;
+pub(crate) use flow_scheduling_service_impl::*;

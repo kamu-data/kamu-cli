@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use proc_macro::TokenStream;
+use proc_macro::{Span, TokenStream};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{
@@ -298,7 +298,7 @@ pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStrea
         #method_visibility #method_signature {
             use tracing::Instrument;
             ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional(|transaction_catalog: Catalog| async move {
+                .transactional(|transaction_catalog: ::dill::Catalog| async move {
                     #method_body
                 })
                 .instrument(tracing::debug_span!(stringify!(#method_name)))
@@ -421,6 +421,169 @@ pub fn transactional_method3(attr: TokenStream, item: TokenStream) -> TokenStrea
         #method_visibility #method_signature {
             use tracing::Instrument;
             ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
+                    #method_body
+                })
+                .instrument(tracing::debug_span!(stringify!(#method_name)))
+                .await
+        }
+    };
+
+    TokenStream::from(updated_method)
+}
+
+#[proc_macro_attribute]
+/// Encrusting the method with a transactional Catalog.
+/// The method must contain the Catalog as a parameter
+///
+/// # Examples
+/// ```compile_fail
+/// #[transactional_static_method()]
+/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
+///     // `transaction_catalog` is available inside the method body
+/// }
+/// ```
+pub fn transactional_static_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+
+    let method_signature = &input.sig;
+    let method_name = &method_signature.ident;
+    let method_body = &input.block;
+    let method_visibility = &input.vis;
+
+    let updated_method = quote! {
+        #method_visibility #method_signature {
+            use tracing::Instrument;
+            ::database_common::DatabaseTransactionRunner::new(catalog.clone())
+                .transactional(|transaction_catalog: Catalog| async move {
+                    #method_body
+                })
+                .instrument(tracing::debug_span!(stringify!(#method_name)))
+                .await
+        }
+    };
+
+    TokenStream::from(updated_method)
+}
+
+#[proc_macro_attribute]
+/// Encrusting the method with a transactional Catalog.
+/// The method must contain the Catalog as a parameter
+///
+/// # Examples
+/// ```compile_fail
+/// // `service` request from a transactional Catalog
+/// #[transactional_static_method1(service1: Arc<dyn Service1>)]
+/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
+///     // `service1` are available inside the method body
+/// }
+/// ```
+pub fn transactional_static_method1(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let CatalogItem1 {
+        item_name: catalog_item_name,
+        item_type: catalog_item_type,
+    } = parse_macro_input!(attr as CatalogItem1);
+    let input = parse_macro_input!(item as ItemFn);
+
+    let method_signature = &input.sig;
+    let method_name = &method_signature.ident;
+    let method_body = &input.block;
+    let method_visibility = &input.vis;
+
+    let catalog_ident = syn::Ident::new("catalog", Span::call_site().into());
+
+    let updated_method = quote! {
+        #method_visibility #method_signature {
+            use tracing::Instrument;
+            ::database_common::DatabaseTransactionRunner::new(#catalog_ident.clone())
+                .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
+                    #method_body
+                })
+                .instrument(tracing::debug_span!(stringify!(#method_name)))
+                .await
+        }
+    };
+
+    TokenStream::from(updated_method)
+}
+
+#[proc_macro_attribute]
+/// Encrusting the method with a transactional Catalog.
+/// The method must contain the Catalog as a parameter
+///
+/// # Examples
+/// ```compile_fail
+/// // `service` request from a transactional Catalog
+/// #[transactional_static_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>)]
+/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
+///     // `service1` and `service2` are available inside the method body
+/// }
+/// ```
+pub fn transactional_static_method2(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let CatalogItem2 {
+        item1_name: catalog_item1_name,
+        item1_type: catalog_item1_type,
+        item2_name: catalog_item2_name,
+        item2_type: catalog_item2_type,
+    } = parse_macro_input!(attr as CatalogItem2);
+    let input = parse_macro_input!(item as ItemFn);
+
+    let method_signature = &input.sig;
+    let method_name = &method_signature.ident;
+    let method_body = &input.block;
+    let method_visibility = &input.vis;
+
+    let catalog_ident = syn::Ident::new("catalog", Span::call_site().into());
+
+    let updated_method = quote! {
+        #method_visibility #method_signature {
+            use tracing::Instrument;
+            ::database_common::DatabaseTransactionRunner::new(#catalog_ident.clone())
+                .transactional_with2(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type| async move {
+                    #method_body
+                })
+                .instrument(tracing::debug_span!(stringify!(#method_name)))
+                .await
+        }
+    };
+
+    TokenStream::from(updated_method)
+}
+
+#[proc_macro_attribute]
+/// Encrusting the method with a transactional Catalog.
+/// The method must contain the Catalog as a parameter
+///
+/// # Examples
+/// ```compile_fail
+/// // `service` request from a transactional Catalog
+/// #[transactional_static_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>, service3: Arc<dyn Service3>)]
+/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
+///     // `service1`, `service2` and `service3` are available inside the method body
+/// }
+/// ```
+pub fn transactional_static_method3(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let CatalogItem3 {
+        item1_name: catalog_item1_name,
+        item1_type: catalog_item1_type,
+        item2_name: catalog_item2_name,
+        item2_type: catalog_item2_type,
+        item3_name: catalog_item3_name,
+        item3_type: catalog_item3_type,
+    } = parse_macro_input!(attr as CatalogItem3);
+    let input = parse_macro_input!(item as ItemFn);
+
+    let method_signature = &input.sig;
+    let method_name = &method_signature.ident;
+    let method_body = &input.block;
+    let method_visibility = &input.vis;
+
+    let catalog_ident = syn::Ident::new("catalog", Span::call_site().into());
+
+    let updated_method = quote! {
+        #method_visibility #method_signature {
+            use tracing::Instrument;
+            ::database_common::DatabaseTransactionRunner::new(#catalog_ident.clone())
                 .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
                     #method_body
                 })

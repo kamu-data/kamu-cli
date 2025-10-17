@@ -239,8 +239,9 @@ impl TestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<DidGeneratorDefault>()
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<DidGeneratorDefault>()
             .add_value(ContainerRuntimeConfig::default())
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
@@ -275,8 +276,10 @@ impl TestHarness {
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .build();
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let catalog = b.build();
 
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
 
@@ -317,7 +320,7 @@ impl TestHarness {
 
         if let PollingIngestResult::Updated {
             old_head, new_head, ..
-        } = &ingest_result
+        } = &ingest_result.result
         {
             target
                 .as_metadata_chain()

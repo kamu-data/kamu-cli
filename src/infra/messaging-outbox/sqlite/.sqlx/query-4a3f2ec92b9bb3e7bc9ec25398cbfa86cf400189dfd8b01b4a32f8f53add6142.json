@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    SELECT\n                        message_id,\n                        producer_name,\n                        content_json as \"content_json: _\",\n                        occurred_on as \"occurred_on: _\",\n                        version as \"version!\"\n                    FROM outbox_messages\n                    ORDER BY message_id\n                    LIMIT $1\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "name": "message_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "producer_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "content_json: _",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "occurred_on: _",
+        "ordinal": 3,
+        "type_info": "Null"
+      },
+      {
+        "name": "version!",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "4a3f2ec92b9bb3e7bc9ec25398cbfa86cf400189dfd8b01b4a32f8f53add6142"
+}

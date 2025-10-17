@@ -246,8 +246,8 @@ impl RemoteStatusTestHarness {
             .build();
         let remote_repos_dir = base_repo_harness.temp_dir_path().join("remote_repos");
 
-        let catalog = CatalogBuilder::new_chained(base_repo_harness.catalog())
-            .add::<RemoteStatusServiceImpl>()
+        let mut b = CatalogBuilder::new_chained(base_repo_harness.catalog());
+        b.add::<RemoteStatusServiceImpl>()
             .add::<SyncServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
@@ -261,8 +261,11 @@ impl RemoteStatusTestHarness {
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add::<DependencyGraphServiceImpl>()
-            .build();
+            .add::<DependencyGraphServiceImpl>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+        let catalog = b.build();
 
         Self {
             base_repo_harness,

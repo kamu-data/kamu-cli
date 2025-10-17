@@ -104,8 +104,6 @@ impl WebUIServer {
             password: account_config.password.into_inner(),
         };
 
-        let gql_schema = kamu_adapter_graphql::schema();
-
         let login_instructions = WebUILoginInstructions {
             login_method: AccountProvider::Password.to_string(),
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
@@ -150,10 +148,17 @@ impl WebUIServer {
             .await
             .expect("Token not retrieved");
 
+        let graphql_router = OpenApiRouter::new()
+            .route("/graphql", axum::routing::post(graphql_handler))
+            .layer(graphql_http::middleware::GraphqlTracingLayer::new(
+                kamu_adapter_graphql::schema(),
+                kamu_adapter_graphql::schema_quiet(),
+            ));
+
         let mut open_api_router = OpenApiRouter::with_openapi(
             kamu_adapter_http::openapi::spec_builder(crate::app::VERSION, "").build(),
         )
-        .route("/graphql", axum::routing::post(graphql_handler))
+        .merge(graphql_router)
         .nest(
             "/odata",
             match tenancy_config {
@@ -215,7 +220,6 @@ impl WebUIServer {
             )
             .merge(kamu_adapter_http::openapi::router().into())
             .layer(axum::extract::Extension(web_ui_catalog))
-            .layer(axum::extract::Extension(gql_schema))
             .layer(axum::extract::Extension(web_ui_runtime_configuration))
             .layer(axum::extract::Extension(ui_configuration))
             .fallback(unknown_fallback_handler)

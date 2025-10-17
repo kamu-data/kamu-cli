@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use crate::ResolvedDataset;
+use crate::{DatasetRegistry, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,6 +61,14 @@ impl ResolvedDatasetsMap {
     pub fn detach_from_transaction(&self) {
         for resolved_dataset in self.resolved_datasets_by_id.values() {
             resolved_dataset.detach_from_transaction();
+        }
+    }
+
+    pub async fn refresh_datasets_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
+        for resolved_dataset in self.resolved_datasets_by_id.values_mut() {
+            *resolved_dataset = dataset_registry
+                .get_dataset_by_handle(resolved_dataset.get_handle())
+                .await;
         }
     }
 }

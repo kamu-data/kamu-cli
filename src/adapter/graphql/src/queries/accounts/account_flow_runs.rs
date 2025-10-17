@@ -7,19 +7,28 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::Account as AccountEntity;
-use kamu_core::DatasetRegistry;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::Account;
 use crate::prelude::*;
-use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, InitiatorFilterInput};
+use crate::queries::{
+    Dataset,
+    DatasetConnection,
+    Flow,
+    FlowConnection,
+    FlowProcessTypeFilterInput,
+    InitiatorFilterInput,
+    list_accessible_datasets_with_flows,
+    prepare_flows_filter_by_initiator,
+    prepare_flows_filter_by_types,
+    prepare_flows_scope_query,
+};
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +48,7 @@ impl<'a> AccountFlowRuns<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_flows, skip_all, fields(?page, ?per_page, ?filters))]
-    async fn list_flows(
+    pub async fn list_flows(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
@@ -90,30 +99,26 @@ impl<'a> AccountFlowRuns<'a> {
 
         let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
+        let scope_query = filters
+            .as_ref()
+            .map(|filters| {
+                prepare_flows_scope_query(filters.by_process_type.as_ref(), &dataset_id_refs)
+            })
+            .unwrap_or_else(|| {
+                afs::FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs)
+            });
+
         let dataset_flow_filters = filters
             .map(|filters| kamu_flow_system::FlowFilters {
-                by_flow_type: filters
-                    .by_flow_type
-                    .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
+                by_flow_types: prepare_flows_filter_by_types(filters.by_process_type.as_ref()),
                 by_flow_status: filters.by_status.map(Into::into),
-                by_initiator: filters
-                    .by_initiator
-                    .map(|initiator_filter| match initiator_filter {
-                        InitiatorFilterInput::System(_) => {
-                            kamu_flow_system::InitiatorFilter::System
-                        }
-                        InitiatorFilterInput::Accounts(account_ids) => {
-                            kamu_flow_system::InitiatorFilter::Account(
-                                account_ids.into_iter().map(Into::into).collect(),
-                            )
-                        }
-                    }),
+                by_initiator: prepare_flows_filter_by_initiator(filters.by_initiator),
             })
             .unwrap_or_default();
 
         let flows_state_listing = flow_query_service
             .list_scoped_flows(
-                afs::FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs),
+                scope_query,
                 dataset_flow_filters,
                 PaginationOpts::from_page(page, per_page),
             )
@@ -133,60 +138,20 @@ impl<'a> AccountFlowRuns<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_datasets_with_flow, skip_all)]
-    async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
+    pub async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
         let logged = utils::logged_account(ctx);
         if !logged {
             return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
         }
 
-        let (flow_query_service, dataset_entry_service, dataset_registry) = from_catalog_n!(
-            ctx,
-            dyn fs::FlowQueryService,
-            dyn DatasetEntryService,
-            dyn DatasetRegistry
-        );
-
-        // Consider using ReBAC: not just owned, but perhaps "Maintain" too,
-        // which allows launching flows
-        let owned_dataset_ids = dataset_entry_service
-            .get_owned_dataset_ids(&self.account.id)
-            .await
-            .int_err()?;
-
-        let input_flow_scopes = owned_dataset_ids
-            .iter()
-            .map(afs::FlowScopeDataset::make_scope)
-            .collect::<Vec<_>>();
-
-        let filtered_flow_scopes = flow_query_service
-            .filter_flow_scopes_having_flows(&input_flow_scopes)
-            .await?;
-
-        let dataset_ids = filtered_flow_scopes
-            .iter()
-            .filter_map(|flow_scope| {
-                afs::FlowScopeDataset::maybe_dataset_id_in_scope(flow_scope).map(Cow::Owned)
-            })
-            .collect::<Vec<_>>();
-
-        let dataset_handles_resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
-            .await
-            .int_err()?;
-
-        for (dataset_id, _) in dataset_handles_resolution.unresolved_datasets {
-            tracing::warn!(
-                %dataset_id,
-                "Ignoring point that refers to a dataset not present in the registry",
-            );
-        }
+        let (dataset_handles, _) =
+            list_accessible_datasets_with_flows(ctx, &self.account.id, 0, usize::MAX).await?;
 
         let account = Account::new(
             self.account.id.clone().into(),
             self.account.account_name.clone().into(),
         );
-        let readable_datasets: Vec<_> = dataset_handles_resolution
-            .resolved_handles
+        let readable_datasets: Vec<_> = dataset_handles
             .into_iter()
             .map(|dataset_handle| Dataset::new_access_checked(account.clone(), dataset_handle))
             .collect();
@@ -205,10 +170,10 @@ impl<'a> AccountFlowRuns<'a> {
 
 #[derive(InputObject, Debug)]
 pub struct AccountFlowFilters {
-    by_flow_type: Option<DatasetFlowType>,
     by_status: Option<FlowStatus>,
     by_initiator: Option<InitiatorFilterInput>,
     by_dataset_ids: Vec<DatasetID<'static>>,
+    by_process_type: Option<FlowProcessTypeFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

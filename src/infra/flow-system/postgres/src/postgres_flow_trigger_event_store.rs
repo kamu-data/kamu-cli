@@ -25,6 +25,44 @@ pub struct PostgresFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
+    #[tracing::instrument(level = "debug", skip_all)]
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT event_id, event_payload
+                FROM flow_trigger_events
+                WHERE
+                    (cast($1 as BIGINT) IS NULL or event_id > $1) AND
+                    (cast($2 as BIGINT) IS NULL or event_id <= $2)
+                ORDER BY event_id ASC
+                "#,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = serde_json::from_value::<FlowTriggerEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     fn get_events(
         &self,
         flow_binding: &FlowBinding,
@@ -50,7 +88,7 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
                     AND scope_data = $2
                     AND (cast($3 as BIGINT) IS NULL or event_id > $3)
                     AND (cast($4 as BIGINT) IS NULL or event_id <= $4)
-                ORDER BY event_id ASC
+                ORDER BY event_id
                 "#,
                 flow_type,
                 scope_json,
@@ -71,6 +109,7 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn save_events(
         &self,
         flow_binding: &FlowBinding,
@@ -117,6 +156,7 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
         Ok(EventID::new(last_event_id))
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -243,14 +283,14 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
             SELECT EXISTS (
                 SELECT 1
                 FROM (
-                    SELECT DISTINCT ON (scope_data, flow_type)
+                    SELECT DISTINCT ON (flow_type, scope_data)
                         scope_data,
                         event_type,
                         event_payload
                     FROM flow_trigger_events
                     WHERE
                         scope_data = ANY($1)
-                    ORDER BY scope_data, flow_type, event_time DESC
+                    ORDER BY flow_type, scope_data, event_time DESC
                 ) AS latest_events
                 WHERE event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (

@@ -546,7 +546,7 @@ impl ExpensiveAccountRepository for PostgresAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                ORDER BY registered_at ASC
+                ORDER BY registered_at
                 LIMIT $1 OFFSET $2
                 "#,
                 limit,

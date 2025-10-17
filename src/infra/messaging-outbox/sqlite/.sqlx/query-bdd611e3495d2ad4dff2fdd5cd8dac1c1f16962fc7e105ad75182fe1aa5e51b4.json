@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                consumer_name, producer_name, last_consumed_message_id\n            FROM outbox_message_consumptions\n            WHERE consumer_name = $1 and producer_name = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "consumer_name",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "producer_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_consumed_message_id",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bdd611e3495d2ad4dff2fdd5cd8dac1c1f16962fc7e105ad75182fe1aa5e51b4"
+}

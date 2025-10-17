@@ -898,6 +898,8 @@ impl PullTestHarness {
             MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
         );
 
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
         let catalog = b.build();
 
         Self {

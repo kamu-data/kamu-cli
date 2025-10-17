@@ -233,6 +233,42 @@ impl PostgresWebhookSubscriptionEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventStore {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<WebhookSubscriptionEvent> {
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT event_id, event_payload FROM webhook_subscription_events
+                    WHERE
+                        (cast($1 as INT8) IS NULL or event_id > $1) AND
+                        (cast($2 as INT8) IS NULL or event_id <= $2)
+                    ORDER BY event_id ASC
+                "#,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = match serde_json::from_value::<WebhookSubscriptionEvent>(event_row.event_payload) {
+                    Ok(event) => event,
+                    Err(e) => return Err(sqlx::Error::Decode(Box::new(e))),
+                };
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
     fn get_events(
         &self,
         subscription_id: &WebhookSubscriptionID,
@@ -254,7 +290,7 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
                     WHERE subscription_id = $1
                          AND (cast($2 as INT8) IS NULL or event_id > $2)
                          AND (cast($3 as INT8) IS NULL or event_id <= $3)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 subscription_id,
                 maybe_from_id,
@@ -277,7 +313,7 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
 
     fn get_events_multi(
         &self,
-        queries: Vec<WebhookSubscriptionID>,
+        queries: &[WebhookSubscriptionID],
     ) -> MultiEventStream<WebhookSubscriptionID, WebhookSubscriptionEvent> {
         let subscription_ids: Vec<uuid::Uuid> = queries.iter().map(|id| *id.as_ref()).collect();
 
@@ -293,7 +329,7 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
                     subscription_id, event_id, event_payload
                 FROM webhook_subscription_events
                     WHERE subscription_id = ANY($1)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 &subscription_ids,
             ).try_map(|event_row| {

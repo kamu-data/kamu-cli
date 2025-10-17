@@ -1250,8 +1250,9 @@ impl IngestTestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<DidGeneratorDefault>()
+        let mut b = dill::CatalogBuilder::new();
+
+        b.add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add_value(ContainerRuntimeConfig::default())
@@ -1275,8 +1276,10 @@ impl IngestTestHarness {
             .add::<FetchService>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PollingIngestServiceImpl>()
-            .add::<DatasetKeyValueServiceSysEnv>()
-            .build();
+            .add::<DatasetKeyValueServiceSysEnv>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let catalog = b.build();
 
         Self {
             temp_dir,
@@ -1307,13 +1310,13 @@ impl IngestTestHarness {
     async fn ingest(
         &self,
         target: ResolvedDataset,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
+    ) -> Result<PollingIngestResponse, PollingIngestError> {
         let metadata_state =
             DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None, None)
                 .await
                 .unwrap();
 
-        let ingest_result = self
+        let ingest_res = self
             .ingest_svc
             .ingest(
                 target.clone(),
@@ -1323,9 +1326,10 @@ impl IngestTestHarness {
             )
             .await;
 
-        if let Ok(PollingIngestResult::Updated {
-            old_head, new_head, ..
-        }) = &ingest_result
+        if let Ok(PollingIngestResponse { result, .. }) = &ingest_res
+            && let PollingIngestResult::Updated {
+                old_head, new_head, ..
+            } = result
         {
             target
                 .as_metadata_chain()
@@ -1341,7 +1345,7 @@ impl IngestTestHarness {
                 .int_err()?;
         }
 
-        ingest_result
+        ingest_res
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {

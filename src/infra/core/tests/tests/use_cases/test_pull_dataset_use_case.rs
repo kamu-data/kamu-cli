@@ -680,8 +680,8 @@ impl PullUseCaseHarness {
         let repos_dir = base_use_case_harness.temp_dir_path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
-            .add::<PullDatasetUseCaseImpl>()
+        let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        b.add::<PullDatasetUseCaseImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add_value(mocks.mock_polling_ingest_service)
@@ -702,8 +702,11 @@ impl PullUseCaseHarness {
             .add_value(IpfsGateway::default())
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
-            .add::<DependencyGraphIndexer>()
-            .build();
+            .add::<DependencyGraphIndexer>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+        let catalog = b.build();
 
         let remote_tmp_dir = tempfile::tempdir().unwrap();
         let remote_repo_url = Url::from_directory_path(remote_tmp_dir.path()).unwrap();

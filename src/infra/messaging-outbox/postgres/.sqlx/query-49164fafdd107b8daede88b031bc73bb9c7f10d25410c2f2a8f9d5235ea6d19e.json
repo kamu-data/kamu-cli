@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO outbox_message_consumptions (consumer_name, producer_name, last_consumed_message_id)\n                VALUES ($1, $2, $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "49164fafdd107b8daede88b031bc73bb9c7f10d25410c2f2a8f9d5235ea6d19e"
+}

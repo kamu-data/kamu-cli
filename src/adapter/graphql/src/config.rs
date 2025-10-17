@@ -11,13 +11,6 @@
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Config {
-    /// Enables compatibility mode where collection and versioned file
-    /// archetypes were inferred from push source read schema in addition to
-    /// using the schema attributes. This setting will be removed shortly after
-    /// migration.
-    #[serde(default)]
-    pub enable_archetype_inference: bool,
-}
+pub struct Config {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,8 +14,9 @@ use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placehold
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::sqlite::SqliteRow;
-use sqlx::{FromRow, QueryBuilder, Row, Sqlite};
+use sqlx::{QueryBuilder, Sqlite};
+
+use crate::helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -170,13 +171,6 @@ impl SqliteFlowEventStore {
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
         events: &[FlowEvent],
     ) -> Result<EventID, SaveEventsError> {
-        let connection_mut = tr.connection_mut().await?;
-
-        #[derive(FromRow)]
-        struct ResultRow {
-            event_id: i64,
-        }
-
         let mut query_builder = QueryBuilder::<sqlx::Sqlite>::new(
             r#"
             INSERT INTO flow_events (flow_id, event_time, event_type, event_payload)
@@ -191,54 +185,21 @@ impl SqliteFlowEventStore {
             b.push_bind(serde_json::to_value(event).unwrap());
         });
 
-        query_builder.push("RETURNING event_id");
-
-        let rows = query_builder
-            .build_query_as::<ResultRow>()
+        let connection_mut = tr.connection_mut().await?;
+        query_builder
+            .build()
             .fetch_all(connection_mut)
             .await
             .int_err()?;
-        let last_event_id = rows.last().unwrap().event_id;
-        Ok(EventID::new(last_event_id))
-    }
 
-    fn generate_scope_condition_clauses(
-        &self,
-        flow_scope_query: &FlowScopeQuery,
-        starting_parameter_index: usize,
-    ) -> (String, usize) {
-        let mut parameter_index = starting_parameter_index;
+        let connection_mut = tr.connection_mut().await?;
+        let actual_last_event_id =
+            sqlx::query_scalar!("SELECT val FROM flow_event_global_counter WHERE name = 'global'")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
 
-        let mut scope_clauses = Vec::new();
-        for (key, values) in &flow_scope_query.attributes {
-            if values.len() == 1 {
-                scope_clauses.push(format!(
-                    "json_extract(scope_data, '$.{key}') = ${parameter_index}",
-                ));
-                parameter_index += 1;
-            } else if !values.is_empty() {
-                scope_clauses.push(format!(
-                    "json_extract(scope_data, '$.{key}') IN ({})",
-                    sqlite_generate_placeholders_list(
-                        values.len(),
-                        NonZeroUsize::new(parameter_index).unwrap()
-                    )
-                ));
-                parameter_index += values.len();
-            }
-        }
-
-        (scope_clauses.join(" AND "), parameter_index)
-    }
-
-    fn form_scope_condition_values(&self, flow_scope_query: FlowScopeQuery) -> Vec<String> {
-        let mut scope_values = Vec::new();
-        for (_, values) in flow_scope_query.attributes {
-            for value in values {
-                scope_values.push(value);
-            }
-        }
-        scope_values
+        Ok(EventID::new(actual_last_event_id))
     }
 }
 
@@ -246,6 +207,50 @@ impl SqliteFlowEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowState> for SqliteFlowEventStore {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowEvent> {
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+            #[allow(dead_code)]
+            pub struct EventModel {
+                pub event_id: i64,
+                pub event_payload: sqlx::types::JsonValue
+            }
+
+            let mut query_stream = sqlx::query_as!(
+                EventModel,
+                r#"
+                SELECT event_id, event_payload as "event_payload: _"
+                FROM flow_events
+                WHERE
+                    (cast($1 as INT8) IS NULL OR event_id > $1) AND
+                    (cast($2 as INT8) IS NULL OR event_id <= $2)
+                ORDER BY event_id ASC
+                "#,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = serde_json::from_value::<FlowEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
     fn get_events(&self, flow_id: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
         let flow_id: i64 = (*flow_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
@@ -272,7 +277,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 WHERE flow_id = $1
                     AND (cast($2 as INT8) IS NULL OR event_id > $2)
                     AND (cast($3 as INT8) IS NULL OR event_id <= $3)
-                ORDER BY event_id ASC
+                ORDER BY event_id
                 "#,
                 flow_id,
                 maybe_from_id,
@@ -292,7 +297,9 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
         })
     }
 
-    fn get_events_multi(&self, queries: Vec<FlowID>) -> MultiEventStream<FlowID, FlowEvent> {
+    fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<FlowID, FlowEvent> {
+        let flow_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
+
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr
@@ -302,50 +309,42 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
             struct EventRow {
-                pub flow_id: FlowID,
+                pub flow_id: i64,
                 pub event_id: i64,
-                pub event_payload: sqlx::types::JsonValue
+                pub event_payload: serde_json::Value,
             }
 
             let query_str = format!(
                 r#"
                 SELECT
-                    flow_id as "flow_id: _",
-                    event_id as "event_id: _",
-                    event_payload as "event_payload: _"
+                    flow_id,
+                    event_id,
+                    event_payload
                 FROM flow_events
                     WHERE flow_id IN ({})
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 sqlite_generate_placeholders_list(
-                    queries.len(),
+                    flow_ids.len(),
                     NonZeroUsize::new(1).unwrap()
                 )
             );
 
-            let mut query = sqlx::query(&query_str);
-            for task_id in queries {
-                let task_id: i64 = task_id.try_into().unwrap();
-                query = query.bind(task_id);
+            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            for flow_id in flow_ids {
+                query = query.bind(flow_id);
             }
 
-            use sqlx::Row;
-
             let mut query_stream = query
-                .try_map(|row: sqlx::sqlite::SqliteRow| {
-                    let flow_id: u64 = row.get(0);
-                    let event_id: i64 = row.get(1);
-                    let event_payload: sqlx::types::JsonValue = row.get(2);
-
-                    let event = serde_json::from_value::<FlowEvent>(event_payload)
-                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-
-                    Ok((FlowID::new(flow_id), EventID::new(event_id), event))
-                })
                 .fetch(connection_mut)
                 .map_err(|e| GetEventsError::Internal(e.int_err()));
 
-            while let Some((flow_id, event_id, event)) = query_stream.try_next().await? {
+            while let Some(row) = query_stream.try_next().await? {
+                let flow_id = FlowID::new(u64::try_from(row.flow_id).unwrap());
+                let event_id = EventID::new(row.event_id);
+                let event = serde_json::from_value::<FlowEvent>(row.event_payload)
+                    .map_err(|e| GetEventsError::Internal(e.int_err()))?;
+
                 yield Ok((flow_id, event_id, event));
             }
         })
@@ -431,6 +430,7 @@ pub struct RunStatsRow {
 
 #[async_trait::async_trait]
 impl FlowEventStore for SqliteFlowEventStore {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn new_flow_id(&self) -> Result<FlowID, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -451,6 +451,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(FlowID::try_from(result.flow_id).unwrap())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn try_get_pending_flow(
         &self,
         flow_binding: &FlowBinding,
@@ -484,6 +485,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_flow_id.map(|id| FlowID::try_from(id).unwrap()))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
     async fn try_get_all_scope_pending_flows(
         &self,
         flow_scope: &FlowScope,
@@ -512,126 +514,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(flow_ids)
     }
 
-    async fn get_flow_run_stats(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<FlowRunStats, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let flow_type = flow_binding.flow_type.as_str();
-
-        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_attempt_result = sqlx::query_as!(
-            RunStatsRow,
-            r#"
-            SELECT attempt.last_event_time AS "last_event_time: _"
-            FROM (
-                SELECT e.event_id AS event_id, e.event_time AS last_event_time
-                FROM flow_events e
-                INNER JOIN flows f ON f.flow_id = e.flow_id
-                WHERE
-                    e.event_type = 'FlowEventTaskFinished' AND
-                    f.flow_type = $1 AND
-                    f.scope_data = $2
-                ORDER BY e.event_id DESC
-                LIMIT 1
-            ) AS attempt
-            "#,
-            flow_type,
-            scope_json_str,
-        )
-        .map(|event_row| event_row.last_event_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_success_result = sqlx::query_as!(
-            RunStatsRow,
-            r#"
-            SELECT success.last_event_time AS "last_event_time: _"
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                FROM flow_events e
-                INNER JOIN flows f ON f.flow_id = e.flow_id
-                WHERE
-                    e.event_type = 'FlowEventTaskFinished' AND
-                    e.event_payload ->> '$.TaskFinished.task_outcome.Success' IS NOT NULL AND
-                    f.flow_type = $1 AND
-                    f.scope_data = $2
-                ORDER BY e.event_id DESC
-                LIMIT 1
-            ) AS success
-            "#,
-            flow_type,
-            scope_json_str,
-        )
-        .map(|event_row| event_row.last_event_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(FlowRunStats {
-            last_attempt_time: maybe_attempt_result,
-            last_success_time: maybe_success_result,
-        })
-    }
-
-    async fn get_current_consecutive_flow_failures_count(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<u32, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let flow_type = flow_binding.flow_type.as_str();
-
-        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
-
-        let consecutive_failures_count = sqlx::query!(
-            r#"
-            WITH finished AS (
-                SELECT
-                    e.event_id,
-                    json_extract(e.event_payload, '$.TaskFinished.task_outcome.Success') IS NOT NULL AS is_success,
-                    json_extract(e.event_payload, '$.TaskFinished.task_outcome.Failed')  IS NOT NULL AS is_failed
-                FROM flow_events e
-                JOIN flows f ON f.flow_id = e.flow_id
-                WHERE
-                    e.event_type = 'FlowEventTaskFinished'
-                    AND f.flow_type = $1
-                    AND f.scope_data = $2
-            ),
-            last_success AS (
-                SELECT event_id
-                FROM finished
-                WHERE is_success
-                ORDER BY event_id DESC
-                LIMIT 1
-            )
-            SELECT
-                COUNT(*) AS consecutive_failures
-            FROM finished
-            WHERE
-                is_failed AND event_id > IFNULL((SELECT event_id FROM last_success), 0);
-            "#,
-            flow_type,
-            scope_json_str,
-        )
-        .map(|event_row| event_row.consecutive_failures)
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        let failures_count: u32 = consecutive_failures_count.try_into().int_err()?;
-
-        Ok(failures_count)
-    }
-
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
@@ -650,7 +533,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 WHERE
                     f.scheduled_for_activation_at IS NOT NULL AND
                     (f.flow_status = 'waiting' OR f.flow_status = 'retrying')
-                ORDER BY f.scheduled_for_activation_at ASC
+                ORDER BY f.scheduled_for_activation_at
                 LIMIT 1
             "#,
         )
@@ -666,6 +549,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_activation_time)
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_flows_scheduled_for_activation_at(
         &self,
         scheduled_for_activation_at: DateTime<Utc>,
@@ -680,7 +564,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 WHERE
                     f.scheduled_for_activation_at = $1 AND
                     (f.flow_status = 'waiting' OR f.flow_status = 'retrying')
-                ORDER BY f.flow_id ASC
+                ORDER BY f.flow_id
             "#,
             scheduled_for_activation_at,
         )
@@ -692,6 +576,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(flow_ids)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(flow_scope_query))]
     fn get_all_flow_ids_matching_scope_query(
         &self,
         flow_scope_query: FlowScopeQuery,
@@ -703,38 +588,50 @@ impl FlowEventStore for SqliteFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let maybe_by_flow_type = filters.by_flow_type.clone();
+        let maybe_by_flow_types = filters.by_flow_types.clone();
         let maybe_by_flow_status = filters.by_flow_status;
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-            let (scope_clauses, next_parameter_index) = self.generate_scope_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
-            let scope_values = self.form_scope_condition_values(flow_scope_query);
+            let (scope_clauses, flow_types_parameter_index) = generate_scope_query_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
+            let scope_values = form_scope_query_condition_values(flow_scope_query);
+
+            let initiators_parameter_index = flow_types_parameter_index + if let Some(flow_types) = &maybe_by_flow_types {
+                flow_types.len()
+            } else {
+                0
+            };
 
             let query_str = format!(
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
                     ({scope_clauses})
-                    AND ($1::text IS NULL OR flow_type = $1)
+                    AND ($1 = 0 OR flow_type IN ({}))
                     AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND ($3 = 0 OR initiator IN ({}))
                 ORDER BY flow_status DESC, last_event_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
+                maybe_by_flow_types.as_ref()
+                    .map(|flow_types| sqlite_generate_placeholders_list(
+                        flow_types.len(),
+                        NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                    ))
+                    .unwrap_or_default(),
                 maybe_initiators
                     .as_ref()
                     .map(|initiators| sqlite_generate_placeholders_list(
                         initiators.len(),
-                        NonZeroUsize::new(next_parameter_index).unwrap()
+                        NonZeroUsize::new(initiators_parameter_index).unwrap()
                     ))
                     .unwrap_or_default(),
             );
 
-            let mut query = sqlx::query(&query_str)
-                .bind(maybe_by_flow_type)
+            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+                .bind(i32::from(maybe_by_flow_types.is_some()))
                 .bind(maybe_by_flow_status)
                 .bind(i32::from(maybe_initiators.is_some()))
                 .bind(i64::try_from(pagination.limit).unwrap())
@@ -744,22 +641,26 @@ impl FlowEventStore for SqliteFlowEventStore {
                 query = query.bind(value);
             }
 
+            if let Some(flow_types) = maybe_by_flow_types {
+                for flow_type in flow_types {
+                    query = query.bind(flow_type);
+                }
+            }
+
             if let Some(initiators) = maybe_initiators {
                 for initiator in initiators {
                     query = query.bind(initiator);
                 }
             }
 
-            let mut query_stream = query
-                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
-                .fetch(connection_mut);
-
+            let mut query_stream = query.fetch(connection_mut);
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
-                yield Ok(flow_id);
+                yield Ok(FlowID::new(u64::try_from(flow_id).unwrap()));
             }
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query))]
     async fn get_count_flows_matching_scope_query(
         &self,
         flow_scope_query: &FlowScopeQuery,
@@ -773,11 +674,18 @@ impl FlowEventStore for SqliteFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let maybe_filters_by_flow_type = filters.by_flow_type.as_deref();
-        let maybe_filters_by_flow_status = filters.by_flow_status;
+        let maybe_by_flow_types = filters.by_flow_types.as_deref();
+        let maybe_by_flow_status = filters.by_flow_status;
 
-        let (scope_clauses, next_parameter_index) =
-            self.generate_scope_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
+        let (scope_clauses, flow_types_parameter_index) =
+            generate_scope_query_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
+
+        let initiators_parameter_index = flow_types_parameter_index
+            + if let Some(flow_types) = &maybe_by_flow_types {
+                flow_types.len()
+            } else {
+                0
+            };
 
         let query_str = format!(
             r#"
@@ -785,29 +693,42 @@ impl FlowEventStore for SqliteFlowEventStore {
             FROM flows
             WHERE
                 ({scope_clauses})
-                AND ($1::text IS NULL OR flow_type = $1)
+                AND ($1 = 0 OR flow_type In ({}))
                 AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                 AND ($3 = 0 OR initiator IN ({}))
             "#,
+            maybe_by_flow_types
+                .as_ref()
+                .map(|flow_types| sqlite_generate_placeholders_list(
+                    flow_types.len(),
+                    NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                ))
+                .unwrap_or_default(),
             maybe_initiators
                 .as_ref()
                 .map(|initiators| {
                     sqlite_generate_placeholders_list(
                         initiators.len(),
-                        NonZeroUsize::new(next_parameter_index).unwrap(),
+                        NonZeroUsize::new(initiators_parameter_index).unwrap(),
                     )
                 })
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query(&query_str)
-            .bind(maybe_filters_by_flow_type)
-            .bind(maybe_filters_by_flow_status)
+        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            .bind(i32::from(maybe_by_flow_types.is_some()))
+            .bind(maybe_by_flow_status)
             .bind(i32::from(maybe_initiators.is_some()));
 
         for (_, values) in &flow_scope_query.attributes {
             for value in values {
                 query = query.bind(value);
+            }
+        }
+
+        if let Some(flow_types) = maybe_by_flow_types {
+            for flow_type in flow_types {
+                query = query.bind(flow_type);
             }
         }
 
@@ -817,21 +738,20 @@ impl FlowEventStore for SqliteFlowEventStore {
             }
         }
 
-        let query_result = query.fetch_one(connection_mut).await.int_err()?;
-        let flows_count: i64 = query_result.get(0);
-
+        let flows_count = query.fetch_one(connection_mut).await.int_err()?;
         Ok(usize::try_from(flows_count).unwrap())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query))]
     fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
             let (scope_clauses, _) =
-                self.generate_scope_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
+                generate_scope_query_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
 
-            let scope_values = self.form_scope_condition_values(flow_scope_query);
+            let scope_values = form_scope_query_condition_values(flow_scope_query);
 
             let query_str = format!(
                 r#"
@@ -842,24 +762,19 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query(&query_str);
+            let mut query = sqlx::query_scalar::<_, String>(&query_str);
             for value in scope_values {
                 query = query.bind(value);
             }
 
-            let mut query_stream = query
-                .try_map(|event_row: SqliteRow| {
-                    let initiator: String = event_row.get("initiator");
-                    Ok(odf::AccountID::from_did_str(&initiator).unwrap())
-                })
-                .fetch(connection_mut);
-
-            while let Some(initiator) = query_stream.try_next().await.int_err()? {
-                yield Ok(initiator);
+            let mut query_stream = query.fetch(connection_mut);
+            while let Some(initiator_id_str) = query_stream.try_next().await.int_err()? {
+                yield Ok(odf::AccountID::from_did_str(&initiator_id_str).unwrap());
             }
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn get_all_flow_ids(
         &self,
         filters: &FlowFilters,
@@ -872,37 +787,56 @@ impl FlowEventStore for SqliteFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let maybe_by_flow_type = filters.by_flow_type.clone();
+        let maybe_by_flow_types = filters.by_flow_types.clone();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
 
             let connection_mut = tr.connection_mut().await?;
 
+            let flow_types_parameter_index = 5;
+            let initiators_parameter_index = flow_types_parameter_index + if let Some(flow_types) = &maybe_by_flow_types {
+                flow_types.len()
+            } else {
+                0
+            };
+
             let query_str = format!(
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    ($1::text IS NULL OR flow_type = $1)
+                    ($1 = 0 OR flow_type IN ({}))
                     AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND ($3 = 0 OR initiator IN ({}))
                 ORDER BY flow_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
+                maybe_by_flow_types.as_ref()
+                    .map(|flow_types| sqlite_generate_placeholders_list(
+                        flow_types.len(),
+                        NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                    ))
+                    .unwrap_or_default(),
                 maybe_initiators
                     .as_ref()
                     .map(|initiators| {
-                        sqlite_generate_placeholders_list(initiators.len(), NonZeroUsize::new(5).unwrap())
+                        sqlite_generate_placeholders_list(initiators.len(), NonZeroUsize::new(initiators_parameter_index).unwrap())
                     })
                     .unwrap_or_default()
             );
 
-            let mut query = sqlx::query(&query_str)
-                .bind(maybe_by_flow_type)
+            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+                .bind(i32::from(maybe_by_flow_types.is_some()))
                 .bind(maybe_by_flow_status)
                 .bind(i32::from(maybe_initiators.is_some()))
                 .bind(i64::try_from(pagination.limit).unwrap())
                 .bind(i64::try_from(pagination.offset).unwrap());
+
+            if let Some(flow_types) = maybe_by_flow_types {
+                for flow_type in flow_types {
+                    query = query.bind(flow_type);
+                }
+            }
 
             if let Some(initiators) = maybe_initiators {
                 for initiator in initiators {
@@ -910,53 +844,74 @@ impl FlowEventStore for SqliteFlowEventStore {
                 }
             }
 
-            let mut query_stream = query
-                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
-                .fetch(connection_mut);
-
+            let mut query_stream = query.fetch(connection_mut);
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
-                yield Ok(flow_id);
+                yield Ok(FlowID::new(u64::try_from(flow_id).unwrap()));
             }
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let maybe_by_flow_status = filters.by_flow_status;
 
-        let maybe_by_flow_type = filters.by_flow_type.as_deref();
+        let maybe_by_flow_types = filters.by_flow_types.as_deref();
 
         let maybe_initiators = filters
             .by_initiator
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
+        let flow_types_parameter_index = 3;
+        let initiators_parameter_index = flow_types_parameter_index
+            + if let Some(flow_types) = &maybe_by_flow_types {
+                flow_types.len()
+            } else {
+                0
+            };
+
         let query_str = format!(
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                ($1::text IS NULL OR flow_type = $1)
+                ($1 = 0 OR flow_type IN ({}))
                 AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                 AND ($3 = 0 OR initiator IN ({}))
             "#,
+            maybe_by_flow_types
+                .as_ref()
+                .map(|flow_types| {
+                    sqlite_generate_placeholders_list(
+                        flow_types.len(),
+                        NonZeroUsize::new(flow_types_parameter_index).unwrap(),
+                    )
+                })
+                .unwrap_or_default(),
             maybe_initiators
                 .as_ref()
                 .map(|initiators| {
                     sqlite_generate_placeholders_list(
                         initiators.len(),
-                        NonZeroUsize::new(3).unwrap(),
+                        NonZeroUsize::new(initiators_parameter_index).unwrap(),
                     )
                 })
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query(&query_str)
-            .bind(maybe_by_flow_type)
+        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            .bind(i32::from(maybe_by_flow_types.is_some()))
             .bind(maybe_by_flow_status)
             .bind(i32::from(maybe_initiators.is_some()));
+
+        if let Some(flow_types) = maybe_by_flow_types {
+            for flow_type in flow_types {
+                query = query.bind(flow_type);
+            }
+        }
 
         if let Some(initiators) = maybe_initiators {
             for initiator in initiators {
@@ -964,9 +919,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             }
         }
 
-        let query_result = query.fetch_one(connection_mut).await.int_err()?;
-        let flows_count: i64 = query_result.get(0);
-
+        let flows_count = query.fetch_one(connection_mut).await.int_err()?;
         Ok(usize::try_from(flows_count).unwrap())
     }
 
@@ -975,7 +928,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             const CHUNK_SIZE: usize = 256;
             for chunk in flow_ids.chunks(CHUNK_SIZE) {
                 let flows = Flow::load_multi(
-                    chunk.to_vec(),
+                    chunk,
                     self
                 ).await.int_err()?;
                 for flow in flows {
@@ -985,6 +938,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn filter_flow_scopes_having_flows(
         &self,
         flow_scopes: &[FlowScope],
@@ -1011,19 +965,18 @@ impl FlowEventStore for SqliteFlowEventStore {
             )
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_scalar::<_, serde_json::Value>(&query_str);
 
         for scope_json in scope_json_parts {
             query = query.bind(scope_json);
         }
 
-        let filtered_flow_scopes = query
-            .map(|flow_row: SqliteRow| {
-                serde_json::from_value::<FlowScope>(flow_row.get("scope_data")).unwrap()
-            })
-            .fetch_all(connection_mut)
-            .await
-            .int_err()?;
+        let scope_data_vec = query.fetch_all(connection_mut).await.int_err()?;
+
+        let filtered_flow_scopes = scope_data_vec
+            .into_iter()
+            .map(|scope_data| serde_json::from_value::<FlowScope>(scope_data).unwrap())
+            .collect::<Vec<_>>();
 
         Ok(filtered_flow_scopes)
     }

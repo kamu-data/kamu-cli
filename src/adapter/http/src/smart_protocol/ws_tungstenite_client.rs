@@ -10,6 +10,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
+use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
 use futures::SinkExt;
 use headers::Header;
@@ -19,6 +20,7 @@ use kamu_core::*;
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
+    CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     NameCollisionError,
@@ -519,6 +521,51 @@ impl WsSmartTransferProtocolClient {
 
         url
     }
+
+    #[transactional_method1(create_dataset_use_case: Arc<dyn CreateDatasetUseCase>)]
+    async fn create_dataset_transactional(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+        dataset_visibility: odf::DatasetVisibility,
+    ) -> Result<CreateDatasetResult, InternalError> {
+        let res = create_dataset_use_case
+            .execute(
+                dataset_alias,
+                seed_block,
+                CreateDatasetUseCaseOptions { dataset_visibility },
+            )
+            .await
+            .int_err()?;
+
+        res.dataset.detach_from_transaction();
+
+        Ok(res)
+    }
+
+    #[transactional_method2(append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>, dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn append_metadata_transactional(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        new_blocks: std::collections::VecDeque<(odf::Multihash, odf::MetadataBlock)>,
+        force_update_if_diverged: bool,
+    ) -> Result<Option<odf::Multihash>, InternalError> {
+        let transactional_target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+
+        append_dataset_metadata_batch_use_case
+            .execute(
+                transactional_target.as_ref(),
+                Box::new(new_blocks.into_iter()),
+                AppendDatasetMetadataBatchUseCaseOptions {
+                    set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(
+                        force_update_if_diverged,
+                    )),
+                    ..Default::default()
+                },
+            )
+            .await
+            .int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -581,6 +628,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             None
         };
 
+        let mut new_head = dst_head.clone();
+
         let dataset_pull_result = match self
             .pull_send_request(
                 &mut ws_stream,
@@ -620,13 +669,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 decode_metadata_batch(&dataset_pull_metadata_response.blocks).int_err()?;
 
             // Create destination dataset if not exists
-            let dst = if let Some(dst) = dst {
+            let (dst, dst_handle) = if let Some(dst) = dst {
                 if transfer_options.force_update_if_diverged
                     && !ensure_seed_not_in_conflict(new_blocks.front(), dst.get_handle())
                 {
                     return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
                 }
-                (**dst).clone()
+                ((**dst).clone(), dst.get_handle().clone())
             } else {
                 let (first_hash, first_block) = new_blocks.pop_front().unwrap();
                 let seed_block = first_block
@@ -636,22 +685,19 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                         source: None,
                     })?;
 
-                let create_dataset_use_case =
-                    self.catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
                 let alias =
                     dst_alias.ok_or_else(|| "Destination dataset alias is unknown".int_err())?;
-                let create_result = create_dataset_use_case
-                    .execute(
+                let create_result = self
+                    .create_dataset_transactional(
                         alias,
                         seed_block,
-                        CreateDatasetUseCaseOptions {
-                            dataset_visibility: transfer_options.visibility_for_created_dataset,
-                        },
+                        transfer_options.visibility_for_created_dataset,
                     )
-                    .await
-                    .int_err()?;
+                    .await?;
                 assert_eq!(first_hash, create_result.head);
-                create_result.dataset
+                new_head = Some(create_result.head);
+
+                (create_result.dataset, create_result.dataset_handle)
             };
 
             let object_files =
@@ -700,31 +746,14 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let append_dataset_metadata_batch_use_case = self
-                .catalog
-                .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
-                .unwrap();
-            let dst_dataset = dst.clone();
-
-            append_dataset_metadata_batch_use_case
-                .execute(
-                    dst_dataset.as_ref(),
-                    Box::new(new_blocks.into_iter()),
-                    AppendDatasetMetadataBatchUseCaseOptions {
-                        set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(
-                            transfer_options.force_update_if_diverged,
-                        )),
-                        ..Default::default()
-                    },
+            let new_dst_head = self
+                .append_metadata_transactional(
+                    &dst_handle,
+                    new_blocks,
+                    transfer_options.force_update_if_diverged,
                 )
-                .await
-                .int_err()?;
-
-            let new_dst_head = dst
-                .as_metadata_chain()
-                .resolve_ref(&odf::BlockRef::Head)
-                .await
-                .int_err()?;
+                .await?
+                .unwrap_or_else(|| new_head.clone().unwrap());
 
             SyncResult::Updated {
                 old_head: dst_head,

@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{ComplexObject, InputObject, Interface, Object, SimpleObject};
+use kamu_webhooks::WebhooksConfig;
+use secrecy::SecretString;
 
 use crate::mutations::*;
 use crate::prelude::*;
@@ -37,13 +39,16 @@ impl<'a> DatasetWebhooksMut<'a> {
         })
     }
 
-    async fn create_subscription(
+    pub async fn create_subscription(
         &self,
         ctx: &Context<'_>,
         input: WebhookSubscriptionInput,
     ) -> Result<CreateWebhookSubscriptionResult> {
-        let create_webhook_subscription_use_case =
-            from_catalog_n!(ctx, dyn kamu_webhooks::CreateWebhookSubscriptionUseCase);
+        let (create_webhook_subscription_use_case, webhooks_config) = from_catalog_n!(
+            ctx,
+            dyn kamu_webhooks::CreateWebhookSubscriptionUseCase,
+            WebhooksConfig
+        );
 
         match create_webhook_subscription_use_case
             .execute(
@@ -58,12 +63,23 @@ impl<'a> DatasetWebhooksMut<'a> {
             )
             .await
         {
-            Ok(res) => Ok(CreateWebhookSubscriptionResult::Success(
-                CreateWebhookSubscriptionResultSuccess {
-                    subscription_id: res.subscription_id.to_string(),
-                    secret: res.secret.to_string(),
-                },
-            )),
+            Ok(res) => {
+                let encryption_key = webhooks_config
+                    .secret_encryption_key
+                    .as_ref()
+                    .map(|key| SecretString::from(key.clone()));
+                Ok(CreateWebhookSubscriptionResult::Success(
+                    CreateWebhookSubscriptionResultSuccess {
+                        subscription_id: res.subscription_id.to_string(),
+                        secret: String::from_utf8(
+                            res.secret
+                                .get_exposed_value(encryption_key.as_ref())
+                                .int_err()?,
+                        )
+                        .int_err()?,
+                    },
+                ))
+            }
 
             Err(e @ kamu_webhooks::CreateWebhookSubscriptionError::InvalidTargetUrl(_)) => {
                 Ok(CreateWebhookSubscriptionResult::InvalidTargetUrl(

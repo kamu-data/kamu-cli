@@ -16,7 +16,9 @@ use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_webhooks::{DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES, DEFAULT_WEBHOOK_DELIVERY_TIMEOUT};
 use merge::Merge;
+use merge::option::overwrite_none;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -30,6 +32,7 @@ use crate::CLIError;
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CLIConfig {
     /// Database connection configuration
+    #[merge(strategy = merge::option::overwrite_none)]
     pub database: Option<DatabaseConfig>,
 
     /// Dataset environment variables configuration
@@ -81,9 +84,11 @@ pub struct CLIConfig {
     pub uploads: Option<UploadsConfig>,
 
     /// Did secret key encryption configuration
+    #[merge(strategy = merge::option::overwrite_none)]
     pub did_encryption: Option<DidSecretEncryptionConfig>,
 
     /// Experimental and temporary configuration options
+    #[merge(strategy = merge::option::overwrite_none)]
     pub extra: Option<ExtraConfig>,
 }
 
@@ -179,6 +184,7 @@ impl ExtraConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct EngineConfig {
     /// Maximum number of engine operations that can be performed concurrently
     pub max_concurrency: Option<u32>,
@@ -242,6 +248,7 @@ impl Default for EngineConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct EngineImagesConfig {
     /// UNSTABLE: Spark engine image
     pub spark: Option<String>,
@@ -284,6 +291,7 @@ impl Default for EngineImagesConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct EngineConfigDatafution {
     /// Base configuration options
     /// See: https://datafusion.apache.org/user-guide/configs.html
@@ -409,6 +417,7 @@ impl Default for EngineConfigDatafution {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct SourceConfig {
     /// Target number of records after which we will stop consuming from the
     /// resumable source and commit data, leaving the rest for the next
@@ -467,6 +476,7 @@ impl Default for SourceConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct HttpSourceConfig {
     /// Value to use for User-Agent header
     pub user_agent: Option<String>,
@@ -514,6 +524,7 @@ impl Default for HttpSourceConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct MqttSourceConfig {
     /// Time in milliseconds to wait for MQTT broker to send us some data after
     /// which we will consider that we have "caught up" and end the polling
@@ -553,6 +564,7 @@ impl Default for MqttSourceConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct EthereumSourceConfig {
     /// Default RPC endpoints to use if source does not specify one explicitly.
     #[merge(strategy = merge::vec::append)]
@@ -683,6 +695,7 @@ impl Default for ProtocolConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct IpfsConfig {
     /// HTTP Gateway URL to use for downloads.
     /// For safety, it defaults to `http://localhost:8080` - a local IPFS daemon.
@@ -723,6 +736,7 @@ impl Default for IpfsConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct FlightSqlConfig {
     /// Whether clients can authenticate as 'anonymous' user
     pub allow_anonymous: Option<bool>,
@@ -839,6 +853,7 @@ impl Default for FrontendConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct JupyterConfig {
     /// Jupyter notebook server image
     pub image: Option<String>,
@@ -987,6 +1002,7 @@ pub struct AwsIamTokenPasswordPolicyConfig {
 #[skip_serializing_none]
 #[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct IdentityConfig {
     /// Private key used to sign API responses.
     /// Currently only `ed25519` keys are supported.
@@ -1033,6 +1049,7 @@ impl IdentityConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct SearchConfig {
     /// Indexer configuration
     pub indexer: Option<SearchIndexerConfig>,
@@ -1188,6 +1205,7 @@ impl Default for EmbeddingsEncoderConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct EmbeddingsEncoderConfigOpenAi {
     pub url: Option<String>,
     pub api_key: Option<String>,
@@ -1228,6 +1246,7 @@ impl Default for VectorRepoConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct VectorRepoConfigQdrant {
     #[merge(skip)]
     pub url: String,
@@ -1251,6 +1270,7 @@ impl Default for VectorRepoConfigQdrant {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct VectorRepoConfigQdrantContainer {
     pub image: Option<String>,
     pub dimensions: Option<usize>,
@@ -1275,6 +1295,7 @@ impl Default for VectorRepoConfigQdrantContainer {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct UploadsConfig {
     pub max_file_size_in_mb: Option<usize>,
 }
@@ -1299,6 +1320,7 @@ impl Default for UploadsConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct OutboxConfig {
     pub awaiting_step_secs: Option<i64>,
     pub batch_size: Option<i64>,
@@ -1330,6 +1352,9 @@ pub struct FlowSystemConfig {
     pub flow_agent: Option<FlowAgentConfig>,
 
     #[merge(strategy = merge_recursive)]
+    pub flow_system_event_agent: Option<FlowSystemEventAgentConfig>,
+
+    #[merge(strategy = merge_recursive)]
     pub task_agent: Option<TaskAgentConfig>,
 }
 
@@ -1337,6 +1362,7 @@ impl FlowSystemConfig {
     pub fn sample() -> Self {
         Self {
             flow_agent: Some(FlowAgentConfig::sample()),
+            flow_system_event_agent: Some(FlowSystemEventAgentConfig::sample()),
             task_agent: Some(TaskAgentConfig::sample()),
         }
     }
@@ -1346,6 +1372,7 @@ impl Default for FlowSystemConfig {
     fn default() -> Self {
         Self {
             flow_agent: Some(FlowAgentConfig::default()),
+            flow_system_event_agent: Some(FlowSystemEventAgentConfig::default()),
             task_agent: Some(TaskAgentConfig::default()),
         }
     }
@@ -1354,6 +1381,7 @@ impl Default for FlowSystemConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct FlowAgentConfig {
     pub awaiting_step_secs: Option<i64>,
     pub mandatory_throttling_period_secs: Option<i64>,
@@ -1379,6 +1407,7 @@ impl Default for FlowAgentConfig {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct RetryPolicyConfig {
     pub max_attempts: Option<u32>,
     pub min_delay_secs: Option<u32>,
@@ -1398,6 +1427,36 @@ pub enum RetryPolicyConfigBackoffType {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
+pub struct FlowSystemEventAgentConfig {
+    pub min_debounce_interval_ms: Option<u32>,
+    pub max_listening_timeout_ms: Option<u32>,
+    pub batch_size: Option<usize>,
+}
+
+impl FlowSystemEventAgentConfig {
+    fn sample() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for FlowSystemEventAgentConfig {
+    fn default() -> Self {
+        // Note: these are good values for CLI use case with SQLite target
+        // Postgres targets need a higher timeout (~60s), larger batch size (~100..500),
+        // and loopback offset (of batch size * 3)
+        Self {
+            min_debounce_interval_ms: Some(100),
+            max_listening_timeout_ms: Some(2000),
+            batch_size: Some(20),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct TaskAgentConfig {
     pub checking_interval_secs: Option<u32>,
 }
@@ -1422,8 +1481,25 @@ impl Default for TaskAgentConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
 pub struct WebhooksConfig {
     pub max_consecutive_failures: Option<u32>,
+    pub delivery_timeout: Option<u32>,
+    pub secret_encryption_enabled: Option<bool>,
+    /// Represents the encryption key for the webhooks secret. This field is
+    /// required if `secret_encryption_enabled` is `true` or `None`.
+    ///
+    /// The encryption key must be a 32-character alphanumeric string, which
+    /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
+    /// digits (0-9).
+    ///
+    /// # Example
+    /// let config = WebhooksConfig {
+    ///     ...
+    ///     secret_encryption_enabled: Some(true),
+    ///     encryption_key:
+    /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) }; ```
+    pub secret_encryption_key: Option<String>,
 }
 
 impl WebhooksConfig {
@@ -1435,7 +1511,10 @@ impl WebhooksConfig {
 impl Default for WebhooksConfig {
     fn default() -> Self {
         Self {
-            max_consecutive_failures: Some(5),
+            max_consecutive_failures: Some(DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES),
+            delivery_timeout: Some(DEFAULT_WEBHOOK_DELIVERY_TIMEOUT),
+            secret_encryption_enabled: Some(false),
+            secret_encryption_key: None,
         }
     }
 }

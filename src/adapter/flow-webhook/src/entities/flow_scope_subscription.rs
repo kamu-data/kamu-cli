@@ -82,6 +82,76 @@ impl<'a> FlowScopeSubscription<'a> {
             .and_then(|value| value.as_str())
             .map(|id_str| odf::DatasetID::from_did_str(id_str).expect("Invalid dataset ID format"))
     }
+
+    pub fn maybe_subscription_id_in_scope(scope: &fs::FlowScope) -> Option<WebhookSubscriptionID> {
+        scope
+            .get_attribute(FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID)
+            .and_then(|value| value.as_str())
+            .and_then(|id_str| uuid::Uuid::parse_str(id_str).ok())
+            .map(WebhookSubscriptionID::new)
+    }
+
+    pub fn query_for_subscriptions_of_dataset(dataset_id: &odf::DatasetID) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
+                    vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
+                    vec![dataset_id.to_string()],
+                ),
+            ],
+        }
+    }
+
+    pub fn query_for_subscriptions_of_multiple_datasets(
+        dataset_id_refs: &[&odf::DatasetID],
+    ) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
+                    vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_DATASET_ID,
+                    dataset_id_refs.iter().map(ToString::to_string).collect(),
+                ),
+            ],
+        }
+    }
+
+    /// Query for all webhook subscriptions regardless of dataset
+    pub fn query_for_all_subscriptions() -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![(
+                fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
+                vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+            )],
+        }
+    }
+
+    pub fn query_for_multiple_subscriptions(
+        subscription_ids: &[WebhookSubscriptionID],
+    ) -> fs::FlowScopeQuery {
+        fs::FlowScopeQuery {
+            attributes: vec![
+                (
+                    fs::FLOW_SCOPE_ATTRIBUTE_TYPE,
+                    vec![FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION.to_string()],
+                ),
+                (
+                    FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID,
+                    subscription_ids
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>(),
+                ),
+            ],
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

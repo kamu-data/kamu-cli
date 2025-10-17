@@ -18,6 +18,7 @@ use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use kamu_webhooks_services::*;
 use odf::metadata::testing::MetadataFactory;
+use secrecy::SecretString;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -1288,6 +1289,59 @@ async fn test_remove_subscription() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_rotate_subscription_secret() {
+    let harness = WebhookSubscriptionsHarness::new().await;
+    let create_result = harness.create_root_dataset("foo").await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let subscription_id = harness
+        .create_webhook_subscription(
+            &schema,
+            &create_result.dataset_handle.id,
+            "https://example.com/webhook".to_string(),
+            vec![kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+            "My Webhook Subscription".to_string(),
+        )
+        .await;
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptionsHarness::rotate_subscription_secret_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "subscriptionId": subscription_id.clone(),
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "subscription": {
+                            "rotateSecret": {
+                                "__typename": "RotateWebhookSubscriptionSecretSuccess",
+                                "message": "Success",
+                            }
+                        }
+                    }
+                }
+
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct WebhookSubscriptionsHarness {
     base_gql_harness: BaseGQLDatasetHarness,
@@ -1300,8 +1354,11 @@ impl WebhookSubscriptionsHarness {
             .tenancy_config(TenancyConfig::MultiTenant)
             .build();
 
+        let fixed_webhook_secret =
+            WebhookSubscriptionSecret::try_new(None, &SecretString::from(FIXED_SECRET.to_string()))
+                .unwrap();
         let mock_secret_generator =
-            WebhookSubscriptionsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+            WebhookSubscriptionsHarness::make_mock_secret_generator(fixed_webhook_secret);
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
@@ -1312,7 +1369,9 @@ impl WebhookSubscriptionsHarness {
             b.add::<ResumeWebhookSubscriptionUseCaseImpl>();
             b.add::<PauseWebhookSubscriptionUseCaseImpl>();
             b.add::<RemoveWebhookSubscriptionUseCaseImpl>();
+            b.add::<RotateWebhookSubscriptionSecretUseCaseImpl>();
             b.add::<WebhookSubscriptionQueryServiceImpl>();
+            b.add_value(WebhooksConfig::sample());
             b.add_value(mock_secret_generator);
             b.bind::<dyn WebhookSecretGenerator, MockWebhookSecretGenerator>();
             b.add::<InMemoryWebhookSubscriptionEventStore>();
@@ -1329,11 +1388,13 @@ impl WebhookSubscriptionsHarness {
         }
     }
 
-    fn make_mock_secret_generator(with_secret: String) -> MockWebhookSecretGenerator {
+    fn make_mock_secret_generator(
+        with_secret: WebhookSubscriptionSecret,
+    ) -> MockWebhookSecretGenerator {
         let mut mock_secret_generator = MockWebhookSecretGenerator::new();
         mock_secret_generator
             .expect_generate_secret()
-            .returning(move || WebhookSubscriptionSecret::try_new(&with_secret).unwrap());
+            .returning(move || Ok(with_secret.clone()));
         mock_secret_generator
     }
 
@@ -1571,6 +1632,30 @@ impl WebhookSubscriptionsHarness {
                         webhooks {
                             subscription(id: $subscriptionId) {
                                 remove {
+                                    __typename
+                                    message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+          "#
+        )
+    }
+
+    fn rotate_subscription_secret_mutation() -> &'static str {
+        indoc!(
+            r#"
+            mutation (
+                $datasetId: DatasetID!,
+                $subscriptionId: WebhookSubscriptionID!
+            ) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        webhooks {
+                            subscription(id: $subscriptionId) {
+                                rotateSecret {
                                     __typename
                                     message
                                 }

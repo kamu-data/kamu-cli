@@ -112,4 +112,7 @@ ignore = [
     # Unmaintained (custom_derive)
     # https://rustsec.org/advisories/RUSTSEC-2025-0058
     "RUSTSEC-2025-0058",
+    # ToDo: Remove once alloy will fix it
+    # https://rustsec.org/advisories/RUSTSEC-2025-0058
+    "RUSTSEC-2025-0073",
 ]

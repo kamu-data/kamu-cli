@@ -97,7 +97,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             use futures::stream::{self, StreamExt, TryStreamExt};
             let flow_bindings: Vec<_> = self.event_store.stream_all_existing_flow_bindings().try_collect().await.int_err()?;
 
-            let flow_configurations = FlowConfiguration::load_multi_simple(flow_bindings, self.event_store.as_ref()).await.int_err()?;
+            let flow_configurations = FlowConfiguration::load_multi_simple(&flow_bindings, self.event_store.as_ref()).await.int_err()?;
             let stream = stream::iter(flow_configurations)
                 .filter_map(|flow_configuration| async {
                 if flow_configuration.is_active() {

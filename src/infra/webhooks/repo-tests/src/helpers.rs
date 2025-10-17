@@ -15,6 +15,7 @@ use kamu_webhooks::{
     WebhookSubscriptionLabel,
     WebhookSubscriptionSecret,
 };
+use secrecy::SecretString;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +33,7 @@ pub(crate) async fn new_webhook_subscription(catalog: &dill::Catalog) -> Webhook
         WebhookSubscriptionLabel::try_new("test".to_string()).unwrap(),
         None,
         vec![WebhookEventTypeCatalog::test()],
-        WebhookSubscriptionSecret::try_new("some-secret").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("some-secret")).unwrap(),
     );
 
     webhook_subscription

@@ -131,7 +131,7 @@ fn test_creates_the_correct_reason_without_context() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_creates_the_correct_reason_wit_context() {
+fn test_creates_the_correct_reason_with_context() {
     let definitely_not_a_number = "λ";
     let error: Result<!, _> =
         Err(IntegerParsingError {}).context_int_err(format!("value '{definitely_not_a_number}'"));

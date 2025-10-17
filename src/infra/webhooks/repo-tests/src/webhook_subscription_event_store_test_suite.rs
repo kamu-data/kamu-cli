@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 
 use futures::TryStreamExt;
 use kamu_webhooks::*;
+use secrecy::SecretString;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +78,7 @@ pub async fn test_store_single_aggregate(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
     );
     subscription.save(event_store.as_ref()).await.unwrap();
 
@@ -172,7 +173,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("label-1").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_1")).unwrap(),
     );
     subscription_1.enable().unwrap();
     subscription_1.save(event_store.as_ref()).await.unwrap();
@@ -183,7 +184,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("label-2").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2")).unwrap(),
     );
     subscription_2.enable().unwrap();
     subscription_2.pause().unwrap();
@@ -196,7 +197,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("label-3").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_3")).unwrap(),
     );
     subscription_3.enable().unwrap();
     subscription_3.pause().unwrap();
@@ -248,11 +249,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
     assert_matches!(events_3[2], WebhookSubscriptionEvent::Paused(_));
 
     let res = event_store
-        .get_events_multi(vec![
-            subscription_id_1,
-            subscription_id_2,
-            subscription_id_3,
-        ])
+        .get_events_multi(&[subscription_id_1, subscription_id_2, subscription_id_3])
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
@@ -348,7 +345,7 @@ pub async fn test_modifying_subscription(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
     );
     subscription.save(event_store.as_ref()).await.unwrap();
 
@@ -394,7 +391,7 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label").unwrap(),
         Some(dataset_id_1.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_1")).unwrap(),
     );
     subscription_1.save(event_store.as_ref()).await.unwrap();
 
@@ -405,7 +402,7 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
                                                                    * dataset */
         Some(dataset_id_2.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2_1")).unwrap(),
     );
     subscription_2_1.save(event_store.as_ref()).await.unwrap();
 
@@ -415,7 +412,7 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label").unwrap(), // same label in the same dataset
         Some(dataset_id_2.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2_2")).unwrap(),
     );
     let res = subscription_2_2.save(event_store.as_ref()).await;
     assert_matches!(res, Err(_));
@@ -441,7 +438,7 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label").unwrap(),
         Some(dataset_id_1.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_1")).unwrap(),
     );
     subscription_1.save(event_store.as_ref()).await.unwrap();
 
@@ -452,7 +449,7 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
                                                                    * dataset */
         Some(dataset_id_2.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2_1")).unwrap(),
     );
     subscription_2_1.save(event_store.as_ref()).await.unwrap();
 
@@ -462,7 +459,7 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label-2").unwrap(),
         Some(dataset_id_2.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2_2")).unwrap(),
     );
     subscription_2_2.save(event_store.as_ref()).await.unwrap();
 
@@ -498,7 +495,7 @@ pub async fn test_empty_labels_allowed_as_duplicates(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_1")).unwrap(),
     );
     subscription_1.save(event_store.as_ref()).await.unwrap();
 
@@ -510,7 +507,7 @@ pub async fn test_empty_labels_allowed_as_duplicates(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2")).unwrap(),
     );
     let res = subscription_2.save(event_store.as_ref()).await;
     assert!(res.is_ok());
@@ -522,7 +519,7 @@ pub async fn test_empty_labels_allowed_as_duplicates(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_3")).unwrap(),
     );
     let res = subscription_3.save(event_store.as_ref()).await;
     assert!(res.is_ok());
@@ -559,7 +556,7 @@ pub async fn test_empty_labels_allowed_as_duplicates_on_modify(catalog: &dill::C
         WebhookSubscriptionLabel::try_new("").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_1")).unwrap(),
     );
     subscription_1.save(event_store.as_ref()).await.unwrap();
 
@@ -570,7 +567,7 @@ pub async fn test_empty_labels_allowed_as_duplicates_on_modify(catalog: &dill::C
         WebhookSubscriptionLabel::try_new("").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2")).unwrap(),
     );
     subscription_2.save(event_store.as_ref()).await.unwrap();
 
@@ -581,7 +578,7 @@ pub async fn test_empty_labels_allowed_as_duplicates_on_modify(catalog: &dill::C
         WebhookSubscriptionLabel::try_new("test-label").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_3")).unwrap(),
     );
     subscription_3.save(event_store.as_ref()).await.unwrap();
 
@@ -631,7 +628,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label-1").unwrap(),
         Some(dataset_id_1.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_1_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_1_1")).unwrap(),
     );
     subscription_1_1.enable().unwrap();
     subscription_1_1.save(event_store.as_ref()).await.unwrap();
@@ -642,7 +639,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label-2").unwrap(),
         Some(dataset_id_1.clone()),
         vec![WebhookEventTypeCatalog::test()],
-        WebhookSubscriptionSecret::try_new("secret_1_2").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_1_2")).unwrap(),
     );
     subscription_1_2.enable().unwrap();
     subscription_1_2.save(event_store.as_ref()).await.unwrap();
@@ -653,7 +650,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label-1").unwrap(),
         Some(dataset_id_2.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2_1")).unwrap(),
     );
     subscription_2_1.enable().unwrap();
     subscription_2_1.save(event_store.as_ref()).await.unwrap();
@@ -664,7 +661,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label-2").unwrap(),
         Some(dataset_id_2.clone()),
         vec![WebhookEventTypeCatalog::test()],
-        WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret_2_2")).unwrap(),
     );
     subscription_2_2.enable().unwrap();
     subscription_2_2.save(event_store.as_ref()).await.unwrap();
@@ -718,7 +715,7 @@ pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::try_new("test-label").unwrap(),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-        WebhookSubscriptionSecret::try_new("secret").unwrap(),
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
     );
     subscription.save(event_store.as_ref()).await.unwrap();
 

@@ -11,7 +11,6 @@ use database_common::TransactionRefT;
 use dill::{component, interface};
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use sqlx::sqlite::SqliteRow;
 
 use crate::domain::*;
 
@@ -38,8 +37,8 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
         sqlx::query!(
             r#"
-                INSERT INTO outbox_messages (producer_name, content_json, occurred_on, version)
-                    VALUES ($1, $2, $3, $4)
+            INSERT INTO outbox_messages (producer_name, content_json, occurred_on, version)
+                VALUES ($1, $2, $3, $4)
             "#,
             message.producer_name,
             message_content_json,
@@ -58,66 +57,67 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
     ) -> OutboxMessageStream {
-        let producer_filters = if above_boundaries_by_producer.is_empty() {
-            "true".to_string()
-        } else {
-            above_boundaries_by_producer
-                .iter()
-                .enumerate()
-                .map(|(i, _)| {
-                    indoc::formatdoc!(
-                        "producer_name = ${} AND message_id > ${}",
-                        i * 2 + 2, // $2, $4, $6, ...
-                        i * 2 + 3, // $3, $5, $7, ...
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(" OR ")
-        };
+        let unfiltered = above_boundaries_by_producer.is_empty();
+
+        let json_bounds = serde_json::to_string(
+            &above_boundaries_by_producer
+                .into_iter()
+                .map(|(p, id)| serde_json::json!({"p": p, "id": id.into_inner()}))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
+            let connection_mut = tr.connection_mut().await?;
 
-            let query_str = indoc::formatdoc!(
-                r#"
-                SELECT
-                    message_id,
-                    producer_name,
-                    content_json,
-                    occurred_on,
-                    version
-                FROM outbox_messages
-                WHERE {producer_filters}
-                ORDER BY message_id
-                LIMIT $1
-                "#,
-            );
+            let batch_size = i64::try_from(batch_size).unwrap();
 
-            let mut query = sqlx::query(&query_str)
-                .bind(i64::try_from(batch_size).unwrap());
+            let mut stream = if unfiltered {
+                sqlx::query_as!(
+                    OutboxMessageRow,
+                    r#"
+                    SELECT
+                        message_id,
+                        producer_name,
+                        content_json as "content_json: _",
+                        occurred_on as "occurred_on: _",
+                        version as "version!"
+                    FROM outbox_messages
+                    ORDER BY message_id
+                    LIMIT $1
+                    "#,
+                    batch_size,
+                ).fetch(connection_mut)
+            } else {
+                sqlx::query_as!(
+                    OutboxMessageRow,
+                    r#"
+                    WITH bounds AS (
+                        SELECT
+                            json_extract(value, '$.p')  AS producer_name,
+                            json_extract(value, '$.id') AS above_id
+                        FROM json_each($1)
+                    )
+                    SELECT
+                        m.message_id,
+                        m.producer_name,
+                        m.content_json as "content_json: _",
+                        m.occurred_on as "occurred_on: _",
+                        m.version as "version!"
+                    FROM outbox_messages AS m
+                    JOIN bounds AS b
+                        ON m.producer_name = b.producer_name AND m.message_id > b.above_id
+                    ORDER BY m.message_id
+                    LIMIT $2
+                    "#,
+                    json_bounds,
+                    batch_size
+                ).fetch(connection_mut)
+            };
 
-            for (producer_name, above_id) in above_boundaries_by_producer {
-                query = query.bind(producer_name).bind(above_id.into_inner());
-            }
-
-
-            use sqlx::Row;
-            let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(OutboxMessage{
-                    message_id: OutboxMessageID::new(event_row.get(0)),
-                    producer_name: event_row.get(1),
-                    content_json: event_row.get(2),
-                    occurred_on: event_row.get(3),
-                    version: event_row.get(4),
-                })
-            })
-            .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
-
-            while let Some(message) = query_stream.try_next().await? {
+            while let Some(message_row) = stream.try_next().await.map_err(ErrorIntoInternal::int_err)? {
+                let message: OutboxMessage = message_row.into();
                 yield Ok(message);
             }
         })
@@ -131,11 +131,11 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
         let records = sqlx::query!(
             r#"
-                SELECT
-                    producer_name,
-                    IFNULL(MAX(message_id), 0) AS max_message_id
-                FROM outbox_messages
-                GROUP BY producer_name
+            SELECT
+                producer_name,
+                IFNULL(MAX(message_id), 0) AS max_message_id
+            FROM outbox_messages
+            GROUP BY producer_name
             "#,
         )
         .fetch_all(connection_mut)

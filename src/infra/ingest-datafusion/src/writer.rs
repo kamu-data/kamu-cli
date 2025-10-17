@@ -72,6 +72,10 @@ impl DataWriterDataFusion {
         }
     }
 
+    pub fn as_metadata_state(&self) -> DataWriterMetadataState {
+        self.meta.clone()
+    }
+
     pub fn prev_offset(&self) -> Option<u64> {
         self.meta.prev_offset
     }

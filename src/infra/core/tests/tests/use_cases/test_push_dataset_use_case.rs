@@ -357,8 +357,9 @@ impl PushUseCaseHarness {
         let repos_dir = base_use_case_harness.temp_dir_path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
-            .add::<PushDatasetUseCaseImpl>()
+        let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+
+        b.add::<PushDatasetUseCaseImpl>()
             .add::<PushRequestPlannerImpl>()
             .add::<SyncServiceImpl>()
             .add::<SyncRequestBuilder>()
@@ -373,8 +374,11 @@ impl PushUseCaseHarness {
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add::<DependencyGraphServiceImpl>()
-            .build();
+            .add::<DependencyGraphServiceImpl>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+        let catalog = b.build();
 
         let use_case = catalog.get_one().unwrap();
         let remote_aliases_registry = catalog.get_one().unwrap();

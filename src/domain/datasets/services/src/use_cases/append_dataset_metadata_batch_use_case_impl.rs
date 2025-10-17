@@ -83,19 +83,19 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
         dataset: &dyn odf::Dataset,
         new_blocks_into_it: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlock> + Send>,
         options: AppendDatasetMetadataBatchUseCaseOptions,
-    ) -> Result<(), AppendDatasetMetadataBatchUseCaseError> {
+    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
         let mut new_blocks_it = new_blocks_into_it.into_iter().peekable();
+
+        let mut new_head = None;
 
         let old_head = if let Some(first_block) = new_blocks_it.peek() {
             first_block.1.prev_block_hash.clone()
         } else {
             // No blocks
-            return Ok(());
+            return Ok(new_head);
         };
 
         let metadata_chain = dataset.as_metadata_chain();
-
-        let mut new_head = None;
 
         while let Some((hash, block)) = new_blocks_it.next() {
             tracing::debug!(sequence_number = %block.sequence_number, hash = %hash, "Appending block");
@@ -121,16 +121,15 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         // Safety: there are blocks, so we are guaranteed to have
         //         a hash of the last one.
-        let new_head = new_head.as_ref().unwrap();
         metadata_chain
             .set_ref(
                 &odf::BlockRef::Head,
-                new_head,
+                new_head.as_ref().unwrap(),
                 Self::set_ref_options(old_head.as_ref(), &options),
             )
             .await?;
 
-        Ok(())
+        Ok(new_head)
     }
 }
 

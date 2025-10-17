@@ -13,7 +13,6 @@ use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::*;
 use kamu_task_system::TaskScheduler;
-use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +25,6 @@ pub(crate) struct FlowAbortHelper {
     flow_sensor_dispatcher: Arc<dyn FlowSensorDispatcher>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,14 +42,6 @@ impl FlowAbortHelper {
                 for task_id in &flow.task_ids {
                     self.task_scheduler.cancel_task(*task_id).await.int_err()?;
                 }
-
-                // Notify the flow has been aborted
-                self.outbox
-                    .post_message(
-                        MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                        FlowProgressMessage::cancelled(self.time_source.now(), flow.flow_id),
-                    )
-                    .await?;
             }
             FlowStatus::Finished => {
                 /* Skip, idempotence */
@@ -108,7 +98,7 @@ impl FlowScopeRemovalHandler for FlowAbortHelper {
 
         // Load these flows
         let flows_2_abort: Vec<Flow> =
-            Flow::load_multi_simple(flow_ids_2_abort, flow_event_store.as_ref())
+            Flow::load_multi_simple(&flow_ids_2_abort, flow_event_store.as_ref())
                 .await
                 .int_err()?;
 

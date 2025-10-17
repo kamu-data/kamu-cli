@@ -17,7 +17,7 @@ pub enum FlowOutcome {
     /// Flow succeeded
     Success(ts::TaskResult),
     /// Flow failed to complete, even after retry logic
-    Failed,
+    Failed(ts::TaskError),
     /// Flow was aborted by user or by system
     Aborted,
 }
@@ -27,6 +27,36 @@ impl FlowOutcome {
         match self {
             Self::Success(task_result) => Some(task_result),
             _ => None,
+        }
+    }
+
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success(_))
+    }
+
+    pub fn is_failure(&self) -> bool {
+        matches!(self, Self::Failed(_))
+    }
+
+    pub fn is_aborted(&self) -> bool {
+        matches!(self, Self::Aborted)
+    }
+
+    pub fn is_unrecoverable_failure(&self) -> bool {
+        matches!(self, Self::Failed(err) if !err.recoverable)
+    }
+
+    pub fn is_recoverable_failure(&self) -> bool {
+        matches!(self, Self::Failed(err) if err.recoverable)
+    }
+}
+
+impl From<ts::TaskOutcome> for FlowOutcome {
+    fn from(value: ts::TaskOutcome) -> Self {
+        match value {
+            ts::TaskOutcome::Success(result) => Self::Success(result),
+            ts::TaskOutcome::Failed(error) => Self::Failed(error),
+            ts::TaskOutcome::Cancelled => Self::Aborted,
         }
     }
 }

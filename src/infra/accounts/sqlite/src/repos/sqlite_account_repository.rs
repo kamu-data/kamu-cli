@@ -13,9 +13,7 @@ use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placehold
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use sqlx::Row;
 use sqlx::error::DatabaseError;
-use sqlx::sqlite::SqliteRow;
 
 use crate::domain::*;
 
@@ -51,20 +49,6 @@ impl SqliteAccountRepository {
         };
 
         AccountErrorDuplicate { account_field }
-    }
-
-    fn map_account_row(account_row: &SqliteRow) -> Account {
-        Account {
-            id: account_row.get(0),
-            account_name: odf::AccountName::new_unchecked(account_row.get::<&str, _>(1)),
-            email: Email::parse(account_row.get(2)).unwrap(),
-            display_name: account_row.get(3),
-            account_type: account_row.get_unchecked(4),
-            avatar_url: account_row.get(5),
-            registered_at: account_row.get(6),
-            provider: account_row.get(7),
-            provider_identity_key: account_row.get(8),
-        }
     }
 }
 
@@ -497,7 +481,7 @@ impl AccountRepository for SqliteAccountRepository {
 
             // ToDo replace it by macro once sqlx will support it
             // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-            let mut query = sqlx::query(&query_str)
+            let mut query = sqlx::query_as::<_, AccountRowModel>(&query_str)
                 .bind(name_pattern)
                 .bind(limit)
                 .bind(offset);
@@ -511,9 +495,8 @@ impl AccountRepository for SqliteAccountRepository {
                 .map_err(ErrorIntoInternal::int_err);
 
             use futures::TryStreamExt;
-
             while let Some(account_row) = query_stream.try_next().await? {
-                yield Ok(Self::map_account_row(&account_row));
+                yield Ok(account_row.into());
             }
         })
     }
@@ -595,7 +578,7 @@ impl ExpensiveAccountRepository for SqliteAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                ORDER BY registered_at ASC
+                ORDER BY registered_at
                 LIMIT $1 OFFSET $2
                 "#,
                 limit,

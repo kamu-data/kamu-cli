@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT event_id as \"event_id: _\", event_payload as \"event_payload: _\" FROM task_events\n                    WHERE task_id = $1\n                         AND (cast($2 as INT8) IS NULL or event_id > $2)\n                         AND (cast($3 as INT8) IS NULL or event_id <= $3)\n                    ORDER BY event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "event_payload: _",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "5608627c2f61a9d78085338478f7f26fb5ce5d44c723e763221c95f0b2bafe11"
+}

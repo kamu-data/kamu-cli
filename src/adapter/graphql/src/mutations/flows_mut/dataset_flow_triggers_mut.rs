@@ -40,7 +40,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_set_trigger, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_trigger(
+    pub async fn set_trigger(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
@@ -78,7 +78,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_binding = FlowBinding::new(
-            map_dataset_flow_type(dataset_flow_type),
+            encode_dataset_flow_type(dataset_flow_type),
             FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
         );
 
@@ -94,7 +94,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn pause_flow(
+    pub async fn pause_flow(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
@@ -102,7 +102,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_binding = FlowBinding::new(
-            map_dataset_flow_type(dataset_flow_type),
+            encode_dataset_flow_type(dataset_flow_type),
             FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
         );
 
@@ -115,7 +115,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn pause_flows(&self, ctx: &Context<'_>) -> Result<bool> {
+    pub async fn pause_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
@@ -128,7 +128,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resume_flow(
+    pub async fn resume_flow(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
@@ -136,7 +136,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_binding = FlowBinding::new(
-            map_dataset_flow_type(dataset_flow_type),
+            encode_dataset_flow_type(dataset_flow_type),
             FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id()),
         );
 
@@ -149,7 +149,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resume_flows(&self, ctx: &Context<'_>) -> Result<bool> {
+    pub async fn resume_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
@@ -165,7 +165,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-enum SetFlowTriggerResult {
+pub enum SetFlowTriggerResult {
     Success(SetFlowTriggerSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     PreconditionsNotMet(FlowPreconditionsNotMet),
@@ -176,7 +176,7 @@ enum SetFlowTriggerResult {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-struct SetFlowTriggerSuccess {
+pub struct SetFlowTriggerSuccess {
     pub trigger: FlowTrigger,
 }
 

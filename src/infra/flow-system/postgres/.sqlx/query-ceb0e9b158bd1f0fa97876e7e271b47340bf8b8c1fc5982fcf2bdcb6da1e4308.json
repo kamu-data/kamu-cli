@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT f.scheduled_for_activation_at as activation_time\n                FROM flows f\n                WHERE\n                    f.scheduled_for_activation_at IS NOT NULL AND\n                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)\n                ORDER BY f.scheduled_for_activation_at\n                LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "activation_time",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "ceb0e9b158bd1f0fa97876e7e271b47340bf8b8c1fc5982fcf2bdcb6da1e4308"
+}
