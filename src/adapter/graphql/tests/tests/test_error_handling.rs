@@ -49,8 +49,7 @@ async fn test_malformed_argument() {
 
     let mut json_resp = serde_json::to_value(res).unwrap();
 
-    // Ignore extensions and error locations
-    json_resp["extensions"] = serde_json::Value::Null;
+    // Ignore error locations
     json_resp["errors"][0]["locations"] = serde_json::Value::Array(Vec::new());
 
     assert_eq!(
@@ -62,7 +61,6 @@ async fn test_malformed_argument() {
                 "path": ["datasets", "byAccountName"],
             }],
             "data": null,
-            "extensions": null,
         })
     );
 }

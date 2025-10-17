@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct GraphQLQueryRequest {
@@ -38,6 +40,8 @@ impl GraphQLQueryRequest {
             .execute(
                 async_graphql::Request::new(self.request_code)
                     .variables(self.variables)
+                    .data(account_entity_data_loader(&catalog))
+                    .data(dataset_handle_data_loader(&catalog))
                     .data(catalog.clone()),
             )
             .await;

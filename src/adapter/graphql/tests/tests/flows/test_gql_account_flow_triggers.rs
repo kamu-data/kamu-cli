@@ -10,6 +10,7 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
+use pretty_assertions::assert_eq;
 
 use crate::utils::{BaseGQLFlowRunsHarness, GraphQLQueryRequest};
 
@@ -135,17 +136,15 @@ async fn test_list_datasets_with_flow() {
         "#
     );
 
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_json(serde_json::json!({
-                    "accountName": DEFAULT_ACCOUNT_NAME_STR,
-                })))
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+    let response = GraphQLQueryRequest::new(
+        request_code,
+        async_graphql::Variables::from_json(serde_json::json!({
+            "accountName": DEFAULT_ACCOUNT_NAME_STR,
+        })),
+    )
+    .execute(&schema, &harness.catalog_authorized)
+    .await;
 
-    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
