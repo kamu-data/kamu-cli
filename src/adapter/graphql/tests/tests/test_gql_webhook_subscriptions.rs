@@ -19,8 +19,8 @@ use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use kamu_webhooks_services::*;
 use odf::metadata::testing::MetadataFactory;
-use secrecy::SecretString;
 use pretty_assertions::assert_eq;
+use secrecy::SecretString;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -1230,20 +1230,17 @@ async fn test_rotate_subscription_secret() {
     let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     let subscription_id = harness
         .create_webhook_subscription(
-            &schema,
             &create_result.dataset_handle.id,
             "https://example.com/webhook".to_string(),
-            vec![kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+            vec![WebhookEventTypeCatalog::DATASET_REF_UPDATED],
             "My Webhook Subscription".to_string(),
         )
         .await;
 
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(
                 WebhookSubscriptionsHarness::rotate_subscription_secret_mutation(),
             )
