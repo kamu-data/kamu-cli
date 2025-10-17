@@ -574,7 +574,7 @@ impl ExpensiveAccountRepository for MySqlAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                ORDER BY registered_at ASC
+                ORDER BY registered_at
                 LIMIT ? OFFSET ?
                 "#,
                 limit,

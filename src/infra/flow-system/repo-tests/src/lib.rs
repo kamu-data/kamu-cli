@@ -12,3 +12,6 @@
 pub mod test_flow_configuration_event_store;
 pub mod test_flow_event_store;
 pub mod test_flow_trigger_event_store;
+
+mod flow_process_state;
+pub use flow_process_state::*;

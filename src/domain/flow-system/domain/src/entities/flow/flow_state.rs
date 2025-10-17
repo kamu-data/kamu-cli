@@ -50,8 +50,10 @@ pub struct FlowTimingRecords {
     pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
     pub running_since: Option<DateTime<Utc>>,
-    /// Finish time (success or cancel/abort)
+    /// Finish time of the last attempt
     pub last_attempt_finished_at: Option<DateTime<Utc>>,
+    /// Flow completion time
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
 impl FlowState {
@@ -138,6 +140,7 @@ impl Projection for FlowState {
                         awaiting_executor_since: None,
                         running_since: None,
                         last_attempt_finished_at: None,
+                        completed_at: None,
                     },
                     task_ids: vec![],
                     config_snapshot,
@@ -148,20 +151,32 @@ impl Projection for FlowState {
             },
 
             (Some(s), event) => {
-                assert_eq!(s.flow_id, event.flow_id());
+                debug_assert_eq!(s.flow_id, event.flow_id());
+                debug_assert_eq!(s.flow_binding, *event.flow_binding());
 
                 match event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
 
                     E::StartConditionUpdated(FlowEventStartConditionUpdated {
+                        event_time,
                         start_condition,
                         ..
                     }) => {
                         if s.outcome.is_some() || s.timing.awaiting_executor_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
+                            let timing = if let FlowStartCondition::Executor(_) = &start_condition {
+                                FlowTimingRecords {
+                                    awaiting_executor_since: Some(event_time),
+                                    ..s.timing
+                                }
+                            } else {
+                                s.timing
+                            };
+
                             Ok(FlowState {
                                 start_condition: Some(start_condition),
+                                timing,
                                 ..s
                             })
                         }
@@ -218,30 +233,20 @@ impl Projection for FlowState {
                                     awaiting_executor_since: None,
                                     running_since: None,
                                     last_attempt_finished_at: None,
+                                    completed_at: None,
                                 },
                                 ..s
                             })
                         }
                     }
 
-                    E::TaskScheduled(FlowEventTaskScheduled {
-                        event_time,
-                        task_id,
-                        ..
-                    }) => {
+                    E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
                         if s.outcome.is_some() || s.timing.scheduled_for_activation_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-                            Ok(FlowState {
-                                task_ids,
-                                timing: FlowTimingRecords {
-                                    awaiting_executor_since: Some(event_time),
-                                    ..s.timing
-                                },
-                                ..s
-                            })
+                            Ok(FlowState { task_ids, ..s })
                         }
                     }
 
@@ -299,7 +304,7 @@ impl Projection for FlowState {
                                     timing,
                                     ..s
                                 }),
-                                ts::TaskOutcome::Failed(_) => {
+                                ts::TaskOutcome::Failed(error) => {
                                     // Retry logic - don't set outcome yet
                                     if let Some(next_attempt_at) = next_attempt_at {
                                         Ok(FlowState {
@@ -314,18 +319,36 @@ impl Projection for FlowState {
                                                     .last_attempt_finished_at,
                                                 // The scheduling time is defined via retry policy
                                                 scheduled_for_activation_at: Some(next_attempt_at),
+                                                // Definitely not completed yet
+                                                completed_at: None,
                                             },
                                             ..s
                                         })
                                     } else {
                                         Ok(FlowState {
-                                            outcome: Some(FlowOutcome::Failed),
+                                            outcome: Some(FlowOutcome::Failed(error.clone())),
                                             timing,
                                             ..s
                                         })
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    E::Completed(FlowEventCompleted { event_time, .. }) => {
+                        if let Some(outcome) = &s.outcome {
+                            if let FlowOutcome::Aborted = outcome {
+                                Err(ProjectionError::new(Some(s), event))
+                            } else {
+                                let timing = FlowTimingRecords {
+                                    completed_at: Some(event_time),
+                                    ..s.timing
+                                };
+                                Ok(FlowState { timing, ..s })
+                            }
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
                         }
                     }
 

@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use async_utils::BackgroundAgent;
 use axum::{Extension, middleware};
 use database_common_macros::transactional_handler;
 use http_common::ApiError;
@@ -22,9 +23,6 @@ use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyCon
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_adapter_http::e2e::e2e_router;
-use kamu_flow_system::FlowAgent;
-use kamu_task_system::TaskAgent;
-use messaging_outbox::OutboxAgent;
 use observability::axum::{panic_handler, unknown_fallback_handler};
 use tokio::sync::Notify;
 use tower_http::catch_panic::CatchPanicLayer;
@@ -38,9 +36,7 @@ use super::{UIConfiguration, UIFeatureFlags};
 pub struct APIServer {
     server_future: Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
-    task_agent: Arc<dyn TaskAgent>,
-    flow_agent: Arc<dyn FlowAgent>,
-    outbox_agent: Arc<OutboxAgent>,
+    background_agents: Vec<Arc<dyn BackgroundAgent>>,
     api_server_catalog: dill::Catalog,
 }
 
@@ -60,13 +56,9 @@ impl APIServer {
     ) -> Result<Self, InternalError> {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
-        let task_agent = cli_catalog.get_one().unwrap();
-
-        let flow_agent = cli_catalog.get_one().unwrap();
-
-        let outbox_agent = cli_catalog.get_one().unwrap();
-
-        let gql_schema = kamu_adapter_graphql::schema();
+        let background_agents = cli_catalog
+            .get::<dill::AllOf<dyn BackgroundAgent>>()
+            .unwrap();
 
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
@@ -112,6 +104,13 @@ impl APIServer {
             },
         };
 
+        let graphql_router = OpenApiRouter::new()
+            .route("/graphql", axum::routing::post(graphql_handler))
+            .layer(graphql_http::middleware::GraphqlTracingLayer::new(
+                kamu_adapter_graphql::schema(),
+                kamu_adapter_graphql::schema_quiet(),
+            ));
+
         let mut router = OpenApiRouter::with_openapi(
             kamu_adapter_http::openapi::spec_builder(
                 crate::app::VERSION,
@@ -147,7 +146,7 @@ impl APIServer {
                 TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
             },
         )
-        .route("/graphql", axum::routing::post(graphql_handler))
+        .merge(graphql_router)
         .nest(
                 match tenancy_config {
                     TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
@@ -221,7 +220,6 @@ impl APIServer {
 
         let (router, api) = router.split_for_parts();
         let router = router
-            .layer(Extension(gql_schema))
             .layer(Extension(api_server_catalog.clone()))
             .layer(Extension(ui_configuration))
             .layer(Extension(Arc::new(api)));
@@ -244,9 +242,7 @@ impl APIServer {
         Ok(Self {
             server_future,
             local_addr,
-            task_agent,
-            flow_agent,
-            outbox_agent,
+            background_agents,
             api_server_catalog,
         })
     }
@@ -260,11 +256,59 @@ impl APIServer {
     }
 
     pub async fn run(self) -> Result<(), InternalError> {
+        // Start all background agents as tasks
+        // Note: Background agents are designed to run forever in event loops.
+        // If any agent completes normally, it's considered an unexpected event
+        // that should trigger a server shutdown.
+        let agent_tasks: Vec<_> = self
+            .background_agents
+            .into_iter()
+            .map(|agent| {
+                let agent_name = agent.agent_name().to_string();
+                tokio::spawn(async move {
+                    tracing::info!("Starting background agent: {}", agent_name);
+                    let result = agent.run().await;
+                    match &result {
+                        Err(error) => {
+                            tracing::error!("Background agent {} failed: {}", agent_name, error);
+                        }
+                        Ok(()) => {
+                            tracing::warn!(
+                                "Background agent {} completed unexpectedly! This will cause \
+                                 server shutdown.",
+                                agent_name
+                            );
+                        }
+                    }
+                    result
+                })
+            })
+            .collect();
+
+        // Ensure we have background agents registered
+        assert!(
+            !agent_tasks.is_empty(),
+            "No background agents found! This indicates a DI container configuration issue. Make \
+             sure all agent implementations are registered as both their specific trait (e.g., \
+             TaskAgent) AND as BackgroundAgent in the DI container."
+        );
+
         tokio::select! {
-            res = self.server_future => { res.int_err() },
-            res = self.outbox_agent.run() => { res.int_err() },
-            res = self.task_agent.run() => { res.int_err() },
-            res = self.flow_agent.run() => { res.int_err() }
+            res = self.server_future => {
+                tracing::warn!("HTTP server completed unexpectedly! This will cause server shutdown.");
+                res.int_err()
+            },
+            res = async {
+                let (result, _index, _remaining) = futures::future::select_all(agent_tasks).await;
+                match result {
+                    Ok(agent_result) => agent_result,
+                    Err(join_error) => {
+                        Err(InternalError::new(format!("Background agent task panicked: {join_error}")))
+                    },
+                }
+            } => {
+                res
+            }
         }
     }
 }

@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    WITH bounds AS (\n                        SELECT *\n                        FROM UNNEST($1::text[], $2::bigint[]) AS b(producer_name, above_id)\n                    )\n                    SELECT\n                        m.message_id,\n                        m.producer_name,\n                        m.content_json,\n                        m.occurred_on,\n                        m.version as \"version!\"\n                    FROM outbox_messages AS m\n                    JOIN bounds AS b\n                        ON m.producer_name = b.producer_name AND m.message_id > b.above_id\n                    ORDER BY m.message_id\n                    LIMIT $3\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "producer_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "content_json",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "occurred_on",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "version!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Int8Array",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "0a8d536bd507be9cfacef339cd2787c8340f19828f5f45e60aca5979f6849e89"
+}

@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use async_utils::BackgroundAgent;
 use database_common::PaginationOpts;
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
@@ -21,6 +22,7 @@ use tracing::Instrument as _;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn BackgroundAgent)]
 #[interface(dyn TaskAgent)]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
@@ -117,7 +119,7 @@ impl TaskAgentImpl {
                 .await?;
             let batch_size = running_task_ids.len();
 
-            let tasks = Task::load_multi_simple(running_task_ids, task_event_store.as_ref())
+            let tasks = Task::load_multi_simple(&running_task_ids, task_event_store.as_ref())
                 .await
                 .int_err()?;
 
@@ -255,14 +257,24 @@ impl TaskAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskAgent for TaskAgentImpl {
-    // TODO: Error and panic handling strategy
+impl BackgroundAgent for TaskAgentImpl {
+    fn agent_name(&self) -> &'static str {
+        "dev.kamu.domain.task-system.TaskAgent"
+    }
+
+    /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
+        // TODO: Error and panic handling strategy
         loop {
             self.run_task_iteration().await?;
         }
     }
+}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl TaskAgent for TaskAgentImpl {
     /// Runs single task only, blocks until it is available (for tests only!)
     #[tracing::instrument(level = "info", skip_all)]
     async fn run_single_task(&self) -> Result<(), InternalError> {

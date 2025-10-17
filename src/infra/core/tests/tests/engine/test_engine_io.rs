@@ -283,8 +283,8 @@ async fn test_engine_io_local_file_mount() {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DatasetKeyValueServiceSysEnv>()
@@ -293,8 +293,10 @@ async fn test_engine_io_local_file_mount() {
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ))
-        .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .build();
+        .add::<odf::dataset::DatasetLfsBuilderDefault>();
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+    let catalog = b.build();
 
     let storage_unit = catalog
         .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
@@ -331,8 +333,8 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
 
     let s3_context = s3_utils::S3Context::from_url(&s3.url).await;
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
@@ -340,8 +342,10 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
             s3_context.clone(),
         ))
-        .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
-        .build();
+        .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None));
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+    let catalog = b.build();
 
     let storage_unit = catalog
         .get_one::<odf::dataset::DatasetStorageUnitS3>()
@@ -388,7 +392,7 @@ async fn ingest(
 
     if let PollingIngestResult::Updated {
         old_head, new_head, ..
-    } = &ingest_result
+    } = &ingest_result.result
     {
         target
             .as_metadata_chain()

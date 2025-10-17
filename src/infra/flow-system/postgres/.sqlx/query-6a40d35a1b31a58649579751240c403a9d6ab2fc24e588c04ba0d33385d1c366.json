@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT f.flow_id as flow_id\n                FROM flows f\n                WHERE\n                    f.scheduled_for_activation_at = $1 AND\n                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)\n                ORDER BY f.flow_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6a40d35a1b31a58649579751240c403a9d6ab2fc24e588c04ba0d33385d1c366"
+}

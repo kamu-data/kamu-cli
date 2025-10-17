@@ -418,7 +418,8 @@ impl DerivedDatasetFlowSensorHarness {
         mock_flow_run_service
             .expect_run_flow_automatically()
             .withf(
-                move |flow_binding: &kamu_flow_system::FlowBinding,
+                move |_,
+                      flow_binding: &kamu_flow_system::FlowBinding,
                       _,
                       maybe_flow_trigger_rule,
                       maybe_forced_flow_config_rule| {
@@ -433,7 +434,7 @@ impl DerivedDatasetFlowSensorHarness {
                     dataset_scope.dataset_id() == dataset_id_clone_1
                 },
             )
-            .returning(move |_, _, _, _| {
+            .returning(move |_, _, _, _, _| {
                 let now = Utc::now();
 
                 Ok(FlowState {
@@ -455,6 +456,7 @@ impl DerivedDatasetFlowSensorHarness {
                         running_since: None,
                         awaiting_executor_since: None,
                         last_attempt_finished_at: None,
+                        completed_at: None,
                     },
                     config_snapshot: None,
                     retry_policy: None,
@@ -472,7 +474,8 @@ impl DerivedDatasetFlowSensorHarness {
         mock_flow_run_service
             .expect_run_flow_automatically()
             .withf(
-                move |flow_binding: &kamu_flow_system::FlowBinding,
+                move |_,
+                      flow_binding: &kamu_flow_system::FlowBinding,
                       _,
                       maybe_flow_trigger_rule,
                       maybe_forced_flow_config_rule| {
@@ -485,7 +488,7 @@ impl DerivedDatasetFlowSensorHarness {
                     dataset_scope.dataset_id() == dataset_id_clone_1
                 },
             )
-            .returning(move |_, _, _, _| {
+            .returning(move |_, _, _, _, _| {
                 let now = Utc::now();
 
                 Ok(FlowState {
@@ -507,6 +510,7 @@ impl DerivedDatasetFlowSensorHarness {
                         running_since: None,
                         awaiting_executor_since: None,
                         last_attempt_finished_at: None,
+                        completed_at: None,
                     },
                     config_snapshot: None,
                     retry_policy: None,

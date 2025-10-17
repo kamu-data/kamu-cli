@@ -10,6 +10,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use database_common_macros::{
+    transactional_method1,
+    transactional_static_method1,
+    transactional_static_method2,
+};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::{
@@ -25,15 +30,12 @@ use kamu_core::*;
 #[component]
 #[interface(dyn PullDatasetUseCase)]
 pub struct PullDatasetUseCaseImpl {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    pull_request_planner: Arc<dyn PullRequestPlanner>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-    polling_ingest_svc: Arc<dyn PollingIngestService>,
     transform_elaboration_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
-    sync_svc: Arc<dyn SyncService>,
     tenancy_config: Arc<TenancyConfig>,
+    polling_ingest_service: Arc<dyn PollingIngestService>,
+    sync_svc: Arc<dyn SyncService>,
+    catalog: dill::Catalog,
 }
 
 impl PullDatasetUseCaseImpl {
@@ -64,8 +66,9 @@ impl PullDatasetUseCaseImpl {
             tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
 
             // Authorization checks for this iteration
-            let (iteration, write_errors) = self.make_authorization_write_checks(iteration).await?;
-            let (iteration, read_errors) = self.make_authorization_read_checks(iteration).await?;
+            let (iteration, write_errors, read_errors) =
+                self.make_authorization_checks(iteration).await?;
+
             if !write_errors.is_empty() || !read_errors.is_empty() {
                 results.extend(write_errors);
                 results.extend(read_errors);
@@ -80,10 +83,13 @@ impl PullDatasetUseCaseImpl {
                         let maybe_listener = maybe_ingest_multi_listener
                             .as_ref()
                             .and_then(|l| l.begin_ingest(pii.target.get_handle()));
+                        let ingest_options = options.ingest_options.clone();
+
                         tasks.spawn(Self::ingest(
                             pii,
-                            options.ingest_options.clone(),
-                            self.polling_ingest_svc.clone(),
+                            ingest_options,
+                            self.catalog.clone(),
+                            self.polling_ingest_service.clone(),
                             maybe_listener,
                         ))
                     }
@@ -91,11 +97,13 @@ impl PullDatasetUseCaseImpl {
                         let maybe_listener = maybe_transform_multi_listener
                             .as_ref()
                             .and_then(|l| l.begin_transform(pti.target.get_handle()));
+
                         tasks.spawn(Self::transform(
                             pti,
                             options.transform_options,
                             self.transform_elaboration_svc.clone(),
                             self.transform_executor.clone(),
+                            self.catalog.clone(),
                             maybe_listener,
                         ))
                     }
@@ -106,13 +114,13 @@ impl PullDatasetUseCaseImpl {
                                 &psi.sync_request.dst.as_user_friendly_any_ref(),
                             )
                         });
+                        let sync_options = options.clone();
 
                         tasks.spawn(Self::sync(
                             psi,
-                            options.clone(),
+                            sync_options,
                             self.sync_svc.clone(),
-                            self.dataset_registry.clone(),
-                            self.remote_alias_registry.clone(),
+                            self.catalog.clone(),
                             maybe_listener,
                         ))
                     }
@@ -138,10 +146,25 @@ impl PullDatasetUseCaseImpl {
         Ok(results)
     }
 
+    #[transactional_method1(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>)]
+    async fn make_authorization_checks(
+        &self,
+        iteration: PullPlanIteration,
+    ) -> Result<(PullPlanIteration, Vec<PullResponse>, Vec<PullResponse>), InternalError> {
+        let (iteration, write_errors) = self
+            .make_authorization_write_checks(iteration, dataset_action_authorizer.clone())
+            .await?;
+        let (iteration, read_errors) = self
+            .make_authorization_read_checks(iteration, dataset_action_authorizer)
+            .await?;
+        Ok((iteration, write_errors, read_errors))
+    }
+
     #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::write_authorizations", skip_all, fields(?iteration))]
     async fn make_authorization_write_checks(
         &self,
         iteration: PullPlanIteration,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
         let mut written_datasets = Vec::with_capacity(iteration.jobs.len());
         let mut written_jobs_by_handle = HashMap::with_capacity(iteration.jobs.len());
@@ -169,8 +192,7 @@ impl PullDatasetUseCaseImpl {
         let ClassifyByAllowanceResponse {
             authorized_handles,
             unauthorized_handles_with_errors,
-        } = self
-            .dataset_action_authorizer
+        } = dataset_action_authorizer
             .classify_dataset_handles_by_allowance(written_datasets, DatasetAction::Write)
             .await?;
 
@@ -215,10 +237,11 @@ impl PullDatasetUseCaseImpl {
         ))
     }
 
-    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::read_authoirzations", skip_all, fields(?iteration))]
+    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::read_authorizations", skip_all, fields(?iteration))]
     async fn make_authorization_read_checks(
         &self,
         iteration: PullPlanIteration,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
         let mut read_datasets = Vec::new();
         let mut reading_jobs = Vec::with_capacity(iteration.jobs.len());
@@ -247,8 +270,7 @@ impl PullDatasetUseCaseImpl {
         let ClassifyByAllowanceResponse {
             authorized_handles: _,
             unauthorized_handles_with_errors,
-        } = self
-            .dataset_action_authorizer
+        } = dataset_action_authorizer
             .classify_dataset_handles_by_allowance(read_datasets, DatasetAction::Read)
             .await?;
 
@@ -317,42 +339,82 @@ impl PullDatasetUseCaseImpl {
         ))
     }
 
+    async fn ingest_loop(
+        pii: PullIngestItem,
+        ingest_options: PollingIngestOptions,
+        catalog: dill::Catalog,
+        polling_ingest_svc: Arc<dyn PollingIngestService>,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
+        let mut combined_result = None;
+        let mut latest_metadata_state = pii.metadata_state;
+
+        loop {
+            match polling_ingest_svc
+                .ingest(
+                    pii.target.clone(),
+                    latest_metadata_state.clone(),
+                    ingest_options.clone(),
+                    maybe_listener.clone(),
+                )
+                .await
+            {
+                Ok(ingest_res) => {
+                    if let PollingIngestResult::Updated {
+                        old_head, new_head, ..
+                    } = &ingest_res.result
+                    {
+                        Self::update_ref_transactionally(
+                            catalog.clone(),
+                            pii.target.get_handle(),
+                            new_head,
+                            old_head,
+                        )
+                        .await?;
+                        latest_metadata_state = ingest_res.metadata_state.unwrap();
+                    }
+
+                    combined_result = Some(Self::merge_results(combined_result, ingest_res.result));
+
+                    let has_more = match combined_result {
+                        Some(PollingIngestResult::UpToDate { .. }) => false,
+                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
+                        None => unreachable!(),
+                    };
+
+                    if !has_more || !ingest_options.exhaust_sources {
+                        break;
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(combined_result.unwrap())
+    }
+
     async fn ingest(
         pii: PullIngestItem,
         ingest_options: PollingIngestOptions,
+        catalog: dill::Catalog,
         polling_ingest_svc: Arc<dyn PollingIngestService>,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let ingest_response = polling_ingest_svc
-            .ingest(
-                pii.target.clone(),
-                pii.metadata_state,
-                ingest_options,
-                maybe_listener,
-            )
-            .await;
+        let local_target = pii.target.get_handle().as_local_ref();
+        let original_request = pii.maybe_original_request.clone();
 
-        if let Ok(PollingIngestResult::Updated {
-            old_head, new_head, ..
-        }) = &ingest_response
-        {
-            pii.target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    new_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
+        let ingest_response = Self::ingest_loop(
+            pii,
+            ingest_options,
+            catalog,
+            polling_ingest_svc,
+            maybe_listener,
+        )
+        .await;
 
         Ok(PullResponse {
-            maybe_original_request: pii.maybe_original_request,
-            maybe_local_ref: Some(pii.target.get_handle().as_local_ref()),
+            maybe_original_request: original_request,
+            maybe_local_ref: Some(local_target),
             maybe_remote_ref: None,
             result: match ingest_response {
                 Ok(r) => Ok(r.into()),
@@ -361,11 +423,64 @@ impl PullDatasetUseCaseImpl {
         })
     }
 
+    #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn update_ref_transactionally(
+        catalog: dill::Catalog,
+        target_handle: &odf::DatasetHandle,
+        new_head: &odf::Multihash,
+        old_head: &odf::Multihash,
+    ) -> Result<(), InternalError> {
+        let transactional_target = dataset_registry.get_dataset_by_handle(target_handle).await;
+
+        // ToDo: Handle concurrent `HEAD` updates
+        transactional_target
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(old_head)),
+                },
+            )
+            .await
+            .int_err()
+    }
+
+    #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn elaborate_transform(
+        mut pti: PullTransformItem,
+        transform_options: TransformOptions,
+        transform_elaboration_svc: Arc<dyn TransformElaborationService>,
+        catalog: dill::Catalog,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
+    ) -> Result<TransformElaboration, TransformElaborateError> {
+        pti.refresh_from_dataset_registry(&*dataset_registry)
+            .await
+            .int_err()?;
+
+        let mut result = transform_elaboration_svc
+            .elaborate_transform(
+                pti.target.clone(),
+                pti.plan,
+                transform_options,
+                maybe_listener.clone(),
+            )
+            .await;
+
+        if let Ok(TransformElaboration::Elaborated(elaborate_res)) = &mut result {
+            elaborate_res.datasets_map.detach_from_transaction();
+        }
+
+        result
+    }
+
     async fn transform(
         pti: PullTransformItem,
         transform_options: TransformOptions,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         transform_executor: Arc<dyn TransformExecutor>,
+        catalog: dill::Catalog,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
         // Remember original request
@@ -374,78 +489,47 @@ impl PullDatasetUseCaseImpl {
         // Remember original target
         let pti_target = pti.target.clone();
 
-        // Main transform run
-        async fn run_transform(
-            pti: PullTransformItem,
-            transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-            transform_executor: Arc<dyn TransformExecutor>,
-            transform_options: TransformOptions,
-            maybe_listener: Option<Arc<dyn TransformListener>>,
-        ) -> (ResolvedDataset, Result<TransformResult, PullError>) {
-            // Elaborate phase
-            match transform_elaboration_svc
-                .elaborate_transform(
-                    pti.target.clone(),
-                    pti.plan,
-                    transform_options,
-                    maybe_listener.clone(),
-                )
-                .await
-            {
-                // Elaborate success
-                Ok(TransformElaboration::Elaborated(plan)) => {
-                    // Execute phase
-                    let (target, result) = transform_executor
-                        .execute_transform(pti.target, plan, maybe_listener)
-                        .await;
-                    (
-                        target,
-                        result.map_err(|e| PullError::TransformError(TransformError::Execute(e))),
-                    )
-                }
-                // Already up-to-date
-                Ok(TransformElaboration::UpToDate) => (pti.target, Ok(TransformResult::UpToDate)),
-                // Elaborate error
-                Err(e) => (
-                    pti.target,
-                    Err(PullError::TransformError(TransformError::Elaborate(e))),
-                ),
-            }
-        }
-
-        let transform_result = run_transform(
+        let transform_result = match Self::elaborate_transform(
             pti,
-            transform_elaboration_svc,
-            transform_executor,
             transform_options,
-            maybe_listener,
+            transform_elaboration_svc,
+            catalog.clone(),
+            maybe_listener.clone(),
         )
-        .await;
-
-        if let Ok(TransformResult::Updated {
-            old_head, new_head, ..
-        }) = &transform_result.1
+        .await
         {
-            pti_target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    new_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
+            // Elaborate success
+            Ok(TransformElaboration::Elaborated(plan)) => {
+                // Execute phase
+                let (target, result) = transform_executor
+                    .execute_transform(pti_target.clone(), plan, maybe_listener)
+                    .await;
+                if let Ok(TransformResult::Updated {
+                    old_head, new_head, ..
+                }) = &result
+                {
+                    Self::update_ref_transactionally(
+                        catalog.clone(),
+                        target.get_handle(),
+                        new_head,
+                        old_head,
+                    )
+                    .await?;
+                }
+                result.map_err(|e| PullError::TransformError(TransformError::Execute(e)))
+            }
+            // Already up-to-date
+            Ok(TransformElaboration::UpToDate) => Ok(TransformResult::UpToDate),
+            // Elaborate error
+            Err(e) => Err(PullError::TransformError(TransformError::Elaborate(e))),
+        };
 
         // Prepare response
         Ok(PullResponse {
             maybe_original_request,
-            maybe_local_ref: Some(transform_result.0.get_handle().as_local_ref()),
+            maybe_local_ref: Some(pti_target.get_handle().as_local_ref()),
             maybe_remote_ref: None,
-            result: transform_result.1.map(Into::into),
+            result: transform_result.map(Into::into),
         })
     }
 
@@ -453,11 +537,9 @@ impl PullDatasetUseCaseImpl {
         psi: PullSyncItem,
         options: PullOptions,
         sync_svc: Arc<dyn SyncService>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+        catalog: dill::Catalog,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
-        // Run sync action
         let mut sync_result = sync_svc
             .sync(*psi.sync_request, options.sync_options, listener)
             .await;
@@ -465,24 +547,14 @@ impl PullDatasetUseCaseImpl {
         // Associate newly-synced datasets with remotes
         if options.add_aliases
             && let Ok(SyncResult::Updated { old_head: None, .. }) = &sync_result
+            && let Err(e) = Self::store_dataset_alias_transactional(
+                catalog,
+                &psi.local_target.as_local_ref(),
+                &psi.remote_ref,
+            )
+            .await
         {
-            // Note: this would have failed before sync if dataset didn't exist,
-            // however, by this moment the dataset must have been created
-            let hdl = dataset_registry
-                .resolve_dataset_handle_by_ref(&psi.local_target.as_local_ref())
-                .await
-                .int_err()?;
-
-            let alias_add_result = match remote_alias_registry.get_remote_aliases(&hdl).await {
-                Ok(mut aliases) => aliases.add(&psi.remote_ref, RemoteAliasKind::Pull).await,
-                Err(e) => match e {
-                    GetAliasesError::Internal(e) => Err(e),
-                },
-            };
-
-            if let Err(e) = alias_add_result {
-                sync_result = Err(SyncError::Internal(e));
-            }
+            sync_result = Err(SyncError::Internal(e));
         }
 
         // Prepare response
@@ -495,6 +567,117 @@ impl PullDatasetUseCaseImpl {
                 Err(e) => Err(e.into()),
             },
         })
+    }
+
+    // TODO: Introduce intermediate structs to avoid full unpacking
+    fn merge_results(
+        combined_result: Option<PollingIngestResult>,
+        new_result: PollingIngestResult,
+    ) -> PollingIngestResult {
+        match (combined_result, new_result) {
+            (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
+            (
+                Some(PollingIngestResult::Updated {
+                    old_head, new_head, ..
+                }),
+                PollingIngestResult::UpToDate { uncacheable, .. },
+            ) => PollingIngestResult::Updated {
+                old_head,
+                new_head,
+                has_more: false,
+                uncacheable,
+            },
+            (
+                Some(PollingIngestResult::Updated {
+                    old_head: prev_old_head,
+                    ..
+                }),
+                PollingIngestResult::Updated {
+                    new_head,
+                    has_more,
+                    uncacheable,
+                    ..
+                },
+            ) => PollingIngestResult::Updated {
+                old_head: prev_old_head,
+                new_head,
+                has_more,
+                uncacheable,
+            },
+        }
+    }
+
+    #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
+    async fn build_plan_for_requests(
+        &self,
+        requests: &[PullRequest],
+        options: &PullOptions,
+    ) -> Result<
+        (
+            Vec<kamu_core::PullPlanIteration>,
+            Vec<kamu_core::PullResponse>,
+        ),
+        InternalError,
+    > {
+        let res = pull_request_planner
+            .build_pull_multi_plan(requests, options, *self.tenancy_config)
+            .await;
+
+        // Detach plan entities from current transaction
+        // to be able to commit it and manage them in iterations separately
+        for iteration in &res.0 {
+            for job in &iteration.jobs {
+                job.detach_from_transaction();
+            }
+        }
+        Ok(res)
+    }
+
+    #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
+    async fn build_plan_for_all_owned_datasets(
+        &self,
+        options: &PullOptions,
+    ) -> Result<
+        (
+            Vec<kamu_core::PullPlanIteration>,
+            Vec<kamu_core::PullResponse>,
+        ),
+        InternalError,
+    > {
+        let res = pull_request_planner
+            .build_pull_plan_all_owner_datasets(options, *self.tenancy_config)
+            .await?;
+
+        // Detach plan entities from current transaction
+        // to be able to commit it and manage them in iterations separately
+        for iteration in &res.0 {
+            for job in &iteration.jobs {
+                job.detach_from_transaction();
+            }
+        }
+
+        Ok(res)
+    }
+
+    #[transactional_static_method2(dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
+    async fn store_dataset_alias_transactional(
+        catalog: dill::Catalog,
+        local_ref: &odf::DatasetRef,
+        remote_ref: &odf::DatasetRefRemote,
+    ) -> Result<bool, InternalError> {
+        // Note: this would have failed before sync if dataset didn't exist,
+        // however, by this moment the dataset must have been created
+        let hdl = dataset_registry
+            .resolve_dataset_handle_by_ref(local_ref)
+            .await
+            .int_err()?;
+
+        match remote_alias_registry.get_remote_aliases(&hdl).await {
+            Ok(mut aliases) => aliases.add(remote_ref, RemoteAliasKind::Pull).await,
+            Err(e) => match e {
+                GetAliasesError::Internal(e) => Err(e),
+            },
+        }
     }
 }
 
@@ -538,9 +721,8 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         tracing::info!(?requests, ?options, "Performing pull");
 
         let (plan, errors) = self
-            .pull_request_planner
-            .build_pull_multi_plan(&requests, &options, *self.tenancy_config)
-            .await;
+            .build_plan_for_requests(requests.as_slice(), &options)
+            .await?;
 
         tracing::info!(
             num_steps = plan.len(),
@@ -567,10 +749,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?options, "Performing pull (all owned)");
 
-        let (plan, errors) = self
-            .pull_request_planner
-            .build_pull_plan_all_owner_datasets(&options, *self.tenancy_config)
-            .await?;
+        let (plan, errors) = self.build_plan_for_all_owned_datasets(&options).await?;
 
         tracing::info!(
             num_steps = plan.len(),

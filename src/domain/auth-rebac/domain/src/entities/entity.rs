@@ -121,6 +121,17 @@ impl EntitiesWithRelation<'_> {
 
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct EntityPropertyRowModel {
+    pub entity_type: EntityType,
+    pub entity_id: String,
+    pub property_name: String,
+    pub property_value: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "sqlx")]
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct EntityWithRelationRowModel {
     pub entity_type: EntityType,
     pub entity_id: String,

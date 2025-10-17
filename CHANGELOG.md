@@ -11,18 +11,69 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [Molecule-specific]
 ### Added
 - GQL: `BigInt` scalar
 ### Changed
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
-- Collection datasets will ignore add and move operations that don't change the entry path, ref, or extra attributes and return `CollectionUpdateUpToDate`
-- GQL: `Search::query()`: case insensitive search.
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
-- Discontinued binary releases for MacOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+
+## [Unreleased]
+### Added
+- GQL: Added new `webhookSubscription::rotateSecret()` method to replace current secret
+### Changed
+- Webhook subscription secrets are now stored encrypted in the database
+
+## [0.251.0] - 2025-10-16
+### Added
+- Flow process state projection model and GQL API (individual flow badges, dashboard cards):
+   - Flow process is a sequence of flow runs, and it's state is automatically projected
+   - Flow badges are statuses of flow processes (primary process + associated webhook channels)
+   - Flow dashboards are sortable and filterable card lists with pagination support
+       that represent multiple automated flow runs and facilitate
+       effective monitoring and triaging activities for the platform
+   - Unaffected with manual launches, only represent automated processes
+   - Higher level integration events model, which replaces `FlowProgressMessage`:
+      - Notify about detected flow failure
+      - Notify about change of flow process effective state
+      - Notify separately about automatic stops (too high failure rate or unrecoverable error)
+   - Projection decides on auto-stopping triggers and whether to schedule next periodic flows
+   - Flow agent only invokes success propagation on task completion, and does not interfeer with scheduling logic.
+   - Introduced `FlowEventCompleted` event that wraps the flow, and transports outcome + late activation causes
+- Internal event-sourcing projection mechanism within the flow system:
+   - Follows changes of 3 original event streams (flow configs, triggers, and runs)
+   - Shared event identifiers between events of the source streams
+   - Union-based view of merged flow stream (without physical copying)
+   - Synchronizes projections based on the merged event stream
+   - Postgres:
+      - guaranteeing proper event ordering via transaction identifiers tracking
+      - utilized LISTEN/NOTIFY mechanism to propagate changes
+   - Sqlite: incremental listening timeout approach, no risk of event ordering issues
+   - In-memory: using broadcast signals to notify about new events
+   - Flow agent tests are now based on the similar projection mechanism instead of query snapshots
+- Introduced abstraction for background agents: API server creates a collection of Tokio tasks
+    instead of directly listing particular agents.
+- Introduced automated outbox wiping procedure in Postgres   
+### Changed
+- Optimized database indices after large flow system refactoring
+- Removed obsolete "allPaused" operation from triggers at dataset level
+- Tests: refactoring - extracted common GQL harnesses for all flow tests
+### Fixed    
+- SQLX: avoid using untyped row interfaces like sqlx::Row|SqliteRow|PgRow
+
+## [0.250.0] - 2025-10-14
+### Added
+- New `delivery_timeout` configuration for `webhooks_config`
+### Changed
+- Discontinued binary releases for macOS Intel architecture (see #1323) and Windows (as we only ever supported WSL2)
+- Update `merge` crate version `0.1` -> `0.2`
+- Removed `extra.graphql.enableArchetypeInference` config option that was added for compatibility during data migrations
+- GQL: Apollo Tracing removed from response. To bring it back, add `x-trace-graphql=1` to request headers (#1402).
 ### Fixed
-- Investigation: potential unstable ordering of dataset entry listings
+- `kamu pull`: perform pulling each dataset in separate transaction and allow to interrupt run and some pulls will be saved. 
+  It also helps to keep ingest iterations progress saved even if some iteration failed
+- Investigation: potential unstable ordering of dataset entry listings (#1405).
 
 ## [0.249.1] - 2025-09-25
 ### Fixed
@@ -30,21 +81,21 @@ Recommendation: for ease of reading, use the following order:
 
 ## [0.249.0] - 2025-09-23
 ### Changed
-- (#1372): GQL: Performance improvement via query vectorization for APIs:
+- GQL: Performance improvement via query vectorization for APIs (#1372):
   - `Dataset::by_ids()`;
   - `DatasetMut::by_ids()`;
   - `Account::by_ids()`;
   - `AccountMut::by_ids()`.
 - Improved compatibility with EVM-based sources
 - Upgraded to `datafusion v50`
-- (#1384) `kamu inspect`: speed-up of iteration through the metadata chain.
-- (#1384) `GQL: Dataset::metadata().current_push_sources`: significant speed-up through iteration 
-  over key blocks stored in the database 
-- (#1384) General iteration optimizations based on the dataset type (root, derived). 
-  Ability to disable hints during iteration.
-- (#1384) `SearchActivePushSourcesVisitor`, `SearchActivePollingSourceVisitor`: accounting for the evolution of data 
-  sources.
-- (#1366): Experiment: beginning of `cheap_clone()` integration.
+- `kamu inspect`: speed-up of iteration through the metadata chain (#1384).
+- `GQL: Dataset::metadata().current_push_sources`: significant speed-up through iteration 
+  over key blocks stored in the database (#1384).
+- General iteration optimizations based on the dataset type (root, derived). 
+  Ability to disable hints during iteration (#1384).
+- `SearchActivePushSourcesVisitor`, `SearchActivePollingSourceVisitor`: accounting for the evolution of data 
+  sources (#1384).
+- Experiment: beginning of `cheap_clone()` integration (#1366).
 
 ## [0.248.1] - 2025-09-11
 ### Fixed
@@ -74,15 +125,15 @@ Recommendation: for ease of reading, use the following order:
 - Flows: each input contribution to batching rule is reflected as an update of start condition,
    so that flow history may show how many accumulated records were present at the moment of each update
 - GQL: `Search::query()`: case insensitive search.
-- (#1263): `images/kamu-base-with-data-mt`: make datasets public by default.
+- `images/kamu-base-with-data-mt`: make datasets public by default (#1263).
 ### Fixed
 - Crash when multiple unlabeled webhook subscriptions are defined within the same dataset
 - Restrict dataset creation with duplicate transform inputs.
-- (#1263) `DependencyGraphImmediateListener`: fixed a message processing race condition.
+- `DependencyGraphImmediateListener`: fixed a message processing race condition (#1263).
   - Parallel processing message of one type, in the case of handlers that were dependent on each other, 
     could lead to incorrect formation of the upstream/downstream dependency list 
     when pulling/pushing existing remote datasets. 
-- (#1263) `OsoDatasetAuthorizer::classify_dataset_ids_by_allowance()`.
+-  `OsoDatasetAuthorizer::classify_dataset_ids_by_allowance()` (#1263).
   - Fixed a bug that returned an empty `unresolved_resources` list 
     when there were no dataset entries. This could happen when pulling a dataset 
     that had upstream dependencies but no dependencies itself.

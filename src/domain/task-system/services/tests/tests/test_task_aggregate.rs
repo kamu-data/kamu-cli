@@ -60,7 +60,7 @@ async fn test_task_save_load_update() {
     task.cancel(Utc::now()).unwrap();
 
     task.save(&event_store).await.unwrap();
-    let cancel_event = *task.last_stored_event_id().unwrap();
+    let cancel_event = task.last_stored_event_id().unwrap();
     assert_eq!(event_store.len().await.unwrap(), 3);
 
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
@@ -114,7 +114,7 @@ async fn test_task_load_multi() {
 
     let delta = 2500;
     let ids: Vec<TaskID> = (delta..(delta + 2000)).map(TaskID::new).collect();
-    let tasks = Task::load_multi(ids, &event_store).await.unwrap();
+    let tasks = Task::load_multi(&ids, &event_store).await.unwrap();
 
     for (i, task_res) in tasks.into_iter().enumerate() {
         assert!(task_res.is_ok());

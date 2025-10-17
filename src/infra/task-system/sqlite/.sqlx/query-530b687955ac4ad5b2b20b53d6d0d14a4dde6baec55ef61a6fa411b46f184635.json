@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT task_id FROM tasks\n                    WHERE task_status == 'running'\n                    ORDER BY task_id\n                    LIMIT $1 OFFSET $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "530b687955ac4ad5b2b20b53d6d0d14a4dde6baec55ef61a6fa411b46f184635"
+}

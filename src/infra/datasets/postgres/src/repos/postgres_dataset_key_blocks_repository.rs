@@ -61,7 +61,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = $1 AND block_ref_name = $2
-            ORDER BY sequence_number ASC
+            ORDER BY sequence_number
             "#,
             dataset_id.to_string(),
             block_ref.as_str()

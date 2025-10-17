@@ -12,10 +12,8 @@ use std::num::NonZeroUsize;
 
 use database_common::{TransactionRefT, postgres_generate_placeholders_tuple_list_2};
 use dill::{component, interface};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::*;
-use sqlx::Row;
-use sqlx::postgres::PgRow;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,21 +21,6 @@ use sqlx::postgres::PgRow;
 #[interface(dyn RebacRepository)]
 pub struct PostgresRebacRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
-}
-
-impl PostgresRebacRepository {
-    fn map_entity_row(row: &PgRow) -> Result<EntitiesWithRelation<'static>, InternalError> {
-        let raw_entity = EntitiesWithRelationRowModel {
-            subject_entity_type: row.get(0),
-            subject_entity_id: row.get(1),
-            relationship: row.get(2),
-            object_entity_type: row.get(3),
-            object_entity_id: row.get(4),
-        };
-        let entity = raw_entity.try_into()?;
-
-        Ok(entity)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,43 +172,45 @@ impl RebacRepository for PostgresRebacRepository {
             return Ok(vec![]);
         }
 
+        let (entity_types, entity_ids): (Vec<EntityType>, Vec<&str>) = entities
+            .iter()
+            .map(|e| (e.entity_type, e.entity_id.as_ref()))
+            .unzip();
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        // TODO: replace it by macro once sqlx will support it
-        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let query_str = format!(
+        let rows = sqlx::query_as!(
+            EntityPropertyRowModel,
             r#"
-            SELECT entity_type, entity_id, property_name, property_value
-            FROM auth_rebac_properties
-            WHERE (entity_type, entity_id) IN ({})
-            "#,
-            postgres_generate_placeholders_tuple_list_2(
-                entities.len(),
-                NonZeroUsize::new(1).unwrap()
+            WITH input_pairs AS (
+                SELECT * FROM UNNEST($1::rebac_entity_type[], $2::text[]) AS t(entity_type, entity_id)
             )
-        );
+            SELECT
+                p.entity_type as "entity_type: _",
+                p.entity_id,
+                p.property_name,
+                p.property_value
+            FROM auth_rebac_properties AS p
+                JOIN input_pairs AS i ON
+                    p.entity_type = i.entity_type AND
+                    p.entity_id   = i.entity_id
+            "#,
+            &entity_types as _,
+            &entity_ids as _
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
 
-        let mut query = sqlx::query(&query_str);
-        for entity in entities {
-            query = query.bind(entity.entity_type);
-            query = query.bind(&entity.entity_id);
-        }
-
-        let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
-        let entity_properties = raw_rows
+        let entity_properties = rows
             .into_iter()
             .map(|row| {
-                let entity_type = row.get(0);
-                let entity_id = row.get::<String, _>(1);
-                let property_name = row.get::<String, _>(2).parse()?;
-                let property_value = Cow::Owned(row.get(3));
-
                 Ok((
-                    Entity::new(entity_type, entity_id),
-                    property_name,
-                    property_value,
+                    Entity::new(row.entity_type, row.entity_id),
+                    row.property_name.parse()?,
+                    Cow::Owned(row.property_value),
                 ))
             })
             .collect::<Result<Vec<_>, _>>()
@@ -389,7 +374,7 @@ impl RebacRepository for PostgresRebacRepository {
             )
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
         for entity in object_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -397,8 +382,8 @@ impl RebacRepository for PostgresRebacRepository {
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
         let rows = raw_rows
-            .iter()
-            .map(Self::map_entity_row)
+            .into_iter()
+            .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetObjectEntityRelationsError::Internal)?;
 
@@ -436,7 +421,7 @@ impl RebacRepository for PostgresRebacRepository {
             )
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
         for entity in subject_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -444,8 +429,8 @@ impl RebacRepository for PostgresRebacRepository {
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
         let rows = raw_rows
-            .iter()
-            .map(Self::map_entity_row)
+            .into_iter()
+            .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetObjectEntityRelationsError::Internal)?;
 

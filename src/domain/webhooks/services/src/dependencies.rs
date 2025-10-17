@@ -27,6 +27,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<ReactivateWebhookSubscriptionUseCaseImpl>();
     catalog_builder.add::<RemoveWebhookSubscriptionUseCaseImpl>();
     catalog_builder.add::<ResumeWebhookSubscriptionUseCaseImpl>();
+    catalog_builder.add::<RotateWebhookSubscriptionSecretUseCaseImpl>();
     catalog_builder.add::<UpdateWebhookSubscriptionUseCaseImpl>();
 }
 

@@ -159,6 +159,7 @@ impl DatasetEnvVarValue {
 #[skip_serializing_none]
 #[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = merge::option::overwrite_none)]
 pub struct DatasetEnvVarsConfig {
     pub enabled: Option<bool>,
     /// Represents the encryption key for the dataset env vars. This field is

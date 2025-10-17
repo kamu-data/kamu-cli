@@ -244,6 +244,7 @@ impl FlowConfigurationHarness {
             .add::<FlowConfigTestListener>()
             .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
             .add::<FlowDatasetsEventBridge>()
             .add::<FlowSensorDispatcherImpl>()
             .add::<SystemTimeSourceDefault>();

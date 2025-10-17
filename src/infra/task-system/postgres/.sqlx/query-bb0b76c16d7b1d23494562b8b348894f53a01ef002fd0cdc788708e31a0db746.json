@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT task_id FROM tasks\n                    WHERE task_status = 'running'::task_status_type\n                    ORDER BY task_id\n                    LIMIT $1 OFFSET $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bb0b76c16d7b1d23494562b8b348894f53a01ef002fd0cdc788708e31a0db746"
+}

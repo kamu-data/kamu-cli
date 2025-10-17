@@ -9,7 +9,8 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_flow_system_inmem::InMemoryFlowEventStore;
+use kamu_flow_system_inmem::{InMemoryFlowEventStore, InMemoryFlowSystemEventBridge};
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -203,22 +204,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_dataset_flow_run_stats,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_system_flow_run_stats,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
     fixture =
         kamu_flow_system_repo_tests::test_flow_event_store::test_pending_flow_dataset_single_type_crud,
     harness = InMemoryFlowEventStoreHarness
@@ -313,15 +298,6 @@ database_transactional_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture =
-        kamu_flow_system_repo_tests::test_flow_event_store::test_flow_consecutive_failures_count,
-    harness = InMemoryFlowEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -333,6 +309,8 @@ impl InMemoryFlowEventStoreHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryFlowEventStore>();
+        catalog_builder.add::<InMemoryFlowSystemEventBridge>();
+        catalog_builder.add::<SystemTimeSourceDefault>();
 
         Self {
             catalog: catalog_builder.build(),

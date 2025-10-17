@@ -11,10 +11,12 @@ mod flow;
 mod flow_configuration;
 mod flow_scope_removal_handler;
 mod flow_sensor;
+mod flow_system_event_projector;
 mod flow_trigger;
 
 pub use flow::*;
 pub use flow_configuration::*;
 pub use flow_scope_removal_handler::*;
 pub use flow_sensor::*;
+pub use flow_system_event_projector::*;
 pub use flow_trigger::*;

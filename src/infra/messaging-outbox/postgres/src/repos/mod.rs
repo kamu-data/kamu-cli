@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod outbox_postgres_message_consumption_repository;
-mod outbox_postgres_message_repository;
+mod postgres_outbox_message_consumption_repository;
+mod postgres_outbox_message_repository;
 
-pub use outbox_postgres_message_consumption_repository::*;
-pub use outbox_postgres_message_repository::*;
+pub use postgres_outbox_message_consumption_repository::*;
+pub use postgres_outbox_message_repository::*;

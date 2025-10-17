@@ -94,7 +94,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ?
-            ORDER BY sequence_number ASC
+            ORDER BY sequence_number
             "#,
             dataset_id_str,
             block_ref_str,
@@ -120,13 +120,20 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
 
         let dataset_ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
 
-        use sqlx::Row;
+        #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+        struct KeyBlockRow {
+            pub dataset_id: String,
+            pub event_type: String,
+            pub sequence_number: i64,
+            pub block_hash: String,
+            pub block_payload: Vec<u8>,
+        }
 
         let query_str = format!(
             r#"
             SELECT
                 dkb.dataset_id,
-                dkb.event_type as "event_type: _",
+                dkb.event_type,
                 dkb.sequence_number,
                 dkb.block_hash,
                 dkb.block_payload
@@ -155,7 +162,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
         );
 
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query_as::<_, KeyBlockRow>(&query_str);
         query = query.bind(block_ref.as_str()).bind(event_type.to_string());
         for dataset_id in dataset_ids {
             query = query.bind(dataset_id);
@@ -166,17 +173,12 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(raw_rows
             .into_iter()
             .map(|r| {
-                let dataset_id = odf::DatasetID::from_did_str(r.get::<&str, _>(0)).unwrap();
-                let event_type: String = r.get(1);
-                let sequence_number: i64 = r.get(2);
-                let block_hash: String = r.get(3);
-                let block_payload: Vec<u8> = r.get(4);
-
+                let dataset_id = odf::DatasetID::from_did_str(&r.dataset_id).unwrap();
                 let key_block = DatasetKeyBlock {
-                    event_kind: MetadataEventType::from_str(&event_type).unwrap(),
-                    sequence_number: u64::try_from(sequence_number).unwrap(),
-                    block_hash: odf::Multihash::from_multibase(&block_hash).unwrap(),
-                    block_payload: bytes::Bytes::from(block_payload),
+                    event_kind: MetadataEventType::from_str(&r.event_type).unwrap(),
+                    sequence_number: u64::try_from(r.sequence_number).unwrap(),
+                    block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                    block_payload: bytes::Bytes::from(r.block_payload),
                 };
                 (dataset_id, key_block)
             })

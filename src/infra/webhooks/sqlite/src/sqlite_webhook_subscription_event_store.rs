@@ -236,12 +236,7 @@ impl SqliteWebhookSubscriptionEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStore {
-    fn get_events(
-        &self,
-        subscription_id: &WebhookSubscriptionID,
-        opts: GetEventsOpts,
-    ) -> EventStream<WebhookSubscriptionEvent> {
-        let subscription_id = *subscription_id.as_ref();
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<WebhookSubscriptionEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
@@ -264,10 +259,59 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
                     event_id as "event_id: _",
                     event_payload as "event_payload: _"
                 FROM webhook_subscription_events
+                    WHERE
+                        (cast($1 as INT8) IS NULL or event_id > $1) AND
+                        (cast($2 as INT8) IS NULL or event_id <= $2)
+                    ORDER BY event_id ASC
+                "#,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = match serde_json::from_value::<WebhookSubscriptionEvent>(event_row.event_payload) {
+                    Ok(event) => event,
+                    Err(e) => return Err(sqlx::Error::Decode(Box::new(e))),
+                };
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
+    fn get_events(
+        &self,
+        subscription_id: &WebhookSubscriptionID,
+        opts: GetEventsOpts,
+    ) -> EventStream<WebhookSubscriptionEvent> {
+        let subscription_id = *subscription_id.as_ref();
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+            struct EventRow {
+                pub event_id: i64,
+                pub event_payload: sqlx::types::JsonValue
+            }
+
+            let mut query_stream = sqlx::query_as!(
+                EventRow,
+                r#"
+                SELECT
+                    event_id as "event_id: _",
+                    event_payload as "event_payload: _"
+                FROM webhook_subscription_events
                     WHERE subscription_id = $1
                          AND (cast($2 as INT8) IS NULL or event_id > $2)
                          AND (cast($3 as INT8) IS NULL or event_id <= $3)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 subscription_id,
                 maybe_from_id,
@@ -290,16 +334,13 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
 
     fn get_events_multi(
         &self,
-        queries: Vec<WebhookSubscriptionID>,
+        queries: &[WebhookSubscriptionID],
     ) -> MultiEventStream<WebhookSubscriptionID, WebhookSubscriptionEvent> {
         let subscription_ids: Vec<uuid::Uuid> = queries.iter().map(|id| *id.as_ref()).collect();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
-
+            let connection_mut = tr.connection_mut().await?;
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
             struct EventRow {
@@ -311,12 +352,12 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
             let query_str = format!(
                 r#"
                 SELECT
-                    subscription_id as "subscription_id: _",
-                    event_id as "event_id: _",
-                    event_payload as "event_payload: _"
+                    subscription_id,
+                    event_id,
+                    event_payload
                 FROM webhook_subscription_events
                     WHERE subscription_id IN ({})
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 sqlite_generate_placeholders_list(
                     subscription_ids.len(),
@@ -324,28 +365,21 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
                 )
             );
 
-            let mut query = sqlx::query(&query_str);
+            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
             for subscription_id in subscription_ids {
                 query = query.bind(subscription_id);
             }
 
-            use sqlx::Row;
-
             let mut query_stream = query
-                .try_map(|row: sqlx::sqlite::SqliteRow| {
-                    let subscription_id: uuid::Uuid = row.get(0);
-                    let event_id: i64 = row.get(1);
-                    let event_payload: sqlx::types::JsonValue = row.get(2);
-
-                    let event = serde_json::from_value::<WebhookSubscriptionEvent>(event_payload)
-                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-
-                    Ok((WebhookSubscriptionID::new(subscription_id), EventID::new(event_id), event))
-                })
                 .fetch(connection_mut)
                 .map_err(|e| GetEventsError::Internal(e.int_err()));
 
-            while let Some((subscription_id, event_id, event)) = query_stream.try_next().await? {
+            while let Some(event_row) = query_stream.try_next().await? {
+                let subscription_id = WebhookSubscriptionID::new(event_row.subscription_id);
+                let event_id = EventID::new(event_row.event_id);
+                let event = serde_json::from_value::<WebhookSubscriptionEvent>(event_row.event_payload)
+                    .map_err(|e| GetEventsError::Internal(e.int_err()))?;
+
                 yield Ok((subscription_id, event_id, event));
             }
         })

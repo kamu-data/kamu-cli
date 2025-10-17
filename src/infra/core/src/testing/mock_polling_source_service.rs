@@ -14,6 +14,7 @@ use kamu_core::{
     PollingIngestError,
     PollingIngestListener,
     PollingIngestOptions,
+    PollingIngestResponse,
     PollingIngestResult,
     PollingIngestService,
     ResolvedDataset,
@@ -32,7 +33,7 @@ mockall::mock! {
             metadata_state: Box<DataWriterMetadataState>,
             options: PollingIngestOptions,
             listener: Option<Arc<dyn PollingIngestListener>>,
-        ) -> Result<PollingIngestResult, PollingIngestError>;
+        ) -> Result<PollingIngestResponse, PollingIngestError>;
     }
 }
 
@@ -44,9 +45,12 @@ impl MockPollingIngestService {
             .withf(move |target, _, _, _| target.get_alias() == &dataset_alias)
             .times(1)
             .returning(|_, _, _, _| {
-                Ok(PollingIngestResult::UpToDate {
-                    no_source_defined: false,
-                    uncacheable: false,
+                Ok(PollingIngestResponse {
+                    result: PollingIngestResult::UpToDate {
+                        no_source_defined: false,
+                        uncacheable: false,
+                    },
+                    metadata_state: None,
                 })
             });
         self

@@ -23,14 +23,17 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-flow-system = { workspace = true }
+internal-error = { workspace = true }
+kamu-flow-system = { workspace = true, features = ["sqlx"] }
 odf = { workspace = true }
+time-source = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }
 futures = "0.3"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio",
@@ -39,6 +42,7 @@ sqlx = { version = "0.8", default-features = false, features = [
     "postgres",
     "chrono"
 ] }
+tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]

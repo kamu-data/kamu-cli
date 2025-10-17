@@ -7,8 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod flow_configuration_updated_message;
 mod flow_message_consumers;
 mod flow_message_producers;
+mod flow_process_lifecycle_message;
+mod flow_trigger_updated_message;
 
+pub use flow_configuration_updated_message::*;
 pub use flow_message_consumers::*;
 pub use flow_message_producers::*;
+pub use flow_process_lifecycle_message::*;
+pub use flow_trigger_updated_message::*;

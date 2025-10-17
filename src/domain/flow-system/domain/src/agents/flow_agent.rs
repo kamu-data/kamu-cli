@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 
+use async_utils::BackgroundAgent;
 use chrono::{DateTime, DurationRound, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
@@ -17,10 +18,7 @@ use crate::RetryPolicy;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowAgent: Sync + Send {
-    /// Runs the update main loop
-    async fn run(&self) -> Result<(), InternalError>;
-}
+pub trait FlowAgent: BackgroundAgent {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,6 +44,14 @@ impl FlowAgentConfig {
             mandatory_throttling_period,
             default_retry_policy_by_flow_type,
         }
+    }
+
+    pub fn test_default() -> Self {
+        Self::new(
+            chrono::Duration::seconds(1),
+            chrono::Duration::minutes(1),
+            HashMap::new(),
+        )
     }
 
     pub fn round_time(&self, time: DateTime<Utc>) -> Result<DateTime<Utc>, InternalError> {

@@ -15,9 +15,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Keep in sync with artifact upload matrix below
-          #
-          # TODO: Add minimal targets that are stripped and do not embed WebUI
           - name: Linux / amd64 / glibc
             runs-on: ubuntu-latest
             expected-target: x86_64-unknown-linux-gnu
@@ -27,10 +24,6 @@ jobs:
             installer-vars: KAMU_LIBC=musl
             expected-target: x86_64-unknown-linux-musl
             expected-install-path: /home/runner/.local/bin/kamu
-          - name: MacOS / amd64
-            runs-on: macos-13
-            expected-target: x86_64-apple-darwin
-            expected-install-path: /Users/runner/.local/bin/kamu
           - name: MacOS / arm64
             runs-on: macos-14
             expected-target: aarch64-apple-darwin

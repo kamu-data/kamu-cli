@@ -25,6 +25,12 @@ pub trait FlowTriggerService: Sync + Send {
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowTriggerState>, InternalError>;
 
+    /// Find multiple triggers by their bindings
+    async fn find_triggers(
+        &self,
+        flow_bindings: &[FlowBinding],
+    ) -> Result<Vec<FlowTriggerState>, InternalError>;
+
     /// Set or modify flow trigger
     async fn set_trigger(
         &self,
@@ -72,33 +78,27 @@ pub trait FlowTriggerService: Sync + Send {
         scopes: &[FlowScope],
     ) -> Result<bool, InternalError>;
 
-    /// Evaluates trigger stop policy after a failure
-    async fn evaluate_trigger_on_failure(
+    /// Automatically stops trigger
+    async fn apply_trigger_auto_stop_decision(
         &self,
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
-        unrecoverable: bool,
-    ) -> Result<(), InternalError>;
+    ) -> Result<Option<FlowTriggerState>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FlowTriggerServiceExt {
-    async fn try_get_flow_active_schedule_rule(
+    async fn try_take_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, InternalError>;
-
-    async fn try_get_flow_active_reactive_rule(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<Option<ReactiveRule>, InternalError>;
 }
 
 #[async_trait::async_trait]
 impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
-    async fn try_get_flow_active_schedule_rule(
+    async fn try_take_flow_active_schedule_rule(
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, InternalError> {
@@ -107,23 +107,7 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
             if let Some(trigger) = maybe_trigger
                 && trigger.is_active()
             {
-                trigger.try_get_schedule_rule()
-            } else {
-                None
-            },
-        )
-    }
-
-    async fn try_get_flow_active_reactive_rule(
-        &self,
-        flow_binding: &FlowBinding,
-    ) -> Result<Option<ReactiveRule>, InternalError> {
-        let maybe_trigger = self.find_trigger(flow_binding).await?;
-        Ok(
-            if let Some(trigger) = maybe_trigger
-                && trigger.is_active()
-            {
-                trigger.try_get_reactive_rule()
+                trigger.try_take_schedule_rule()
             } else {
                 None
             },

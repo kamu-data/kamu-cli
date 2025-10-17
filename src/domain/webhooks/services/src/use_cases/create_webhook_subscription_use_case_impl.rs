@@ -70,7 +70,7 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 }
             })?;
 
-            let secret = self.webhook_secret_generator.generate_secret();
+            let secret = self.webhook_secret_generator.generate_secret().int_err()?;
 
             let subscription_id = kamu_webhooks::WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 

@@ -138,6 +138,42 @@ impl PostgresTaskEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<TaskState> for PostgresTaskEventStore {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<TaskEvent> {
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT event_id, event_payload FROM task_events
+                    WHERE
+                         (cast($1 as INT8) IS NULL or event_id > $1) AND
+                         (cast($2 as INT8) IS NULL or event_id <= $2)
+                    ORDER BY event_id ASC
+                "#,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = match serde_json::from_value::<TaskEvent>(event_row.event_payload) {
+                    Ok(event) => event,
+                    Err(e) => return Err(sqlx::Error::Decode(Box::new(e))),
+                };
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
     fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
         let task_id: i64 = (*task_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
@@ -155,7 +191,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
                     WHERE task_id = $1
                          AND (cast($2 as INT8) IS NULL or event_id > $2)
                          AND (cast($3 as INT8) IS NULL or event_id <= $3)
-                    ORDER BY event_id ASC
+                    ORDER BY event_id
                 "#,
                 task_id,
                 maybe_from_id,
@@ -176,7 +212,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
         })
     }
 
-    fn get_events_multi(&self, queries: Vec<TaskID>) -> MultiEventStream<TaskID, TaskEvent> {
+    fn get_events_multi(&self, queries: &[TaskID]) -> MultiEventStream<TaskID, TaskEvent> {
         let task_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
 
         Box::pin(async_stream::stream! {
@@ -190,7 +226,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
                 SELECT task_id, event_id, event_payload
                 FROM task_events
                 WHERE task_id = ANY($1)
-                ORDER BY event_id ASC
+                ORDER BY event_id
                 "#,
                 &task_ids,
             ).try_map(|event_row| {
@@ -296,7 +332,7 @@ impl TaskEventStore for PostgresTaskEventStore {
             r#"
             SELECT task_id FROM tasks
                 WHERE task_status = 'queued'::task_status_type
-                ORDER BY task_id ASC
+                ORDER BY task_id
                 LIMIT 1
             "#,
         )
@@ -325,7 +361,7 @@ impl TaskEventStore for PostgresTaskEventStore {
                 r#"
                 SELECT task_id FROM tasks
                     WHERE task_status = 'running'::task_status_type
-                    ORDER BY task_id ASC
+                    ORDER BY task_id
                     LIMIT $1 OFFSET $2
                 "#,
                 limit,
