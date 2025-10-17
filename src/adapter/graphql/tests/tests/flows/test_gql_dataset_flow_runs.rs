@@ -2207,41 +2207,39 @@ async fn test_list_flow_initiators() {
         .await;
 
     // Pure initiator listing
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlowInitiators {
-                                nodes {
-                                    accountName
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlowInitiators {
+                                        nodes {
+                                            accountName
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = GraphQLQueryRequest::new(
-        request_code,
-        async_graphql::Variables::from_json(serde_json::json!({
-            "datasetId": create_result.dataset_handle.id.to_string()
-        })),
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
-
-    assert_eq!(
-        response.data,
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {

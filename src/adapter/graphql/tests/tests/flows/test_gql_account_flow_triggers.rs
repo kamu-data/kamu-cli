@@ -112,41 +112,39 @@ async fn test_list_datasets_with_flow() {
         .await;
 
     // Pure datasets listing
-    let request_code = indoc!(
-        r#"
-        query($accountName: String!) {
-            accounts {
-                byName (name: $accountName) {
-                    flows {
-                        runs {
-                            listDatasetsWithFlow {
-                                nodes {
-                                    id
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($accountName: String!) {
+                    accounts {
+                        byName (name: $accountName) {
+                            flows {
+                                runs {
+                                    listDatasetsWithFlow {
+                                        nodes {
+                                            id
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = GraphQLQueryRequest::new(
-        request_code,
-        async_graphql::Variables::from_json(serde_json::json!({
-            "accountName": DEFAULT_ACCOUNT_NAME_STR,
-        })),
-    )
-    .execute(&schema, &harness.catalog_authorized)
-    .await;
-
-    assert_eq!(
-        response.data,
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+            })),
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byName": {

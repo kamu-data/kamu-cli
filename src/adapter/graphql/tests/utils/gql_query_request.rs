@@ -29,14 +29,6 @@ impl GraphQLQueryRequest {
         }
     }
 
-    pub(crate) fn with_no_variables(request_code: impl Into<String>) -> Self {
-        Self {
-            request_code: request_code.into(),
-            variables: None,
-            expect_success: true,
-        }
-    }
-
     pub(crate) fn expect_error(mut self) -> Self {
         self.expect_success = false;
         self
@@ -68,15 +60,9 @@ impl GraphQLQueryRequest {
     }
 }
 
-impl From<String> for GraphQLQueryRequest {
-    fn from(value: String) -> Self {
-        Self::with_no_variables(value)
-    }
-}
-
 impl From<&str> for GraphQLQueryRequest {
     fn from(value: &str) -> Self {
-        Self::with_no_variables(value)
+        Self::new(value, async_graphql::Variables::default())
     }
 }
 

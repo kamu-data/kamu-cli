@@ -11,12 +11,11 @@ use async_graphql::value;
 use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
-use kamu_adapter_graphql::data_loader::account_entity_data_loader;
 use kamu_adapter_graphql::traits::ResponseExt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
-use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
+use crate::utils::{GraphQLQueryRequest, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,24 +25,30 @@ async fn test_account_by_id() {
 
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let res = harness
-        .execute_anonymous_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byId (accountId: "{}") {{
-                        accountName
-                    }}
-                }}
-            }}
-            "#,
-            *DEFAULT_ACCOUNT_ID
-        )))
-        .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
 
-    assert!(res.is_ok(), "{res:?}");
+    let request_code = indoc!(
+        r#"
+        query ($accountId: AccountID!) {
+          accounts {
+            byId(accountId: $accountId) {
+              accountName
+            }
+          }
+        }
+        "#,
+    );
+
     assert_eq!(
-        res.data,
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_value(value!({
+                "accountId": *DEFAULT_ACCOUNT_ID
+            })),
+        )
+        .execute(&schema, &harness.catalog_anonymous)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byId": {
@@ -53,23 +58,16 @@ async fn test_account_by_id() {
         })
     );
 
-    let res = harness
-        .execute_anonymous_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byId (accountId: "{invalid_account_id}") {{
-                        accountName
-                    }}
-                }}
-            }}
-            "#,
-        )))
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_value(value!({
+                "accountId": invalid_account_id
+            })),
+        )
+        .execute(&schema, &harness.catalog_anonymous)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byId": null
@@ -84,23 +82,30 @@ async fn test_account_by_id() {
 async fn test_account_by_name() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let res = harness
-        .execute_anonymous_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byName (name: "{DEFAULT_ACCOUNT_NAME_STR}") {{
-                        accountName
-                    }}
-                }}
-            }}
-            "#,
-        )))
-        .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
 
-    assert!(res.is_ok(), "{res:?}");
+    let request_code = indoc!(
+        r#"
+        query ($accountName: AccountName!) {
+          accounts {
+            byName(name: $accountName) {
+              accountName
+            }
+          }
+        }
+        "#,
+    );
+
     assert_eq!(
-        res.data,
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_value(value!({
+                "accountName": DEFAULT_ACCOUNT_NAME_STR
+            })),
+        )
+        .execute(&schema, &harness.catalog_anonymous)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byName": {
@@ -110,49 +115,35 @@ async fn test_account_by_name() {
         })
     );
 
-    let res = harness
-        .execute_anonymous_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byName (name: "{}") {{
-                        accountName
-                    }}
-                }}
-            }}
-            "#,
-            "unknown",
-        )))
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_value(value!({
+                "accountName": DEFAULT_ACCOUNT_NAME_STR
+            })),
+        )
+        .execute(&schema, &harness.catalog_anonymous)
+        .await
+        .data,
         value!({
             "accounts": {
-                "byName": null
+                "byName": {
+                    "accountName": "unknown"
+                }
             }
         })
     );
 
-    let res = harness
-        .execute_anonymous_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byName (name: "{}") {{
-                        accountName
-                    }}
-                }}
-            }}
-            "#,
-            DEFAULT_ACCOUNT_NAME_STR.to_ascii_uppercase(),
-        )))
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        GraphQLQueryRequest::new(
+            request_code,
+            async_graphql::Variables::from_value(value!({
+                "accountName": DEFAULT_ACCOUNT_NAME_STR.to_ascii_uppercase()
+            })),
+        )
+        .execute(&schema, &harness.catalog_anonymous)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byName": {
@@ -169,30 +160,34 @@ async fn test_account_by_name() {
 async fn test_account_attributes() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byId (accountId: "{}") {{
-                        id
-                        accountName
-                        displayName
-                        accountType
-                        email
-                        avatarUrl
-                        isAdmin
-                    }}
-                }}
-            }}
-            "#,
-            *DEFAULT_ACCOUNT_ID
-        )))
-        .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
 
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query ($accountId: AccountID!) {
+                  accounts {
+                    byId(accountId: $accountId) {
+                      id
+                      accountName
+                      displayName
+                      accountType
+                      email
+                      avatarUrl
+                      isAdmin
+                    }
+                  }
+                }
+                "#,
+            ),
+            async_graphql::Variables::from_value(value!({
+                "accountId": *DEFAULT_ACCOUNT_ID
+            })),
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byId": {
@@ -208,29 +203,31 @@ async fn test_account_attributes() {
         })
     );
 
-    let res = harness
-        .execute_anonymous_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byId (accountId: "{}") {{
-                        id
-                        accountName
-                        displayName
-                        accountType
-                        avatarUrl
-                        isAdmin
-                    }}
-                }}
-            }}
-            "#,
-            *DEFAULT_ACCOUNT_ID
-        )))
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
-        res.data,
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query ($accountId: AccountID!) {
+                  accounts {
+                    byId(accountId: $accountId) {
+                      id
+                      accountName
+                      displayName
+                      accountType
+                      avatarUrl
+                      isAdmin
+                    }
+                  }
+                }
+                "#,
+            ),
+            async_graphql::Variables::from_value(value!({
+                "accountId": *DEFAULT_ACCOUNT_ID
+            })),
+        )
+        .execute(&schema, &harness.catalog_anonymous)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byId": {
@@ -245,24 +242,29 @@ async fn test_account_attributes() {
         })
     );
 
-    let res = harness
-        .execute_anonymous_query(async_graphql::Request::new(format!(
-            r#"
-            query {{
-                accounts {{
-                    byId (accountId: "{}") {{
-                        email
-                    }}
-                }}
-            }}
-            "#,
-            *DEFAULT_ACCOUNT_ID
-        )))
-        .await;
-
-    assert!(res.is_err());
-    assert_eq!(res.errors.len(), 1);
-    assert_eq!(res.errors[0].message, "Account access error".to_string());
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query ($accountId: AccountID!) {
+                  accounts {
+                    byId(accountId: $accountId) {
+                      email
+                    }
+                  }
+                }
+                "#,
+            ),
+            async_graphql::Variables::from_value(value!({
+                "accountId": *DEFAULT_ACCOUNT_ID
+            })),
+        )
+        .expect_error()
+        .execute(&schema, &harness.catalog_anonymous)
+        .await
+        .error_messages(),
+        ["Account access error"]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
