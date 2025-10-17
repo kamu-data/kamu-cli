@@ -13,15 +13,26 @@ use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_hand
 
 pub(crate) struct GraphQLQueryRequest {
     request_code: String,
-    variables: async_graphql::Variables,
+    variables: Option<async_graphql::Variables>,
     expect_success: bool,
 }
 
 impl GraphQLQueryRequest {
-    pub(crate) fn new(request_code: &str, variables: async_graphql::Variables) -> Self {
+    pub(crate) fn new(
+        request_code: impl Into<String>,
+        variables: async_graphql::Variables,
+    ) -> Self {
         Self {
-            request_code: request_code.to_string(),
-            variables,
+            request_code: request_code.into(),
+            variables: Some(variables),
+            expect_success: true,
+        }
+    }
+
+    pub(crate) fn with_no_variables(request_code: impl Into<String>) -> Self {
+        Self {
+            request_code: request_code.into(),
+            variables: None,
             expect_success: true,
         }
     }
@@ -36,15 +47,16 @@ impl GraphQLQueryRequest {
         schema: &kamu_adapter_graphql::Schema,
         catalog: &dill::Catalog,
     ) -> async_graphql::Response {
-        let response = schema
-            .execute(
-                async_graphql::Request::new(self.request_code)
-                    .variables(self.variables)
-                    .data(account_entity_data_loader(&catalog))
-                    .data(dataset_handle_data_loader(&catalog))
-                    .data(catalog.clone()),
-            )
-            .await;
+        let request = {
+            let mut r = async_graphql::Request::new(self.request_code);
+            if let Some(variables) = self.variables {
+                r = r.variables(variables);
+            }
+            r.data(account_entity_data_loader(catalog))
+                .data(dataset_handle_data_loader(catalog))
+                .data(catalog.clone())
+        };
+        let response = schema.execute(request).await;
 
         if self.expect_success {
             assert!(response.is_ok(), "{:?}", response.errors);
@@ -53,6 +65,18 @@ impl GraphQLQueryRequest {
         }
 
         response
+    }
+}
+
+impl From<String> for GraphQLQueryRequest {
+    fn from(value: String) -> Self {
+        Self::with_no_variables(value)
+    }
+}
+
+impl From<&str> for GraphQLQueryRequest {
+    fn from(value: &str) -> Self {
+        Self::with_no_variables(value)
     }
 }
 
