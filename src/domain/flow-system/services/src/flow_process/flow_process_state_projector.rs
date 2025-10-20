@@ -18,6 +18,7 @@ use crate::FlowSchedulingService;
 
 #[dill::component(pub)]
 #[dill::interface(dyn FlowSystemEventProjector)]
+#[dill::interface(dyn FlowScopeRemovalHandler)]
 pub struct FlowProcessStateProjector {
     flow_process_state_repository: Arc<dyn FlowProcessStateRepository>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
@@ -65,12 +66,8 @@ impl FlowProcessStateProjector {
                 None
             }
 
-            FlowTriggerEvent::ScopeRemoved(e) => {
-                // Idempotent delete
-                self.flow_process_state_repository
-                    .delete_process_states_by_scope(&e.flow_binding.scope)
-                    .await
-                    .int_err()?;
+            FlowTriggerEvent::ScopeRemoved(_) => {
+                // Ignored, handled separately via FlowScopeRemovalHandler
                 None
             }
         };
@@ -361,6 +358,26 @@ impl FlowSystemEventProjector for FlowProcessStateProjector {
                 self.process_flow_event(event.event_id, flow_event).await?;
             }
         }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FlowScopeRemovalHandler for FlowProcessStateProjector {
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        tracing::debug!(
+            ?flow_scope,
+            "Handling flow scope removal for flow process state projector"
+        );
+
+        self.flow_process_state_repository
+            .delete_process_states_by_scope(flow_scope)
+            .await
+            .int_err()?;
 
         Ok(())
     }

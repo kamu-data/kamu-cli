@@ -184,7 +184,10 @@ async fn test_apply_trigger_events() {
         s.consecutive_failures() == 0
     );
 
-    // Remove trigger scope
+    // Apply trigger scope removal event
+    // Note: ScopeRemoved events are ignored by the projector itself - they don't
+    // directly affect the projection. The actual scope removal is handled
+    // separately via the FlowScopeRemovalHandler trait implementation.
     harness
         .projector
         .apply(&FlowSystemEvent {
@@ -203,12 +206,92 @@ async fn test_apply_trigger_events() {
         .await
         .unwrap();
 
+    // State should still exist since ScopeRemoved events are ignored by the
+    // projector
     let state = harness
         .flow_process_state_query
         .try_get_process_state(&foo_binding)
         .await
         .unwrap();
-    assert!(state.is_none());
+    assert!(state.is_some());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_flow_scope_removal_via_handler() {
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let foo_binding = ingest_dataset_binding(&foo_id);
+
+    let foo_schedule = FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+        every: Duration::hours(1),
+    }));
+
+    let mock_flow_trigger_service = {
+        let mut m = MockFlowTriggerService::new();
+        m.expect_find_trigger().times(1).returning(|_| Ok(None));
+        m
+    };
+
+    let mock_outbox = MockOutbox::new();
+
+    let harness = FlowProcessStateProjectorHarness::new(
+        mock_flow_trigger_service,
+        MockFlowSchedulingService::new(),
+        mock_outbox,
+    );
+
+    // Create an active flow process state
+    harness
+        .projector
+        .apply(&FlowSystemEvent {
+            event_id: EventID::new(1),
+            tx_id: 1,
+            source_type: FlowSystemEventSourceType::FlowTrigger,
+            occurred_at: Utc::now(),
+            payload: serde_json::to_value(FlowTriggerEvent::Created(FlowTriggerEventCreated {
+                event_time: Utc::now(),
+                flow_binding: foo_binding.clone(),
+                paused: false,
+                rule: foo_schedule.clone(),
+                stop_policy: FlowTriggerStopPolicy::Never,
+            }))
+            .unwrap(),
+        })
+        .await
+        .unwrap();
+
+    // Verify the process state exists
+    let state = harness
+        .flow_process_state_query
+        .try_get_process_state(&foo_binding)
+        .await
+        .unwrap();
+    assert!(
+        state.is_some(),
+        "Process state should exist after trigger creation"
+    );
+
+    // Extract the scope from the flow binding to call the scope removal handler
+    let flow_scope = &foo_binding.scope;
+
+    // Now call the FlowScopeRemovalHandler directly to simulate scope removal
+    harness
+        .projector
+        .handle_flow_scope_removal(flow_scope)
+        .await
+        .unwrap();
+
+    // Verify the process state has been removed
+    let state = harness
+        .flow_process_state_query
+        .try_get_process_state(&foo_binding)
+        .await
+        .unwrap();
+    assert!(
+        state.is_none(),
+        "Process state should be removed after scope removal"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
