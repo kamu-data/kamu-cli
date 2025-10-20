@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.251.1] - 2025-10-20
 ### Added
 - GQL: Added new `webhookSubscription::rotateSecret()` method to replace current secret
 ### Changed
