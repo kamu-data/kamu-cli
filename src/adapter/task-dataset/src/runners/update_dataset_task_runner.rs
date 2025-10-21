@@ -139,6 +139,7 @@ impl UpdateDatasetTaskRunner {
                 | PollingIngestError::BadInputSchema(_)
                 | PollingIngestError::IncompatibleSchema(_)
                 | PollingIngestError::InvalidParameterFormat(_)
+                | PollingIngestError::MergeError(_)
                 | PollingIngestError::TemplateError(_) => {
                     Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
                 }
@@ -149,7 +150,6 @@ impl UpdateDatasetTaskRunner {
                 | PollingIngestError::EngineProvisioningError(_)
                 | PollingIngestError::ImagePull(_)
                 | PollingIngestError::Internal(_)
-                | PollingIngestError::MergeError(_)
                 | PollingIngestError::NotFound { .. }
                 | PollingIngestError::PipeError(_)
                 | PollingIngestError::ProcessError(_)

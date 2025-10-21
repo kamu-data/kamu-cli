@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Hotfix: merge error during polling ingest should be considered as unrecoverable failure
+
 ## [0.251.1] - 2025-10-20
 ### Added
 - GQL: Added new `webhookSubscription::rotateSecret()` method to replace current secret
