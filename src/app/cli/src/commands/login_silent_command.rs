@@ -68,22 +68,23 @@ impl LoginSilentCommand {
     }
 
     async fn new_login(&self, odf_server_backend_url: Url) -> Result<(), CLIError> {
-        let maybe_repo_name = if self.skip_add_repo {
-            None
-        } else {
-            let repo_name = if let Some(repo_name) = self.repo_name.as_ref() {
-                repo_name.clone()
+        let maybe_repo_name =
+            if self.skip_add_repo || self.scope == odf_server::AccessTokenStoreScope::User {
+                None
             } else {
-                let host = odf_server_backend_url.host_str().ok_or_else(|| {
-                    CLIError::usage_error(format!(
-                        "Server URL does not contain the host part: {}",
-                        odf_server_backend_url.as_str()
-                    ))
-                })?;
-                odf::RepoName::try_from(host).map_err(CLIError::failure)?
+                let repo_name = if let Some(repo_name) = self.repo_name.as_ref() {
+                    repo_name.clone()
+                } else {
+                    let host = odf_server_backend_url.host_str().ok_or_else(|| {
+                        CLIError::usage_error(format!(
+                            "Server URL does not contain the host part: {}",
+                            odf_server_backend_url.as_str()
+                        ))
+                    })?;
+                    odf::RepoName::try_from(host).map_err(CLIError::failure)?
+                };
+                Some(repo_name)
             };
-            Some(repo_name)
-        };
 
         // Execute a login method depending on the input mode
         let login_response = match &self.mode {

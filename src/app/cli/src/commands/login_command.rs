@@ -66,7 +66,7 @@ impl LoginCommand {
             odf_server_backend_url,
             access_token.to_string(),
         )?;
-        if !self.skip_add_repo {
+        if !self.skip_add_repo && self.scope == odf_server::AccessTokenStoreScope::Workspace {
             self.add_repository(odf_server_backend_url, odf_server_backend_url)?;
         }
         eprintln!(
@@ -114,7 +114,7 @@ impl LoginCommand {
             login_interactive_response.access_token,
         )?;
 
-        if !self.skip_add_repo {
+        if !self.skip_add_repo && self.scope == odf_server::AccessTokenStoreScope::Workspace {
             self.add_repository(
                 &odf_server_frontend_url,
                 &login_interactive_response.backend_url,
