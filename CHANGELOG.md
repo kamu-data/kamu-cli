@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - Hotfix: merge error during polling ingest should be considered as unrecoverable failure
 - Hotfix: running flow task should clear "next_planned_at" field in the process state
+- Hotfix: ignore creation of remote repository for User scoped login
 
 ## [0.251.1] - 2025-10-20
 ### Added
