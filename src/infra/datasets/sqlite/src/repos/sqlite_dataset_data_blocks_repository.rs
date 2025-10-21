@@ -20,22 +20,22 @@ use kamu_datasets::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
-#[interface(dyn DatasetKeyBlockRepository)]
-pub struct SqliteDatasetKeyBlockRepository {
+#[interface(dyn DatasetDataBlockRepository)]
+pub struct SqliteDatasetDataBlockRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, sqlx::FromRow)]
-struct DatasetKeyBlockRow {
+struct DatasetDataBlockRow {
     event_type: String,
     sequence_number: i64,
     block_hash: String,
     block_payload: Vec<u8>,
 }
 
-impl DatasetKeyBlockRow {
+impl DatasetDataBlockRow {
     fn into_domain(self) -> DatasetBlock {
         DatasetBlock {
             event_kind: MetadataEventType::from_str(&self.event_type).unwrap(),
@@ -49,7 +49,7 @@ impl DatasetKeyBlockRow {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
+impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
     async fn has_blocks(
         &self,
         dataset_id: &odf::DatasetID,
@@ -62,7 +62,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let block_ref_str = block_ref.as_str();
 
         let result: Option<i32> = sqlx::query_scalar(
-            "SELECT 1 FROM dataset_key_blocks WHERE dataset_id = ? AND block_ref_name = ? LIMIT 1",
+            "SELECT 1 FROM dataset_data_blocks WHERE dataset_id = ? AND block_ref_name = ? LIMIT 1",
         )
         .bind(dataset_id_str)
         .bind(block_ref_str)
@@ -73,11 +73,11 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(result.is_some())
     }
 
-    async fn get_all_key_blocks(
+    async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError> {
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -85,14 +85,14 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let block_ref_str = block_ref.as_str();
 
         let rows = sqlx::query_as!(
-            DatasetKeyBlockRow,
+            DatasetDataBlockRow,
             r#"
             SELECT
                 event_type,
                 sequence_number,
                 block_hash,
                 block_payload
-            FROM dataset_key_blocks
+            FROM dataset_data_blocks
             WHERE dataset_id = ? AND block_ref_name = ?
             ORDER BY sequence_number
             "#,
@@ -105,7 +105,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
 
         Ok(rows
             .into_iter()
-            .map(DatasetKeyBlockRow::into_domain)
+            .map(DatasetDataBlockRow::into_domain)
             .collect())
     }
 
@@ -121,7 +121,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let dataset_ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
 
         #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-        struct KeyBlockRow {
+        struct DataBlockRow {
             pub dataset_id: String,
             pub event_type: String,
             pub sequence_number: i64,
@@ -132,17 +132,17 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let query_str = format!(
             r#"
             SELECT
-                dkb.dataset_id,
-                dkb.event_type,
-                dkb.sequence_number,
-                dkb.block_hash,
-                dkb.block_payload
-            FROM dataset_key_blocks dkb
+                ddb.dataset_id,
+                ddb.event_type,
+                ddb.sequence_number,
+                ddb.block_hash,
+                ddb.block_payload
+            FROM dataset_data_blocks ddb
             JOIN (
                 SELECT
                     dataset_id,
                     MAX(sequence_number) AS max_seq
-                FROM dataset_key_blocks
+                FROM dataset_data_blocks
                 WHERE
                     block_ref_name = $1 AND
                     event_type = $2 AND
@@ -150,19 +150,19 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 GROUP BY dataset_id
             ) latest
             ON
-                dkb.dataset_id = latest.dataset_id AND
-                dkb.sequence_number = latest.max_seq
+                ddb.dataset_id = latest.dataset_id AND
+                ddb.sequence_number = latest.max_seq
             WHERE
-                dkb.block_ref_name = $1 AND
-                dkb.event_type = $2 AND
-                dkb.dataset_id IN ({})
+                ddb.block_ref_name = $1 AND
+                ddb.event_type = $2 AND
+                ddb.dataset_id IN ({})
             "#,
             // Generate same list twice to avoid duplicate binding
             sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
             sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
         );
 
-        let mut query = sqlx::query_as::<_, KeyBlockRow>(&query_str);
+        let mut query = sqlx::query_as::<_, DataBlockRow>(&query_str);
         query = query.bind(block_ref.as_str()).bind(event_type.to_string());
         for dataset_id in dataset_ids {
             query = query.bind(dataset_id);
@@ -190,7 +190,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
-    ) -> Result<(), DatasetKeyBlockSaveError> {
+    ) -> Result<(), DatasetDataBlockSaveError> {
         if blocks.is_empty() {
             return Ok(());
         }
@@ -199,7 +199,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let conn = tr.connection_mut().await?;
 
         let mut builder = sqlx::QueryBuilder::new(
-            "INSERT INTO dataset_key_blocks (
+            "INSERT INTO dataset_data_blocks (
                 dataset_id,
                 block_ref_name,
                 event_type,
@@ -224,7 +224,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
-                DatasetKeyBlockSaveError::DuplicateSequenceNumber(
+                DatasetDataBlockSaveError::DuplicateSequenceNumber(
                     // We can't know which block caused it in batch insert
                     blocks.iter().map(|b| b.sequence_number).collect(),
                 )
@@ -234,7 +234,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                     "Foreign key constraint failed while batch inserting key blocks: {}",
                     e.message()
                 );
-                DatasetKeyBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
+                DatasetDataBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
                     dataset_id: dataset_id.clone(),
                 })
             }
@@ -256,7 +256,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let block_ref_str = block_ref.as_str();
 
         sqlx::query!(
-            "DELETE FROM dataset_key_blocks WHERE dataset_id = ? AND block_ref_name = ?",
+            "DELETE FROM dataset_data_blocks WHERE dataset_id = ? AND block_ref_name = ?",
             dataset_id_str,
             block_ref_str
         )

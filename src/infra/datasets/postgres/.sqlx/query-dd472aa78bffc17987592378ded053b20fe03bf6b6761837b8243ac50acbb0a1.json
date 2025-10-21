@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM dataset_data_blocks\n                WHERE dataset_id = $1 AND block_ref_name = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dd472aa78bffc17987592378ded053b20fe03bf6b6761837b8243ac50acbb0a1"
+}

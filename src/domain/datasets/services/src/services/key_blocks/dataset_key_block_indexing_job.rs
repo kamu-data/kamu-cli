@@ -13,7 +13,7 @@ use database_common_macros::transactional_method2;
 use dill::Catalog;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{DatasetRegistry, ResolvedDataset};
-use kamu_datasets::{DatasetKeyBlock, DatasetKeyBlockRepository, MetadataEventType};
+use kamu_datasets::{DatasetBlock, DatasetKeyBlockRepository, MetadataEventType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -221,7 +221,7 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
 pub(crate) fn make_key_block(
     block_hash: odf::Multihash,
     block: &odf::MetadataBlock,
-) -> DatasetKeyBlock {
+) -> DatasetBlock {
     use odf::serde::MetadataBlockSerializer;
     use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 
@@ -229,7 +229,7 @@ pub(crate) fn make_key_block(
         .write_manifest(block)
         .unwrap();
 
-    DatasetKeyBlock {
+    DatasetBlock {
         event_kind: MetadataEventType::from_metadata_event(&block.event),
         sequence_number: block.sequence_number,
         block_hash,
@@ -241,7 +241,7 @@ pub(crate) fn make_key_block(
 
 #[derive(Debug)]
 pub(crate) struct CollectKeyBlockResponse {
-    pub(crate) key_blocks: Vec<DatasetKeyBlock>,
+    pub(crate) key_blocks: Vec<DatasetBlock>,
     pub(crate) key_event_flags: odf::metadata::MetadataEventTypeFlags,
     pub(crate) divergence_detected: bool,
 }

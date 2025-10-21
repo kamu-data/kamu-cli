@@ -10,23 +10,23 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DatasetBlock, MetadataEventType};
+use crate::{DatasetBlock, DatasetUnmatchedEntryError, MetadataEventType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetKeyBlockRepository: Send + Sync {
+pub trait DatasetDataBlockRepository: Send + Sync {
     async fn has_blocks(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<bool, InternalError>;
 
-    async fn get_all_key_blocks(
+    async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError>;
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError>;
 
     async fn match_datasets_having_blocks(
         &self,
@@ -40,7 +40,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
-    ) -> Result<(), DatasetKeyBlockSaveError>;
+    ) -> Result<(), DatasetDataBlockSaveError>;
 
     async fn delete_all_for_ref(
         &self,
@@ -52,7 +52,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DatasetKeyBlockQueryError {
+pub enum DatasetDataBlockQueryError {
     #[error(transparent)]
     UnmatchedDatasetEntry(DatasetUnmatchedEntryError),
 
@@ -63,7 +63,7 @@ pub enum DatasetKeyBlockQueryError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DatasetKeyBlockSaveError {
+pub enum DatasetDataBlockSaveError {
     #[error("A block already exists at one of the sequence numbers {0:?}")]
     DuplicateSequenceNumber(Vec<u64>),
 
@@ -72,14 +72,6 @@ pub enum DatasetKeyBlockSaveError {
 
     #[error("Internal error: {0}")]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Invalid dataset ID '{dataset_id}' (no matching dataset entry available)")]
-pub struct DatasetUnmatchedEntryError {
-    pub dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

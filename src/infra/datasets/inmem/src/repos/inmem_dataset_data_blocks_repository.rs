@@ -19,20 +19,20 @@ use kamu_datasets::*;
 
 #[derive(Default)]
 struct State {
-    key_blocks: HashMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
+    data_blocks: HashMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDatasetKeyBlockRepository {
+pub struct InMemoryDatasetDataBlockRepository {
     state: Arc<Mutex<State>>,
 }
 
 #[component(pub)]
-#[interface(dyn DatasetKeyBlockRepository)]
+#[interface(dyn DatasetDataBlockRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
-impl InMemoryDatasetKeyBlockRepository {
+impl InMemoryDatasetDataBlockRepository {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -43,7 +43,7 @@ impl InMemoryDatasetKeyBlockRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
+impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
     async fn has_blocks(
         &self,
         dataset_id: &odf::DatasetID,
@@ -51,7 +51,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
     ) -> Result<bool, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .key_blocks
+            .data_blocks
             .get(&(dataset_id.clone(), block_ref.cheap_clone()))
             .is_some_and(|v| !v.is_empty()))
     }
@@ -61,14 +61,14 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
-    ) -> Result<(), DatasetKeyBlockSaveError> {
+    ) -> Result<(), DatasetDataBlockSaveError> {
         if blocks.is_empty() {
             return Ok(());
         }
 
         let mut guard = self.state.lock().unwrap();
         let entry = guard
-            .key_blocks
+            .data_blocks
             .entry((dataset_id.clone(), block_ref.cheap_clone()))
             .or_default();
 
@@ -78,7 +78,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .iter()
             .find(|b| existing.contains(&b.sequence_number))
         {
-            return Err(DatasetKeyBlockSaveError::DuplicateSequenceNumber(vec![
+            return Err(DatasetDataBlockSaveError::DuplicateSequenceNumber(vec![
                 dup.sequence_number,
             ]));
         }
@@ -88,14 +88,14 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         Ok(())
     }
 
-    async fn get_all_key_blocks(
+    async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError> {
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .key_blocks
+            .data_blocks
             .get(&(dataset_id.clone(), block_ref.cheap_clone()))
             .cloned()
             .unwrap_or_default())
@@ -112,7 +112,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
 
         for dataset_id in dataset_ids {
             if let Some(blocks) = guard
-                .key_blocks
+                .data_blocks
                 .get(&(dataset_id.clone(), block_ref.cheap_clone()))
                 && let Some(block) = blocks
                     .iter()
@@ -133,7 +133,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
         guard
-            .key_blocks
+            .data_blocks
             .remove(&(dataset_id.clone(), block_ref.cheap_clone()));
         Ok(())
     }
@@ -142,13 +142,13 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetEntryRemovalListener for InMemoryDatasetKeyBlockRepository {
+impl DatasetEntryRemovalListener for InMemoryDatasetDataBlockRepository {
     async fn on_dataset_entry_removed(
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
-        guard.key_blocks.retain(|(id, _), _| id != dataset_id);
+        guard.data_blocks.retain(|(id, _), _| id != dataset_id);
         Ok(())
     }
 }

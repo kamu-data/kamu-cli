@@ -19,7 +19,7 @@ use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_info_block(sequence_number: u64) -> DatasetKeyBlock {
+fn make_info_block(sequence_number: u64) -> DatasetBlock {
     let event = MetadataFactory::set_info()
         .description("Test dataset")
         .keyword("demo")
@@ -30,7 +30,7 @@ fn make_info_block(sequence_number: u64) -> DatasetKeyBlock {
     make_block(sequence_number, &block, MetadataEventType::SetInfo)
 }
 
-fn make_license_block(sequence_number: u64) -> DatasetKeyBlock {
+fn make_license_block(sequence_number: u64) -> DatasetBlock {
     let event = MetadataFactory::set_license()
         .short_name("MIT")
         .name("MIT License")
@@ -41,7 +41,7 @@ fn make_license_block(sequence_number: u64) -> DatasetKeyBlock {
     make_block(sequence_number, &block, MetadataEventType::SetLicense)
 }
 
-fn make_seed_block() -> DatasetKeyBlock {
+fn make_seed_block() -> DatasetBlock {
     let event = MetadataFactory::seed(odf::DatasetKind::Root).build();
 
     let block = MetadataFactory::metadata_block(event).build();
@@ -53,7 +53,7 @@ fn make_block(
     sequence_number: u64,
     block: &odf::MetadataBlock,
     kind: MetadataEventType,
-) -> DatasetKeyBlock {
+) -> DatasetBlock {
     let block_hash =
         odf::Multihash::from_digest_sha3_256(format!("block-{sequence_number}").as_bytes());
 
@@ -61,7 +61,7 @@ fn make_block(
         .write_manifest(block)
         .unwrap();
 
-    DatasetKeyBlock {
+    DatasetBlock {
         event_kind: kind,
         sequence_number,
         block_hash,

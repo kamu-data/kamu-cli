@@ -117,6 +117,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_postgres::PostgresDatasetReferenceRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetStatisticsRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetKeyBlockRepository>();
+            b.add::<kamu_datasets_postgres::PostgresDatasetDataBlockRepository>();
 
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowTriggerEventStore>();
@@ -154,6 +155,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
+            b.add::<kamu_datasets_inmem::InMemoryDatasetDataBlockRepository>();
 
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
@@ -187,6 +189,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_sqlite::SqliteDatasetReferenceRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetStatisticsRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetKeyBlockRepository>();
+            b.add::<kamu_datasets_sqlite::SqliteDatasetDataBlockRepository>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
@@ -240,6 +243,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
+    b.add::<kamu_datasets_inmem::InMemoryDatasetDataBlockRepository>();
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
