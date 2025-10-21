@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - Hotfix: merge error during polling ingest should be considered as unrecoverable failure
+- Hotfix: running flow task should clear "next_planned_at" field in the process state
 
 ## [0.251.1] - 2025-10-20
 ### Added

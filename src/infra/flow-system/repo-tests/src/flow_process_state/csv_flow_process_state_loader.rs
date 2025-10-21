@@ -277,6 +277,13 @@ impl CsvFlowProcessStateLoader {
                 .await
                 .expect("Failed to schedule flow");
 
+            // Then the task started running
+            let running_event_id = self.next_event_id();
+            self.flow_process_repository
+                .on_flow_task_running(running_event_id, flow_binding, event_time)
+                .await
+                .expect("Failed to mark flow task as running");
+
             // Then the event happened itself
             let flow_event_id = self.next_event_id();
             self.flow_process_repository

@@ -95,6 +95,11 @@ impl FlowProcessStateProjector {
                     .await?;
             }
 
+            FlowEvent::TaskRunning(_) => {
+                self.handle_flow_task_running_event(event_id, &flow_event)
+                    .await?;
+            }
+
             FlowEvent::Completed(e) => {
                 self.handle_flow_completed_event(event_id, &flow_event, e)
                     .await?;
@@ -106,7 +111,6 @@ impl FlowProcessStateProjector {
             | FlowEvent::ConfigSnapshotModified(_)
             | FlowEvent::StartConditionUpdated(_)
             | FlowEvent::TaskScheduled(_)
-            | FlowEvent::TaskRunning(_)
             | FlowEvent::TaskFinished(_) => {
                 // Ignored
             }
@@ -129,6 +133,36 @@ impl FlowProcessStateProjector {
                 flow_event.flow_binding(),
                 scheduled_event.scheduled_for_activation_at,
             )
+            .await
+        {
+            Ok(ps) => ps,
+            Err(FlowProcessFlowEventError::ConcurrentModification(e)) => {
+                return Err(e.int_err());
+            }
+            Err(FlowProcessFlowEventError::Internal(e)) => {
+                return Err(e);
+            }
+        };
+
+        // Apply any pending events that were generated as part of the state update
+        self.apply_flow_process_events(
+            flow_event.flow_binding(),
+            new_process_state.take_pending_events(),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn handle_flow_task_running_event(
+        &self,
+        event_id: EventID,
+        flow_event: &FlowEvent,
+    ) -> Result<(), InternalError> {
+        // Tracking "last attempted at" time for running flows
+        let mut new_process_state = match self
+            .flow_process_state_repository
+            .on_flow_task_running(event_id, flow_event.flow_binding(), flow_event.event_time())
             .await
         {
             Ok(ps) => ps,
