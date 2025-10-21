@@ -15,15 +15,15 @@ use kamu_datasets::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
-#[interface(dyn DatasetKeyBlockRepository)]
-pub struct PostgresDatasetKeyBlockRepository {
+#[interface(dyn DatasetDataBlockRepository)]
+pub struct PostgresDatasetDataBlockRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
+impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
     async fn has_blocks(
         &self,
         dataset_id: &odf::DatasetID,
@@ -33,7 +33,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         let conn = tr.connection_mut().await?;
 
         let result = sqlx::query_scalar!(
-            r#"SELECT 1 FROM dataset_key_blocks WHERE dataset_id = $1 AND block_ref_name = $2 LIMIT 1"#,
+            r#"SELECT 1 FROM dataset_data_blocks WHERE dataset_id = $1 AND block_ref_name = $2 LIMIT 1"#,
             dataset_id.to_string(),
             block_ref.as_str()
         )
@@ -44,11 +44,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         Ok(result.is_some())
     }
 
-    async fn get_all_key_blocks(
+    async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError> {
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -59,7 +59,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 sequence_number,
                 block_hash,
                 block_payload
-            FROM dataset_key_blocks
+            FROM dataset_data_blocks
             WHERE dataset_id = $1 AND block_ref_name = $2
             ORDER BY sequence_number
             "#,
@@ -100,7 +100,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 sequence_number,
                 block_hash,
                 block_payload
-            FROM dataset_key_blocks
+            FROM dataset_data_blocks
             WHERE
                 dataset_id = ANY($1) AND
                 block_ref_name = $2 AND
@@ -136,7 +136,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
-    ) -> Result<(), DatasetKeyBlockSaveError> {
+    ) -> Result<(), DatasetDataBlockSaveError> {
         if blocks.is_empty() {
             return Ok(());
         }
@@ -147,7 +147,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         let conn = tr.connection_mut().await?;
 
         let mut builder: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
-            "INSERT INTO dataset_key_blocks (
+            "INSERT INTO dataset_data_blocks (
                 dataset_id,
                 block_ref_name,
                 event_type,
@@ -174,7 +174,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
-                DatasetKeyBlockSaveError::DuplicateSequenceNumber(
+                DatasetDataBlockSaveError::DuplicateSequenceNumber(
                     // We can't know which block caused it in batch insert
                     blocks.iter().map(|b| b.sequence_number).collect(),
                 )
@@ -184,7 +184,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                     "Foreign key constraint failed while batch inserting key blocks: {}",
                     e.message()
                 );
-                DatasetKeyBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
+                DatasetDataBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
                     dataset_id: dataset_id.clone(),
                 })
             }
@@ -204,7 +204,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
 
         sqlx::query!(
             r#"
-            DELETE FROM dataset_key_blocks
+            DELETE FROM dataset_data_blocks
                 WHERE dataset_id = $1 AND block_ref_name = $2
             "#,
             dataset_id.to_string(),
