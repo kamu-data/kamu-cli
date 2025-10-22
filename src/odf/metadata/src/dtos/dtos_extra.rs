@@ -418,6 +418,10 @@ impl MetadataEventTypeFlags {
     pub fn has_data_flags(&self) -> bool {
         !(*self & Self::DATA_BLOCK).is_empty()
     }
+
+    pub fn has_key_block_flags(&self) -> bool {
+        !(*self & Self::KEY_BLOCK).is_empty()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

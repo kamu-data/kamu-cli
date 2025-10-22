@@ -420,6 +420,7 @@ impl TestHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()

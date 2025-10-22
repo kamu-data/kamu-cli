@@ -375,6 +375,7 @@ impl ServerHarness {
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add::<InMemoryAccountRepository>()

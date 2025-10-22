@@ -49,6 +49,7 @@ use kamu_core::{
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
+    InMemoryDatasetDataBlockRepository,
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
@@ -163,6 +164,7 @@ impl ServerSideLocalFsHarness {
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()

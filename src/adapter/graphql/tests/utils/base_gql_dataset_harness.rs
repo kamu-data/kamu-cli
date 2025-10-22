@@ -78,8 +78,10 @@ impl BaseGQLDatasetHarness {
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add::<DatasetKeyBlockUpdateHandler>()
+                .add::<DatasetDataBlockUpdateHandler>()
                 .add_value(RunInfoDir::new(run_info_dir));
 
             if let Some(mock) = mock_dataset_action_authorizer {
