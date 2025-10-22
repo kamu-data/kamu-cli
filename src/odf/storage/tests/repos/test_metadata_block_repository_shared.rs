@@ -11,8 +11,6 @@ use std::assert_matches::assert_matches;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use odf_metadata::serde::MetadataBlockSerializer;
-use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::*;
 use opendatafabric_storage::*;
 
@@ -52,9 +50,7 @@ pub fn create_block() -> (MetadataBlock, Bytes, Multihash, u64) {
             keywords: None,
         }),
     };
-    let block_data = FlatbuffersMetadataBlockSerializer
-        .write_manifest(&block)
-        .unwrap();
+    let block_data = serialize_metadata_block(&block).unwrap();
     let hash = Multihash::from_multibase(
         "f16205603b882241c71351baf996d6dba7e3ddbd571457e93c1cd282bdc61f9fed5f2",
     )
