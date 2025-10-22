@@ -222,18 +222,13 @@ pub(crate) fn make_key_block(
     block_hash: odf::Multihash,
     block: &odf::MetadataBlock,
 ) -> DatasetBlock {
-    use odf::serde::MetadataBlockSerializer;
-    use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-
-    let block_data = FlatbuffersMetadataBlockSerializer
-        .write_manifest(block)
-        .unwrap();
+    let block_data = odf::storage::serialize_metadata_block(block).unwrap();
 
     DatasetBlock {
         event_kind: MetadataEventType::from_metadata_event(&block.event),
         sequence_number: block.sequence_number,
         block_hash,
-        block_payload: bytes::Bytes::from(block_data.collapse_vec()),
+        block_payload: bytes::Bytes::from(block_data),
     }
 }
 

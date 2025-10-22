@@ -12,8 +12,6 @@ use std::assert_matches::assert_matches;
 use dill::Catalog;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
-use odf::serde::MetadataBlockSerializer;
-use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 
 use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
 
@@ -57,15 +55,13 @@ fn make_block(
     let block_hash =
         odf::Multihash::from_digest_sha3_256(format!("block-{sequence_number}").as_bytes());
 
-    let block_data = FlatbuffersMetadataBlockSerializer
-        .write_manifest(block)
-        .unwrap();
+    let block_payload = bytes::Bytes::from(odf::storage::serialize_metadata_block(block).unwrap());
 
     DatasetBlock {
         event_kind: kind,
         sequence_number,
         block_hash,
-        block_payload: bytes::Bytes::from(block_data.collapse_vec()),
+        block_payload,
     }
 }
 
