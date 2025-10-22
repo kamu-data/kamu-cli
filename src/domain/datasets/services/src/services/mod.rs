@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod data_blocks;
 mod dataset_account_lifecycle_handler;
 mod dataset_alias_update_handler;
 mod dataset_increment_query_service_impl;
@@ -18,6 +19,7 @@ mod odf;
 mod refs;
 mod statistics;
 
+pub use data_blocks::*;
 pub use dataset_account_lifecycle_handler::*;
 pub use dataset_alias_update_handler::*;
 pub use dataset_increment_query_service_impl::*;

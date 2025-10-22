@@ -30,6 +30,9 @@ pub const MESSAGE_CONSUMER_KAMU_DATASET_STATISTICS_UPDATE_HANDLER: &str =
 pub const MESSAGE_CONSUMER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER: &str =
     "dev.kamu.domain.datasets.DatasetKeyBlockUpdateHandler";
 
+pub const MESSAGE_CONSUMER_KAMU_DATASET_DATA_BLOCK_UPDATE_HANDLER: &str =
+    "dev.kamu.domain.datasets.DatasetDataBlockUpdateHandler";
+
 pub const MESSAGE_CONSUMER_KAMU_DATASETS_LIFECYCLE_HANDLER: &str =
     "dev.kamu.domain.datasets.DatasetsLifecycleHandler";
 
