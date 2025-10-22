@@ -21,6 +21,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
         b.add::<DatasetStatisticsIndexer>();
         b.add::<DependencyGraphIndexer>();
         b.add::<DatasetKeyBlockIndexer>();
+        b.add::<DatasetDataBlockIndexer>();
     }
 
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
@@ -43,6 +44,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
 
     b.add::<DatasetAliasUpdateHandler>();
     b.add::<DatasetKeyBlockUpdateHandler>();
+    b.add::<DatasetDataBlockUpdateHandler>();
     b.add::<DatasetStatisticsUpdateHandler>();
     b.add::<DependencyGraphImmediateListener>();
 
