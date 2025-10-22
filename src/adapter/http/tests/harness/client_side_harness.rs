@@ -36,6 +36,7 @@ use kamu_auth_rebac_services::{
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
+    InMemoryDatasetDataBlockRepository,
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
@@ -193,6 +194,7 @@ impl ClientSideHarness {
         b.add::<DatasetEntryServiceImpl>();
         b.add::<InMemoryDatasetEntryRepository>();
         b.add::<InMemoryDatasetKeyBlockRepository>();
+        b.add::<InMemoryDatasetDataBlockRepository>();
 
         b.add::<InMemoryDidSecretKeyRepository>();
 

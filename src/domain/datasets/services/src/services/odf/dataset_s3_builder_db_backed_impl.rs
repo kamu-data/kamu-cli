@@ -48,6 +48,7 @@ impl odf::dataset::DatasetS3Builder for DatasetS3BuilderDatabaseBackedImpl {
                 MetadataChainDatabaseBackedImpl::new(
                     dataset_id.clone(),
                     self.catalog.get_one().unwrap(),
+                    self.catalog.get_one().unwrap(),
                     MetadataChainImpl::new(
                         DatasetS3BuilderDefault::build_meta_block_repo(
                             odf::storage::lfs::ObjectRepositoryCachingLocalFs::new(
@@ -71,6 +72,7 @@ impl odf::dataset::DatasetS3Builder for DatasetS3BuilderDatabaseBackedImpl {
             Arc::new(DatasetImpl::new(
                 MetadataChainDatabaseBackedImpl::new(
                     dataset_id.clone(),
+                    self.catalog.get_one().unwrap(),
                     self.catalog.get_one().unwrap(),
                     MetadataChainImpl::new(
                         DatasetS3BuilderDefault::build_meta_block_repo(
