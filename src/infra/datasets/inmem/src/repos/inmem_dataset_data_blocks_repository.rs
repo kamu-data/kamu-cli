@@ -101,31 +101,6 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
             .unwrap_or_default())
     }
 
-    async fn match_datasets_having_blocks(
-        &self,
-        dataset_ids: &[odf::DatasetID],
-        block_ref: &odf::BlockRef,
-        event_type: MetadataEventType,
-    ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        let mut result = Vec::new();
-
-        for dataset_id in dataset_ids {
-            if let Some(blocks) = guard
-                .data_blocks
-                .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-                && let Some(block) = blocks
-                    .iter()
-                    .rev()
-                    .find(|block| block.event_kind == event_type)
-            {
-                result.push((dataset_id.clone(), block.clone()));
-            }
-        }
-
-        Ok(result)
-    }
-
     async fn delete_all_for_ref(
         &self,
         dataset_id: &odf::DatasetID,

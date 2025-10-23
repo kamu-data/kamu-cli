@@ -22,16 +22,18 @@ where
     dataset_id: odf::DatasetID,
     metadata_chain: TMetadataChain,
     state: RwLock<State>,
+    key_blocks_loading_lock: tokio::sync::Mutex<()>,
+    data_blocks_loading_lock: tokio::sync::Mutex<()>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct State {
     /// Key blocks
-    cached_key_blocks: CachedBlocksRange,
+    cached_key_blocks: Option<CachedBlocksRange>,
 
     /// Data blocks
-    cached_data_blocks: CachedBlocksRange,
+    cached_data_blocks: Option<CachedBlocksRange>,
 
     /// A detachable key block repository component
     maybe_dataset_key_block_repo: Option<Arc<dyn DatasetKeyBlockRepository>>,
@@ -46,8 +48,8 @@ impl State {
         dataset_data_block_repo: Arc<dyn DatasetDataBlockRepository>,
     ) -> Self {
         Self {
-            cached_key_blocks: CachedBlocksRange::new(),
-            cached_data_blocks: CachedBlocksRange::new(),
+            cached_key_blocks: None,
+            cached_data_blocks: None,
             maybe_dataset_key_block_repo: Some(dataset_key_block_repo),
             maybe_dataset_data_block_repo: Some(dataset_data_block_repo),
         }
@@ -58,7 +60,8 @@ impl State {
         (min_boundary, max_boundary): (u64, u64),
     ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
         self.cached_key_blocks
-            .get_cached_blocks_for_range((min_boundary, max_boundary))
+            .as_ref()
+            .and_then(|ckb| ckb.get_cached_blocks_for_range((min_boundary, max_boundary)))
     }
 
     fn get_cached_data_blocks_for_range(
@@ -66,24 +69,9 @@ impl State {
         (min_boundary, max_boundary): (u64, u64),
     ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
         self.cached_data_blocks
-            .get_cached_blocks_for_range((min_boundary, max_boundary))
+            .as_ref()
+            .and_then(|cdb| cdb.get_cached_blocks_for_range((min_boundary, max_boundary)))
     }
-
-    fn summary(&self) -> CachedStateSummary {
-        CachedStateSummary {
-            key_blocks_cached: self.cached_key_blocks.len() > 0,
-            data_blocks_cached: self.cached_data_blocks.len() > 0,
-            maybe_key_blocks_repo: self.maybe_dataset_key_block_repo.clone(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct CachedStateSummary {
-    key_blocks_cached: bool,
-    data_blocks_cached: bool,
-    maybe_key_blocks_repo: Option<Arc<dyn DatasetKeyBlockRepository>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,11 +89,25 @@ struct CachedBlocksRange {
 }
 
 impl CachedBlocksRange {
-    fn new() -> Self {
+    fn new(block_rows: Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>) -> Self {
+        let mut blocks = Vec::with_capacity(block_rows.len());
+        let mut original_block_payloads = Vec::with_capacity(block_rows.len());
+
+        for (hash, payload, block) in block_rows {
+            blocks.push((hash, block));
+            original_block_payloads.push(payload);
+        }
+
+        let blocks_lookup = blocks
+            .iter()
+            .enumerate()
+            .map(|(idx, (hash, _))| (hash.clone(), idx))
+            .collect();
+
         Self {
-            blocks: Vec::new(),
-            original_block_payloads: Vec::new(),
-            blocks_lookup: HashMap::new(),
+            blocks,
+            original_block_payloads,
+            blocks_lookup,
         }
     }
 
@@ -134,31 +136,6 @@ impl CachedBlocksRange {
         self.blocks_lookup
             .get(hash)
             .map(|&idx| self.original_block_payloads[idx].clone())
-    }
-
-    fn cache_blocks(&mut self, blocks: Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>) {
-        self.blocks = Vec::with_capacity(blocks.len());
-        self.original_block_payloads = Vec::with_capacity(blocks.len());
-
-        for (hash, payload, block) in blocks {
-            self.blocks.push((hash, block));
-            self.original_block_payloads.push(payload);
-        }
-
-        self.blocks_lookup = self
-            .blocks
-            .iter()
-            .enumerate()
-            .map(|(idx, (hash, _))| (hash.clone(), idx))
-            .collect();
-    }
-
-    fn append_block(&mut self, hash: &odf::Multihash, block: &odf::MetadataBlock) {
-        let payload = bytes::Bytes::from(odf::storage::serialize_metadata_block(block).unwrap());
-
-        self.blocks_lookup.insert(hash.clone(), self.blocks.len());
-        self.blocks.push((hash.clone(), block.clone()));
-        self.original_block_payloads.push(payload);
     }
 
     fn get_cached_blocks_for_range(
@@ -210,6 +187,8 @@ where
             dataset_id,
             metadata_chain,
             state: RwLock::new(State::new(dataset_key_block_repo, dataset_data_block_repo)),
+            key_blocks_loading_lock: tokio::sync::Mutex::default(),
+            data_blocks_loading_lock: tokio::sync::Mutex::default(),
         }
     }
 
@@ -226,226 +205,123 @@ where
             .cloned()
     }
 
-    /// Generic helper method for block operations that follow the same pattern:
-    ///  - check existing caches for keys and data blocks first
-    ///  - if missing, and key blocks cache is not yet loaded, attempt loading
-    ///  - don't attempt loading data blocks into cache, this is expensive
-    ///  - if still not found, fall back to the underlying chain operation
-    async fn get_from_cache_or_fallback<T, E, F, G>(
-        &self,
-        hash: &odf::Multihash,
-        cache_lookup: F,
-        fallback_operation: G,
-    ) -> Result<T, E>
-    where
-        F: Fn(&CachedBlocksRange, &odf::Multihash) -> Option<T>,
-        G: std::future::Future<Output = Result<T, E>>,
-        E: From<InternalError>,
-    {
-        // First, try to find the block in the cache - keys or data
-        let cache_summary = {
-            // Summarize state of the cache
+    async fn ensure_key_blocks_are_preloaded(&self) -> Result<(), InternalError> {
+        // Try getting access to repository
+        let maybe_key_block_repository = {
+            // Ignore if already loaded
             let read_guard = self.state.read().unwrap();
-            let summary = read_guard.summary();
-
-            // Check key blocks cache
-            if summary.key_blocks_cached
-                && let Some(result) = cache_lookup(&read_guard.cached_key_blocks, hash)
-            {
-                return Ok(result);
+            if read_guard.cached_key_blocks.is_some() {
+                return Ok(());
             }
 
-            // Check data blocks cache
-            if summary.data_blocks_cached
-                && let Some(result) = cache_lookup(&read_guard.cached_data_blocks, hash)
-            {
-                return Ok(result);
-            }
-
-            // No answer in caches yet
-            summary
+            // Not loaded. Try looking at repository
+            read_guard.maybe_dataset_key_block_repo.clone()
         };
 
-        // If we are here, the block is not in the cache
-        // Maybe there is no key block cache at all yet?
-        if !cache_summary.key_blocks_cached {
-            // Attempt loading key blocks into cache
-            if let Some(dataset_key_blocks_repo) = cache_summary.maybe_key_blocks_repo {
-                self.try_load_key_blocks_into_cache(dataset_key_blocks_repo.as_ref())
-                    .await?;
+        // If there is a repository, we could try loading
+        if let Some(key_block_repository) = maybe_key_block_repository {
+            // Take loading lock
+            let loading_guard = self.key_blocks_loading_lock.lock().await;
+
+            // Try again, maybe another task has loaded key blocks already
+            {
+                // Ignore if already loaded
+                let read_guard = self.state.read().unwrap();
+                if read_guard.cached_key_blocks.is_some() {
+                    return Ok(());
+                }
             }
 
-            // Check again in the cache - just the key blocks
-            let read_guard = self.state.read().unwrap();
-            if let Some(result) = cache_lookup(&read_guard.cached_key_blocks, hash) {
-                return Ok(result);
+            // Read all key blocks of this dataset
+            // No worries, there usually are not many of those, we can read entirely
+            let key_block_records = key_block_repository
+                .get_all_key_blocks(&self.dataset_id, &odf::BlockRef::Head)
+                .await
+                .int_err()?;
+
+            if key_block_records.is_empty() {
+                // At least Seed exists in every dataset.
+                // If the result is empty, there was no indexing yet
+                tracing::warn!(dataset_id=%self.dataset_id, "Key blocks of the dataset are not indexed");
+                return Ok(());
             }
-        }
 
-        // Do not attempt loading data blocks into cache - this is expensive
-
-        // Fall back to the underlying operation in the raw chain
-        fallback_operation.await
-    }
-
-    async fn try_load_key_blocks_into_cache(
-        &self,
-        key_block_repository: &dyn DatasetKeyBlockRepository,
-    ) -> Result<(), InternalError> {
-        // Read all key blocks of this dataset
-        // No worries, there usually are not many of those, we can read entirely
-        let key_block_records = key_block_repository
-            .get_all_key_blocks(&self.dataset_id, &odf::BlockRef::Head)
-            .await
-            .int_err()?;
-
-        // Convert the key blocks to the metadata blocks
-        let key_blocks = key_block_records
-            .into_iter()
-            .map(|key_block| {
-                odf::storage::deserialize_metadata_block(
-                    &key_block.block_hash,
-                    &key_block.block_payload,
-                )
-                .map(|metadata_block| {
-                    (
-                        key_block.block_hash,
-                        key_block.block_payload,
-                        metadata_block,
+            // Convert the key blocks to the metadata blocks
+            let key_blocks = key_block_records
+                .into_iter()
+                .map(|key_block| {
+                    odf::storage::deserialize_metadata_block(
+                        &key_block.block_hash,
+                        &key_block.block_payload,
                     )
+                    .map(|metadata_block| {
+                        (
+                            key_block.block_hash,
+                            key_block.block_payload,
+                            metadata_block,
+                        )
+                    })
+                    .int_err()
                 })
-                .int_err()
-            })
-            .collect::<Result<Vec<_>, InternalError>>()?;
+                .collect::<Result<Vec<_>, InternalError>>()?;
 
-        // Cache the key blocks
-        let mut write_guard = self.state.write().unwrap();
-        assert!(write_guard.cached_key_blocks.len() == 0);
-        write_guard.cached_key_blocks.cache_blocks(key_blocks);
+            // Form resulting structure
+            let cached_key_blocks = CachedBlocksRange::new(key_blocks);
 
-        // Report cache miss
-        tracing::trace!(
-            dataset_id=%self.dataset_id,
-            num_blocks = write_guard.cached_key_blocks.len(),
-            "No key blocks cached. Loaded key blocks from the repository"
-        );
-        Ok(())
-    }
+            // Report cache fill operation
+            tracing::trace!(
+                dataset_id=%self.dataset_id,
+                num_blocks = cached_key_blocks.len(),
+                "No key blocks cached. Loaded key blocks from the repository"
+            );
 
-    async fn get_key_block_with_hint(
-        &self,
-        requested_boundary: (u64, u64),
-        hint_flags: odf::metadata::MetadataEventTypeFlags,
-    ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
-        // First, try to read the ready answer from the cache
-        let cache_summary = {
-            let read_guard = self.state.read().unwrap();
-            if let Some(cached_blocks_in_range) =
-                read_guard.get_cached_key_blocks_for_range(requested_boundary)
+            // Fix loaded state
             {
-                // Report cache hit
-                tracing::trace!(
-                    dataset_id=%self.dataset_id,
-                    num_blocks = cached_blocks_in_range.len(),
-                    "Found key blocks in the cache"
-                );
-
-                // We have cached blocks in the requested range
-                // Filter them by the requested flags, starting from the last one.
-                if let Some(found_block_hint) =
-                    Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
-                {
-                    return Ok(BlockLookupResult::Found(found_block_hint));
-                }
-
-                // Note that if there is no cached block matching the hints,
-                // it means we can stop searching in general
-                return Ok(BlockLookupResult::Stop);
+                let mut write_guard = self.state.write().unwrap();
+                write_guard.cached_key_blocks = Some(cached_key_blocks);
             }
 
-            // If we are here, the cache is empty or does not contain the requested range
-            read_guard.summary()
-        };
-
-        // At this point we must ensure the cache could be still filled
-        if !cache_summary.key_blocks_cached
-            && let Some(dataset_key_blocks_repo) = cache_summary.maybe_key_blocks_repo
-        {
-            // Attempt loading cache
-            self.try_load_key_blocks_into_cache(dataset_key_blocks_repo.as_ref())
-                .await?;
-
-            // Pick the matching slice for the requested range
-            let read_guard = self.state.read().unwrap();
-            if let Some(cached_blocks_in_range) =
-                read_guard.get_cached_key_blocks_for_range(requested_boundary)
-            {
-                // Filter them by the requested flags, starting from the last one.
-                if let Some(found_block_hint) =
-                    Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
-                {
-                    return Ok(BlockLookupResult::Found(found_block_hint));
-                }
-
-                // Note that if there is no cached block matching the hints,
-                // it means we can stop searching in general
-                return Ok(BlockLookupResult::Stop);
-            }
-
-            // Trace confidently. At least Seed exists in every dataset.
-            // If the result is empty, there was no indexing yet
-            tracing::warn!(dataset_id=%self.dataset_id, "Key blocks of the dataset are not indexed");
+            // Unlock loading guard
+            drop(loading_guard);
         } else {
             // The repository is detached. We cannot provide any quick answers,
             //  so fall back to the linear iteration
             tracing::warn!(dataset_id=%self.dataset_id, "Key blocks repository is detached. Cannot read key blocks");
         }
 
-        Ok(BlockLookupResult::NotFound)
+        Ok(())
     }
 
-    async fn get_data_block_with_hint(
-        &self,
-        requested_boundary: (u64, u64),
-        hint_flags: odf::metadata::MetadataEventTypeFlags,
-    ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
-        // First, try to read the ready answer from the cache
+    async fn ensure_data_blocks_are_preloaded(&self) -> Result<(), InternalError> {
+        // Try getting access to repository
         let maybe_data_block_repository = {
+            // Ignore if already loaded
             let read_guard = self.state.read().unwrap();
-            if let Some(cached_blocks_in_range) =
-                read_guard.get_cached_data_blocks_for_range(requested_boundary)
-            {
-                // Report cache hit
-                tracing::trace!(
-                    dataset_id=%self.dataset_id,
-                    num_blocks = cached_blocks_in_range.len(),
-                    "Found data blocks in the cache"
-                );
-
-                // We have cached blocks in the requested range
-                // Filter them by the requested flags, starting from the last one.
-                if let Some(found_block_hint) =
-                    Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
-                {
-                    return Ok(BlockLookupResult::Found(found_block_hint));
-                }
-
-                // Note that if there is no cached block matching the hints, this does not mean
-                // anything, unlike key blocks. There might be still data blocks
-                // in the earlier pages, we don't know that for sure.
-                return Ok(BlockLookupResult::NotFound);
+            if read_guard.cached_data_blocks.is_some() {
+                return Ok(());
             }
 
-            // If we are here, the cache is empty or does not contain the requested range
-            // Check if the repository is attached
+            // Not loaded. Try looking at repository
             read_guard.maybe_dataset_data_block_repo.clone()
         };
 
-        // At this point we must ensure the cache could be still filled
-        if let Some(dataset_data_block_repo) = maybe_data_block_repository {
+        // If there is a repository, we could try loading
+        if let Some(data_block_repository) = maybe_data_block_repository {
+            // Take loading lock
+            let loading_guard = self.data_blocks_loading_lock.lock().await;
+
+            // Try again, maybe another task has loaded data blocks already
+            {
+                // Ignore if already loaded
+                let read_guard = self.state.read().unwrap();
+                if read_guard.cached_data_blocks.is_some() {
+                    return Ok(());
+                }
+            }
+
             // Temporary: read all data blocks of this dataset
             // TODO: read in pages, not all at once
-            let data_block_records = dataset_data_block_repo
+            let data_block_records = data_block_repository
                 .get_all_data_blocks(&self.dataset_id, &odf::BlockRef::Head)
                 .await
                 .int_err()?;
@@ -469,40 +345,145 @@ where
                 })
                 .collect::<Result<Vec<_>, InternalError>>()?;
 
-            // Cache the data blocks
-            let mut write_guard = self.state.write().unwrap();
-            write_guard.cached_data_blocks.cache_blocks(data_blocks);
+            // Form resulting structure
+            let cached_data_blocks = CachedBlocksRange::new(data_blocks);
 
-            // Report cache miss
+            // Report cache load operation
             tracing::trace!(
                 dataset_id=%self.dataset_id,
-                num_blocks = write_guard.cached_data_blocks.len(),
+                num_blocks = cached_data_blocks.len(),
                 "No data blocks cached. Loaded data blocks from the repository"
             );
 
-            // Pick the matching slice for the requested range
-            if let Some(cached_blocks_in_range) =
-                write_guard.get_cached_data_blocks_for_range(requested_boundary)
+            // Fix loaded state
             {
-                // Filter them by the requested flags, starting from the last one.
-                if let Some(found_block_hint) =
-                    Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
-                {
-                    return Ok(BlockLookupResult::Found(found_block_hint));
-                }
-
-                // Note that if there is no cached block matching the hints, this does not mean
-                // anything, unlike key blocks. There might be still data blocks
-                // in the earlier pages, we don't know that for sure.
-                return Ok(BlockLookupResult::NotFound);
+                let mut write_guard = self.state.write().unwrap();
+                write_guard.cached_data_blocks = Some(cached_data_blocks);
             }
 
-            // We don't know if there are data blocks at all or they haven't
-            // been indexed yet
+            // Unlock loading guard
+            drop(loading_guard);
         } else {
             // The repository is detached. We cannot provide any quick answers,
             //  so fall back to the linear iteration
             tracing::warn!(dataset_id=%self.dataset_id, "Data blocks repository is detached. Cannot read data blocks");
+        }
+
+        Ok(())
+    }
+
+    /// Generic helper method for block operations that follow the same pattern:
+    ///  - check existing caches for keys and data blocks first
+    ///  - if missing, and key blocks cache is not yet loaded, attempt loading
+    ///  - don't attempt loading data blocks into cache, this is expensive
+    ///  - if still not found, fall back to the underlying chain operation
+    async fn get_from_cache_or_fallback<T, E, F, G>(
+        &self,
+        hash: &odf::Multihash,
+        cache_lookup: F,
+        fallback_operation: G,
+    ) -> Result<T, E>
+    where
+        F: Fn(&CachedBlocksRange, &odf::Multihash) -> Option<T>,
+        G: std::future::Future<Output = Result<T, E>>,
+        E: From<InternalError>,
+    {
+        // Force loading key blocks unless it was already done
+        self.ensure_key_blocks_are_preloaded().await?;
+
+        // First, try to find the block in the cache - keys or data
+        {
+            let read_guard = self.state.read().unwrap();
+
+            // Check key blocks cache. Preload it if necessary
+            if let Some(cached_key_blocks) = read_guard.cached_key_blocks.as_ref()
+                && let Some(result) = cache_lookup(cached_key_blocks, hash)
+            {
+                return Ok(result);
+            }
+
+            // Check data blocks cache, but don't preload anything.
+            if let Some(cached_data_blocks) = read_guard.cached_data_blocks.as_ref()
+                && let Some(result) = cache_lookup(cached_data_blocks, hash)
+            {
+                return Ok(result);
+            }
+        };
+
+        // Do not attempt loading data blocks into cache - this is expensive
+
+        // Fall back to the underlying operation in the raw chain
+        fallback_operation.await
+    }
+
+    async fn get_key_block_with_hint(
+        &self,
+        requested_boundary: (u64, u64),
+        hint_flags: odf::metadata::MetadataEventTypeFlags,
+    ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
+        // Force loading key blocks unless it was already done
+        self.ensure_key_blocks_are_preloaded().await?;
+
+        // Read what's in the key blocks cache
+        let read_guard = self.state.read().unwrap();
+        if let Some(cached_blocks_in_range) =
+            read_guard.get_cached_key_blocks_for_range(requested_boundary)
+        {
+            // Report cache hit
+            tracing::trace!(
+                dataset_id=%self.dataset_id,
+                num_blocks = cached_blocks_in_range.len(),
+                "Found key blocks in the cache"
+            );
+
+            // We have cached blocks in the requested range
+            // Filter them by the requested flags, starting from the last one.
+            if let Some(found_block_hint) =
+                Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
+            {
+                return Ok(BlockLookupResult::Found(found_block_hint));
+            }
+
+            // Note that if there is no cached block matching the hints,
+            // it means we can stop searching in general
+            return Ok(BlockLookupResult::Stop);
+        }
+
+        Ok(BlockLookupResult::NotFound)
+    }
+
+    async fn get_data_block_with_hint(
+        &self,
+        requested_boundary: (u64, u64),
+        hint_flags: odf::metadata::MetadataEventTypeFlags,
+    ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
+        // Force loading data blocks unless it was already done
+        self.ensure_data_blocks_are_preloaded().await?;
+
+        // Read what's in the data blocks cache
+        let read_guard = self.state.read().unwrap();
+        if let Some(cached_blocks_in_range) =
+            read_guard.get_cached_data_blocks_for_range(requested_boundary)
+        {
+            // Report cache hit
+            tracing::trace!(
+                dataset_id=%self.dataset_id,
+                num_blocks = cached_blocks_in_range.len(),
+                "Found data blocks in the cache"
+            );
+
+            // We have cached blocks in the requested range
+            // Filter them by the requested flags, starting from the last one.
+            if let Some(found_block_hint) =
+                Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
+            {
+                return Ok(BlockLookupResult::Found(found_block_hint));
+            }
+
+            // Note that if there is no cached block matching the hints, this
+            // does not mean anything, unlike key blocks.
+            // There might be still data blocks in the earlier pages,
+            // we don't know that for sure.
         }
 
         Ok(BlockLookupResult::NotFound)
@@ -575,42 +556,24 @@ where
         block: odf::MetadataBlock,
         opts: odf::dataset::AppendOpts<'a>,
     ) -> Result<odf::Multihash, odf::dataset::AppendError> {
-        // Determine if we have any caches loaded
-        let cache_summary = {
-            let read_guard = self.state.read().unwrap();
-            read_guard.summary()
-        };
-
         // Classify the block type
         let block_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
 
-        // Key block and key blocks are cached?
-        if block_flags.has_key_block_flags() && cache_summary.key_blocks_cached {
-            // Write the block to the underlying chain
-            let hash = self.metadata_chain.append(block.clone(), opts).await?;
-
-            // Update the cache of key blocks
+        // Key block
+        if block_flags.has_key_block_flags() {
+            // If there is anything cached for key blocks, we must reset it
             let mut write_guard = self.state.write().unwrap();
-            write_guard.cached_key_blocks.append_block(&hash, &block);
+            write_guard.cached_key_blocks = None;
 
-            // Resulting hash
-            Ok(hash)
-
-        // Data block and data blocks are cached?
-        } else if block_flags.has_data_flags() && cache_summary.data_blocks_cached {
-            // Write the block to the underlying chain
-            let hash = self.metadata_chain.append(block.clone(), opts).await?;
-
-            // Update the cache of data blocks
+        // Data block
+        } else if block_flags.has_data_flags() {
+            // If there is anything cached for data blocks, we must reset it
             let mut write_guard = self.state.write().unwrap();
-            write_guard.cached_data_blocks.append_block(&hash, &block);
-
-            // Resulting hash
-            Ok(hash)
-        } else {
-            // No caches to update, just append to the underlying chain
-            self.metadata_chain.append(block, opts).await
+            write_guard.cached_data_blocks = None;
         }
+
+        // Append the block to the underlying chain
+        self.metadata_chain.append(block, opts).await
     }
 
     async fn resolve_ref(

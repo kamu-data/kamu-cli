@@ -9,10 +9,9 @@
 
 // Copyright Kamu Data, Inc. and contributors. All rights reserved.
 
-use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -106,82 +105,6 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
         Ok(rows
             .into_iter()
             .map(DatasetDataBlockRow::into_domain)
-            .collect())
-    }
-
-    async fn match_datasets_having_blocks(
-        &self,
-        dataset_ids: &[odf::DatasetID],
-        block_ref: &odf::BlockRef,
-        event_type: MetadataEventType,
-    ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let dataset_ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
-
-        #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-        struct DataBlockRow {
-            pub dataset_id: String,
-            pub event_type: String,
-            pub sequence_number: i64,
-            pub block_hash: String,
-            pub block_payload: Vec<u8>,
-        }
-
-        let query_str = format!(
-            r#"
-            SELECT
-                ddb.dataset_id,
-                ddb.event_type,
-                ddb.sequence_number,
-                ddb.block_hash,
-                ddb.block_payload
-            FROM dataset_data_blocks ddb
-            JOIN (
-                SELECT
-                    dataset_id,
-                    MAX(sequence_number) AS max_seq
-                FROM dataset_data_blocks
-                WHERE
-                    block_ref_name = $1 AND
-                    event_type = $2 AND
-                    dataset_id IN ({})
-                GROUP BY dataset_id
-            ) latest
-            ON
-                ddb.dataset_id = latest.dataset_id AND
-                ddb.sequence_number = latest.max_seq
-            WHERE
-                ddb.block_ref_name = $1 AND
-                ddb.event_type = $2 AND
-                ddb.dataset_id IN ({})
-            "#,
-            // Generate same list twice to avoid duplicate binding
-            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
-            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
-        );
-
-        let mut query = sqlx::query_as::<_, DataBlockRow>(&query_str);
-        query = query.bind(block_ref.as_str()).bind(event_type.to_string());
-        for dataset_id in dataset_ids {
-            query = query.bind(dataset_id);
-        }
-
-        let raw_rows = query.fetch_all(conn).await.int_err()?;
-
-        Ok(raw_rows
-            .into_iter()
-            .map(|r| {
-                let dataset_id = odf::DatasetID::from_did_str(&r.dataset_id).unwrap();
-                let key_block = DatasetBlock {
-                    event_kind: MetadataEventType::from_str(&r.event_type).unwrap(),
-                    sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                    block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
-                    block_payload: bytes::Bytes::from(r.block_payload),
-                };
-                (dataset_id, key_block)
-            })
             .collect())
     }
 
