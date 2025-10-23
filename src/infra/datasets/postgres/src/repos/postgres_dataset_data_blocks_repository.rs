@@ -57,7 +57,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
             SELECT
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             FROM dataset_data_blocks
             WHERE dataset_id = $1 AND block_ref_name = $2
@@ -75,58 +75,8 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
             .map(|r| DatasetBlock {
                 event_kind: r.event_type,
                 sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                block_hash: odf::Multihash::from_digest_sha3_256(&r.block_hash_bin),
                 block_payload: bytes::Bytes::from(r.block_payload),
-            })
-            .collect())
-    }
-
-    async fn match_datasets_having_blocks(
-        &self,
-        dataset_ids: &[odf::DatasetID],
-        block_ref: &odf::BlockRef,
-        event_type: MetadataEventType,
-    ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let dataset_ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
-
-        let rows = sqlx::query!(
-            r#"
-            SELECT DISTINCT ON (dataset_id)
-                dataset_id,
-                event_type as "event_type: MetadataEventType",
-                sequence_number,
-                block_hash,
-                block_payload
-            FROM dataset_data_blocks
-            WHERE
-                dataset_id = ANY($1) AND
-                block_ref_name = $2 AND
-                event_type = ($3::text)::metadata_event_type
-            ORDER BY dataset_id, sequence_number DESC
-            "#,
-            &dataset_ids,
-            block_ref.as_str(),
-            event_type.to_string()
-        )
-        .fetch_all(conn)
-        .await
-        .int_err()?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| {
-                (
-                    odf::DatasetID::from_did_str(&r.dataset_id).unwrap(),
-                    DatasetBlock {
-                        event_kind: r.event_type,
-                        sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                        block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
-                        block_payload: bytes::Bytes::from(r.block_payload),
-                    },
-                )
             })
             .collect())
     }
@@ -152,7 +102,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
                 block_ref_name,
                 event_type,
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             )",
         );
@@ -164,7 +114,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
                 .push_bind_unseparated(block.event_kind.to_string())
                 .push_unseparated(")::metadata_event_type")
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
-                .push_bind(block.block_hash.to_string())
+                .push_bind(block.block_hash.digest())
                 .push_bind(block.block_payload.as_ref());
         });
 
@@ -174,6 +124,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
+                // TODO: might be a unique violation on block hash as well
                 DatasetDataBlockSaveError::DuplicateSequenceNumber(
                     // We can't know which block caused it in batch insert
                     blocks.iter().map(|b| b.sequence_number).collect(),

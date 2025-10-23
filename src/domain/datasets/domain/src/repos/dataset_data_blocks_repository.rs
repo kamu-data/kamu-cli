@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DatasetBlock, DatasetUnmatchedEntryError, MetadataEventType};
+use crate::{DatasetBlock, DatasetUnmatchedEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,13 +27,6 @@ pub trait DatasetDataBlockRepository: Send + Sync {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError>;
-
-    async fn match_datasets_having_blocks(
-        &self,
-        dataset_ids: &[odf::DatasetID],
-        block_ref: &odf::BlockRef,
-        event_type: MetadataEventType,
-    ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError>;
 
     async fn save_blocks_batch(
         &self,

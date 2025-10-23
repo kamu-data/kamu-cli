@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                event_type as \"event_type: MetadataEventType\",\n                sequence_number,\n                block_hash,\n                block_payload\n            FROM dataset_data_blocks\n            WHERE dataset_id = $1 AND block_ref_name = $2\n            ORDER BY sequence_number\n            ",
+  "query": "\n            SELECT\n                event_type as \"event_type: MetadataEventType\",\n                sequence_number,\n                block_hash_bin,\n                block_payload\n            FROM dataset_data_blocks\n            WHERE dataset_id = $1 AND block_ref_name = $2\n            ORDER BY sequence_number\n            ",
   "describe": {
     "columns": [
       {
@@ -36,8 +36,8 @@
       },
       {
         "ordinal": 2,
-        "name": "block_hash",
-        "type_info": "Varchar"
+        "name": "block_hash_bin",
+        "type_info": "Bytea"
       },
       {
         "ordinal": 3,
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "d1843e3818a3a0940abb186b5e2fb5c52c690ea381ebd20ae866f2029ce06592"
+  "hash": "8ab02424793fb90d9507b8b18d963b5a92aa12bce294a39fc7f243f49f5c63bd"
 }
