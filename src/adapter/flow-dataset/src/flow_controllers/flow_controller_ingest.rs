@@ -150,9 +150,9 @@ impl fs::FlowController for FlowControllerIngest {
                     },
                 );
 
-                if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
+                if has_more
+                    && let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
                     && FlowConfigRuleIngest::from_flow_config(config_snapshot)?.fetch_next_iteration
-                    && has_more
                 {
                     self.run_next_iteration_ingest(success_flow_state, finish_time)
                         .await?;
