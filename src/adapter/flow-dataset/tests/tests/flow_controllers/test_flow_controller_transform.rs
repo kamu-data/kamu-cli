@@ -156,6 +156,7 @@ async fn test_transform_propagate_success_updated_notifies_dispatcher() {
             PullResult::Updated {
                 old_head: None,
                 new_head,
+                has_more: false,
             },
         )
         .await;

@@ -164,6 +164,7 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
             PullResult::Updated {
                 old_head: None,
                 new_head,
+                has_more: false,
             },
         )
         .await;
@@ -188,9 +189,13 @@ impl FlowControllerIngestHarness {
         mock_dataset_increment_service: MockDatasetIncrementQueryService,
         mock_flow_sensor_dispatcher: MockFlowSensorDispatcher,
     ) -> Self {
+        let mock_flow_run_service = MockFlowRunService::new();
+
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerIngest>()
             .add::<InMemoryFlowEventStore>()
+            .add_value(mock_flow_run_service)
+            .bind::<dyn FlowRunService, MockFlowRunService>()
             .add::<InMemoryFlowSystemEventBridge>()
             .add_value(mock_dataset_increment_service)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()

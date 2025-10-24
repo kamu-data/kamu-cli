@@ -34,8 +34,11 @@ use crate::{
 pub struct FlowControllerIngest {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
+    flow_run_service: Arc<dyn fs::FlowRunService>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl fs::FlowController for FlowControllerIngest {
@@ -79,7 +82,11 @@ impl fs::FlowController for FlowControllerIngest {
                 tracing::debug!(flow_id = %success_flow_state.flow_id, "Ingest up-to-date, skipping propagation");
                 return Ok(());
             }
-            PullResult::Updated { old_head, new_head } => {
+            PullResult::Updated {
+                old_head,
+                new_head,
+                has_more,
+            } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
@@ -115,6 +122,20 @@ impl fs::FlowController for FlowControllerIngest {
                         .int_err()?,
                     },
                 );
+
+                if has_more {
+                    // Trigger another run to fetch remaining data
+                    self.flow_run_service
+                        .run_flow_automatically(
+                            activation_cause.activation_time(),
+                            &success_flow_state.flow_binding,
+                            vec![activation_cause.clone()],
+                            None,
+                            success_flow_state.config_snapshot.clone(),
+                        )
+                        .await
+                        .int_err()?;
+                }
 
                 self.flow_sensor_dispatcher
                     .dispatch_input_flow_success(

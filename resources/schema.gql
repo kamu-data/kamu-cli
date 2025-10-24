@@ -2341,6 +2341,7 @@ type FlowDescriptionUpdateResultSuccess {
 	numBlocks: Int!
 	numRecords: Int!
 	updatedWatermark: DateTime
+	hasMore: Boolean!
 }
 
 type FlowDescriptionUpdateResultUnknown {
