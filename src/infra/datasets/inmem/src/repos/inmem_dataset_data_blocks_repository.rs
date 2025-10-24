@@ -111,18 +111,23 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         upper_sequence_number_inclusive: u64,
     ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
         let guard = self.state.lock().unwrap();
-        let page: Vec<DatasetBlock> = guard
+        let mut page: Vec<DatasetBlock> = guard
             .data_blocks
             .get(&(dataset_id.clone(), block_ref.cheap_clone()))
             .map(|blocks| {
                 blocks
                     .iter()
+                    .rev()
                     .filter(|b| b.sequence_number <= upper_sequence_number_inclusive)
                     .take(page_size)
                     .cloned()
                     .collect()
             })
             .unwrap_or_default();
+
+        // The page is scanned backwards until we take N values,
+        // so we need to reverse the final order
+        page.reverse();
 
         Ok(page)
     }

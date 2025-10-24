@@ -130,15 +130,18 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
 
         let rows = sqlx::query!(
             r#"
-            SELECT
-                event_type as "event_type: MetadataEventType",
-                sequence_number,
-                block_hash_bin,
-                block_payload
-            FROM dataset_data_blocks
-            WHERE dataset_id = $1 AND block_ref_name = $2 AND sequence_number <= $3
-            ORDER BY sequence_number DESC
-            LIMIT $4
+            SELECT * FROM (
+                SELECT
+                    event_type as "event_type: MetadataEventType",
+                    sequence_number,
+                    block_hash_bin,
+                    block_payload
+                FROM dataset_data_blocks
+                WHERE dataset_id = $1 AND block_ref_name = $2 AND sequence_number <= $3
+                ORDER BY sequence_number DESC
+                LIMIT $4
+            )
+            ORDER BY sequence_number
             "#,
             dataset_id.to_string(),
             block_ref.as_str(),
