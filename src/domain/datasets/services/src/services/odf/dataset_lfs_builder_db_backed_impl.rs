@@ -13,20 +13,20 @@ use dill::{Catalog, component, interface};
 use odf::Dataset;
 use url::Url;
 
-use crate::{MetadataChainDatabaseBackedImpl, MetadataChainRefRepositoryDatabaseBackedImpl};
+use crate::{
+    MetadataChainDatabaseBackedImpl,
+    MetadataChainDbBackedConfig,
+    MetadataChainRefRepositoryDatabaseBackedImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetLfsBuilderDatabaseBackedImpl {
-    catalog: Catalog,
-}
-
 #[component(pub)]
 #[interface(dyn odf::dataset::DatasetLfsBuilder)]
-impl DatasetLfsBuilderDatabaseBackedImpl {
-    pub fn new(catalog: Catalog) -> Self {
-        Self { catalog }
-    }
+
+pub struct DatasetLfsBuilderDatabaseBackedImpl {
+    catalog: Catalog,
+    config: Arc<MetadataChainDbBackedConfig>,
 }
 
 impl odf::dataset::DatasetLfsBuilder for DatasetLfsBuilderDatabaseBackedImpl {
@@ -39,6 +39,7 @@ impl odf::dataset::DatasetLfsBuilder for DatasetLfsBuilderDatabaseBackedImpl {
 
         Arc::new(DatasetImpl::new(
             MetadataChainDatabaseBackedImpl::new(
+                *(self.config.as_ref()),
                 dataset_id.clone(),
                 self.catalog.get_one().unwrap(),
                 self.catalog.get_one().unwrap(),

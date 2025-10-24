@@ -127,6 +127,7 @@ impl ServerSideS3Harness {
                     s3_context.clone(),
                 ))
                 .add::<kamu_datasets_services::DatasetS3BuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()

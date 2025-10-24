@@ -141,6 +141,7 @@ impl ClientSideHarness {
             datasets_dir,
         ));
         b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
+        b.add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default());
 
         b.add::<RemoteRepositoryRegistryImpl>();
 

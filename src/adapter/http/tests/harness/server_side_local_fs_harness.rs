@@ -147,6 +147,7 @@ impl ServerSideLocalFsHarness {
                     datasets_dir,
                 ))
                 .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()

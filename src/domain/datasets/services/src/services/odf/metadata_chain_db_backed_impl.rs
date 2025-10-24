@@ -13,12 +13,15 @@ use std::sync::{Arc, RwLock};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetDataBlockRepository, DatasetKeyBlockRepository};
 
+use crate::MetadataChainDbBackedConfig;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MetadataChainDatabaseBackedImpl<TMetadataChain>
 where
     TMetadataChain: odf::MetadataChain + Send + Sync,
 {
+    config: MetadataChainDbBackedConfig,
     dataset_id: odf::DatasetID,
     metadata_chain: TMetadataChain,
     state: RwLock<State>,
@@ -178,12 +181,14 @@ where
     TMetadataChain: odf::MetadataChain + Send + Sync,
 {
     pub fn new(
+        config: MetadataChainDbBackedConfig,
         dataset_id: odf::DatasetID,
         dataset_key_block_repo: Arc<dyn DatasetKeyBlockRepository>,
         dataset_data_block_repo: Arc<dyn DatasetDataBlockRepository>,
         metadata_chain: TMetadataChain,
     ) -> Self {
         Self {
+            config,
             dataset_id,
             metadata_chain,
             state: RwLock::new(State::new(dataset_key_block_repo, dataset_data_block_repo)),
@@ -292,7 +297,13 @@ where
         Ok(())
     }
 
-    async fn ensure_data_blocks_are_preloaded(&self) -> Result<(), InternalError> {
+    async fn ensure_data_blocks_are_preloaded(
+        &self,
+        requested_boundary: (u64, u64),
+    ) -> Result<(), InternalError> {
+        // TODO: implement data block preloading in pages
+        assert!(self.config.data_blocks_page_size > 0);
+
         // Try getting access to repository
         let maybe_data_block_repository = {
             // Ignore if already loaded
@@ -484,7 +495,8 @@ where
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
         // Force loading data blocks unless it was already done
-        self.ensure_data_blocks_are_preloaded().await?;
+        self.ensure_data_blocks_are_preloaded(requested_boundary)
+            .await?;
 
         // Read what's in the data blocks cache
         let read_guard = self.state.read().unwrap();
