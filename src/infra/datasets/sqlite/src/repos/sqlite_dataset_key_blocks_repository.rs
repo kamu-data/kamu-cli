@@ -31,7 +31,7 @@ pub struct SqliteDatasetKeyBlockRepository {
 struct DatasetKeyBlockRow {
     event_type: String,
     sequence_number: i64,
-    block_hash: String,
+    block_hash_bin: Vec<u8>,
     block_payload: Vec<u8>,
 }
 
@@ -40,7 +40,11 @@ impl DatasetKeyBlockRow {
         DatasetBlock {
             event_kind: MetadataEventType::from_str(&self.event_type).unwrap(),
             sequence_number: u64::try_from(self.sequence_number).unwrap(),
-            block_hash: odf::Multihash::from_multibase(&self.block_hash).unwrap(),
+            block_hash: odf::Multihash::new(
+                odf::metadata::Multicodec::Sha3_256,
+                &self.block_hash_bin,
+            )
+            .unwrap(),
             block_payload: bytes::Bytes::from(self.block_payload),
         }
     }
@@ -90,7 +94,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             SELECT
                 event_type,
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ?
@@ -125,7 +129,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             pub dataset_id: String,
             pub event_type: String,
             pub sequence_number: i64,
-            pub block_hash: String,
+            pub block_hash_bin: Vec<u8>,
             pub block_payload: Vec<u8>,
         }
 
@@ -135,7 +139,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 dkb.dataset_id,
                 dkb.event_type,
                 dkb.sequence_number,
-                dkb.block_hash,
+                dkb.block_hash_bin,
                 dkb.block_payload
             FROM dataset_key_blocks dkb
             JOIN (
@@ -177,7 +181,11 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 let key_block = DatasetBlock {
                     event_kind: MetadataEventType::from_str(&r.event_type).unwrap(),
                     sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                    block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                    block_hash: odf::Multihash::new(
+                        odf::metadata::Multicodec::Sha3_256,
+                        &r.block_hash_bin,
+                    )
+                    .unwrap(),
                     block_payload: bytes::Bytes::from(r.block_payload),
                 };
                 (dataset_id, key_block)
@@ -204,7 +212,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 block_ref_name,
                 event_type,
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             ) ",
         );
@@ -214,7 +222,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 .push_bind(block_ref.as_str())
                 .push_bind(block.event_kind.to_string())
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
-                .push_bind(block.block_hash.to_string())
+                .push_bind(block.block_hash.digest())
                 .push_bind(block.block_payload.as_ref());
         });
 

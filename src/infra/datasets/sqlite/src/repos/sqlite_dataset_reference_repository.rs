@@ -60,7 +60,7 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
 
         let maybe_record = sqlx::query!(
             r#"
-            SELECT block_hash
+            SELECT block_hash_bin
                 FROM dataset_references
                 WHERE dataset_id = $1 AND block_ref_name = $2
             "#,
@@ -72,7 +72,10 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         .int_err()?;
 
         if let Some(record) = maybe_record {
-            Ok(odf::Multihash::from_multibase(&record.block_hash).unwrap())
+            Ok(
+                odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &record.block_hash_bin)
+                    .unwrap(),
+            )
         } else {
             Err(DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
@@ -95,7 +98,7 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
 
         let records = sqlx::query!(
             r#"
-            SELECT block_ref_name, block_hash
+            SELECT block_ref_name, block_hash_bin
                 FROM dataset_references
                 WHERE dataset_id = $1
             "#,
@@ -109,7 +112,8 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         for record in records {
             res.push((
                 odf::BlockRef::from_str(record.block_ref_name.as_str())?,
-                odf::Multihash::from_multibase(&record.block_hash).int_err()?,
+                odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &record.block_hash_bin)
+                    .int_err()?,
             ));
         }
 
@@ -133,23 +137,20 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
 
             let block_ref_str = block_ref.as_str();
 
-            let maybe_prev_block_hash = maybe_prev_block_hash.map(ToString::to_string);
-            let maybe_prev_block_hash_str = maybe_prev_block_hash.as_deref();
-
-            let block_hash = block_hash.to_string();
-            let block_hash_str = block_hash.as_str();
+            let maybe_prev_block_hash_bytes = maybe_prev_block_hash.map(odf::Multihash::digest);
+            let block_hash_bytes = block_hash.digest();
 
             sqlx::query!(
                 r#"
-                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash)
+                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash_bin)
                     VALUES ($1, $2, $3)
                     ON CONFLICT(dataset_id, block_ref_name)
-                    DO UPDATE SET block_hash = $3 WHERE dataset_references.block_hash = $4
+                    DO UPDATE SET block_hash_bin = $3 WHERE dataset_references.block_hash_bin = $4
                 "#,
                 dataset_id_str,
                 block_ref_str,
-                block_hash_str,
-                maybe_prev_block_hash_str,
+                block_hash_bytes,
+                maybe_prev_block_hash_bytes,
             )
             .execute(connection_mut)
             .await

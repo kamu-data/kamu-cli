@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT block_hash_bin\n                FROM dataset_references\n                WHERE dataset_id = $1 AND block_ref_name = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "block_hash_bin",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b859429f88976fb3bcb843634966252c61907a2cb82b7812aa47fe9c206ca282"
+}
