@@ -46,7 +46,7 @@ pub trait FlowController: Send + Sync {
         success_flow_state: &FlowState,
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
-    ) -> Result<(), InternalError>;
+    ) -> Result<bool, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

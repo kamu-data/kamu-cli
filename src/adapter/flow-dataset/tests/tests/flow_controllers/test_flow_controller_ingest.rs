@@ -19,6 +19,8 @@ use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrem
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_task_system::LogicalPlan;
+use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_services::TaskSchedulerImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -164,6 +166,7 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
             PullResult::Updated {
                 old_head: None,
                 new_head,
+                has_more: false,
             },
         )
         .await;
@@ -191,7 +194,9 @@ impl FlowControllerIngestHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerIngest>()
             .add::<InMemoryFlowEventStore>()
+            .add::<InMemoryTaskEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<TaskSchedulerImpl>()
             .add_value(mock_dataset_increment_service)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
             .add_value(mock_flow_sensor_dispatcher)

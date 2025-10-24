@@ -216,9 +216,9 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         _: &fs::FlowState,
         _: &ts::TaskResult,
         _: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         // No further actions triggered with a webhook delivery
-        Ok(())
+        Ok(true)
     }
 }
 

@@ -65,8 +65,12 @@ impl FlowState {
 
     /// Computes status
     pub fn status(&self) -> FlowStatus {
-        if self.outcome.is_some() {
+        if self.timing.completed_at.is_some() {
             FlowStatus::Finished
+        // Check if there are completed tasks but flow is running next
+        // iterations
+        } else if self.outcome.is_some() {
+            FlowStatus::Waiting
         } else if self.timing.last_attempt_finished_at.is_some() {
             FlowStatus::Retrying
         } else if self.timing.running_since.is_some() {
@@ -241,7 +245,9 @@ impl Projection for FlowState {
                     }
 
                     E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
-                        if s.outcome.is_some() || s.timing.scheduled_for_activation_at.is_none() {
+                        if s.status() == FlowStatus::Finished
+                            || s.timing.scheduled_for_activation_at.is_none()
+                        {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
@@ -255,7 +261,7 @@ impl Projection for FlowState {
                         task_id,
                         ..
                     }) => {
-                        if s.outcome.is_some()
+                        if s.status() == FlowStatus::Finished
                             || !s.task_ids.contains(&task_id)
                             || s.timing.awaiting_executor_since.is_none()
                         {
@@ -285,7 +291,7 @@ impl Projection for FlowState {
                             || s.start_condition.is_some()
                         {
                             Err(ProjectionError::new(Some(s), event))
-                        } else if s.outcome.is_some() {
+                        } else if s.status() == FlowStatus::Finished {
                             // Ignore for idempotence motivation
                             Ok(s)
                         } else {
@@ -365,6 +371,7 @@ impl Projection for FlowState {
                                 outcome: Some(FlowOutcome::Aborted),
                                 timing: FlowTimingRecords {
                                     last_attempt_finished_at: Some(event_time),
+                                    completed_at: Some(event_time),
                                     ..s.timing
                                 },
                                 start_condition: None,

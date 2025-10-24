@@ -49,9 +49,9 @@ impl FlowController for FlowControllerSystemGC {
         _: &FlowState,
         _: &ts::TaskResult,
         _: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         // No propagation needed for system GC dispatcher
-        Ok(())
+        Ok(true)
     }
 }
 

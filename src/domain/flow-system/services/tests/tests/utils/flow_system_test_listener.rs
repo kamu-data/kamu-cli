@@ -395,7 +395,7 @@ impl FlowSystemEventProjector for FlowSystemTestListener {
                     FlowEvent::ScheduledForActivation(_)
                     | FlowEvent::Aborted(_)
                     | FlowEvent::TaskRunning(_)
-                    | FlowEvent::TaskFinished(_) => {
+                    | FlowEvent::Completed(_) => {
                         self.make_a_snapshot(flow_event.event_time());
                     }
 
@@ -413,8 +413,8 @@ impl FlowSystemEventProjector for FlowSystemTestListener {
 
                     FlowEvent::ActivationCauseAdded(_)
                     | FlowEvent::ConfigSnapshotModified(_)
-                    | FlowEvent::Completed(_)
                     | FlowEvent::Initiated(_)
+                    | FlowEvent::TaskFinished(_)
                     | FlowEvent::TaskScheduled(_) => { /* Ignore */ }
                 }
             }

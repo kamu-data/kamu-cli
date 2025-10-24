@@ -6993,6 +6993,8 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-task-system",
+ "kamu-task-system-inmem",
+ "kamu-task-system-services",
  "messaging-outbox",
  "mockall",
  "opendatafabric",

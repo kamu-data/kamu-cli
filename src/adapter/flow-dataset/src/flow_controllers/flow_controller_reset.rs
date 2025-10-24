@@ -68,7 +68,7 @@ impl fs::FlowController for FlowControllerReset {
         success_flow_state: &fs::FlowState,
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         let reset_result = ats::TaskResultDatasetReset::from_task_result(task_result)
             .int_err()?
             .reset_result;
@@ -80,7 +80,7 @@ impl fs::FlowController for FlowControllerReset {
         {
             // No reset was performed, no propagation needed
             tracing::debug!(flow_id=%success_flow_state.flow_id, "No reset performed, skipping propagation");
-            return Ok(());
+            return Ok(true);
         }
 
         let dataset_id = FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
@@ -114,7 +114,7 @@ impl fs::FlowController for FlowControllerReset {
             .await
             .int_err()?;
 
-        Ok(())
+        Ok(true)
     }
 }
 

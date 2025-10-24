@@ -101,17 +101,19 @@ impl fs::FlowController for FlowControllerTransform {
         success_flow_state: &fs::FlowState,
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         let task_result_update =
             ats::TaskResultDatasetUpdate::from_task_result(task_result).int_err()?;
 
         match task_result_update.pull_result {
             PullResult::UpToDate(_) => {
                 tracing::debug!(flow_id = %success_flow_state.flow_id, "Transform up-to-date, skipping propagation");
-                return Ok(());
+                return Ok(true);
             }
 
-            PullResult::Updated { old_head, new_head } => {
+            PullResult::Updated {
+                old_head, new_head, ..
+            } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
@@ -159,7 +161,7 @@ impl fs::FlowController for FlowControllerTransform {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 }
 

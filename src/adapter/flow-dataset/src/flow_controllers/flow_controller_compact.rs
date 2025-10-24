@@ -73,7 +73,7 @@ impl fs::FlowController for FlowControllerCompact {
         success_flow_state: &fs::FlowState,
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         let compact_compaction_result =
             ats::TaskResultDatasetHardCompact::from_task_result(task_result)
                 .int_err()?
@@ -83,7 +83,7 @@ impl fs::FlowController for FlowControllerCompact {
             CompactionResult::NothingToDo => {
                 // No compaction was performed, no propagation needed
                 tracing::debug!(flow_id=%success_flow_state.flow_id, "No compaction performed, skipping propagation");
-                return Ok(());
+                return Ok(true);
             }
             CompactionResult::Success {
                 old_head,
@@ -127,7 +127,7 @@ impl fs::FlowController for FlowControllerCompact {
                     .await
                     .int_err()?;
 
-                Ok(())
+                Ok(true)
             }
         }
     }

@@ -2563,13 +2563,11 @@ impl<'a> DatasetFlowGenerator<'a> {
         assert_eq!(flow.status(), FlowStatus::Running);
 
         let flow_id: u64 = flow.flow_id.into();
+        let event_time = flow.timing.running_since.unwrap() + Duration::minutes(10);
 
-        flow.on_task_finished(
-            flow.timing.running_since.unwrap() + Duration::minutes(10),
-            TaskID::new(flow_id * 2 + 1),
-            outcome,
-        )
-        .unwrap();
+        flow.on_task_finished(event_time, TaskID::new(flow_id * 2 + 1), outcome)
+            .unwrap();
+        flow.complete(event_time).unwrap();
 
         flow.save(self.flow_event_store.as_ref()).await.unwrap();
         flow
@@ -2646,13 +2644,11 @@ impl SystemFlowGenerator {
         assert_eq!(flow.status(), FlowStatus::Running);
 
         let flow_id: u64 = flow.flow_id.into();
+        let event_time = flow.timing.running_since.unwrap() + Duration::minutes(10);
 
-        flow.on_task_finished(
-            flow.timing.running_since.unwrap() + Duration::minutes(10),
-            TaskID::new(flow_id * 2 + 1),
-            outcome,
-        )
-        .unwrap();
+        flow.on_task_finished(event_time, TaskID::new(flow_id * 2 + 1), outcome)
+            .unwrap();
+        flow.complete(event_time).unwrap();
 
         flow.save(self.flow_event_store.as_ref()).await.unwrap();
     }
@@ -2694,12 +2690,14 @@ fn drive_flow_to_status(flow: &mut Flow, expected_status: FlowStatus) {
             .unwrap();
 
         if expected_status == FlowStatus::Finished {
+            let finish_event_time = start_moment + Duration::minutes(10);
             flow.on_task_finished(
-                start_moment + Duration::minutes(10),
+                finish_event_time,
                 task_id,
                 TaskOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
+            flow.complete(finish_event_time).unwrap();
         } else if expected_status != FlowStatus::Running {
             panic!("Not expecting flow status {expected_status:?}");
         }

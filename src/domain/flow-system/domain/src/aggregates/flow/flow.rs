@@ -172,7 +172,11 @@ impl Flow {
             next_attempt_at,
         })?;
 
-        // Auto-submit Completed event if the outcome is final and not Aborted
+        Ok(())
+    }
+
+    /// Flow completed
+    pub fn complete(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<FlowState>> {
         if let Some(outcome) = self.outcome.as_ref()
             && !outcome.is_aborted()
         {

@@ -58,6 +58,8 @@ kamu-adapter-flow-dataset = { workspace = true, features = ["testing"] }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
+kamu-task-system-services = { workspace = true }
+kamu-task-system-inmem = { workspace = true }
 
 
 mockall = { version = "0.13" }

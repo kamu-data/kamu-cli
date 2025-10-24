@@ -501,12 +501,15 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                 }
             }
             TaskProgressMessage::Finished(message) => {
+                println!("Finished message: {:?}", message);
                 // Is this a task associated with flows?
                 let maybe_flow_id = Self::flow_id_from_task_metadata(&message.task_metadata)?;
                 if let Some(flow_id) = maybe_flow_id {
                     let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
                         .await
                         .int_err()?;
+
+                    let mut flow_completed = true;
 
                     if flow.status() != FlowStatus::Finished {
                         flow.on_task_finished(
@@ -515,7 +518,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                             message.outcome.clone(),
                         )
                         .int_err()?;
-                        flow.save(flow_event_store.as_ref()).await.int_err()?;
 
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
@@ -545,11 +547,16 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     &flow.flow_binding.flow_type,
                                 )?;
 
-                                flow_controller
+                                flow_completed = flow_controller
                                     .propagate_success(&flow, task_result, message.event_time)
                                     .await
                                     .int_err()?;
                             }
+
+                            if flow_completed {
+                                flow.complete(message.event_time).int_err()?;
+                            }
+                            flow.save(flow_event_store.as_ref()).await.int_err()?;
                         }
                     } else {
                         tracing::info!(

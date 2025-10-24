@@ -57,7 +57,7 @@ impl fs::FlowController for FlowControllerResetToMetadata {
         success_flow_state: &fs::FlowState,
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         let reset_to_metadata_only_result =
             ats::TaskResultDatasetResetToMetadata::from_task_result(task_result)
                 .int_err()?
@@ -67,7 +67,7 @@ impl fs::FlowController for FlowControllerResetToMetadata {
             CompactionResult::NothingToDo => {
                 // No changes performed, no propagation needed
                 tracing::debug!(flow_id = %success_flow_state.flow_id, "No reset to metadata performed, skipping propagation");
-                return Ok(());
+                return Ok(true);
             }
             CompactionResult::Success {
                 old_head,
@@ -113,7 +113,7 @@ impl fs::FlowController for FlowControllerResetToMetadata {
                     .await
                     .int_err()?;
 
-                Ok(())
+                Ok(true)
             }
         }
     }
