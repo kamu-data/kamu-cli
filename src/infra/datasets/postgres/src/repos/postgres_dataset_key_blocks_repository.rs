@@ -57,7 +57,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             SELECT
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = $1 AND block_ref_name = $2
@@ -75,7 +75,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .map(|r| DatasetBlock {
                 event_kind: r.event_type,
                 sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                block_hash: odf::Multihash::new(
+                    odf::metadata::Multicodec::Sha3_256,
+                    &r.block_hash_bin,
+                )
+                .unwrap(),
                 block_payload: bytes::Bytes::from(r.block_payload),
             })
             .collect())
@@ -98,7 +102,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 dataset_id,
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             FROM dataset_key_blocks
             WHERE
@@ -123,7 +127,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                     DatasetBlock {
                         event_kind: r.event_type,
                         sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                        block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                        block_hash: odf::Multihash::new(
+                            odf::metadata::Multicodec::Sha3_256,
+                            &r.block_hash_bin,
+                        )
+                        .unwrap(),
                         block_payload: bytes::Bytes::from(r.block_payload),
                     },
                 )
@@ -152,7 +160,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 block_ref_name,
                 event_type,
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             )",
         );
@@ -164,7 +172,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 .push_bind_unseparated(block.event_kind.to_string())
                 .push_unseparated(")::metadata_event_type")
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
-                .push_bind(block.block_hash.to_string())
+                .push_bind(block.block_hash.digest())
                 .push_bind(block.block_payload.as_ref());
         });
 
@@ -174,6 +182,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
+                // TODO: might be a unique violation on block hash as well
                 DatasetKeyBlockSaveError::DuplicateSequenceNumber(
                     // We can't know which block caused it in batch insert
                     blocks.iter().map(|b| b.sequence_number).collect(),
