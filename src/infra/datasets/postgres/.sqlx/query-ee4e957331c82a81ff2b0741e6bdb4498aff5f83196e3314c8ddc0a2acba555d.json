@@ -1,15 +1,10 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT DISTINCT ON (dataset_id)\n                dataset_id,\n                event_type as \"event_type: MetadataEventType\",\n                sequence_number,\n                block_hash,\n                block_payload\n            FROM dataset_key_blocks\n            WHERE\n                dataset_id = ANY($1) AND\n                block_ref_name = $2 AND\n                event_type = ($3::text)::metadata_event_type\n            ORDER BY dataset_id, sequence_number DESC\n            ",
+  "query": "\n            SELECT\n                event_type as \"event_type: MetadataEventType\",\n                sequence_number,\n                block_hash_bin,\n                block_payload\n            FROM dataset_key_blocks\n            WHERE dataset_id = $1 AND block_ref_name = $2\n            ORDER BY sequence_number\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "dataset_id",
-        "type_info": "Varchar"
-      },
-      {
-        "ordinal": 1,
         "name": "event_type: MetadataEventType",
         "type_info": {
           "Custom": {
@@ -35,24 +30,23 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 1,
         "name": "sequence_number",
         "type_info": "Int8"
       },
       {
-        "ordinal": 3,
-        "name": "block_hash",
-        "type_info": "Varchar"
+        "ordinal": 2,
+        "name": "block_hash_bin",
+        "type_info": "Bytea"
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "block_payload",
         "type_info": "Bytea"
       }
     ],
     "parameters": {
       "Left": [
-        "TextArray",
         "Text",
         "Text"
       ]
@@ -61,9 +55,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "7c1a0bc5fae351dc4deed4e0a54995e7020baab211a685a9829a19cbfc23e7d4"
+  "hash": "ee4e957331c82a81ff2b0741e6bdb4498aff5f83196e3314c8ddc0a2acba555d"
 }

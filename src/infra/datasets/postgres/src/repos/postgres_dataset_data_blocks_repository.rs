@@ -75,7 +75,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
             .map(|r| DatasetBlock {
                 event_kind: r.event_type,
                 sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                block_hash: odf::Multihash::from_digest_sha3_256(&r.block_hash_bin),
+                block_hash: odf::Multihash::new(
+                    odf::metadata::Multicodec::Sha3_256,
+                    &r.block_hash_bin,
+                )
+                .unwrap(),
                 block_payload: bytes::Bytes::from(r.block_payload),
             })
             .collect())
