@@ -53,7 +53,7 @@ impl DatasetDataBlockRow {
 
 #[async_trait::async_trait]
 impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
-    async fn has_blocks(
+    async fn has_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -65,7 +65,12 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
         let block_ref_str = block_ref.as_str();
 
         let result: Option<i32> = sqlx::query_scalar(
-            "SELECT 1 FROM dataset_data_blocks WHERE dataset_id = ? AND block_ref_name = ? LIMIT 1",
+            r#"
+            SELECT 1
+            FROM dataset_data_blocks
+            WHERE dataset_id = $1 AND block_ref_name = $2
+            LIMIT 1
+            "#,
         )
         .bind(dataset_id_str)
         .bind(block_ref_str)
@@ -74,6 +79,93 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
         .int_err()?;
 
         Ok(result.is_some())
+    }
+
+    async fn contains_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<bool, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let dataset_id_str = dataset_id.to_string();
+        let block_hash_digest = block_hash.digest();
+
+        let result: Option<i32> = sqlx::query_scalar(
+            r#"
+            SELECT 1
+            FROM dataset_data_blocks
+            WHERE dataset_id = $1 AND block_hash_bin = $2
+            LIMIT 1
+            "#,
+        )
+        .bind(dataset_id_str)
+        .bind(block_hash_digest)
+        .fetch_optional(conn)
+        .await
+        .int_err()?;
+
+        Ok(result.is_some())
+    }
+
+    async fn get_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<DatasetBlock>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let dataset_id_str = dataset_id.to_string();
+        let block_hash_digest = block_hash.digest();
+
+        let row = sqlx::query_as!(
+            DatasetDataBlockRow,
+            r#"
+            SELECT
+                event_type,
+                sequence_number,
+                block_hash_bin,
+                block_payload
+            FROM dataset_data_blocks
+            WHERE dataset_id = $1 AND block_hash_bin = $2
+            "#,
+            dataset_id_str,
+            block_hash_digest
+        )
+        .fetch_optional(conn)
+        .await
+        .int_err()?;
+
+        Ok(row.map(DatasetDataBlockRow::into_domain))
+    }
+
+    async fn get_data_block_size(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<usize>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let dataset_id_str = dataset_id.to_string();
+        let block_hash_digest = block_hash.digest();
+
+        let result: Option<i64> = sqlx::query_scalar(
+            r#"
+            SELECT LENGTH(block_payload)
+            FROM dataset_data_blocks
+            WHERE dataset_id = $1 AND block_hash_bin = $2
+            "#,
+        )
+        .bind(dataset_id_str)
+        .bind(block_hash_digest)
+        .fetch_optional(conn)
+        .await
+        .int_err()?;
+
+        Ok(result.map(|size| usize::try_from(size).unwrap()))
     }
 
     async fn get_all_data_blocks(
@@ -96,7 +188,7 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
                 block_hash_bin,
                 block_payload
             FROM dataset_data_blocks
-            WHERE dataset_id = ? AND block_ref_name = ?
+            WHERE dataset_id = $1 AND block_ref_name = $2
             ORDER BY sequence_number
             "#,
             dataset_id_str,
@@ -112,7 +204,7 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
             .collect())
     }
 
-    async fn save_blocks_batch(
+    async fn save_data_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -171,7 +263,7 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
         Ok(())
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -183,7 +275,7 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
         let block_ref_str = block_ref.as_str();
 
         sqlx::query!(
-            "DELETE FROM dataset_data_blocks WHERE dataset_id = ? AND block_ref_name = ?",
+            "DELETE FROM dataset_data_blocks WHERE dataset_id = $1 AND block_ref_name = $2",
             dataset_id_str,
             block_ref_str
         )

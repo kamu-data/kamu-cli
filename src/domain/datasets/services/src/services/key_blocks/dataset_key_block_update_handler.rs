@@ -124,14 +124,14 @@ impl DatasetKeyBlockUpdateHandler {
 
                     // Drop existing key blocks, as they might conflict with the new results
                     self.dataset_key_block_repo
-                        .delete_all_for_ref(&message.dataset_id, &message.block_ref)
+                        .delete_all_key_blocks_for_ref(&message.dataset_id, &message.block_ref)
                         .await
                         .int_err()?;
                 }
 
                 // Save batch of the key blocks
                 self.dataset_key_block_repo
-                    .save_blocks_batch(
+                    .save_key_blocks_batch(
                         &message.dataset_id,
                         &message.block_ref,
                         &key_blocks_response.key_blocks,

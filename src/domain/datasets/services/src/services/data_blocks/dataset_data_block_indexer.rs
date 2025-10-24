@@ -59,7 +59,7 @@ impl DatasetDataBlockIndexer {
             included_count += 1;
             tracing::debug!(%dataset_handle, "Checking if dataset index exists");
             let has_blocks = dataset_data_block_repo
-                .has_blocks(&dataset_handle.id, &odf::BlockRef::Head)
+                .has_data_blocks_for_ref(&dataset_handle.id, &odf::BlockRef::Head)
                 .await?;
 
             if !has_blocks {

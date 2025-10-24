@@ -16,7 +16,7 @@ use crate::{DatasetBlock, MetadataEventType};
 
 #[async_trait::async_trait]
 pub trait DatasetKeyBlockRepository: Send + Sync {
-    async fn has_blocks(
+    async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -28,21 +28,21 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         block_ref: &odf::BlockRef,
     ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError>;
 
-    async fn match_datasets_having_blocks(
+    async fn match_datasets_having_key_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
     ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError>;
 
-    async fn save_blocks_batch(
+    async fn save_key_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
     ) -> Result<(), DatasetKeyBlockSaveError>;
 
-    async fn delete_all_for_ref(
+    async fn delete_all_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

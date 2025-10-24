@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                event_type,\n                sequence_number,\n                block_hash_bin,\n                block_payload\n            FROM dataset_key_blocks\n            WHERE dataset_id = $1 AND block_ref_name = $2\n            ORDER BY sequence_number\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_type",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sequence_number",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "block_hash_bin",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "block_payload",
+        "ordinal": 3,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e0dcde811339880cb47d77448e80483b7a3a1b489671ad5413ce0392b8642d54"
+}

@@ -16,11 +16,29 @@ use crate::{DatasetBlock, DatasetUnmatchedEntryError};
 
 #[async_trait::async_trait]
 pub trait DatasetDataBlockRepository: Send + Sync {
-    async fn has_blocks(
+    async fn has_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<bool, InternalError>;
+
+    async fn contains_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<bool, InternalError>;
+
+    async fn get_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<DatasetBlock>, InternalError>;
+
+    async fn get_data_block_size(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<usize>, InternalError>;
 
     async fn get_all_data_blocks(
         &self,
@@ -28,14 +46,14 @@ pub trait DatasetDataBlockRepository: Send + Sync {
         block_ref: &odf::BlockRef,
     ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError>;
 
-    async fn save_blocks_batch(
+    async fn save_data_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
     ) -> Result<(), DatasetDataBlockSaveError>;
 
-    async fn delete_all_for_ref(
+    async fn delete_all_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

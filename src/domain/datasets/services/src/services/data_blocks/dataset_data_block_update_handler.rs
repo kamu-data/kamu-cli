@@ -97,14 +97,14 @@ impl DatasetDataBlockUpdateHandler {
 
                     // Drop existing data blocks, as they might conflict with the new results
                     self.dataset_data_block_repo
-                        .delete_all_for_ref(&message.dataset_id, &message.block_ref)
+                        .delete_all_data_blocks_for_ref(&message.dataset_id, &message.block_ref)
                         .await
                         .int_err()?;
                 }
 
                 // Save batch of the data blocks
                 self.dataset_data_block_repo
-                    .save_blocks_batch(
+                    .save_data_blocks_batch(
                         &message.dataset_id,
                         &message.block_ref,
                         &data_blocks_response.data_blocks,

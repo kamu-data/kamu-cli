@@ -86,17 +86,17 @@ pub async fn test_has_blocks(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
     assert!(
         !repo
-            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
 
     let block = make_seed_block();
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[block])
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[block])
         .await
         .unwrap();
     assert!(
-        repo.has_blocks(&dataset_id, &odf::BlockRef::Head)
+        repo.has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -122,7 +122,7 @@ pub async fn test_save_blocks_batch(catalog: &Catalog) {
 
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
     let blocks = vec![make_seed_block(), make_info_block(1), make_license_block(2)];
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &blocks)
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
@@ -162,14 +162,14 @@ pub async fn test_save_blocks_batch_duplicate_sequence_number(catalog: &Catalog)
 
     // Save a Seed block at sequence number 0
     let seed_block = make_seed_block();
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[seed_block])
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[seed_block])
         .await
         .unwrap();
 
     // Attempt to save another block at sequence number 0
     let invalid_block = make_info_block(0);
     let result = repo
-        .save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[invalid_block])
+        .save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[invalid_block])
         .await;
 
     // Verify the error is DuplicateSequenceNumber
@@ -224,12 +224,12 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
 
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
     let blocks = vec![make_seed_block(), make_info_block(1), make_license_block(2)];
-    repo.save_blocks_batch(&dataset_id_1, &odf::BlockRef::Head, &blocks)
+    repo.save_key_blocks_batch(&dataset_id_1, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
     let blocks = vec![make_seed_block(), make_info_block(1), make_info_block(2)];
-    repo.save_blocks_batch(&dataset_id_2, &odf::BlockRef::Head, &blocks)
+    repo.save_key_blocks_batch(&dataset_id_2, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
@@ -239,7 +239,7 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
         make_license_block(2),
         make_license_block(3),
     ];
-    repo.save_blocks_batch(&dataset_id_3, &odf::BlockRef::Head, &blocks)
+    repo.save_key_blocks_batch(&dataset_id_3, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
@@ -250,7 +250,7 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
     ];
 
     let matches = repo
-        .match_datasets_having_blocks(
+        .match_datasets_having_key_blocks(
             &dataset_ids,
             &odf::BlockRef::Head,
             kamu_datasets::MetadataEventType::SetLicense,
@@ -271,7 +271,7 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
     );
 
     let matches = repo
-        .match_datasets_having_blocks(
+        .match_datasets_having_key_blocks(
             &dataset_ids,
             &odf::BlockRef::Head,
             kamu_datasets::MetadataEventType::SetInfo,
@@ -316,21 +316,21 @@ pub async fn test_delete_blocks(catalog: &Catalog) {
     .await;
 
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_seed_block()])
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_seed_block()])
         .await
         .unwrap();
     for i in 1..5 {
-        repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
+        repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
             .await
             .unwrap();
     }
 
-    repo.delete_all_for_ref(&dataset_id, &odf::BlockRef::Head)
+    repo.delete_all_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
         .await
         .unwrap();
     assert!(
         !repo
-            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -357,18 +357,18 @@ pub async fn test_remove_dataset_entry_removes_key_blocks(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
 
     // Add some blocks
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_seed_block()])
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_seed_block()])
         .await
         .unwrap();
     for i in 1..4 {
-        repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
+        repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
             .await
             .unwrap();
     }
 
     // Verify blocks exist
     assert!(
-        repo.has_blocks(&dataset_id, &odf::BlockRef::Head)
+        repo.has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -379,7 +379,7 @@ pub async fn test_remove_dataset_entry_removes_key_blocks(catalog: &Catalog) {
     // Verify blocks are removed
     assert!(
         !repo
-            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );

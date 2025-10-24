@@ -12,7 +12,7 @@ CREATE TABLE dataset_data_blocks (
     ),
     sequence_number INTEGER NOT NULL,
     block_hash_bin BLOB NOT NULL,
-    block_hash_hex TEXT GENERATED ALWAYS AS ('f1620' || hex(block_hash_bin)) VIRTUAL,
+    block_hash_hex TEXT GENERATED ALWAYS AS ('f1620' || hex(block_hash_bin)) VIRTUAL NOT NULL,
     block_payload BLOB NOT NULL,
     PRIMARY KEY (dataset_id, block_ref_name, sequence_number)
 );
@@ -40,7 +40,7 @@ CREATE TABLE dataset_key_blocks (
     ),
     sequence_number INTEGER NOT NULL,
     block_hash_bin BLOB NOT NULL,
-    block_hash_hex TEXT GENERATED ALWAYS AS ('f1620' || hex(block_hash_bin)) VIRTUAL,
+    block_hash_hex TEXT GENERATED ALWAYS AS ('f1620' || hex(block_hash_bin)) VIRTUAL NOT NULL,
     block_payload BLOB NOT NULL,
     PRIMARY KEY (dataset_id, block_ref_name, sequence_number)
 );
@@ -63,18 +63,18 @@ CREATE TABLE dataset_references_new (
     dataset_id VARCHAR(100) NOT NULL REFERENCES dataset_entries(dataset_id) ON DELETE CASCADE,
     block_ref_name VARCHAR(50) NOT NULL,
     block_hash_bin BLOB NOT NULL,
-    block_hash_hex TEXT GENERATED ALWAYS AS ('f1620' || hex(block_hash_bin)) VIRTUAL
+    block_hash_hex TEXT GENERATED ALWAYS AS ('f1620' || hex(block_hash_bin)) VIRTUAL NOT NULL
 );
 
 -- Copy data from old table, converting hex format to binary
 -- The format is f1620<hex-digest>, so we strip the f1620 prefix and convert hex to binary
 INSERT INTO dataset_references_new (dataset_id, block_ref_name, block_hash_bin)
-SELECT 
-    dataset_id, 
-    block_ref_name, 
-    unhex(substr(block_hash, 6))
-FROM dataset_references 
-WHERE block_hash LIKE 'f1620%';
+    SELECT 
+        dataset_id, 
+        block_ref_name, 
+        unhex(substr(block_hash, 6))
+    FROM dataset_references 
+    WHERE block_hash LIKE 'f1620%';
 
 -- Drop old table and rename new one
 DROP TABLE dataset_references;

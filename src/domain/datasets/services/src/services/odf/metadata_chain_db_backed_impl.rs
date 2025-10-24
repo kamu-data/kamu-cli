@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetDataBlockRepository, DatasetKeyBlockRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -376,16 +376,18 @@ where
     ///  - check existing caches for keys and data blocks first
     ///  - if missing, and key blocks cache is not yet loaded, attempt loading
     ///  - don't attempt loading data blocks into cache, this is expensive
+    ///  - try direct repository access for individual data block lookup
     ///  - if still not found, fall back to the underlying chain operation
     async fn get_from_cache_or_fallback<T, E, F, G>(
         &self,
         hash: &odf::Multihash,
         cache_lookup: F,
-        fallback_operation: G,
+        data_blocks_repo_lookup: G,
+        fallback_operation: impl std::future::Future<Output = Result<T, E>>,
     ) -> Result<T, E>
     where
         F: Fn(&CachedBlocksRange, &odf::Multihash) -> Option<T>,
-        G: std::future::Future<Output = Result<T, E>>,
+        G: std::future::Future<Output = Result<Option<T>, InternalError>>,
         E: From<InternalError>,
     {
         // Force loading key blocks unless it was already done
@@ -410,10 +412,34 @@ where
             }
         };
 
-        // Do not attempt loading data blocks into cache - this is expensive
+        // Try direct data blocks repository lookup - this should be faster than raw
+        // chain, at least for S3, probably the same in local case
+        if let Ok(Some(result)) = data_blocks_repo_lookup.await {
+            return Ok(result);
+        }
 
-        // Fall back to the underlying operation in the raw chain
+        // Fall back to the underlying potentially slow operation in the raw chain
         fallback_operation.await
+    }
+
+    async fn try_data_block_repo_lookup<T, F, Fut>(
+        &self,
+        operation: F,
+    ) -> Result<Option<T>, InternalError>
+    where
+        F: FnOnce(Arc<dyn DatasetDataBlockRepository>, odf::DatasetID) -> Fut,
+        Fut: std::future::Future<Output = Result<Option<T>, InternalError>>,
+    {
+        let maybe_data_block_repository = {
+            let read_guard = self.state.read().unwrap();
+            read_guard.maybe_dataset_data_block_repo.clone()
+        };
+
+        if let Some(data_block_repository) = maybe_data_block_repository {
+            operation(data_block_repository, self.dataset_id.clone()).await
+        } else {
+            Ok(None)
+        }
     }
 
     async fn get_key_block_with_hint(
@@ -510,6 +536,11 @@ where
                     None
                 }
             },
+            self.try_data_block_repo_lookup(|repo, dataset_id| async move {
+                repo.contains_data_block(&dataset_id, hash)
+                    .await
+                    .map(|exists| if exists { Some(true) } else { None })
+            }),
             self.metadata_chain.contains_block(hash),
         )
         .await
@@ -522,6 +553,11 @@ where
         self.get_from_cache_or_fallback(
             hash,
             CachedBlocksRange::try_get_block_size,
+            self.try_data_block_repo_lookup(|repo, dataset_id| async move {
+                repo.get_data_block_size(&dataset_id, hash)
+                    .await
+                    .map(|size_opt| size_opt.map(|size| size as u64))
+            }),
             self.metadata_chain.get_block_size(hash),
         )
         .await
@@ -534,6 +570,11 @@ where
         self.get_from_cache_or_fallback(
             hash,
             CachedBlocksRange::try_get_block_bytes,
+            self.try_data_block_repo_lookup(|repo, dataset_id| async move {
+                repo.get_data_block(&dataset_id, hash)
+                    .await
+                    .map(|block_opt| block_opt.map(|block| block.block_payload))
+            }),
             self.metadata_chain.get_block_bytes(hash),
         )
         .await
@@ -546,6 +587,21 @@ where
         self.get_from_cache_or_fallback(
             hash,
             CachedBlocksRange::try_get_block,
+            self.try_data_block_repo_lookup(|repo, dataset_id| async move {
+                match repo.get_data_block(&dataset_id, hash).await {
+                    Ok(Some(data_block)) => {
+                        match odf::storage::deserialize_metadata_block(
+                            &data_block.block_hash,
+                            &data_block.block_payload,
+                        ) {
+                            Ok(metadata_block) => Ok(Some(metadata_block)),
+                            Err(e) => Err(e.int_err()),
+                        }
+                    }
+                    Ok(None) => Ok(None),
+                    Err(e) => Err(e),
+                }
+            }),
             self.metadata_chain.get_block(hash),
         )
         .await
