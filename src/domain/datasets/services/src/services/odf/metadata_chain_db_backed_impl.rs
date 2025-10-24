@@ -60,20 +60,20 @@ impl State {
 
     fn get_cached_key_blocks_for_range(
         &self,
-        (min_boundary, max_boundary): (u64, u64),
+        range: std::ops::RangeInclusive<u64>,
     ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
         self.cached_key_blocks
             .as_ref()
-            .and_then(|ckb| ckb.get_cached_blocks_for_range((min_boundary, max_boundary)))
+            .and_then(|ckb| ckb.get_cached_blocks_for_range(range))
     }
 
     fn get_cached_data_blocks_for_range(
         &self,
-        (min_boundary, max_boundary): (u64, u64),
+        range: std::ops::RangeInclusive<u64>,
     ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
         self.cached_data_blocks
             .as_ref()
-            .and_then(|cdb| cdb.get_cached_blocks_for_range((min_boundary, max_boundary)))
+            .and_then(|cdb| cdb.get_cached_blocks_for_range(range))
     }
 }
 
@@ -141,13 +141,28 @@ impl CachedBlocksRange {
             .map(|&idx| self.original_block_payloads[idx].clone())
     }
 
+    fn get_covered_range(&self, full_page_size: usize) -> Option<std::ops::RangeInclusive<u64>> {
+        if self.blocks.is_empty() {
+            None
+        } else {
+            let min_boundary = self.blocks.first().unwrap().1.sequence_number;
+            let max_boundary = self.blocks.last().unwrap().1.sequence_number;
+
+            // If we've loaded less than full page size, it means we are at the beginning.
+            // At the beginning, there are at least some key blocks,
+            // so data blocks never start from seq number 0
+            if self.blocks.len() < full_page_size {
+                Some(0..=max_boundary)
+            } else {
+                Some(min_boundary..=max_boundary)
+            }
+        }
+    }
+
     fn get_cached_blocks_for_range(
         &self,
-        (min_boundary, max_boundary): (u64, u64),
+        range: std::ops::RangeInclusive<u64>,
     ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
-        // Ensure correct boundary
-        assert!(min_boundary < max_boundary);
-
         // No blocks yet?
         if self.blocks.is_empty() {
             return None;
@@ -156,12 +171,12 @@ impl CachedBlocksRange {
         // Find the first block that is greater than or equal to the min boundary
         let start_index = self
             .blocks
-            .binary_search_by_key(&min_boundary, |(_, block)| block.sequence_number)
+            .binary_search_by_key(range.start(), |(_, block)| block.sequence_number)
             .unwrap_or_else(|x| x);
 
         // Use the start_index to reduce the search space for the max boundary
         let end_index = self.blocks[start_index..]
-            .binary_search_by_key(&max_boundary, |(_, block)| block.sequence_number)
+            .binary_search_by_key(range.end(), |(_, block)| block.sequence_number)
             .map(|x| x + start_index)
             .unwrap_or_else(|x| x + start_index);
 
@@ -299,41 +314,53 @@ where
 
     async fn ensure_data_blocks_are_preloaded(
         &self,
-        requested_boundary: (u64, u64),
+        interested_range: std::ops::RangeInclusive<u64>,
     ) -> Result<(), InternalError> {
-        // TODO: implement data block preloading in pages
-        assert!(self.config.data_blocks_page_size > 0);
-
         // Try getting access to repository
         let maybe_data_block_repository = {
-            // Ignore if already loaded
+            // Ignore if already covered
             let read_guard = self.state.read().unwrap();
-            if read_guard.cached_data_blocks.is_some() {
+            if let Some(cached_data_blocks) = &read_guard.cached_data_blocks
+                && cached_data_blocks
+                    .get_covered_range(self.config.data_blocks_page_size)
+                    .is_some_and(|cached_range| cached_range.contains(interested_range.end()))
+            {
                 return Ok(());
             }
 
-            // Not loaded. Try looking at repository
+            // Not covered. Try looking at repository
             read_guard.maybe_dataset_data_block_repo.clone()
         };
 
-        // If there is a repository, we could try loading
+        // If there is a repository, we could try loading blocks to cover the range
         if let Some(data_block_repository) = maybe_data_block_repository {
             // Take loading lock
             let loading_guard = self.data_blocks_loading_lock.lock().await;
 
-            // Try again, maybe another task has loaded data blocks already
+            // Try again, maybe another task has loaded required data blocks already
             {
-                // Ignore if already loaded
+                // Ignore if already covered
                 let read_guard = self.state.read().unwrap();
-                if read_guard.cached_data_blocks.is_some() {
+                if let Some(cached_data_blocks) = &read_guard.cached_data_blocks
+                    && cached_data_blocks
+                        .get_covered_range(self.config.data_blocks_page_size)
+                        .is_some_and(|cached_range| cached_range.contains(interested_range.end()))
+                {
                     return Ok(());
                 }
             }
 
-            // Temporary: read all data blocks of this dataset
-            // TODO: read in pages, not all at once
+            // Read standard page of data blocks from the upper boundary.
+            // It might not cover the entire interested range,
+            // when range is large, load 1 page only.
+            // The page might also be larger than interested range.
             let data_block_records = data_block_repository
-                .get_all_data_blocks(&self.dataset_id, &odf::BlockRef::Head)
+                .get_page_of_data_blocks(
+                    &self.dataset_id,
+                    &odf::BlockRef::Head,
+                    self.config.data_blocks_page_size,
+                    *interested_range.end(),
+                )
                 .await
                 .int_err()?;
 
@@ -363,10 +390,13 @@ where
             tracing::trace!(
                 dataset_id=%self.dataset_id,
                 num_blocks = cached_data_blocks.len(),
-                "No data blocks cached. Loaded data blocks from the repository"
+                covered_range = ?cached_data_blocks.get_covered_range(self.config.data_blocks_page_size),
+                "Data blocks cache miss. Loading page of data blocks from the repository"
             );
 
-            // Fix loaded state
+            // Fix loaded state: discard previous cache if any
+            // Completely random access is undesirable, that would replace pages frequently
+            // However, most of the time the access patterns are sequential & go backwards
             {
                 let mut write_guard = self.state.write().unwrap();
                 write_guard.cached_data_blocks = Some(cached_data_blocks);
@@ -455,7 +485,7 @@ where
 
     async fn get_key_block_with_hint(
         &self,
-        requested_boundary: (u64, u64),
+        requested_range: std::ops::RangeInclusive<u64>,
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
         // Force loading key blocks unless it was already done
@@ -464,7 +494,7 @@ where
         // Read what's in the key blocks cache
         let read_guard = self.state.read().unwrap();
         if let Some(cached_blocks_in_range) =
-            read_guard.get_cached_key_blocks_for_range(requested_boundary)
+            read_guard.get_cached_key_blocks_for_range(requested_range)
         {
             // Report cache hit
             tracing::trace!(
@@ -491,17 +521,17 @@ where
 
     async fn get_data_block_with_hint(
         &self,
-        requested_boundary: (u64, u64),
+        requested_range: std::ops::RangeInclusive<u64>,
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
         // Force loading data blocks unless it was already done
-        self.ensure_data_blocks_are_preloaded(requested_boundary)
+        self.ensure_data_blocks_are_preloaded(requested_range.clone())
             .await?;
 
         // Read what's in the data blocks cache
         let read_guard = self.state.read().unwrap();
         if let Some(cached_blocks_in_range) =
-            read_guard.get_cached_data_blocks_for_range(requested_boundary)
+            read_guard.get_cached_data_blocks_for_range(requested_range)
         {
             // Report cache hit
             tracing::trace!(
@@ -697,13 +727,14 @@ where
 
         // This is the working range of our iteration [min, max).
         // We should not return blocks outside of this range.
-        let requested_boundary = (tail_sequence_number, head_block.sequence_number);
+        let requested_boundary: std::ops::RangeInclusive<u64> =
+            tail_sequence_number..=head_block.sequence_number;
 
         // If we are looking for specific block types, try to use the caches first
         if let odf::dataset::MetadataVisitorDecision::NextOfType(hint_flags) = hint {
             // Try key blocks from cache, if flags expect key nodes
             let key_block_result = if hint_flags.has_key_block_flags() {
-                self.get_key_block_with_hint(requested_boundary, hint_flags)
+                self.get_key_block_with_hint(requested_boundary.clone(), hint_flags)
                     .await?
             } else {
                 BlockLookupResult::Stop
