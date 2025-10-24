@@ -47,3 +47,28 @@ CREATE UNIQUE INDEX idx_dataset_key_blocks_by_hash
     ON dataset_key_blocks (dataset_id, block_hash_bin);    
 
 /* ------------------------------ */
+
+-- Migrate dataset_references table to use binary storage with virtual hex field
+-- First, add the new binary column
+ALTER TABLE dataset_references 
+ADD COLUMN block_hash_bin BYTEA;
+
+-- Convert existing textual hashes to binary format
+-- The format is f1620<hex-digest>, so we strip the f1620 prefix and decode the hex
+UPDATE dataset_references 
+SET block_hash_bin = decode(substring(block_hash from 6), 'hex')
+WHERE block_hash LIKE 'f1620%';
+
+-- Make the binary column NOT NULL after data migration
+ALTER TABLE dataset_references 
+ALTER COLUMN block_hash_bin SET NOT NULL;
+
+-- Add the virtual generated hex column
+ALTER TABLE dataset_references 
+ADD COLUMN block_hash_hex TEXT GENERATED ALWAYS AS (('f1620' || encode(block_hash_bin, 'hex'))) VIRTUAL;
+
+-- Drop the old textual column
+ALTER TABLE dataset_references 
+DROP COLUMN block_hash;
+
+/* ------------------------------ */
