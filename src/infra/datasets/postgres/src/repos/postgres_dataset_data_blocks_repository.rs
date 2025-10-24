@@ -24,7 +24,7 @@ pub struct PostgresDatasetDataBlockRepository {
 
 #[async_trait::async_trait]
 impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
-    async fn has_blocks(
+    async fn has_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -42,6 +42,80 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         .int_err()?;
 
         Ok(result.is_some())
+    }
+
+    async fn contains_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<bool, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let result = sqlx::query_scalar!(
+            r#"SELECT 1 FROM dataset_data_blocks WHERE dataset_id = $1 AND block_hash_bin = $2 LIMIT 1"#,
+            dataset_id.to_string(),
+            block_hash.digest()
+        )
+        .fetch_optional(conn)
+        .await
+        .int_err()?;
+
+        Ok(result.is_some())
+    }
+
+    async fn get_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<DatasetBlock>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                event_type as "event_type: MetadataEventType",
+                sequence_number,
+                block_hash_bin,
+                block_payload
+            FROM dataset_data_blocks
+            WHERE dataset_id = $1 AND block_hash_bin = $2
+            "#,
+            dataset_id.to_string(),
+            block_hash.digest()
+        )
+        .fetch_optional(conn)
+        .await
+        .int_err()?;
+
+        Ok(row.map(|r| DatasetBlock {
+            event_kind: r.event_type,
+            sequence_number: u64::try_from(r.sequence_number).unwrap(),
+            block_hash: odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &r.block_hash_bin)
+                .unwrap(),
+            block_payload: bytes::Bytes::from(r.block_payload),
+        }))
+    }
+
+    async fn get_data_block_size(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<usize>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let result = sqlx::query_scalar!(
+            r#"SELECT LENGTH(block_payload) FROM dataset_data_blocks WHERE dataset_id = $1 AND block_hash_bin = $2"#,
+            dataset_id.to_string(),
+            block_hash.digest()
+        )
+        .fetch_optional(conn)
+        .await
+        .int_err()?;
+
+        Ok(result.flatten().map(|size| usize::try_from(size).unwrap()))
     }
 
     async fn get_all_data_blocks(
@@ -85,7 +159,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
             .collect())
     }
 
-    async fn save_blocks_batch(
+    async fn save_data_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -149,7 +223,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         Ok(())
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

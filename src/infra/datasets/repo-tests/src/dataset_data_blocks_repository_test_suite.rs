@@ -34,7 +34,7 @@ pub async fn test_no_blocks(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn DatasetDataBlockRepository>().unwrap();
     assert!(
         !repo
-            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .has_data_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );

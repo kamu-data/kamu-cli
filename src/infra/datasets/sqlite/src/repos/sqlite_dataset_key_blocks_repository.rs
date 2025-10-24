@@ -54,7 +54,7 @@ impl DatasetKeyBlockRow {
 
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
-    async fn has_blocks(
+    async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -66,7 +66,12 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let block_ref_str = block_ref.as_str();
 
         let result: Option<i32> = sqlx::query_scalar(
-            "SELECT 1 FROM dataset_key_blocks WHERE dataset_id = ? AND block_ref_name = ? LIMIT 1",
+            r#"
+            SELECT 1
+            FROM dataset_key_blocks
+            WHERE dataset_id = $1 AND block_ref_name = $2
+            LIMIT 1
+            "#,
         )
         .bind(dataset_id_str)
         .bind(block_ref_str)
@@ -97,7 +102,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 block_hash_bin,
                 block_payload
             FROM dataset_key_blocks
-            WHERE dataset_id = ? AND block_ref_name = ?
+            WHERE dataset_id = $1 AND block_ref_name = $2
             ORDER BY sequence_number
             "#,
             dataset_id_str,
@@ -113,7 +118,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn match_datasets_having_blocks(
+    async fn match_datasets_having_key_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
@@ -193,7 +198,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn save_blocks_batch(
+    async fn save_key_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -252,7 +257,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(())
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

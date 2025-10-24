@@ -44,7 +44,7 @@ impl InMemoryDatasetKeyBlockRepository {
 
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
-    async fn has_blocks(
+    async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -56,7 +56,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .is_some_and(|v| !v.is_empty()))
     }
 
-    async fn save_blocks_batch(
+    async fn save_key_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -101,7 +101,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .unwrap_or_default())
     }
 
-    async fn match_datasets_having_blocks(
+    async fn match_datasets_having_key_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
@@ -126,7 +126,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         Ok(result)
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

@@ -71,7 +71,7 @@ pub(crate) async fn index_dataset_key_blocks_entirely(
     // Make sure the repository contains no key blocks for this dataset
     assert!(
         !dataset_key_block_repo
-            .has_blocks(target.get_id(), block_ref)
+            .has_key_blocks_for_ref(target.get_id(), block_ref)
             .await?
     );
 
@@ -106,7 +106,7 @@ pub(crate) async fn index_dataset_key_blocks_entirely(
             // Save in chunks of 100
             if current_chunk.len() >= 100 {
                 dataset_key_block_repo
-                    .save_blocks_batch(target.get_id(), block_ref, &current_chunk)
+                    .save_key_blocks_batch(target.get_id(), block_ref, &current_chunk)
                     .await
                     .int_err()?;
 
@@ -128,7 +128,7 @@ pub(crate) async fn index_dataset_key_blocks_entirely(
     // Save remaining blocks
     if !current_chunk.is_empty() {
         dataset_key_block_repo
-            .save_blocks_batch(target.get_id(), block_ref, &current_chunk)
+            .save_key_blocks_batch(target.get_id(), block_ref, &current_chunk)
             .await
             .int_err()?;
 

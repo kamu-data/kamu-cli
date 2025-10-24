@@ -423,7 +423,7 @@ impl FlowDescriptionBuilder {
         // number range of the head at the flow launch moment,
         // as metadata might have already evolved by now
         let matches = key_blocks_repository
-            .match_datasets_having_blocks(
+            .match_datasets_having_key_blocks(
                 dataset_ids,
                 &odf::BlockRef::Head,
                 kamu_datasets::MetadataEventType::SetPollingSource,
@@ -463,7 +463,7 @@ impl FlowDescriptionBuilder {
         // number range of the head at the flow launch moment,
         // as metadata might have already evolved by now
         let matches = key_blocks_repository
-            .match_datasets_having_blocks(
+            .match_datasets_having_key_blocks(
                 dataset_ids,
                 &odf::BlockRef::Head,
                 kamu_datasets::MetadataEventType::SetTransform,

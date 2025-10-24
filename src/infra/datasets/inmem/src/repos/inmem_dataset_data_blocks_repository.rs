@@ -44,7 +44,7 @@ impl InMemoryDatasetDataBlockRepository {
 
 #[async_trait::async_trait]
 impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
-    async fn has_blocks(
+    async fn has_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -56,7 +56,54 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
             .is_some_and(|v| !v.is_empty()))
     }
 
-    async fn save_blocks_batch(
+    async fn contains_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<bool, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard.data_blocks.iter().any(|((id, _), blocks)| {
+            id == dataset_id && blocks.iter().any(|block| &block.block_hash == block_hash)
+        }))
+    }
+
+    async fn get_data_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<DatasetBlock>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard.data_blocks.iter().find_map(|((id, _), blocks)| {
+            if id == dataset_id {
+                blocks
+                    .iter()
+                    .find(|block| &block.block_hash == block_hash)
+                    .cloned()
+            } else {
+                None
+            }
+        }))
+    }
+
+    async fn get_data_block_size(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+    ) -> Result<Option<usize>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard.data_blocks.iter().find_map(|((id, _), blocks)| {
+            if id == dataset_id {
+                blocks
+                    .iter()
+                    .find(|block| &block.block_hash == block_hash)
+                    .map(|block| block.block_payload.len())
+            } else {
+                None
+            }
+        }))
+    }
+
+    async fn save_data_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -101,7 +148,7 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
             .unwrap_or_default())
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

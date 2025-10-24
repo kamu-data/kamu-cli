@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                event_type,\n                sequence_number,\n                block_hash_bin,\n                block_payload\n            FROM dataset_data_blocks\n            WHERE dataset_id = ? AND block_ref_name = ?\n            ORDER BY sequence_number\n            ",
+  "query": "\n            SELECT\n                event_type,\n                sequence_number,\n                block_hash_bin,\n                block_payload\n            FROM dataset_data_blocks\n            WHERE dataset_id = $1 AND block_hash_bin = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "0b6ed7d5a9ce88ca18e19a93b86b40c48dfc6c9b79d5574cd64d0d5ece3c114d"
+  "hash": "eea8faa51c405ff0f082b8104e69997783e8d8fc37de645efd660d7b1afe35dc"
 }
