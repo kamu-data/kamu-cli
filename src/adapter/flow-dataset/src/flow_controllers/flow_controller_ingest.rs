@@ -38,6 +38,33 @@ pub struct FlowControllerIngest {
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
+impl FlowControllerIngest {
+    async fn run_next_iteration_ingest(
+        &self,
+        flow_state: &fs::FlowState,
+        previous_flow_finish_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        let activation_cause =
+            fs::FlowActivationCause::IterationFinished(fs::FlowActivationCauseIterationFinished {
+                activation_time: previous_flow_finish_time,
+            });
+
+        // Trigger another run to fetch remaining data
+        self.flow_run_service
+            .run_flow_automatically(
+                activation_cause.activation_time(),
+                &flow_state.flow_binding,
+                vec![activation_cause.clone()],
+                None,
+                flow_state.config_snapshot.clone(),
+            )
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -127,18 +154,9 @@ impl fs::FlowController for FlowControllerIngest {
                     && FlowConfigRuleIngest::from_flow_config(config_snapshot)?.fetch_next_iteration
                     && has_more
                 {
-                    // Trigger another run to fetch remaining data
-                    self.flow_run_service
-                        .run_flow_automatically(
-                            activation_cause.activation_time(),
-                            &success_flow_state.flow_binding,
-                            vec![activation_cause.clone()],
-                            None,
-                            success_flow_state.config_snapshot.clone(),
-                        )
-                        .await
-                        .int_err()?;
-                };
+                    self.run_next_iteration_ingest(success_flow_state, finish_time)
+                        .await?;
+                }
 
                 self.flow_sensor_dispatcher
                     .dispatch_input_flow_success(

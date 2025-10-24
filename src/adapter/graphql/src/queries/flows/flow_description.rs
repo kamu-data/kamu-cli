@@ -620,7 +620,8 @@ impl FlowDescriptionBuilder {
                             fs::FlowActivationCause::Manual(_) => {
                                 (None, "Flow activated manually".to_string())
                             }
-                            fs::FlowActivationCause::AutoPolling(_) => {
+                            fs::FlowActivationCause::AutoPolling(_)
+                            | fs::FlowActivationCause::IterationFinished(_) => {
                                 (None, "Flow activated automatically".to_string())
                             }
                             fs::FlowActivationCause::ResourceUpdate(update) => {
