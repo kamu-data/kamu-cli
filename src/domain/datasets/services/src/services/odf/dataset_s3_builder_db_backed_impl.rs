@@ -13,21 +13,31 @@ use std::sync::Arc;
 use dill::*;
 use s3_utils::S3Context;
 
-use crate::{MetadataChainDatabaseBackedImpl, MetadataChainRefRepositoryDatabaseBackedImpl};
+use crate::{
+    MetadataChainDatabaseBackedImpl,
+    MetadataChainDbBackedConfig,
+    MetadataChainRefRepositoryDatabaseBackedImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetS3BuilderDatabaseBackedImpl {
     catalog: Catalog,
+    config: Arc<MetadataChainDbBackedConfig>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
 }
 
 #[component(pub)]
 #[interface(dyn odf::dataset::DatasetS3Builder)]
 impl DatasetS3BuilderDatabaseBackedImpl {
-    pub fn new(catalog: Catalog, metadata_cache_local_fs_path: Option<Arc<PathBuf>>) -> Self {
+    pub fn new(
+        catalog: Catalog,
+        config: Arc<MetadataChainDbBackedConfig>,
+        metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
+    ) -> Self {
         Self {
             catalog,
+            config,
             metadata_cache_local_fs_path,
         }
     }
@@ -46,6 +56,7 @@ impl odf::dataset::DatasetS3Builder for DatasetS3BuilderDatabaseBackedImpl {
         if let Some(metadata_cache_local_fs_path) = &self.metadata_cache_local_fs_path {
             Arc::new(DatasetImpl::new(
                 MetadataChainDatabaseBackedImpl::new(
+                    *(self.config.as_ref()),
                     dataset_id.clone(),
                     self.catalog.get_one().unwrap(),
                     self.catalog.get_one().unwrap(),
@@ -71,6 +82,7 @@ impl odf::dataset::DatasetS3Builder for DatasetS3BuilderDatabaseBackedImpl {
         } else {
             Arc::new(DatasetImpl::new(
                 MetadataChainDatabaseBackedImpl::new(
+                    *(self.config.as_ref()),
                     dataset_id.clone(),
                     self.catalog.get_one().unwrap(),
                     self.catalog.get_one().unwrap(),

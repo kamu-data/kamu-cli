@@ -168,6 +168,51 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
         Ok(result.map(|size| usize::try_from(size).unwrap()))
     }
 
+    async fn get_page_of_data_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        page_size: usize,
+        upper_sequence_number_inclusive: u64,
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let dataset_id_str = dataset_id.to_string();
+        let block_ref_str = block_ref.as_str();
+
+        let page_size = i64::try_from(page_size).unwrap();
+        let upper_sequence_number_inclusive =
+            i64::try_from(upper_sequence_number_inclusive).unwrap();
+
+        let rows = sqlx::query_as!(
+            DatasetDataBlockRow,
+            r#"
+            SELECT
+                event_type,
+                sequence_number,
+                block_hash_bin,
+                block_payload
+            FROM dataset_data_blocks
+            WHERE dataset_id = $1 AND block_ref_name = $2 AND sequence_number <= $3
+            ORDER BY sequence_number DESC
+            LIMIT $4
+            "#,
+            dataset_id_str,
+            block_ref_str,
+            upper_sequence_number_inclusive,
+            page_size,
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(DatasetDataBlockRow::into_domain)
+            .collect())
+    }
+
     async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,

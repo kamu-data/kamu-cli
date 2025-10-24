@@ -103,6 +103,43 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         }))
     }
 
+    async fn get_page_of_data_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        page_size: usize,
+        upper_sequence_number_inclusive: u64,
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
+        let guard = self.state.lock().unwrap();
+        let page: Vec<DatasetBlock> = guard
+            .data_blocks
+            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
+            .map(|blocks| {
+                blocks
+                    .iter()
+                    .filter(|b| b.sequence_number <= upper_sequence_number_inclusive)
+                    .take(page_size)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(page)
+    }
+
+    async fn get_all_data_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard
+            .data_blocks
+            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
+            .cloned()
+            .unwrap_or_default())
+    }
+
     async fn save_data_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
@@ -133,19 +170,6 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         entry.extend_from_slice(blocks);
         entry.sort_by_key(|b| b.sequence_number);
         Ok(())
-    }
-
-    async fn get_all_data_blocks(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
-            .data_blocks
-            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-            .cloned()
-            .unwrap_or_default())
     }
 
     async fn delete_all_data_blocks_for_ref(

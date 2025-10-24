@@ -118,6 +118,52 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         Ok(result.flatten().map(|size| usize::try_from(size).unwrap()))
     }
 
+    async fn get_page_of_data_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        page_size: usize,
+        upper_sequence_number_inclusive: u64,
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                event_type as "event_type: MetadataEventType",
+                sequence_number,
+                block_hash_bin,
+                block_payload
+            FROM dataset_data_blocks
+            WHERE dataset_id = $1 AND block_ref_name = $2 AND sequence_number <= $3
+            ORDER BY sequence_number DESC
+            LIMIT $4
+            "#,
+            dataset_id.to_string(),
+            block_ref.as_str(),
+            i64::try_from(upper_sequence_number_inclusive).unwrap(),
+            i64::try_from(page_size).unwrap()
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| DatasetBlock {
+                event_kind: r.event_type,
+                sequence_number: u64::try_from(r.sequence_number).unwrap(),
+                block_hash: odf::Multihash::new(
+                    odf::metadata::Multicodec::Sha3_256,
+                    &r.block_hash_bin,
+                )
+                .unwrap(),
+                block_payload: bytes::Bytes::from(r.block_payload),
+            })
+            .collect())
+    }
+
     async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,

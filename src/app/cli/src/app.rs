@@ -440,6 +440,8 @@ pub fn configure_base_catalog(
     ));
     b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
 
+    b.add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default());
+
     b.add::<odf::dataset::DatasetFactoryImpl>();
 
     b.add::<RemoteRepositoryRegistryImpl>();

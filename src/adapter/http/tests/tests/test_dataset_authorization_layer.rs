@@ -368,6 +368,7 @@ impl ServerHarness {
                     odf::dataset::DatasetStorageUnitLocalFs::builder(datasets_dir)
                 )
                 .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetReferenceServiceImpl>()

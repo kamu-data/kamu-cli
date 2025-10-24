@@ -63,6 +63,7 @@ impl BaseGQLDatasetHarness {
                     datasets_dir,
                 ))
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()

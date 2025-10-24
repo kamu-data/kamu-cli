@@ -40,6 +40,14 @@ pub trait DatasetDataBlockRepository: Send + Sync {
         block_hash: &odf::Multihash,
     ) -> Result<Option<usize>, InternalError>;
 
+    async fn get_page_of_data_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        page_size: usize,
+        upper_sequence_number_inclusive: u64,
+    ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError>;
+
     async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,
