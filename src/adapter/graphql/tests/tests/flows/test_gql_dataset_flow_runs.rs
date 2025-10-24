@@ -305,6 +305,7 @@ async fn test_trigger_ingest_root_dataset() {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                        has_more: false,
                     },
                 }
                 .into_task_result(),
@@ -768,6 +769,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                        has_more: false,
                     },
                 }
                 .into_task_result(),
@@ -4043,6 +4045,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                        has_more: false,
                     },
                 }
                 .into_task_result(),

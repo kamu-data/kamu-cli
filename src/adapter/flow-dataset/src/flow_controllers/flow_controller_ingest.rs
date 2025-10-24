@@ -34,8 +34,38 @@ use crate::{
 pub struct FlowControllerIngest {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
+    flow_run_service: Arc<dyn fs::FlowRunService>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
+
+impl FlowControllerIngest {
+    async fn run_next_iteration_ingest(
+        &self,
+        flow_state: &fs::FlowState,
+        previous_flow_finish_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        let activation_cause =
+            fs::FlowActivationCause::IterationFinished(fs::FlowActivationCauseIterationFinished {
+                activation_time: previous_flow_finish_time,
+            });
+
+        // Trigger another run to fetch remaining data
+        self.flow_run_service
+            .run_flow_automatically(
+                activation_cause.activation_time(),
+                &flow_state.flow_binding,
+                vec![activation_cause.clone()],
+                None,
+                flow_state.config_snapshot.clone(),
+            )
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl fs::FlowController for FlowControllerIngest {
@@ -79,7 +109,11 @@ impl fs::FlowController for FlowControllerIngest {
                 tracing::debug!(flow_id = %success_flow_state.flow_id, "Ingest up-to-date, skipping propagation");
                 return Ok(());
             }
-            PullResult::Updated { old_head, new_head } => {
+            PullResult::Updated {
+                old_head,
+                new_head,
+                has_more,
+            } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
@@ -115,6 +149,14 @@ impl fs::FlowController for FlowControllerIngest {
                         .int_err()?,
                     },
                 );
+
+                if has_more
+                    && let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
+                    && FlowConfigRuleIngest::from_flow_config(config_snapshot)?.fetch_next_iteration
+                {
+                    self.run_next_iteration_ingest(success_flow_state, finish_time)
+                        .await?;
+                }
 
                 self.flow_sensor_dispatcher
                     .dispatch_input_flow_success(

@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Ingest flow respects `has_more` flag and trigger follow up ingest flow
+
 ## [0.251.2] - 2025-10-21
 ### Fixed
 - Hotfix: merge error during polling ingest should be considered as unrecoverable failure

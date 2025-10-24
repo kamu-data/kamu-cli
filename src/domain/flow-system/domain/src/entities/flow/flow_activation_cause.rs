@@ -19,6 +19,7 @@ pub enum FlowActivationCause {
     Manual(FlowActivationCauseManual),
     AutoPolling(FlowActivationCauseAutoPolling),
     ResourceUpdate(FlowActivationCauseResourceUpdate),
+    IterationFinished(FlowActivationCauseIterationFinished),
 }
 
 impl FlowActivationCause {
@@ -27,6 +28,7 @@ impl FlowActivationCause {
             Self::Manual(t) => t.activation_time,
             Self::AutoPolling(t) => t.activation_time,
             Self::ResourceUpdate(t) => t.activation_time,
+            Self::IterationFinished(t) => t.activation_time,
         }
     }
 
@@ -83,6 +85,13 @@ pub type InitiatorIDStream<'a> = std::pin::Pin<
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowActivationCauseAutoPolling {
+    pub activation_time: DateTime<Utc>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowActivationCauseIterationFinished {
     pub activation_time: DateTime<Utc>,
 }
 

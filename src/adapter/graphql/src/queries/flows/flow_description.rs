@@ -149,6 +149,7 @@ pub(crate) struct FlowDescriptionUpdateResultSuccess {
     num_blocks: u64,
     num_records: u64,
     updated_watermark: Option<DateTime<Utc>>,
+    has_more: bool,
 }
 
 impl FlowDescriptionUpdateResult {
@@ -178,6 +179,7 @@ impl FlowDescriptionUpdateResult {
                                         num_blocks: increment.num_blocks,
                                         num_records: increment.num_records,
                                         updated_watermark: increment.updated_watermark,
+                                        has_more: update.has_more(),
                                     })))
                                 }
                                 Err(err) => {
@@ -618,7 +620,8 @@ impl FlowDescriptionBuilder {
                             fs::FlowActivationCause::Manual(_) => {
                                 (None, "Flow activated manually".to_string())
                             }
-                            fs::FlowActivationCause::AutoPolling(_) => {
+                            fs::FlowActivationCause::AutoPolling(_)
+                            | fs::FlowActivationCause::IterationFinished(_) => {
                                 (None, "Flow activated automatically".to_string())
                             }
                             fs::FlowActivationCause::ResourceUpdate(update) => {

@@ -21,7 +21,9 @@ kamu_task_system::task_result_struct! {
 impl TaskResultDatasetUpdate {
     pub fn try_as_increment(&self) -> Option<(Option<&odf::Multihash>, &odf::Multihash)> {
         match &self.pull_result {
-            PullResult::Updated { old_head, new_head } => Some((old_head.as_ref(), new_head)),
+            PullResult::Updated {
+                old_head, new_head, ..
+            } => Some((old_head.as_ref(), new_head)),
             PullResult::UpToDate(_) => None,
         }
     }
@@ -30,6 +32,13 @@ impl TaskResultDatasetUpdate {
         match &self.pull_result {
             PullResult::UpToDate(up_to_date) => Some(up_to_date),
             PullResult::Updated { .. } => None,
+        }
+    }
+
+    pub fn has_more(&self) -> bool {
+        match &self.pull_result {
+            PullResult::Updated { has_more, .. } => *has_more,
+            PullResult::UpToDate(_) => false,
         }
     }
 }
