@@ -193,12 +193,16 @@ impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
 pub struct FlowConfigIngestInput {
     /// Flag indicates to ignore cache during ingest step for API calls
     pub fetch_uncacheable: bool,
+    /// Flag indicates to trigger next flow iteration right if `has_more` is
+    /// true
+    pub fetch_next_iteration: bool,
 }
 
 impl From<FlowConfigIngestInput> for afs::FlowConfigRuleIngest {
     fn from(value: FlowConfigIngestInput) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
+            fetch_next_iteration: value.fetch_next_iteration,
         }
     }
 }

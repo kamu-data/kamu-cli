@@ -62,6 +62,7 @@ async fn test_ingest_logical_plan_with_config() {
             Some(
                 FlowConfigRuleIngest {
                     fetch_uncacheable: true,
+                    fetch_next_iteration: false,
                 }
                 .into_flow_config(),
             ),

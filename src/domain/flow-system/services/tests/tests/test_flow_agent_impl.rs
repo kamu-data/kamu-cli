@@ -49,6 +49,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -534,6 +535,7 @@ async fn test_manual_trigger() {
                 maybe_forced_flow_config_rule: Some(
                     FlowConfigRuleIngest {
                         fetch_uncacheable: true,
+                        fetch_next_iteration: false,
                     }
                     .into_flow_config(),
                 ),
@@ -680,6 +682,7 @@ async fn test_ingest_trigger_with_ingest_config() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: true,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -889,7 +892,6 @@ async fn test_ingest_trigger_with_ingest_config() {
 
 #[test_log::test(tokio::test)]
 async fn test_ingest_flow_with_multiple_iterations() {
-    // bar: evaluated after enabling trigger
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     mock_transform_flow_evaluator
         .expect_evaluate_transform_status()
@@ -925,6 +927,19 @@ async fn test_ingest_flow_with_multiple_iterations() {
         )
         .await;
 
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+                fetch_next_iteration: true,
+            },
+            None,
+        )
+        .await;
+
     harness
         .set_flow_trigger(
             harness.now(),
@@ -937,14 +952,10 @@ async fn test_ingest_flow_with_multiple_iterations() {
         )
         .await;
 
-    // Enforce dependency graph initialization
-
     // Flow listener will collect snapshots at important moments of time
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
-
-    let foo_flow_binding = ingest_dataset_binding(&foo_id);
 
     // Run scheduler concurrently with simulation script
     harness
@@ -8746,6 +8757,7 @@ async fn test_disable_trigger_on_flow_fail_default() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -8882,6 +8894,7 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -9114,6 +9127,7 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -9348,6 +9362,7 @@ async fn test_disable_trigger_on_flow_fail_ignores_stop_policy_for_unrecoverable
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -9954,6 +9969,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             Some(RetryPolicy {
                 max_attempts: 2,
@@ -10118,6 +10134,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             Some(RetryPolicy {
                 max_attempts: 2,
@@ -10282,6 +10299,7 @@ async fn test_manual_ingest_with_retry_policy_ignored_on_unrecoverable_error() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             Some(RetryPolicy {
                 max_attempts: 2,

@@ -123,7 +123,10 @@ impl fs::FlowController for FlowControllerIngest {
                     },
                 );
 
-                if has_more {
+                if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
+                    && FlowConfigRuleIngest::from_flow_config(config_snapshot)?.fetch_next_iteration
+                    && has_more
+                {
                     // Trigger another run to fetch remaining data
                     self.flow_run_service
                         .run_flow_automatically(
@@ -135,7 +138,7 @@ impl fs::FlowController for FlowControllerIngest {
                         )
                         .await
                         .int_err()?;
-                }
+                };
 
                 self.flow_sensor_dispatcher
                     .dispatch_input_flow_success(
