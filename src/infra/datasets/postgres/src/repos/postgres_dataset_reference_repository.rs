@@ -57,7 +57,7 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
 
         let maybe_record = sqlx::query!(
             r#"
-            SELECT block_hash
+            SELECT block_hash_bin
                 FROM dataset_references
                 WHERE dataset_id = $1 AND block_ref_name = $2
             "#,
@@ -69,7 +69,10 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
         .int_err()?;
 
         if let Some(record) = maybe_record {
-            Ok(odf::Multihash::from_multibase(&record.block_hash).unwrap())
+            Ok(
+                odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &record.block_hash_bin)
+                    .unwrap(),
+            )
         } else {
             Err(DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
@@ -91,7 +94,7 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
 
         let records = sqlx::query!(
             r#"
-            SELECT block_ref_name, block_hash
+            SELECT block_ref_name, block_hash_bin
                 FROM dataset_references
                 WHERE dataset_id = $1
             "#,
@@ -105,7 +108,8 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
         for record in records {
             res.push((
                 odf::BlockRef::from_str(record.block_ref_name.as_str())?,
-                odf::Multihash::from_multibase(&record.block_hash).int_err()?,
+                odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &record.block_hash_bin)
+                    .int_err()?,
             ));
         }
 
@@ -126,15 +130,15 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
 
             sqlx::query!(
                 r#"
-                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash)
+                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash_bin)
                     VALUES ($1, $2, $3)
                     ON CONFLICT(dataset_id, block_ref_name)
-                    DO UPDATE SET block_hash = $3 WHERE dataset_references.block_hash = $4
+                    DO UPDATE SET block_hash_bin = $3 WHERE dataset_references.block_hash_bin = $4
                 "#,
                 dataset_id.to_string(),
                 block_ref.as_str(),
-                block_hash.to_string(),
-                maybe_prev_block_hash.map(ToString::to_string),
+                block_hash.digest(),
+                maybe_prev_block_hash.map(odf::Multihash::digest),
             )
             .execute(connection_mut)
             .await
