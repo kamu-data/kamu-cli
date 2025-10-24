@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT block_ref_name, block_hash\n                FROM dataset_references\n                WHERE dataset_id = $1\n            ",
+  "query": "\n            SELECT block_ref_name, block_hash_bin\n                FROM dataset_references\n                WHERE dataset_id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -9,9 +9,9 @@
         "type_info": "Text"
       },
       {
-        "name": "block_hash",
+        "name": "block_hash_bin",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Blob"
       }
     ],
     "parameters": {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "758012b70a7aad966b03ad7850d0393c545ccb5c364525bde6a73b836f2238a7"
+  "hash": "43221bf6a6f0129afb59fd8db69fb1ca3d0d21f8316813c1f2a604ad13ae0b6f"
 }
