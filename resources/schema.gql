@@ -2255,6 +2255,7 @@ type FlowConfigRuleCompaction {
 
 type FlowConfigRuleIngest {
 	fetchUncacheable: Boolean!
+	fetchNextIteration: Boolean!
 }
 
 type FlowConfigRuleReset {

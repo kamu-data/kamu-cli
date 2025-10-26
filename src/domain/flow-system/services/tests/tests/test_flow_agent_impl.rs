@@ -1103,35 +1103,35 @@ async fn test_ingest_flow_with_multiple_iterations() {
 
             #5: +30ms:
               "foo" Ingest:
-                Flow ID = 1 Waiting Input(foo)
+                Flow ID = 1 Waiting Iteration Finish
                 Flow ID = 0 Finished Success
 
             #6: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1030ms)
               "foo" Ingest:
-                Flow ID = 1 Waiting Input(foo)
+                Flow ID = 1 Waiting Iteration Finish
                 Flow ID = 0 Finished Success
 
             #7: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1030ms) Activating(at=30ms)
               "foo" Ingest:
-                Flow ID = 1 Waiting Input(foo)
+                Flow ID = 1 Waiting Iteration Finish
                 Flow ID = 0 Finished Success
 
             #8: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1030ms) Activating(at=30ms)
               "foo" Ingest:
-                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=30ms)
+                Flow ID = 1 Waiting Iteration Finish Executor(task=1, since=30ms)
                 Flow ID = 0 Finished Success
 
             #9: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Executor(task=2, since=30ms)
               "foo" Ingest:
-                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=30ms)
+                Flow ID = 1 Waiting Iteration Finish Executor(task=1, since=30ms)
                 Flow ID = 0 Finished Success
 
             #10: +40ms:
@@ -1152,7 +1152,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
               "bar" ExecuteTransform:
                 Flow ID = 2 Waiting Input(foo) Executor(task=2, since=30ms)
               "foo" Ingest:
-                Flow ID = 3 Waiting Input(foo)
+                Flow ID = 3 Waiting Iteration Finish
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1160,7 +1160,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
               "bar" ExecuteTransform:
                 Flow ID = 2 Running(task=2)
               "foo" Ingest:
-                Flow ID = 3 Waiting Input(foo)
+                Flow ID = 3 Waiting Iteration Finish
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1168,7 +1168,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
               "bar" ExecuteTransform:
                 Flow ID = 2 Running(task=2)
               "foo" Ingest:
-                Flow ID = 3 Waiting Input(foo) Executor(task=3, since=60ms)
+                Flow ID = 3 Waiting Iteration Finish Executor(task=3, since=60ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1176,7 +1176,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
               "bar" ExecuteTransform:
                 Flow ID = 2 Finished Success
               "foo" Ingest:
-                Flow ID = 3 Waiting Input(foo) Executor(task=3, since=60ms)
+                Flow ID = 3 Waiting Iteration Finish Executor(task=3, since=60ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1185,7 +1185,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
                 Flow ID = 4 Waiting Input(foo) Throttling(for=20ms, wakeup=100ms, shifted=60ms)
                 Flow ID = 2 Finished Success
               "foo" Ingest:
-                Flow ID = 3 Waiting Input(foo) Executor(task=3, since=60ms)
+                Flow ID = 3 Waiting Iteration Finish Executor(task=3, since=60ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 

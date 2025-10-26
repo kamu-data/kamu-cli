@@ -68,12 +68,14 @@ impl From<fs::FlowConfigurationRule> for FlowConfigRule {
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigRuleIngest {
     pub fetch_uncacheable: bool,
+    pub fetch_next_iteration: bool,
 }
 
 impl From<afs::FlowConfigRuleIngest> for FlowConfigRuleIngest {
     fn from(value: afs::FlowConfigRuleIngest) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
+            fetch_next_iteration: value.fetch_next_iteration,
         }
     }
 }
