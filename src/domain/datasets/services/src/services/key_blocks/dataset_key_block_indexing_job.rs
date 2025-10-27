@@ -91,9 +91,10 @@ pub(crate) async fn index_dataset_key_blocks_entirely(
     let mut chunks_saved = 0;
 
     // Iterate over blocks of the entire dataset.
-    let mut blocks_stream = target
-        .as_metadata_chain()
-        .iter_blocks_interval(&head, None, true);
+    let mut blocks_stream =
+        target
+            .as_metadata_chain()
+            .iter_blocks_interval((&head).into(), None, true);
 
     while let Some((block_hash, block)) = blocks_stream.try_next().await.int_err()? {
         // Ignore non-key events, such as `AddData` and `ExecuteTransform`
@@ -171,9 +172,10 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
     // Note: don't ignore missing tail, we want to detect InvalidInterval error.
     //       Therefore, we need to iterate through all blocks, not only key ones,
     //       to perform an accurate tail check.
-    let mut blocks_stream = target
-        .as_metadata_chain()
-        .iter_blocks_interval(head, tail, false);
+    let mut blocks_stream =
+        target
+            .as_metadata_chain()
+            .iter_blocks_interval(head.into(), tail.map(Into::into), false);
 
     loop {
         // Try reading next stream element

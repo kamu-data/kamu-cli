@@ -133,7 +133,7 @@ impl<'a> MetadataChain<'a> {
             usize::try_from(chain.get_block(&head).await.int_err()?.sequence_number).unwrap() + 1;
 
         let mut block_stream = chain
-            .iter_blocks_interval(&head, None, false)
+            .iter_blocks_interval((&head).into(), None, false)
             .skip(page * per_page)
             .take(per_page);
 

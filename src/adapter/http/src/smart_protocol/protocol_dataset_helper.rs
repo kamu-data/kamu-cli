@@ -64,8 +64,11 @@ pub async fn prepare_dataset_transfer_plan(
     begin_after: Option<&odf::Multihash>,
     ignore_missing_tail: bool,
 ) -> Result<TransferPlan, PrepareDatasetTransferEstimateError> {
-    let mut block_stream =
-        metadata_chain.iter_blocks_interval(stop_at, begin_after, ignore_missing_tail);
+    let mut block_stream = metadata_chain.iter_blocks_interval(
+        stop_at.into(),
+        begin_after.map(Into::into),
+        ignore_missing_tail,
+    );
 
     let mut blocks_count: u32 = 0;
     let mut bytes_in_blocks: u64 = 0;
@@ -141,7 +144,11 @@ pub async fn prepare_dataset_metadata_batch(
     let mut tarball_builder = tar::Builder::new(encoder);
 
     let blocks_for_transfer: Vec<odf::dataset::HashedMetadataBlock> = metadata_chain
-        .iter_blocks_interval(stop_at, begin_after, ignore_missing_tail)
+        .iter_blocks_interval(
+            stop_at.into(),
+            begin_after.map(Into::into),
+            ignore_missing_tail,
+        )
         .try_collect()
         .await
         .int_err()?;
@@ -269,10 +276,11 @@ pub async fn collect_object_references_from_interval(
 ) -> Result<Vec<ObjectFileReference>, CollectMissingObjectReferencesFromIntervalError> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
 
-    let mut block_stream =
-        dataset
-            .as_metadata_chain()
-            .iter_blocks_interval(head, tail, ignore_missing_tail);
+    let mut block_stream = dataset.as_metadata_chain().iter_blocks_interval(
+        head.into(),
+        tail.map(Into::into),
+        ignore_missing_tail,
+    );
     while let Some((_, block)) = block_stream.try_next().await? {
         collect_object_references_from_block(
             dataset,

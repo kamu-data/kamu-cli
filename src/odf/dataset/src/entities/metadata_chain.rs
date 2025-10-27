@@ -114,7 +114,7 @@ pub trait MetadataChainExt: MetadataChain {
     /// know the type of blocks, it's better to consider using accept_*()
     /// API.
     fn iter_blocks(&self) -> DynMetadataStream<'_> {
-        self.iter_blocks_interval_ref(&BlockRef::Head, None)
+        self.iter_blocks_interval((&BlockRef::Head).into(), None, false)
     }
 
     /// Convenience function to iterate blocks starting with the specified
@@ -124,7 +124,7 @@ pub trait MetadataChainExt: MetadataChain {
     /// know the type of blocks, it's better to consider using accept_*()
     /// API.
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
-        self.iter_blocks_interval_ref(head, None)
+        self.iter_blocks_interval(head.into(), None, false)
     }
 
     /// Iterates the chain in reverse order starting with specified block and
@@ -139,79 +139,20 @@ pub trait MetadataChainExt: MetadataChain {
     /// API.
     fn iter_blocks_interval<'a>(
         &'a self,
-        head_hash: &'a Multihash,
-        tail_hash: Option<&'a Multihash>,
+        head_boundary: MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
         ignore_missing_tail: bool,
     ) -> DynMetadataStream<'a> {
         Box::pin(async_stream::try_stream! {
-            let mut current = Some(head_hash.clone());
+            let head_hash = match head_boundary {
+                MetadataChainIterBoundary::Hash(h) => h.clone(),
+                MetadataChainIterBoundary::Ref(r) => self.resolve_ref(r).await?,
+            };
 
-            while current.is_some() && current.as_ref() != tail_hash {
-                let block = self.get_block(current.as_ref().unwrap()).await?;
-                let next = block.prev_block_hash.clone();
-                yield (current.take().unwrap(), block);
-                current = next;
-            }
-
-            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash.clone(),
-                    tail: tail_hash.clone(),
-                }))?;
-            }
-        })
-    }
-
-    /// Iterates the chain in reverse order starting with specified block and
-    /// following the previous block links. The interval returned is `[head,
-    /// tail]` - tail is inclusive. If `tail` argument is provided but not
-    /// encountered the iteration will continue until first block followed by an
-    /// error. If `ignore_missing_tail` argument is provided, the exception
-    /// is not generated if tail is not detected while traversing from head
-    ///
-    /// PERF: iterates over blocks sequentially: O(N). If you initially
-    /// know the type of blocks, it's better to consider using accept_*()
-    /// API.
-    fn iter_blocks_interval_inclusive<'a>(
-        &'a self,
-        head_hash: &'a Multihash,
-        tail_hash: &'a Multihash,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let mut current = head_hash.clone();
-
-            loop {
-                let block = self.get_block(&current).await?;
-                let next = block.prev_block_hash.clone();
-                let done = current == *tail_hash;
-                yield (current.clone(), block);
-                if done || next.is_none() {
-                    break;
-                }
-                current = next.unwrap();
-            }
-
-            if !ignore_missing_tail && current != *tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash.clone(),
-                    tail: tail_hash.clone(),
-                }))?;
-            }
-        })
-    }
-
-    // TODO: Remove this method by allowing BlockRefs to be either tags or hashes
-    fn iter_blocks_interval_ref<'a>(
-        &'a self,
-        head: &'a BlockRef,
-        tail: Option<&'a BlockRef>,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let head_hash = self.resolve_ref(head).await?;
-            let tail_hash = match tail {
+            let tail_hash = match tail_boundary {
                 None => None,
-                Some(r) => Some(self.resolve_ref(r).await?),
+                Some(MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
+                Some(MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
             };
 
             let mut current = Some(head_hash.clone());
@@ -223,10 +164,10 @@ pub trait MetadataChainExt: MetadataChain {
                 current = next;
             }
 
-            if current.is_none() && let Some(tail_hash) = tail_hash {
+            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
                 Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
                     head: head_hash,
-                    tail: tail_hash
+                    tail: tail_hash,
                 }))?;
             }
         })

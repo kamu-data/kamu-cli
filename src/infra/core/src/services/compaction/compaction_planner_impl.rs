@@ -62,7 +62,7 @@ impl CompactionPlannerImpl {
         {
             use futures::TryStreamExt;
             use odf::dataset::MetadataChainExt;
-            let mut block_stream = chain.iter_blocks_interval(&head, None, false);
+            let mut block_stream = chain.iter_blocks_interval((&head).into(), None, false);
             while let Some((block_hash, block)) = block_stream.try_next().await? {
                 old_num_blocks += 1;
                 match block.event {

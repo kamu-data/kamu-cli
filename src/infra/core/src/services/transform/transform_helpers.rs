@@ -203,7 +203,11 @@ pub(crate) async fn get_transform_input_from_query_input(
     use futures::TryStreamExt;
     let blocks_unprocessed = if let Some(new_block_hash) = &query_input.new_block_hash {
         input_chain
-            .iter_blocks_interval(new_block_hash, query_input.prev_block_hash.as_ref(), false)
+            .iter_blocks_interval(
+                new_block_hash.into(),
+                query_input.prev_block_hash.as_ref().map(Into::into),
+                false,
+            )
             .try_collect()
             .await
             .map_err(|chain_err| match chain_err {

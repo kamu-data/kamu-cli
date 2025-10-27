@@ -70,7 +70,7 @@ impl MetadataChainComparator {
             lhs_chain.expecting_to_read_blocks(lhs_sequence_number + 1);
             return Ok(CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: lhs_chain
-                    .iter_blocks_interval(lhs_head, None, false)
+                    .iter_blocks_interval(lhs_head.into(), None, false)
                     .try_collect()
                     .await?,
             });
@@ -172,7 +172,7 @@ impl MetadataChainComparator {
         use odf::dataset::MetadataChainExt;
 
         let ahead_blocks: Vec<odf::dataset::HashedMetadataBlock> = ahead_chain
-            .iter_blocks_interval(ahead_head, None, false)
+            .iter_blocks_interval(ahead_head.into(), None, false)
             .take(usize::try_from(ahead_size).unwrap())
             .try_collect()
             .await?;
@@ -238,8 +238,8 @@ impl MetadataChainComparator {
         }
 
         use odf::dataset::MetadataChainExt;
-        let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head, None, false);
-        let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head, None, false);
+        let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head.into(), None, false);
+        let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head.into(), None, false);
 
         let mut curr_lhs_block_sequence_number = lhs_start_block_sequence_number;
         while curr_lhs_block_sequence_number > rhs_start_block_sequence_number {

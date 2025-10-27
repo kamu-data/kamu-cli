@@ -339,9 +339,11 @@ impl SyncServiceImpl {
 
                 use futures::TryStreamExt;
                 use odf::dataset::MetadataChainExt;
-                let mut block_stream = src_dataset
-                    .as_metadata_chain()
-                    .iter_blocks_interval(&src_head, None, false);
+                let mut block_stream = src_dataset.as_metadata_chain().iter_blocks_interval(
+                    (&src_head).into(),
+                    None,
+                    false,
+                );
 
                 while let Some((_, _)) = block_stream.try_next().await.map_err(|e| match e {
                     odf::IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
