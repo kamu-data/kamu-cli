@@ -27,6 +27,9 @@ pub trait MetadataChain: Send + Sync {
         // Nothing to do by default
     }
 
+    /// Returns raw version of the metadata chain
+    fn as_raw_version(&self) -> &dyn MetadataChain;
+
     /// Returns true if chain contains block
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;
 

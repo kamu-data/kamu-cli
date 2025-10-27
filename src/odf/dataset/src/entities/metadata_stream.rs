@@ -23,6 +23,7 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Copy, Clone)]
 pub enum MetadataChainIterBoundary<'a> {
     Ref(&'a BlockRef),
     Hash(&'a Multihash),

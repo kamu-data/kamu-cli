@@ -402,6 +402,10 @@ impl<'a> MetadataChainWithStats<'a> {
 
 #[async_trait]
 impl odf::MetadataChain for MetadataChainWithStats<'_> {
+    fn as_raw_version(&self) -> &dyn odf::MetadataChain {
+        self.chain.as_raw_version()
+    }
+
     async fn resolve_ref(&self, r: &odf::BlockRef) -> Result<odf::Multihash, odf::GetRefError> {
         self.chain.resolve_ref(r).await
     }

@@ -141,6 +141,23 @@ impl CachedBlocksRange {
         }
     }
 
+    fn find_block_by_sequence_number(
+        &self,
+        sequence_number: u64,
+    ) -> Option<&(odf::Multihash, odf::MetadataBlock)> {
+        if self.blocks.is_empty() {
+            return None;
+        }
+
+        match self
+            .blocks
+            .binary_search_by_key(&sequence_number, |(_, block)| block.sequence_number)
+        {
+            Ok(idx) => Some(&self.blocks[idx]),
+            Err(_) => None,
+        }
+    }
+
     fn get_cached_blocks_for_range(
         &self,
         range: std::ops::RangeInclusive<u64>,
@@ -340,34 +357,9 @@ where
             // It might not cover the entire interested range,
             // when range is large, load 1 page only.
             // The page might also be larger than interested range.
-            let data_block_records = data_block_repository
-                .get_page_of_data_blocks(
-                    &self.dataset_id,
-                    &odf::BlockRef::Head,
-                    self.config.data_blocks_page_size,
-                    *interested_range.end(),
-                )
-                .await
-                .int_err()?;
-
-            // Convert the data blocks to the metadata blocks
-            let data_blocks = data_block_records
-                .into_iter()
-                .map(|data_block| {
-                    odf::storage::deserialize_metadata_block(
-                        &data_block.block_hash,
-                        &data_block.block_payload,
-                    )
-                    .map(|metadata_block| {
-                        (
-                            data_block.block_hash,
-                            data_block.block_payload,
-                            metadata_block,
-                        )
-                    })
-                    .int_err()
-                })
-                .collect::<Result<Vec<_>, InternalError>>()?;
+            let data_blocks = self
+                .read_page_of_data_blocks(data_block_repository.as_ref(), interested_range.clone())
+                .await?;
 
             // Form resulting structure
             let cached_data_blocks = Arc::new(CachedBlocksRange::new(data_blocks));
@@ -399,6 +391,47 @@ where
             tracing::warn!(dataset_id=%self.dataset_id, "Data blocks repository is detached. Cannot read data blocks");
             Ok(None)
         }
+    }
+
+    async fn read_page_of_data_blocks(
+        &self,
+        data_block_repository: &dyn DatasetDataBlockRepository,
+        interested_range: std::ops::RangeInclusive<u64>,
+    ) -> Result<Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>, InternalError> {
+        // Read standard page of data blocks from the upper boundary.
+        // It might not cover the entire interested range,
+        // when range is large, load 1 page only.
+        // The page might also be larger than interested range.
+        let data_block_records = data_block_repository
+            .get_page_of_data_blocks(
+                &self.dataset_id,
+                &odf::BlockRef::Head,
+                self.config.data_blocks_page_size,
+                *interested_range.end(),
+            )
+            .await
+            .int_err()?;
+
+        // Convert the data blocks to the metadata blocks
+        let data_blocks = data_block_records
+            .into_iter()
+            .map(|data_block| {
+                odf::storage::deserialize_metadata_block(
+                    &data_block.block_hash,
+                    &data_block.block_payload,
+                )
+                .map(|metadata_block| {
+                    (
+                        data_block.block_hash,
+                        data_block.block_payload,
+                        metadata_block,
+                    )
+                })
+                .int_err()
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?;
+
+        Ok(data_blocks)
     }
 
     /// Generic helper method for block operations that follow the same pattern:
@@ -550,6 +583,10 @@ impl<TMetadataChain> odf::MetadataChain for MetadataChainDatabaseBackedImpl<TMet
 where
     TMetadataChain: odf::MetadataChain + Send + Sync,
 {
+    fn as_raw_version(&self) -> &dyn odf::MetadataChain {
+        self.metadata_chain.as_raw_version()
+    }
+
     async fn contains_block(
         &self,
         hash: &odf::Multihash,
@@ -640,9 +677,128 @@ where
         tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
         ignore_missing_tail: bool,
     ) -> odf::dataset::DynMetadataStream<'a> {
-        // TODO: use caches to speed up iteration where possible
-        self.metadata_chain
-            .iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail)
+        Box::pin(async_stream::try_stream! {
+            use futures::TryStreamExt;
+            let mut stream = self.metadata_chain.iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail);
+
+            // Try reading first block to see if there is anything at all
+            let Some((head_hash, head_block)) = stream.try_next().await? else {
+                // No blocks at all
+                return;
+            };
+
+            // Force loading key blocks unless it was already done
+            let maybe_cached_key_blocks = self.ensure_key_blocks_are_preloaded().await?;
+
+            // Try getting data block repository
+            let maybe_data_block_repository = if maybe_cached_key_blocks.is_some() {
+                let read_guard = self.state.read().unwrap();
+                read_guard.maybe_dataset_data_block_repo.clone()
+            } else {
+                None
+            };
+
+            // We should have both key blocks and data blocks cache available for optimized iteration
+            if let Some(cached_key_blocks) = maybe_cached_key_blocks && let Some(data_block_repository) = maybe_data_block_repository {
+                // We need tail hash boundary
+                let maybe_tail_hash = match tail_boundary {
+                    None => None,
+                    Some(odf::dataset::MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
+                    Some(odf::dataset::MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
+                };
+
+                // Iterate backwards from head to tail
+                let mut current_sequence_number = head_block.sequence_number;
+                loop {
+                    // Read page of data blocks covering current sequence number
+                    let data_blocks_page = CachedBlocksRange::new(self
+                        .read_page_of_data_blocks(
+                            data_block_repository.as_ref(),
+                            0..=current_sequence_number,
+                        )
+                        .await?);
+
+                    let data_blocks_range = if let Some(range) = data_blocks_page.get_covered_range(self.config.data_blocks_page_size) {
+                        //println!("Data blocks page covers range {:?}, dataset {}", range, self.dataset_id);
+                        range
+                    } else {
+                        // No data blocks loaded
+                        //println!("No data blocks loaded for dataset {}", self.dataset_id);
+                        0..=0
+                    };
+
+                    loop {
+                        // Try key blocks
+                        if let Some((key_block_hash, key_block)) = cached_key_blocks.find_block_by_sequence_number(current_sequence_number) {
+                            // Check if we reached the tail
+                            if Some(key_block_hash) == maybe_tail_hash.as_ref() {
+                                //println!("Reached tail at key block seq {} hash {}, dataset {}", key_block.sequence_number, key_block_hash, self.dataset_id);
+                                return;
+                            }
+
+                            // Yield key block
+                            yield (key_block_hash.clone(), key_block.clone());
+                            //println!("Yielded key block seq {} hash {}, dataset {}", key_block.sequence_number, key_block_hash, self.dataset_id);
+                        }
+
+                        // Try data blocks
+                        else if data_blocks_range.contains(&current_sequence_number) {
+                            // Found data block in the page
+                            if let Some((data_block_hash, data_block)) = data_blocks_page.find_block_by_sequence_number(current_sequence_number) {
+                                // Check if we reached the tail
+                                if Some(data_block_hash) == maybe_tail_hash.as_ref() {
+                                    // println!("Reached tail at data block seq {} hash {}, dataset {}", data_block.sequence_number, data_block_hash, self.dataset_id);
+                                    return;
+                                }
+
+                                // Yield block
+                                yield (data_block_hash.clone(), data_block.clone());
+                                //println!("Yielded data block seq {} hash {}, dataset {}", data_block.sequence_number, data_block_hash, self.dataset_id);
+                            } else {
+                                unreachable!("Data blocks page should contain the block for sequence number {}", current_sequence_number);
+                            }
+                        } else {
+                            // Advanced to next page
+                            // println!("Page is over at seq {}, dataset {}", current_sequence_number, self.dataset_id);
+                            break;
+                        }
+
+                        if current_sequence_number == 0 {
+                            // Reached the beginning
+                            break;
+                        }
+                        current_sequence_number -= 1;
+                    }
+
+                    if current_sequence_number == 0 {
+                        // Reached the beginning
+                        break;
+                    }
+                }
+
+                // println!("Reached the beginning of the chain, dataset {}", self.dataset_id);
+
+                // Have we reached the beginning?
+                if current_sequence_number == 0 {
+                    // Report error if tail was expected, and wasn't met
+                    if !ignore_missing_tail && let Some(tail_hash) = maybe_tail_hash {
+                        Err(odf::IterBlocksError::InvalidInterval(odf::dataset::InvalidIntervalError {
+                            head: head_hash,
+                            tail: tail_hash,
+                        }))?;
+                    }
+                }
+
+                // println!("Iteration completed, dataset {}", self.dataset_id);
+
+            } else {
+                // Data blocks cache is not available, simply forward the stream
+                yield (head_hash, head_block);
+                while let Some((block_hash, block)) = stream.try_next().await? {
+                    yield (block_hash, block);
+                }
+            }
+        })
     }
 
     async fn append<'a>(

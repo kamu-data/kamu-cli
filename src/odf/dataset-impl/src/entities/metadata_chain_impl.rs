@@ -61,6 +61,10 @@ where
         self.meta_ref_repo.detach_from_transaction();
     }
 
+    fn as_raw_version(&self) -> &dyn MetadataChain {
+        self
+    }
+
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
         self.meta_block_repo.contains_block(hash).await
     }
