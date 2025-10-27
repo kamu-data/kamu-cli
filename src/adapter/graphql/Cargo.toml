@@ -58,9 +58,10 @@ odf = { workspace = true, default-features = false, features = [
 random-strings = { workspace = true }
 
 async-graphql = { version = "7", default-features = false, features = [
-    "chrono",
-    "url",
     "apollo_tracing",
+    "chrono",
+    "dataloader",
+    "url",
 ] }
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.22", default-features = false }

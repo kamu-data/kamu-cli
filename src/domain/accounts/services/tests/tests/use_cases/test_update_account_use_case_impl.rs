@@ -12,23 +12,7 @@ use std::sync::Arc;
 
 use bon::bon;
 use database_common::NoOpDatabasePlugin;
-use kamu_accounts::{
-    Account,
-    AccountConfig,
-    AccountDuplicateField,
-    AccountErrorDuplicate,
-    AccountLifecycleMessage,
-    AccountService,
-    AnonymousAccountReason,
-    CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
-    CurrentAccountSubject,
-    DidSecretEncryptionConfig,
-    MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-    PredefinedAccountsConfig,
-    UpdateAccountError,
-    UpdateAccountUseCase,
-};
+use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::{AccountAuthorizationHelper, MockAccountAuthorizationHelper};
 use kamu_accounts_services::{
@@ -123,7 +107,7 @@ async fn test_rename_own_account() {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
         ];
         p
@@ -161,7 +145,7 @@ async fn test_duplicate_name() {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
         ];
         p
@@ -204,7 +188,7 @@ async fn test_admin_renames_other_account() {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
         ];
         p
@@ -242,7 +226,7 @@ async fn test_anonymous_try_to_rename_account() {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
         ];
         p
@@ -274,7 +258,7 @@ async fn test_non_admin_try_to_rename_other_account() {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
             AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
         ];
         p

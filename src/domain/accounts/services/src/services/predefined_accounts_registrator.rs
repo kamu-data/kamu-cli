@@ -89,7 +89,7 @@ impl PredefinedAccountsRegistrator {
             AccountPropertyName::CanProvisionAccounts,
         ] {
             let value = if let Some(predefined_properties) = &account_config.properties
-                && predefined_properties.contains(&name)
+                && predefined_properties.contains(&name.into())
             {
                 boolean_property_value(true)
             } else {

@@ -16,6 +16,7 @@ use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{TaskError, TaskOutcome};
 use odf::dataset::MetadataChainIncrementInterval;
+use pretty_assertions::assert_eq;
 
 use crate::utils::*;
 
@@ -35,7 +36,7 @@ async fn test_primary_rollup() {
         .await;
     let primary_rollup = harness.extract_rollup(&primary_rollup_response.data, "primaryRollup");
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         primary_rollup,
         &value!({
             "total": 4,
@@ -66,7 +67,7 @@ async fn test_webhook_rollup() {
 
     let webhook_rollup = harness.extract_rollup(&webhook_rollup_response.data, "webhookRollup");
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         webhook_rollup,
         &value!({
             "total": 4,
@@ -97,7 +98,7 @@ async fn test_full_rollup() {
 
     let full_rollup = harness.extract_rollup(&full_rollup_response.data, "fullRollup");
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         full_rollup,
         &value!({
             "total": 8,
@@ -133,7 +134,7 @@ async fn test_primary_cards() {
         .await;
     let cards = harness.extract_cards("primaryCards", &primary_cards_response.data);
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         cards,
         &value!({
             "nodes": [
@@ -187,7 +188,7 @@ async fn test_primary_cards() {
 
     let primary_cards_response = harness
         .primary_cards_query(
-            Some(async_graphql::value!({
+            Some(value!({
                 "effectiveStateIn": [ "FAILING", "PAUSED_MANUAL"]
             })), /* filters */
             None, /* ordering */
@@ -198,7 +199,7 @@ async fn test_primary_cards() {
         .await;
     let cards = harness.extract_cards("primaryCards", &primary_cards_response.data);
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         cards,
         &value!({
             "nodes": [
@@ -235,7 +236,7 @@ async fn test_primary_cards() {
     let primary_cards_response = harness
         .primary_cards_query(
             None, /* filters */
-            Some(async_graphql::value!({
+            Some(value!({
                 "field": "EFFECTIVE_STATE",
                 "direction": "DESC"
             })), /* ordering */
@@ -246,7 +247,7 @@ async fn test_primary_cards() {
         .await;
     let cards = harness.extract_cards("primaryCards", &primary_cards_response.data);
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         cards,
         &value!({
             "nodes": [
@@ -309,7 +310,7 @@ async fn test_primary_cards() {
         .await;
     let cards = harness.extract_cards("primaryCards", &primary_cards_response.data);
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         cards,
         &value!({
             "nodes": [
@@ -364,7 +365,7 @@ async fn test_webhook_cards() {
         .await;
     let cards = harness.extract_cards("webhookCards", &webhook_cards_response.data);
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         cards,
         &value!({
             "nodes": [
@@ -429,7 +430,7 @@ async fn test_all_cards() {
     let all_cards_response = harness
         .all_cards_query(
             None, /* filters */
-            Some(async_graphql::value!({
+            Some(value!({
                 "field": "EFFECTIVE_STATE",
                 "direction": "ASC"
             })), /* ordering */
@@ -440,7 +441,7 @@ async fn test_all_cards() {
         .await;
     let cards = harness.extract_cards("allCards", &all_cards_response.data);
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         cards,
         &value!({
             "nodes": [

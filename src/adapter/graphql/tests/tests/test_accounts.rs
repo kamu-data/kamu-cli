@@ -11,6 +11,7 @@ use async_graphql::value;
 use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
+use kamu_adapter_graphql::data_loader::account_entity_data_loader;
 use kamu_adapter_graphql::traits::ResponseExt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -25,23 +26,19 @@ async fn test_account_by_id() {
 
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byId (accountId: "{}") {{
-                            accountName
-                        }}
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byId (accountId: "{}") {{
+                        accountName
                     }}
                 }}
-                "#,
-                *DEFAULT_ACCOUNT_ID
-            ))
-            .data(harness.catalog_anonymous.clone()),
-        )
+            }}
+            "#,
+            *DEFAULT_ACCOUNT_ID
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -56,21 +53,18 @@ async fn test_account_by_id() {
         })
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byId (accountId: "{invalid_account_id}") {{
-                            accountName
-                        }}
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byId (accountId: "{invalid_account_id}") {{
+                        accountName
                     }}
                 }}
-                "#,
-            ))
-            .data(harness.catalog_anonymous),
-        )
+            }}
+            "#,
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -90,22 +84,18 @@ async fn test_account_by_id() {
 async fn test_account_by_name() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byName (name: "{DEFAULT_ACCOUNT_NAME_STR}") {{
-                            accountName
-                        }}
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byName (name: "{DEFAULT_ACCOUNT_NAME_STR}") {{
+                        accountName
                     }}
                 }}
-                "#,
-            ))
-            .data(harness.catalog_anonymous.clone()),
-        )
+            }}
+            "#,
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -120,22 +110,19 @@ async fn test_account_by_name() {
         })
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byName (name: "{}") {{
-                            accountName
-                        }}
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byName (name: "{}") {{
+                        accountName
                     }}
                 }}
-                "#,
-                "unknown",
-            ))
-            .data(harness.catalog_anonymous.clone()),
-        )
+            }}
+            "#,
+            "unknown",
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -148,22 +135,19 @@ async fn test_account_by_name() {
         })
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byName (name: "{}") {{
-                            accountName
-                        }}
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byName (name: "{}") {{
+                        accountName
                     }}
                 }}
-                "#,
-                DEFAULT_ACCOUNT_NAME_STR.to_ascii_uppercase(),
-            ))
-            .data(harness.catalog_anonymous),
-        )
+            }}
+            "#,
+            DEFAULT_ACCOUNT_NAME_STR.to_ascii_uppercase(),
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -185,29 +169,25 @@ async fn test_account_by_name() {
 async fn test_account_attributes() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byId (accountId: "{}") {{
-                            id
-                            accountName
-                            displayName
-                            accountType
-                            email
-                            avatarUrl
-                            isAdmin
-                        }}
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byId (accountId: "{}") {{
+                        id
+                        accountName
+                        displayName
+                        accountType
+                        email
+                        avatarUrl
+                        isAdmin
                     }}
                 }}
-                "#,
-                *DEFAULT_ACCOUNT_ID
-            ))
-            .data(harness.catalog_authorized),
-        )
+            }}
+            "#,
+            *DEFAULT_ACCOUNT_ID
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -228,27 +208,24 @@ async fn test_account_attributes() {
         })
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byId (accountId: "{}") {{
-                            id
-                            accountName
-                            displayName
-                            accountType
-                            avatarUrl
-                            isAdmin
-                        }}
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byId (accountId: "{}") {{
+                        id
+                        accountName
+                        displayName
+                        accountType
+                        avatarUrl
+                        isAdmin
                     }}
                 }}
-                "#,
-                *DEFAULT_ACCOUNT_ID
-            ))
-            .data(harness.catalog_anonymous.clone()),
-        )
+            }}
+            "#,
+            *DEFAULT_ACCOUNT_ID
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -268,22 +245,19 @@ async fn test_account_attributes() {
         })
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                query {{
-                    accounts {{
-                        byId (accountId: "{}") {{
-                            email
-                        }}
+    let res = harness
+        .execute_anonymous_query(async_graphql::Request::new(format!(
+            r#"
+            query {{
+                accounts {{
+                    byId (accountId: "{}") {{
+                        email
                     }}
                 }}
-                "#,
-                *DEFAULT_ACCOUNT_ID
-            ))
-            .data(harness.catalog_anonymous),
-        )
+            }}
+            "#,
+            *DEFAULT_ACCOUNT_ID
+        )))
         .await;
 
     assert!(res.is_err());
@@ -297,28 +271,24 @@ async fn test_account_attributes() {
 async fn test_update_email_success() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                mutation {{
-                    accounts {{
-                        byId (accountId: "{}") {{
-                            updateEmail(newEmail: "{}") {{
-                                message
-                                ... on UpdateEmailSuccess {{
-                                    newEmail
-                                }}
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(format!(
+            r#"
+            mutation {{
+                accounts {{
+                    byId (accountId: "{}") {{
+                        updateEmail(newEmail: "{}") {{
+                            message
+                            ... on UpdateEmailSuccess {{
+                                newEmail
                             }}
                         }}
                     }}
                 }}
-                "#,
-                *DEFAULT_ACCOUNT_ID, "wasya@example.com"
-            ))
-            .data(harness.catalog_authorized),
-        )
+            }}
+            "#,
+            *DEFAULT_ACCOUNT_ID, "wasya@example.com"
+        )))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -343,25 +313,21 @@ async fn test_update_email_success() {
 async fn test_update_email_bad_email() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                mutation {{
-                    accounts {{
-                        byId (accountId: "{}") {{
-                            updateEmail(newEmail: "{}") {{
-                                message
-                            }}
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(format!(
+            r#"
+            mutation {{
+                accounts {{
+                    byId (accountId: "{}") {{
+                        updateEmail(newEmail: "{}") {{
+                            message
                         }}
                     }}
                 }}
-                "#,
-                *DEFAULT_ACCOUNT_ID, "wasya#example.com"
-            ))
-            .data(harness.catalog_authorized),
-        )
+            }}
+            "#,
+            *DEFAULT_ACCOUNT_ID, "wasya#example.com"
+        )))
         .await;
 
     assert_eq!(
@@ -380,16 +346,15 @@ async fn test_update_email_unauthorized() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     // Create an account
-    let res = schema
-        .execute(create_account_request("foo").data(harness.catalog_authorized.clone()))
+    let res = harness
+        .execute_authorized_query(create_account_request("foo"))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_anonymous_query(
             async_graphql::Request::new(indoc!(
                 r#"
                 mutation ($accountName: AccountName!, $newEmail: Email!) {
@@ -406,8 +371,7 @@ async fn test_update_email_unauthorized() {
             .variables(async_graphql::Variables::from_value(value!({
                 "accountName": "foo",
                 "newEmail": "foo@example.com",
-            })))
-            .data(harness.catalog_anonymous),
+            }))),
         )
         .await;
 
@@ -423,10 +387,9 @@ async fn test_create_account() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
-        .execute(create_account_request("foo").data(harness.catalog_authorized.clone()))
+    let res = harness
+        .execute_authorized_query(create_account_request("foo"))
         .await;
 
     assert_eq!(
@@ -447,8 +410,8 @@ async fn test_create_account() {
     );
 
     // Creating an account with the same name should return an error
-    let res = schema
-        .execute(create_account_request("foo").data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(create_account_request("foo"))
         .await;
 
     assert_eq!(
@@ -469,10 +432,9 @@ async fn test_create_account() {
 #[test_log::test(tokio::test)]
 async fn test_create_account_without_permissions() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
-        .execute(create_account_request("foo").data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(create_account_request("foo"))
         .await;
 
     assert_eq!(
@@ -504,7 +466,6 @@ async fn test_create_wallet_accounts() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let wallet_accounts = [
         "did:pkh:eip155:1:0xbf9a00755BB7d2E904b5F569095220c54E742E07",
@@ -537,11 +498,8 @@ async fn test_create_wallet_accounts() {
     });
 
     {
-        let res = schema
-            .execute(
-                create_wallet_accounts_request(&wallet_accounts)
-                    .data(harness.catalog_authorized.clone()),
-            )
+        let res = harness
+            .execute_authorized_query(create_wallet_accounts_request(&wallet_accounts))
             .await;
         assert!(res.is_ok(), "{res:?}");
 
@@ -551,11 +509,8 @@ async fn test_create_wallet_accounts() {
     }
     // Idempotence.
     {
-        let res = schema
-            .execute(
-                create_wallet_accounts_request(&wallet_accounts)
-                    .data(harness.catalog_authorized.clone()),
-            )
+        let res = harness
+            .execute_authorized_query(create_wallet_accounts_request(&wallet_accounts))
             .await;
 
         assert!(res.is_ok(), "{res:?}");
@@ -575,7 +530,6 @@ async fn test_create_wallet_accounts_without_permissions() {
         can_provision_accounts: false,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let wallet_accounts = [
         "did:pkh:eip155:1:0xbf9a00755BB7d2E904b5F569095220c54E742E07",
@@ -583,8 +537,8 @@ async fn test_create_wallet_accounts_without_permissions() {
         "did:pkh:eip155:1:0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
     ];
 
-    let res = schema
-        .execute(create_wallet_accounts_request(&wallet_accounts).data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(create_wallet_accounts_request(&wallet_accounts))
         .await;
 
     assert_eq!(
@@ -604,17 +558,15 @@ async fn test_modify_password() {
     })
     .await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     // Create an account
-    let res = schema
-        .execute(create_account_request("foo").data(harness.catalog_authorized.clone()))
+    let res = harness
+        .execute_authorized_query(create_account_request("foo"))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
     // Modify the password for the account
-    let res = schema
-        .execute(modify_password_request("foo", "p4s5w0rd").data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(modify_password_request("foo", "p4s5w0rd"))
         .await;
     assert_eq!(
         &value!({
@@ -641,11 +593,9 @@ async fn test_modify_password_errors() {
     })
     .await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     // Create an account
-    let res = schema
-        .execute(create_account_request("foo").data(harness.catalog_authorized.clone()))
+    let res = harness
+        .execute_authorized_query(create_account_request("foo"))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -653,8 +603,8 @@ async fn test_modify_password_errors() {
         ("", "Minimum password length is 8"),
         ("foo±password", "Password contains non-ASCII characters"),
     ] {
-        let res = schema
-            .execute(
+        let res = harness
+            .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
                     r#"
                     mutation ($accountName: AccountName!, $newPassword: AccountPassword!) {
@@ -671,8 +621,7 @@ async fn test_modify_password_errors() {
                 .variables(async_graphql::Variables::from_value(value!({
                     "accountName": "foo",
                     "newPassword": password,
-                })))
-                .data(harness.catalog_authorized.clone()),
+                }))),
             )
             .await;
 
@@ -696,17 +645,15 @@ async fn test_modify_password_non_admin() {
     })
     .await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-
     // Create an account
-    let res = schema
-        .execute(create_account_request("foo").data(harness.catalog_authorized.clone()))
+    let res = harness
+        .execute_authorized_query(create_account_request("foo"))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
     // Modify the password for the account
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
                 mutation ($accountName: AccountName!, $newPassword: AccountPassword!) {
@@ -723,8 +670,7 @@ async fn test_modify_password_non_admin() {
             .variables(async_graphql::Variables::from_value(value!({
                 "accountName": "foo",
                 "newPassword": "foo_password",
-            })))
-            .data(harness.catalog_authorized),
+            }))),
         )
         .await;
 
@@ -740,15 +686,11 @@ async fn test_delete_own_account() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let default_test_account = CurrentAccountSubject::new_test();
 
-    let res = schema
-        .execute(
-            delete_account_request(default_test_account.account_name())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(delete_account_request(default_test_account.account_name()))
         .await;
     assert_eq!(
         &value!({
@@ -765,11 +707,8 @@ async fn test_delete_own_account() {
         "{res:?}"
     );
 
-    let res = schema
-        .execute(
-            account_by_name_request(default_test_account.account_name())
-                .data(harness.catalog_authorized),
-        )
+    let res = harness
+        .execute_authorized_query(account_by_name_request(default_test_account.account_name()))
         .await;
     assert_eq!(
         &res.data,
@@ -791,23 +730,16 @@ async fn test_admin_delete_other_account() {
         is_admin: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let another_account_username = "another-user";
 
-    let res = schema
-        .execute(
-            create_account_request(another_account_username)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(create_account_request(another_account_username))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let res = schema
-        .execute(
-            delete_account_request(another_account_username)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(delete_account_request(another_account_username))
         .await;
     assert_eq!(
         &value!({
@@ -824,8 +756,8 @@ async fn test_admin_delete_other_account() {
         "{res:?}"
     );
 
-    let res = schema
-        .execute(account_by_name_request(another_account_username).data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(account_by_name_request(another_account_username))
         .await;
     assert_eq!(
         &res.data,
@@ -843,15 +775,11 @@ async fn test_admin_delete_other_account() {
 #[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_delete_account() {
     let harness = GraphQLAccountsHarness::new(Default::default()).await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let default_test_account = CurrentAccountSubject::new_test();
 
-    let res = schema
-        .execute(
-            delete_account_request(default_test_account.account_name())
-                .data(harness.catalog_anonymous),
-        )
+    let res = harness
+        .execute_anonymous_query(delete_account_request(default_test_account.account_name()))
         .await;
     assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
@@ -865,20 +793,16 @@ async fn test_non_admin_try_to_delete_other_account() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let another_account_username = "another-user";
 
-    let res = schema
-        .execute(
-            create_account_request(another_account_username)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(create_account_request(another_account_username))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let res = schema
-        .execute(delete_account_request(another_account_username).data(harness.catalog_authorized))
+    let res = harness
+        .execute_authorized_query(delete_account_request(another_account_username))
         .await;
 
     assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
@@ -893,21 +817,17 @@ async fn test_rename_own_account() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let default_test_account = CurrentAccountSubject::new_test();
     let default_password = AccountConfig::generate_password(default_test_account.account_name());
 
     const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
 
-    let res = schema
-        .execute(
-            rename_account_request(
-                default_test_account.account_name(),
-                RENAMED_ANOTHER_ACCOUNT_NAME,
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(rename_account_request(
+            default_test_account.account_name(),
+            RENAMED_ANOTHER_ACCOUNT_NAME,
+        ))
         .await;
 
     assert_eq!(
@@ -925,11 +845,8 @@ async fn test_rename_own_account() {
         "{res:?}"
     );
 
-    let res = schema
-        .execute(
-            account_by_name_request(default_test_account.account_name())
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(account_by_name_request(default_test_account.account_name()))
         .await;
     assert_eq!(
         &res.data,
@@ -941,10 +858,8 @@ async fn test_rename_own_account() {
         "{res:?}"
     );
 
-    let res = schema
-        .execute(
-            account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized),
-        )
+    let res = harness
+        .execute_authorized_query(account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME))
         .await;
     assert_eq!(
         &res.data,
@@ -959,16 +874,13 @@ async fn test_rename_own_account() {
     );
 
     // Try login with the new name
-    let res = schema
-        .execute(
-            login_via_password_request(
-                // login is new, the renamed account name
-                RENAMED_ANOTHER_ACCOUNT_NAME,
-                // password is still the same
-                &default_password,
-            )
-            .data(harness.catalog_anonymous.clone()),
-        )
+    let res = harness
+        .execute_anonymous_query(login_via_password_request(
+            // login is new, the renamed account name
+            RENAMED_ANOTHER_ACCOUNT_NAME,
+            // password is still the same
+            &default_password,
+        ))
         .await;
 
     assert_eq!(
@@ -986,11 +898,11 @@ async fn test_rename_own_account() {
     );
 
     // An attempt to login under the old name should fail
-    let res = schema
-        .execute(
-            login_via_password_request(default_test_account.account_name(), &default_password)
-                .data(harness.catalog_anonymous.clone()),
-        )
+    let res = harness
+        .execute_anonymous_query(login_via_password_request(
+            default_test_account.account_name(),
+            &default_password,
+        ))
         .await;
     assert!(res.is_err(), "{res:?}");
     assert!(res.errors.len() == 1);
@@ -1009,23 +921,20 @@ async fn test_rename_own_account_taken_name() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let default_test_account = CurrentAccountSubject::new_test();
     const TAKEN_ACCOUNT_NAME: &str = "taken-account-name";
 
-    let res = schema
-        .execute(
-            create_account_request(TAKEN_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(create_account_request(TAKEN_ACCOUNT_NAME))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let res = schema
-        .execute(
-            rename_account_request(default_test_account.account_name(), TAKEN_ACCOUNT_NAME)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(rename_account_request(
+            default_test_account.account_name(),
+            TAKEN_ACCOUNT_NAME,
+        ))
         .await;
 
     assert_eq!(
@@ -1044,14 +953,11 @@ async fn test_rename_own_account_taken_name() {
     );
 
     // Idempotent behavior
-    let res = schema
-        .execute(
-            rename_account_request(
-                default_test_account.account_name(),
-                default_test_account.account_name(),
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(rename_account_request(
+            default_test_account.account_name(),
+            default_test_account.account_name(),
+        ))
         .await;
 
     assert_eq!(
@@ -1079,23 +985,20 @@ async fn test_admin_renames_other_account() {
         is_admin: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     const ANOTHER_ACCOUNT_NAME: &str = "another-user";
     const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
 
-    let res = schema
-        .execute(
-            create_account_request(ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(create_account_request(ANOTHER_ACCOUNT_NAME))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let res = schema
-        .execute(
-            rename_account_request(ANOTHER_ACCOUNT_NAME, RENAMED_ANOTHER_ACCOUNT_NAME)
-                .data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(rename_account_request(
+            ANOTHER_ACCOUNT_NAME,
+            RENAMED_ANOTHER_ACCOUNT_NAME,
+        ))
         .await;
     assert_eq!(
         &value!({
@@ -1112,10 +1015,8 @@ async fn test_admin_renames_other_account() {
         "{res:?}"
     );
 
-    let res = schema
-        .execute(
-            account_by_name_request(ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(account_by_name_request(ANOTHER_ACCOUNT_NAME))
         .await;
     assert_eq!(
         &res.data,
@@ -1127,10 +1028,8 @@ async fn test_admin_renames_other_account() {
         "{res:?}"
     );
 
-    let res = schema
-        .execute(
-            account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized),
-        )
+    let res = harness
+        .execute_authorized_query(account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME))
         .await;
     assert_eq!(
         &res.data,
@@ -1150,15 +1049,14 @@ async fn test_admin_renames_other_account() {
 #[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_rename_account() {
     let harness = GraphQLAccountsHarness::new(Default::default()).await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     let default_test_account = CurrentAccountSubject::new_test();
 
-    let res = schema
-        .execute(
-            rename_account_request(default_test_account.account_name(), "renamed-user")
-                .data(harness.catalog_anonymous),
-        )
+    let res = harness
+        .execute_anonymous_query(rename_account_request(
+            default_test_account.account_name(),
+            "renamed-user",
+        ))
         .await;
     assert_eq!(["Unauthorized"], *res.error_messages(), "{res:?}");
 }
@@ -1172,23 +1070,20 @@ async fn test_non_admin_try_to_rename_other_account() {
         can_provision_accounts: true,
     })
     .await;
-    let schema = kamu_adapter_graphql::schema_quiet();
 
     const ANOTHER_ACCOUNT_NAME: &str = "another-user";
     const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
 
-    let res = schema
-        .execute(
-            create_account_request(ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
-        )
+    let res = harness
+        .execute_authorized_query(create_account_request(ANOTHER_ACCOUNT_NAME))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let res = schema
-        .execute(
-            rename_account_request(ANOTHER_ACCOUNT_NAME, RENAMED_ANOTHER_ACCOUNT_NAME)
-                .data(harness.catalog_authorized),
-        )
+    let res = harness
+        .execute_authorized_query(rename_account_request(
+            ANOTHER_ACCOUNT_NAME,
+            RENAMED_ANOTHER_ACCOUNT_NAME,
+        ))
         .await;
 
     assert_eq!(["Unauthorized"], *res.error_messages(), "{res:?}");
@@ -1200,12 +1095,9 @@ async fn test_non_admin_try_to_rename_other_account() {
 async fn test_create_and_get_access_token() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
     let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
 
-    let res = schema
-        .execute(mutation_request.data(harness.catalog_authorized.clone()))
-        .await;
+    let res = harness.execute_authorized_query(mutation_request).await;
 
     assert!(res.is_ok());
 
@@ -1216,9 +1108,7 @@ async fn test_create_and_get_access_token() {
         json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
 
     let query_request = get_access_tokens_request(&DEFAULT_ACCOUNT_ID.to_string());
-    let res = schema
-        .execute(query_request.data(harness.catalog_authorized.clone()))
-        .await;
+    let res = harness.execute_authorized_query(query_request).await;
 
     assert_eq!(
         res.data,
@@ -1241,9 +1131,7 @@ async fn test_create_and_get_access_token() {
 
     let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
 
-    let res = schema
-        .execute(mutation_request.data(harness.catalog_authorized))
-        .await;
+    let res = harness.execute_authorized_query(mutation_request).await;
 
     assert_eq!(
         res.data,
@@ -1268,12 +1156,9 @@ async fn test_create_and_get_access_token() {
 async fn test_revoke_access_token() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
     let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
 
-    let res = schema
-        .execute(mutation_request.data(harness.catalog_authorized.clone()))
-        .await;
+    let res = harness.execute_authorized_query(mutation_request).await;
 
     assert!(res.is_ok());
 
@@ -1288,9 +1173,7 @@ async fn test_revoke_access_token() {
         &created_token_id.to_string(),
     );
 
-    let res = schema
-        .execute(mutation_request.data(harness.catalog_anonymous))
-        .await;
+    let res = harness.execute_anonymous_query(mutation_request).await;
 
     assert!(res.is_err());
     assert_eq!(res.errors.len(), 1);
@@ -1304,9 +1187,7 @@ async fn test_revoke_access_token() {
         &created_token_id.to_string(),
     );
 
-    let res = schema
-        .execute(mutation_request.data(harness.catalog_authorized.clone()))
-        .await;
+    let res = harness.execute_authorized_query(mutation_request).await;
 
     assert!(res.is_ok());
     assert_eq!(
@@ -1330,9 +1211,7 @@ async fn test_revoke_access_token() {
         &created_token_id.to_string(),
     );
 
-    let res = schema
-        .execute(mutation_request.data(harness.catalog_authorized.clone()))
-        .await;
+    let res = harness.execute_authorized_query(mutation_request).await;
 
     assert!(res.is_ok());
     assert_eq!(
@@ -1354,6 +1233,7 @@ async fn test_revoke_access_token() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct GraphQLAccountsHarness {
+    schema: kamu_adapter_graphql::Schema,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -1378,6 +1258,7 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
             .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
             .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
+            .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
             .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
             .add_value(AuthConfig::sample())
@@ -1392,9 +1273,38 @@ impl GraphQLAccountsHarness {
             authentication_catalogs(&final_catalog, predefined_account_opts).await;
 
         Self {
+            schema: kamu_adapter_graphql::schema_quiet(),
             catalog_anonymous,
             catalog_authorized,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        self.schema
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
+            .await
+    }
+
+    pub async fn execute_anonymous_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        self.schema
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_anonymous.clone()),
+            )
+            .await
     }
 }
 

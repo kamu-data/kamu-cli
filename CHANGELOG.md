@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following order:
 - Executing init script for predefined accounts in parallel. Solves a noticeable slowdown 
    of CLI commands in multi-tenant workspaces
 - Fixed S3 bucket listing issue when the number of child objects exceeds 1,000 records.   
+- GQL: Optimization: apply DataLoader to solve N+1 problem for federation entity resolvers (#1410).
 
 ## [0.252.1] - 2025-10-30
 ### Fixed
