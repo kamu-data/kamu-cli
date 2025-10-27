@@ -60,3 +60,19 @@ WHERE event_type = 'FlowConfigSnapshotModified'
   AND json_extract(event_payload, '$.ConfigSnapshotModified.config_snapshot.IngestRule.fetch_next_iteration') IS NULL;
 
 /* ------------------------------ */
+
+UPDATE flow_events
+SET event_payload = json_set(
+    event_payload,
+    '$.TaskFinished.task_outcome.Success.UpdateDatasetResult.pull_result.Updated',
+    json_patch(
+        json_extract(event_payload, '$.TaskFinished.task_outcome.Success.UpdateDatasetResult.pull_result.Updated'),
+        '{"has_more": false}'
+    )
+)
+WHERE event_type = 'FlowEventTaskFinished'
+  AND json_extract(event_payload, '$.TaskFinished.task_outcome.Success.UpdateDatasetResult.pull_result.Updated') IS NOT NULL
+  AND json_type(json_extract(event_payload, '$.TaskFinished.task_outcome.Success.UpdateDatasetResult.pull_result.Updated')) = 'object'
+  AND json_extract(event_payload, '$.TaskFinished.task_outcome.Success.UpdateDatasetResult.pull_result.Updated.has_more') IS NULL;
+
+/* ------------------------------ */

@@ -63,3 +63,20 @@ WHERE
     AND NOT (event_payload #> '{ConfigSnapshotModified,config_snapshot,IngestRule}') ? 'fetch_next_iteration';
 
 /* ------------------------------ */
+
+UPDATE public.flow_events
+SET event_payload = jsonb_set(
+    event_payload,
+    '{TaskFinished,task_outcome,Success,UpdateDatasetResult,pull_result,Updated}',
+    (
+        event_payload #> '{TaskFinished,task_outcome,Success,UpdateDatasetResult,pull_result,Updated}'
+    ) || '{"has_more": false}'::jsonb
+)
+WHERE
+    event_type = 'FlowEventTaskFinished'
+    AND event_payload ? 'TaskFinished'
+    AND (event_payload #> '{TaskFinished,task_outcome,Success,UpdateDatasetResult,pull_result,Updated}') IS NOT NULL
+    AND jsonb_typeof(event_payload #> '{TaskFinished,task_outcome,Success,UpdateDatasetResult,pull_result,Updated}') = 'object'
+    AND NOT (event_payload #> '{TaskFinished,task_outcome,Success,UpdateDatasetResult,pull_result,Updated}') ? 'has_more';
+
+/* ------------------------------ */
