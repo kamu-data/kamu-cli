@@ -33,10 +33,10 @@ where
 
 struct State {
     /// Key blocks
-    cached_key_blocks: Option<CachedBlocksRange>,
+    cached_key_blocks: Option<Arc<CachedBlocksRange>>,
 
     /// Data blocks
-    cached_data_blocks: Option<CachedBlocksRange>,
+    cached_data_blocks: Option<Arc<CachedBlocksRange>>,
 
     /// A detachable key block repository component
     maybe_dataset_key_block_repo: Option<Arc<dyn DatasetKeyBlockRepository>>,
@@ -56,24 +56,6 @@ impl State {
             maybe_dataset_key_block_repo: Some(dataset_key_block_repo),
             maybe_dataset_data_block_repo: Some(dataset_data_block_repo),
         }
-    }
-
-    fn get_cached_key_blocks_for_range(
-        &self,
-        range: std::ops::RangeInclusive<u64>,
-    ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
-        self.cached_key_blocks
-            .as_ref()
-            .and_then(|ckb| ckb.get_cached_blocks_for_range(range))
-    }
-
-    fn get_cached_data_blocks_for_range(
-        &self,
-        range: std::ops::RangeInclusive<u64>,
-    ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
-        self.cached_data_blocks
-            .as_ref()
-            .and_then(|cdb| cdb.get_cached_blocks_for_range(range))
     }
 }
 
@@ -225,13 +207,15 @@ where
             .cloned()
     }
 
-    async fn ensure_key_blocks_are_preloaded(&self) -> Result<(), InternalError> {
+    async fn ensure_key_blocks_are_preloaded(
+        &self,
+    ) -> Result<Option<Arc<CachedBlocksRange>>, InternalError> {
         // Try getting access to repository
         let maybe_key_block_repository = {
             // Ignore if already loaded
             let read_guard = self.state.read().unwrap();
-            if read_guard.cached_key_blocks.is_some() {
-                return Ok(());
+            if let Some(cached_key_blocks) = read_guard.cached_key_blocks.as_ref() {
+                return Ok(Some(cached_key_blocks.clone()));
             }
 
             // Not loaded. Try looking at repository
@@ -247,8 +231,8 @@ where
             {
                 // Ignore if already loaded
                 let read_guard = self.state.read().unwrap();
-                if read_guard.cached_key_blocks.is_some() {
-                    return Ok(());
+                if let Some(cached_key_blocks) = read_guard.cached_key_blocks.as_ref() {
+                    return Ok(Some(cached_key_blocks.clone()));
                 }
             }
 
@@ -263,7 +247,7 @@ where
                 // At least Seed exists in every dataset.
                 // If the result is empty, there was no indexing yet
                 tracing::warn!(dataset_id=%self.dataset_id, "Key blocks of the dataset are not indexed");
-                return Ok(());
+                return Ok(None);
             }
 
             // Convert the key blocks to the metadata blocks
@@ -286,7 +270,7 @@ where
                 .collect::<Result<Vec<_>, InternalError>>()?;
 
             // Form resulting structure
-            let cached_key_blocks = CachedBlocksRange::new(key_blocks);
+            let cached_key_blocks = Arc::new(CachedBlocksRange::new(key_blocks));
 
             // Report cache fill operation
             tracing::trace!(
@@ -298,24 +282,26 @@ where
             // Fix loaded state
             {
                 let mut write_guard = self.state.write().unwrap();
-                write_guard.cached_key_blocks = Some(cached_key_blocks);
+                write_guard.cached_key_blocks = Some(cached_key_blocks.clone());
             }
 
             // Unlock loading guard
             drop(loading_guard);
+
+            // Result
+            Ok(Some(cached_key_blocks))
         } else {
             // The repository is detached. We cannot provide any quick answers,
             //  so fall back to the linear iteration
             tracing::warn!(dataset_id=%self.dataset_id, "Key blocks repository is detached. Cannot read key blocks");
+            Ok(None)
         }
-
-        Ok(())
     }
 
     async fn ensure_data_blocks_are_preloaded(
         &self,
         interested_range: std::ops::RangeInclusive<u64>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Option<Arc<CachedBlocksRange>>, InternalError> {
         // Try getting access to repository
         let maybe_data_block_repository = {
             // Ignore if already covered
@@ -325,7 +311,7 @@ where
                     .get_covered_range(self.config.data_blocks_page_size)
                     .is_some_and(|cached_range| cached_range.contains(interested_range.end()))
             {
-                return Ok(());
+                return Ok(Some(cached_data_blocks.clone()));
             }
 
             // Not covered. Try looking at repository
@@ -346,7 +332,7 @@ where
                         .get_covered_range(self.config.data_blocks_page_size)
                         .is_some_and(|cached_range| cached_range.contains(interested_range.end()))
                 {
-                    return Ok(());
+                    return Ok(Some(cached_data_blocks.clone()));
                 }
             }
 
@@ -384,7 +370,7 @@ where
                 .collect::<Result<Vec<_>, InternalError>>()?;
 
             // Form resulting structure
-            let cached_data_blocks = CachedBlocksRange::new(data_blocks);
+            let cached_data_blocks = Arc::new(CachedBlocksRange::new(data_blocks));
 
             // Report cache load operation
             tracing::trace!(
@@ -399,18 +385,20 @@ where
             // However, most of the time the access patterns are sequential & go backwards
             {
                 let mut write_guard = self.state.write().unwrap();
-                write_guard.cached_data_blocks = Some(cached_data_blocks);
+                write_guard.cached_data_blocks = Some(cached_data_blocks.clone());
             }
 
             // Unlock loading guard
             drop(loading_guard);
+
+            // Result
+            Ok(Some(cached_data_blocks))
         } else {
             // The repository is detached. We cannot provide any quick answers,
             //  so fall back to the linear iteration
             tracing::warn!(dataset_id=%self.dataset_id, "Data blocks repository is detached. Cannot read data blocks");
+            Ok(None)
         }
-
-        Ok(())
     }
 
     /// Generic helper method for block operations that follow the same pattern:
@@ -431,21 +419,17 @@ where
         G: std::future::Future<Output = Result<Option<T>, InternalError>>,
         E: From<InternalError>,
     {
-        // Force loading key blocks unless it was already done
-        self.ensure_key_blocks_are_preloaded().await?;
+        // Force loading key blocks unless it was already done, and check in there
+        let maybe_cached_key_blocks = self.ensure_key_blocks_are_preloaded().await?;
+        if let Some(cached_key_blocks) = maybe_cached_key_blocks
+            && let Some(result) = cache_lookup(cached_key_blocks.as_ref(), hash)
+        {
+            return Ok(result);
+        }
 
-        // First, try to find the block in the cache - keys or data
+        // Try checking existing data blocks cache, without preloading anything
         {
             let read_guard = self.state.read().unwrap();
-
-            // Check key blocks cache. Preload it if necessary
-            if let Some(cached_key_blocks) = read_guard.cached_key_blocks.as_ref()
-                && let Some(result) = cache_lookup(cached_key_blocks, hash)
-            {
-                return Ok(result);
-            }
-
-            // Check data blocks cache, but don't preload anything.
             if let Some(cached_data_blocks) = read_guard.cached_data_blocks.as_ref()
                 && let Some(result) = cache_lookup(cached_data_blocks, hash)
             {
@@ -489,12 +473,12 @@ where
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
         // Force loading key blocks unless it was already done
-        self.ensure_key_blocks_are_preloaded().await?;
+        let maybe_key_blocks_cache = self.ensure_key_blocks_are_preloaded().await?;
 
         // Read what's in the key blocks cache
-        let read_guard = self.state.read().unwrap();
-        if let Some(cached_blocks_in_range) =
-            read_guard.get_cached_key_blocks_for_range(requested_range)
+        if let Some(key_blocks_cache) = maybe_key_blocks_cache
+            && let Some(cached_blocks_in_range) =
+                key_blocks_cache.get_cached_blocks_for_range(requested_range)
         {
             // Report cache hit
             tracing::trace!(
@@ -525,13 +509,14 @@ where
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
         // Force loading data blocks unless it was already done
-        self.ensure_data_blocks_are_preloaded(requested_range.clone())
+        let maybe_cached_data_blocks = self
+            .ensure_data_blocks_are_preloaded(requested_range.clone())
             .await?;
 
         // Read what's in the data blocks cache
-        let read_guard = self.state.read().unwrap();
-        if let Some(cached_blocks_in_range) =
-            read_guard.get_cached_data_blocks_for_range(requested_range)
+        if let Some(cached_data_blocks) = maybe_cached_data_blocks
+            && let Some(cached_blocks_in_range) =
+                cached_data_blocks.get_cached_blocks_for_range(requested_range)
         {
             // Report cache hit
             tracing::trace!(
