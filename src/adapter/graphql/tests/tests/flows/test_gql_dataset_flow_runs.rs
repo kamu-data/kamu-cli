@@ -24,6 +24,7 @@ use kamu_datasets::DatasetIntervalIncrement;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{self as ts, TaskError};
+use pretty_assertions::assert_eq;
 
 use crate::utils::{
     BaseGQLFlowRunsHarness,
@@ -57,7 +58,7 @@ async fn test_trigger_ingest_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -88,7 +89,7 @@ async fn test_trigger_ingest_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -157,7 +158,7 @@ async fn test_trigger_ingest_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -231,7 +232,7 @@ async fn test_trigger_ingest_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -317,7 +318,7 @@ async fn test_trigger_ingest_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -417,7 +418,7 @@ async fn test_trigger_reset_root_dataset_flow() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -473,7 +474,7 @@ async fn test_trigger_reset_root_dataset_flow() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -565,7 +566,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -602,7 +603,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -651,7 +652,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -682,7 +683,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -780,7 +781,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -879,7 +880,7 @@ async fn test_trigger_compaction_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -910,7 +911,7 @@ async fn test_trigger_compaction_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -974,7 +975,7 @@ async fn test_trigger_compaction_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1043,7 +1044,7 @@ async fn test_trigger_compaction_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1126,7 +1127,7 @@ async fn test_trigger_compaction_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1208,7 +1209,7 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1239,7 +1240,7 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1303,7 +1304,7 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1372,7 +1373,7 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1455,7 +1456,7 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -1544,43 +1545,38 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     // Pure listing
 
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string()
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -1608,43 +1604,39 @@ async fn test_list_flows_with_filters_and_pagination() {
     );
 
     // Split on 2 pages by 1 element
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows(perPage: 1, page: 1) {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows(perPage: 1, page: 1) {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string()
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -1670,51 +1662,46 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     // Filter by flow type
 
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows(
-                                filters: {
-                                    byProcessType: {
-                                        primary: {
-                                            byFlowTypes: ["HARD_COMPACTION"]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows(
+                                        filters: {
+                                            byProcessType: {
+                                                primary: {
+                                                    byFlowTypes: ["HARD_COMPACTION"]
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
                                         }
                                     }
-                                }
-                            ) {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string()
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -1740,47 +1727,42 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     // Filter by flow status
 
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows(
-                                filters: {
-                                    byStatus: "WAITING"
-                                }
-                            ) {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows(
+                                        filters: {
+                                            byStatus: "WAITING"
+                                        }
+                                    ) {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string()
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -1809,48 +1791,43 @@ async fn test_list_flows_with_filters_and_pagination() {
 
     // Filter by initiator
 
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!, $accountIds: [AccountID!]) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows(
-                                filters: {
-                                    byInitiator: { accounts: $accountIds }
-                                }
-                            ) {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!, $accountIds: [AccountID!]) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows(
+                                        filters: {
+                                            byInitiator: { accounts: $accountIds }
+                                        }
+                                    ) {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string(),
-                    "accountIds": [DEFAULT_ACCOUNT_ID.to_string()],
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "accountIds": [DEFAULT_ACCOUNT_ID.to_string()],
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -1877,47 +1854,42 @@ async fn test_list_flows_with_filters_and_pagination() {
         })
     );
 
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows(
-                                filters: {
-                                    byInitiator: { system: true }
-                                }
-                            ) {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows(
+                                        filters: {
+                                            byInitiator: { system: true }
+                                        }
+                                    ) {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string(),
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -1974,43 +1946,38 @@ async fn test_list_flows_with_webhooks() {
 
     // Pure listing
 
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string()
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -2042,51 +2009,46 @@ async fn test_list_flows_with_webhooks() {
 
     // Filter by all webhooks
 
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlows(
-                                filters: {
-                                    byProcessType: {
-                                        webhooks: {
-                                            subscriptionIds: []
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlows(
+                                        filters: {
+                                            byProcessType: {
+                                                webhooks: {
+                                                    subscriptionIds: []
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        nodes {
+                                            flowId
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
                                         }
                                     }
-                                }
-                            ) {
-                                nodes {
-                                    flowId
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string()
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -2148,19 +2110,17 @@ async fn test_list_flows_with_webhooks() {
     );
 
     // Alpha first
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string(),
-                    "subscriptionId": subscription_alpha_id.to_string(),
-                })))
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+    let response = GraphQLQueryRequest::new(
+        request_code,
+        async_graphql::Variables::from_json(serde_json::json!({
+            "datasetId": create_result.dataset_handle.id.to_string(),
+            "subscriptionId": subscription_alpha_id.to_string(),
+        })),
+    )
+    .execute(&schema, &harness.catalog_authorized)
+    .await;
 
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2186,19 +2146,17 @@ async fn test_list_flows_with_webhooks() {
     );
 
     // Beta second - same query, different variable
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string(),
-                    "subscriptionId": subscription_beta_id.to_string(),
-                })))
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+    let response = GraphQLQueryRequest::new(
+        request_code,
+        async_graphql::Variables::from_json(serde_json::json!({
+            "datasetId": create_result.dataset_handle.id.to_string(),
+            "subscriptionId": subscription_beta_id.to_string(),
+        })),
+    )
+    .execute(&schema, &harness.catalog_authorized)
+    .await;
 
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2249,43 +2207,39 @@ async fn test_list_flow_initiators() {
         .await;
 
     // Pure initiator listing
-    let request_code = indoc!(
-        r#"
-        query($datasetId: DatasetID!) {
-            datasets {
-                byId (datasetId: $datasetId) {
-                    flows {
-                        runs {
-                            listFlowInitiators {
-                                nodes {
-                                    accountName
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($datasetId: DatasetID!) {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                runs {
+                                    listFlowInitiators {
+                                        nodes {
+                                            accountName
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_value(value!({
-                    "datasetId": create_result.dataset_handle.id.to_string()
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "datasetId": create_result.dataset_handle.id.to_string()
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    pretty_assertions::assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "datasets": {
                 "byId": {
@@ -2334,7 +2288,7 @@ async fn test_conditions_not_met_for_flows() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2359,7 +2313,7 @@ async fn test_conditions_not_met_for_flows() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2404,7 +2358,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2429,7 +2383,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2454,7 +2408,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2502,13 +2456,13 @@ async fn test_cancel_ingest_root_dataset() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // Cancelation
+    // Cancellation
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2569,14 +2523,14 @@ async fn test_cancel_running_transform_derived_dataset() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_derived_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2632,14 +2586,14 @@ async fn test_cancel_hard_compaction_root_dataset() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2685,7 +2639,7 @@ async fn test_cancel_wrong_flow_id_fails() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2732,14 +2686,14 @@ async fn test_cancel_foreign_flow_fails() {
     let flow_id =
         harness.extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
 
-    // cancelation of foreign flow
+    // Cancellation of foreign flow
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_derived_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2785,14 +2739,14 @@ async fn test_cancel_waiting_flow() {
 
     // Note: no scheduling of tasks, waiting!
 
-    // Cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2850,7 +2804,7 @@ async fn test_cancel_already_aborted_flow() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // First cancelation
+    // First Cancellation
 
     harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
@@ -2863,7 +2817,7 @@ async fn test_cancel_already_aborted_flow() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -2927,14 +2881,14 @@ async fn test_cancel_already_succeeded_flow() {
         )
         .await;
 
-    // Cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3011,7 +2965,7 @@ async fn test_history_of_completed_ingest_flow() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3188,7 +3142,7 @@ async fn test_history_of_completed_transform_flow() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3326,7 +3280,7 @@ async fn test_execute_transform_flow_error_after_compaction() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3385,7 +3339,7 @@ async fn test_execute_transform_flow_error_after_compaction() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3456,7 +3410,7 @@ async fn test_execute_transform_flow_error_after_compaction() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3508,7 +3462,7 @@ async fn test_execute_transform_flow_error_after_compaction() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3647,7 +3601,7 @@ async fn test_config_snapshot_returned_correctly() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3678,7 +3632,7 @@ async fn test_config_snapshot_returned_correctly() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3776,7 +3730,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3817,7 +3771,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3869,7 +3823,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 
     let next_scheduled_at_0 = complete_time_0 + Duration::minutes(1);
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -3959,7 +3913,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {
@@ -4056,7 +4010,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         response.data,
         value!({
             "datasets": {

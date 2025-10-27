@@ -16,6 +16,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
@@ -56,7 +57,7 @@ macro_rules! test_dataset_create_empty_public {
         let res = harness.execute_authorized_query(request_code).await;
 
         assert!(res.is_ok(), "{res:?}");
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             async_graphql::value!({
                 "datasets": {
                     "createEmpty": {
@@ -96,7 +97,7 @@ async fn test_dataset_by_id_does_not_exist() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": null,
@@ -145,7 +146,7 @@ async fn test_dataset_by_id_private() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": null
@@ -176,7 +177,7 @@ async fn test_dataset_by_id_private() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -226,7 +227,7 @@ async fn test_dataset_by_id_public() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -276,7 +277,7 @@ async fn test_dataset_by_account_and_name_case_insensitive() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byOwnerAndName": {
@@ -329,7 +330,7 @@ async fn test_dataset_by_account_id() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byAccountId": {
@@ -411,7 +412,7 @@ async fn test_dataset_create_from_snapshot() {
     let res = harness.execute_authorized_query(request_code).await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "createFromSnapshot": {
@@ -452,7 +453,7 @@ async fn test_dataset_create_from_snapshot_malformed() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "createFromSnapshot": {
@@ -507,7 +508,7 @@ async fn test_dataset_create_from_snapshot_unauthorized() {
     let res = harness.execute_authorized_query(request_code).await;
 
     assert!(res.is_err(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [(
             vec![
                 "Field(\"datasets\")".to_string(),
@@ -571,7 +572,7 @@ async fn test_dataset_rename_success() {
     let res = harness.execute_authorized_query(request_code).await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -630,7 +631,7 @@ async fn test_dataset_rename_no_changes() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -695,7 +696,7 @@ async fn test_dataset_rename_name_collision() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -752,7 +753,7 @@ async fn test_dataset_delete_success() {
     let res = harness.execute_authorized_query(request_code).await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -816,7 +817,7 @@ async fn test_dataset_delete_dangling_ref() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -1033,7 +1034,7 @@ async fn test_dataset_view_permissions(
     let res = harness.execute_authorized_query(request_code).await;
 
     assert!(res.is_ok(), "{res:?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "datasets": {
                 "byId": {
@@ -1144,18 +1145,14 @@ impl GraphQLDatasetsHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_authorized.clone()))
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     pub async fn execute_anonymous_query(
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_anonymous.clone()))
-            .await
+        self.execute_query(query, &self.catalog_anonymous).await
     }
 }
 

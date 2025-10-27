@@ -11,7 +11,6 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -159,24 +158,11 @@ impl From<DatasetPropertyName> for PropertyName {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    strum::EnumString,
-    strum::Display,
-    Serialize,
-    Deserialize,
+    Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
 )]
-#[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "snake_case")]
 pub enum AccountPropertyName {
     CanProvisionAccounts,
-    #[serde(rename = "admin")]
     IsAdmin,
 }
 
@@ -191,6 +177,27 @@ impl AccountPropertyName {
         let value = boolean_property_value(yes);
 
         (AccountPropertyName::CanProvisionAccounts, value)
+    }
+}
+
+type A = kamu_accounts::AccountPropertyName;
+type R = AccountPropertyName;
+
+impl From<A> for R {
+    fn from(value: A) -> R {
+        match value {
+            A::CanProvisionAccounts => R::CanProvisionAccounts,
+            A::IsAdmin => R::IsAdmin,
+        }
+    }
+}
+
+impl From<R> for A {
+    fn from(value: R) -> A {
+        match value {
+            R::CanProvisionAccounts => A::CanProvisionAccounts,
+            R::IsAdmin => A::IsAdmin,
+        }
     }
 }
 

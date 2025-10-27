@@ -11,6 +11,7 @@ use async_graphql::value;
 use indoc::indoc;
 use kamu_core::TenancyConfig;
 use kamu_flow_system_services::FlowTriggerServiceImpl;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{
     BaseGQLDatasetHarness,

@@ -18,6 +18,7 @@ use crate::queries::*;
 
 pub struct Query;
 
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Query {
     /// Returns the version of the GQL API
@@ -78,6 +79,30 @@ impl Query {
     async fn molecule(&self) -> Molecule {
         Molecule
     }
+
+    // Federation:
+    // - These methods must be in Query root.
+    // - Methods won't be shown in the GQL schema.
+
+    #[graphql(entity)]
+    #[tracing::instrument(level = "info", name = Query_find_account_by_id, skip_all, fields(%account_id))]
+    async fn find_account_by_id(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID<'_>,
+    ) -> Result<Option<Account>> {
+        Accounts.by_id(ctx, account_id).await
+    }
+
+    #[graphql(entity)]
+    #[tracing::instrument(level = "info", name = Query_find_dataset_by_id, skip_all, fields(%dataset_id))]
+    async fn find_dataset_by_id(
+        &self,
+        ctx: &Context<'_>,
+        dataset_id: DatasetID<'_>,
+    ) -> Result<Option<Dataset>> {
+        Datasets.by_id(ctx, dataset_id).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,6 +147,10 @@ impl Mutation {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub type SchemaBuilder = async_graphql::SchemaBuilder<Query, Mutation, EmptySubscription>;
 
@@ -135,10 +164,16 @@ pub fn schema() -> Schema {
     schema_builder()
         .extension(Tracing)
         .extension(extensions::ApolloTracing)
+        .enable_federation()
         .finish()
 }
 
 /// Returns schema preconfigured schema without apollo tracing extension
 pub fn schema_quiet() -> Schema {
-    schema_builder().extension(Tracing).finish()
+    schema_builder()
+        .extension(Tracing)
+        .enable_federation()
+        .finish()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

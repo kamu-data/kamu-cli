@@ -9,6 +9,7 @@
 
 use async_graphql::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_adapter_graphql::data_loader::account_entity_data_loader;
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
@@ -560,7 +561,11 @@ impl GqlSearchHarness {
     pub async fn execute_authorized(&self, request: &str) -> Response {
         let res = self
             .schema
-            .execute(Request::new(request).data(self.catalog_authorized.clone()))
+            .execute(
+                Request::new(request)
+                    .data(account_entity_data_loader(&self.catalog_authorized))
+                    .data(self.catalog_authorized.clone()),
+            )
             .await;
 
         assert!(res.is_ok(), "{res:?}");

@@ -16,6 +16,7 @@ use dill::Component;
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::{
     AccountConfig,
+    AccountPropertyName,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_NAME,
     PredefinedAccountsConfig,
@@ -28,7 +29,6 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
     UpdateAccountUseCaseImpl,
 };
-use kamu_auth_rebac::AccountPropertyName;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::TenancyConfig;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};

@@ -13,6 +13,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::*;
 use kamu_datasets_services::*;
 use odf::dataset::MetadataChainExt;
+use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -35,11 +36,11 @@ async fn test_collection_operations() {
     let did = harness.create_collection("x", None).await;
 
     // Entries are empty
-    pretty_assertions::assert_eq!(harness.list_entries(&did).await, json!([]));
+    assert_eq!(harness.list_entries(&did).await, json!([]));
 
     // No-op update is ok
     harness.update_entries(&did, json!([])).await;
-    pretty_assertions::assert_eq!(harness.list_entries(&did).await, json!([]));
+    assert_eq!(harness.list_entries(&did).await, json!([]));
 
     // Add first entry
     harness
@@ -56,7 +57,7 @@ async fn test_collection_operations() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([{
             "path": "/foo",
@@ -82,7 +83,7 @@ async fn test_collection_operations() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([{
             "path": "/foo",
@@ -109,7 +110,7 @@ async fn test_collection_operations() {
         .await;
 
     // Entries are alphabetically sorted
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([
             {
@@ -140,7 +141,7 @@ async fn test_collection_operations() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([
             {
@@ -174,7 +175,7 @@ async fn test_collection_operations() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([
             {
@@ -207,7 +208,7 @@ async fn test_collection_operations() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([
             {
@@ -236,7 +237,7 @@ async fn test_collection_operations() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([
             {
@@ -262,7 +263,7 @@ async fn test_collection_operations() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([
             {
@@ -305,7 +306,7 @@ async fn test_collection_extra_data() {
         .await;
 
     // Entries are empty
-    pretty_assertions::assert_eq!(harness.list_entries(&did).await, json!([]));
+    assert_eq!(harness.list_entries(&did).await, json!([]));
 
     // Add first entry
     harness
@@ -323,7 +324,7 @@ async fn test_collection_extra_data() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([{
             "path": "/foo",
@@ -345,7 +346,7 @@ async fn test_collection_extra_data() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([{
             "path": "/bar",
@@ -368,7 +369,7 @@ async fn test_collection_extra_data() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([{
             "path": "/bar",
@@ -461,7 +462,7 @@ async fn test_collection_path_prefix_and_max_depth() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([
             {
@@ -483,7 +484,7 @@ async fn test_collection_path_prefix_and_max_depth() {
     );
 
     // With prefix
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries_ext(&did, Some("/1/"), None).await,
         json!([
             {
@@ -499,7 +500,7 @@ async fn test_collection_path_prefix_and_max_depth() {
         ])
     );
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries_ext(&did, Some("/1/2/"), None).await,
         json!([
             {
@@ -510,7 +511,7 @@ async fn test_collection_path_prefix_and_max_depth() {
         ])
     );
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries_ext(&did, Some("/1/2/c"), None).await,
         json!([
             {
@@ -521,7 +522,7 @@ async fn test_collection_path_prefix_and_max_depth() {
         ])
     );
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries_ext(&did, Some("/1/2/3/"), None).await,
         json!([])
     );
@@ -577,10 +578,10 @@ async fn test_collection_entry_search() {
         .await;
 
     // Path does not exist
-    pretty_assertions::assert_eq!(harness.get_entry(&did, "/barz").await, json!(null));
+    assert_eq!(harness.get_entry(&did, "/barz").await, json!(null));
 
     // Get single entry by path
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.get_entry(&did, "/bar").await,
         json!({
             "path": "/bar",
@@ -590,7 +591,7 @@ async fn test_collection_entry_search() {
     );
 
     // Reverse search by refs
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.entries_by_ref(&did, &[&foo]).await,
         json!([
             {
@@ -606,7 +607,7 @@ async fn test_collection_entry_search() {
         ])
     );
 
-    pretty_assertions::assert_eq!(harness.entries_by_ref(&did, &[&baz]).await, json!([]));
+    assert_eq!(harness.entries_by_ref(&did, &[&baz]).await, json!([]));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -639,7 +640,7 @@ async fn test_collection_resolve_ref_to_dataset() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.list_entries(&did).await,
         json!([{
             "path": "/foo",
@@ -682,7 +683,7 @@ async fn test_collection_resolve_ref_to_dataset() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["latest"]["entries"]
             ["nodes"]
             .clone(),
@@ -724,7 +725,7 @@ async fn test_add_entry_errors() {
 
     assert!(res.is_ok(), "{res:#?}");
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"].clone(),
         json!({
             "expectedHead": expected_head,
@@ -788,9 +789,7 @@ impl GraphQLDatasetsHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_authorized.clone()))
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     pub async fn create_root_dataset(&self, name: &str) -> kamu_datasets::CreateDatasetResult {
@@ -1020,7 +1019,7 @@ impl GraphQLDatasetsHarness {
             .await;
 
         assert!(res.is_ok(), "{res:#?}");
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["updateEntries"],
             json!({
                 "isSuccess": true,
