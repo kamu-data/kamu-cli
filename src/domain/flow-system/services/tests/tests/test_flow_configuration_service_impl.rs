@@ -36,6 +36,7 @@ async fn test_visibility() {
     let foo_ingest_binding = ingest_dataset_binding(&foo_id);
     let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: false,
+        fetch_next_iteration: false,
     }
     .into_flow_config();
 
@@ -150,6 +151,7 @@ async fn test_config_with_retry() {
     let foo_ingest_binding = ingest_dataset_binding(&foo_id);
     let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: false,
+        fetch_next_iteration: false,
     }
     .into_flow_config();
 
@@ -190,6 +192,7 @@ async fn test_dataset_deleted() {
     let foo_ingest_binding = ingest_dataset_binding(&foo_id);
     let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: true,
+        fetch_next_iteration: false,
     }
     .into_flow_config();
 
@@ -216,7 +219,8 @@ async fn test_dataset_deleted() {
     assert_eq!(
         flow_config_state.rule,
         FlowConfigRuleIngest {
-            fetch_uncacheable: true
+            fetch_uncacheable: true,
+            fetch_next_iteration: false,
         }
         .into_flow_config()
     );

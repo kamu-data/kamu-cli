@@ -587,12 +587,14 @@ impl BaseGQLFlowHarness {
         &self,
         dataset_id: &odf::DatasetID,
         fetch_uncacheable: bool,
+        fetch_next_iteration: bool,
         retry_policy: Option<async_graphql::Value>,
     ) -> GraphQLQueryRequest {
         let mutation_code = r#"
             mutation(
                 $datasetId: DatasetID!,
                 $fetchUncacheable: Boolean!,
+                $fetchNextIteration: Boolean!,
                 $retryPolicy: FlowRetryPolicyInput
             ) {
                 datasets {
@@ -602,6 +604,7 @@ impl BaseGQLFlowHarness {
                                 setIngestConfig (
                                     ingestConfigInput : {
                                         fetchUncacheable: $fetchUncacheable,
+                                        fetchNextIteration: $fetchNextIteration
                                     },
                                     retryPolicyInput: $retryPolicy
                                 ) {
@@ -614,6 +617,7 @@ impl BaseGQLFlowHarness {
                                                 __typename
                                                 ... on FlowConfigRuleIngest {
                                                     fetchUncacheable
+                                                    fetchNextIteration
                                                 }
                                             }
                                             retryPolicy {
@@ -638,6 +642,7 @@ impl BaseGQLFlowHarness {
         let mut vars = value!({
             "datasetId": dataset_id.to_string(),
             "fetchUncacheable": fetch_uncacheable,
+            "fetchNextIteration": fetch_next_iteration,
         });
 
         use async_graphql::*;

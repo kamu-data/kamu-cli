@@ -353,6 +353,7 @@ pub enum PullResult {
     Updated {
         old_head: Option<odf::Multihash>,
         new_head: odf::Multihash,
+        has_more: bool,
     },
 }
 
@@ -381,10 +382,14 @@ impl From<PollingIngestResult> for PullResult {
                 PullResultUpToDate::PollingIngest(PollingIngestResultUpToDate { uncacheable }),
             ),
             PollingIngestResult::Updated {
-                old_head, new_head, ..
+                old_head,
+                new_head,
+                has_more,
+                ..
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
+                has_more,
             },
         }
     }
@@ -397,6 +402,7 @@ impl From<TransformResult> for PullResult {
             TransformResult::Updated { old_head, new_head } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
+                has_more: false,
             },
         }
     }
@@ -408,7 +414,11 @@ impl From<SyncResult> for PullResult {
             SyncResult::UpToDate => PullResult::UpToDate(PullResultUpToDate::Sync),
             SyncResult::Updated {
                 old_head, new_head, ..
-            } => PullResult::Updated { old_head, new_head },
+            } => PullResult::Updated {
+                old_head,
+                new_head,
+                has_more: false,
+            },
         }
     }
 }
