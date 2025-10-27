@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetDataBlockRepository, DatasetKeyBlockRepository};
 
+use super::cached_blocks_range::{BlockLookupResult, CachedBlocksRange};
+use super::merge_iterator::{CachedBlocksMergeIterator, load_data_blocks_from_repository};
 use crate::MetadataChainDbBackedConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,135 +57,6 @@ impl State {
             maybe_dataset_key_block_repo: Some(dataset_key_block_repo),
             maybe_dataset_data_block_repo: Some(dataset_data_block_repo),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct CachedBlocksRange {
-    /// Cached blocks with hashes in chronological order
-    blocks: Vec<(odf::Multihash, odf::MetadataBlock)>,
-
-    /// Original block payloads, in the same order as in `blocks`
-    original_block_payloads: Vec<bytes::Bytes>,
-
-    /// The same info in lookup-friendly form:
-    ///  index in `blocks` by block hash
-    blocks_lookup: HashMap<odf::Multihash, usize>,
-}
-
-impl CachedBlocksRange {
-    fn new(block_rows: Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>) -> Self {
-        let mut blocks = Vec::with_capacity(block_rows.len());
-        let mut original_block_payloads = Vec::with_capacity(block_rows.len());
-
-        for (hash, payload, block) in block_rows {
-            blocks.push((hash, block));
-            original_block_payloads.push(payload);
-        }
-
-        let blocks_lookup = blocks
-            .iter()
-            .enumerate()
-            .map(|(idx, (hash, _))| (hash.clone(), idx))
-            .collect();
-
-        Self {
-            blocks,
-            original_block_payloads,
-            blocks_lookup,
-        }
-    }
-
-    #[inline]
-    fn len(&self) -> usize {
-        self.blocks.len()
-    }
-
-    fn contains_block(&self, hash: &odf::Multihash) -> bool {
-        self.blocks_lookup.contains_key(hash)
-    }
-
-    fn try_get_block(&self, hash: &odf::Multihash) -> Option<odf::MetadataBlock> {
-        self.blocks_lookup
-            .get(hash)
-            .map(|&idx| self.blocks[idx].1.clone())
-    }
-
-    fn try_get_block_size(&self, hash: &odf::Multihash) -> Option<u64> {
-        self.blocks_lookup
-            .get(hash)
-            .map(|&idx| self.original_block_payloads[idx].len() as u64)
-    }
-
-    fn try_get_block_bytes(&self, hash: &odf::Multihash) -> Option<bytes::Bytes> {
-        self.blocks_lookup
-            .get(hash)
-            .map(|&idx| self.original_block_payloads[idx].clone())
-    }
-
-    fn get_covered_range(&self, full_page_size: usize) -> Option<std::ops::RangeInclusive<u64>> {
-        if self.blocks.is_empty() {
-            None
-        } else {
-            let min_boundary = self.blocks.first().unwrap().1.sequence_number;
-            let max_boundary = self.blocks.last().unwrap().1.sequence_number;
-
-            // If we've loaded less than full page size, it means we are at the beginning.
-            // At the beginning, there are at least some key blocks,
-            // so data blocks never start from seq number 0
-            if self.blocks.len() < full_page_size {
-                Some(0..=max_boundary)
-            } else {
-                Some(min_boundary..=max_boundary)
-            }
-        }
-    }
-
-    fn find_block_by_sequence_number(
-        &self,
-        sequence_number: u64,
-    ) -> Option<&(odf::Multihash, odf::MetadataBlock)> {
-        if self.blocks.is_empty() {
-            return None;
-        }
-
-        match self
-            .blocks
-            .binary_search_by_key(&sequence_number, |(_, block)| block.sequence_number)
-        {
-            Ok(idx) => Some(&self.blocks[idx]),
-            Err(_) => None,
-        }
-    }
-
-    fn get_cached_blocks_for_range(
-        &self,
-        range: std::ops::RangeInclusive<u64>,
-    ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
-        // No blocks yet?
-        if self.blocks.is_empty() {
-            return None;
-        }
-
-        // Find the first block that is greater than or equal to the min boundary
-        let start_index = self
-            .blocks
-            .binary_search_by_key(range.start(), |(_, block)| block.sequence_number)
-            .unwrap_or_else(|x| x);
-
-        // Use the start_index to reduce the search space for the max boundary
-        let end_index = self.blocks[start_index..]
-            .binary_search_by_key(range.end(), |(_, block)| block.sequence_number)
-            .map(|x| x + start_index)
-            .unwrap_or_else(|x| x + start_index);
-
-        // The slice is [start_index, end_index)
-        //   [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9 ]
-        //           min=2                  max=8
-        //             ^ start_index           |
-        //                                     ^ end_index
-        Some(&self.blocks[start_index..end_index])
     }
 }
 
@@ -357,9 +229,13 @@ where
             // It might not cover the entire interested range,
             // when range is large, load 1 page only.
             // The page might also be larger than interested range.
-            let data_blocks = self
-                .read_page_of_data_blocks(data_block_repository.as_ref(), interested_range.clone())
-                .await?;
+            let data_blocks = load_data_blocks_from_repository(
+                data_block_repository.as_ref(),
+                &self.dataset_id,
+                self.config.data_blocks_page_size,
+                *interested_range.end(),
+            )
+            .await?;
 
             // Form resulting structure
             let cached_data_blocks = Arc::new(CachedBlocksRange::new(data_blocks));
@@ -391,47 +267,6 @@ where
             tracing::warn!(dataset_id=%self.dataset_id, "Data blocks repository is detached. Cannot read data blocks");
             Ok(None)
         }
-    }
-
-    async fn read_page_of_data_blocks(
-        &self,
-        data_block_repository: &dyn DatasetDataBlockRepository,
-        interested_range: std::ops::RangeInclusive<u64>,
-    ) -> Result<Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>, InternalError> {
-        // Read standard page of data blocks from the upper boundary.
-        // It might not cover the entire interested range,
-        // when range is large, load 1 page only.
-        // The page might also be larger than interested range.
-        let data_block_records = data_block_repository
-            .get_page_of_data_blocks(
-                &self.dataset_id,
-                &odf::BlockRef::Head,
-                self.config.data_blocks_page_size,
-                *interested_range.end(),
-            )
-            .await
-            .int_err()?;
-
-        // Convert the data blocks to the metadata blocks
-        let data_blocks = data_block_records
-            .into_iter()
-            .map(|data_block| {
-                odf::storage::deserialize_metadata_block(
-                    &data_block.block_hash,
-                    &data_block.block_payload,
-                )
-                .map(|metadata_block| {
-                    (
-                        data_block.block_hash,
-                        data_block.block_payload,
-                        metadata_block,
-                    )
-                })
-                .int_err()
-            })
-            .collect::<Result<Vec<_>, InternalError>>()?;
-
-        Ok(data_blocks)
     }
 
     /// Generic helper method for block operations that follow the same pattern:
@@ -633,7 +468,7 @@ where
     ) -> Result<bytes::Bytes, odf::storage::GetBlockDataError> {
         self.get_from_cache_or_fallback(
             hash,
-            CachedBlocksRange::try_get_block_bytes,
+            CachedBlocksRange::try_get_original_block_payload,
             self.try_data_block_repo_lookup(|repo, dataset_id| async move {
                 repo.get_data_block(&dataset_id, hash)
                     .await
@@ -707,89 +542,40 @@ where
                     Some(odf::dataset::MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
                 };
 
-                // Iterate backwards from head to tail
-                let mut current_sequence_number = head_block.sequence_number;
-                loop {
-                    // Read page of data blocks covering current sequence number
-                    let data_blocks_page = CachedBlocksRange::new(self
-                        .read_page_of_data_blocks(
-                            data_block_repository.as_ref(),
-                            0..=current_sequence_number,
-                        )
-                        .await?);
+                // Create and initialize the merge iterator for efficient traversal
+                let mut merge_iterator = CachedBlocksMergeIterator::prepare(
+                    data_block_repository.as_ref(),
+                    &self.dataset_id,
+                    self.config.data_blocks_page_size,
+                    cached_key_blocks.as_ref(),
+                    head_block.sequence_number,
+                )
+                .await?;
 
-                    let data_blocks_range = if let Some(range) = data_blocks_page.get_covered_range(self.config.data_blocks_page_size) {
-                        //println!("Data blocks page covers range {:?}, dataset {}", range, self.dataset_id);
-                        range
-                    } else {
-                        // No data blocks loaded
-                        //println!("No data blocks loaded for dataset {}", self.dataset_id);
-                        0..=0
+                // Iterate backwards from head to tail using the optimized merge iterator
+                loop {
+                    // Get the next block with the highest sequence number
+                    let Some((block_hash, block)) = merge_iterator.next().await? else {
+                        // No more blocks
+                        break;
                     };
 
-                    loop {
-                        // Try key blocks
-                        if let Some((key_block_hash, key_block)) = cached_key_blocks.find_block_by_sequence_number(current_sequence_number) {
-                            // Check if we reached the tail
-                            if Some(key_block_hash) == maybe_tail_hash.as_ref() {
-                                //println!("Reached tail at key block seq {} hash {}, dataset {}", key_block.sequence_number, key_block_hash, self.dataset_id);
-                                return;
-                            }
-
-                            // Yield key block
-                            yield (key_block_hash.clone(), key_block.clone());
-                            //println!("Yielded key block seq {} hash {}, dataset {}", key_block.sequence_number, key_block_hash, self.dataset_id);
-                        }
-
-                        // Try data blocks
-                        else if data_blocks_range.contains(&current_sequence_number) {
-                            // Found data block in the page
-                            if let Some((data_block_hash, data_block)) = data_blocks_page.find_block_by_sequence_number(current_sequence_number) {
-                                // Check if we reached the tail
-                                if Some(data_block_hash) == maybe_tail_hash.as_ref() {
-                                    // println!("Reached tail at data block seq {} hash {}, dataset {}", data_block.sequence_number, data_block_hash, self.dataset_id);
-                                    return;
-                                }
-
-                                // Yield block
-                                yield (data_block_hash.clone(), data_block.clone());
-                                //println!("Yielded data block seq {} hash {}, dataset {}", data_block.sequence_number, data_block_hash, self.dataset_id);
-                            } else {
-                                unreachable!("Data blocks page should contain the block for sequence number {}", current_sequence_number);
-                            }
-                        } else {
-                            // Advanced to next page
-                            // println!("Page is over at seq {}, dataset {}", current_sequence_number, self.dataset_id);
-                            break;
-                        }
-
-                        if current_sequence_number == 0 {
-                            // Reached the beginning
-                            break;
-                        }
-                        current_sequence_number -= 1;
+                    // Check if we reached the tail
+                    if Some(&block_hash) == maybe_tail_hash.as_ref() {
+                        return;
                     }
 
-                    if current_sequence_number == 0 {
-                        // Reached the beginning
-                        break;
-                    }
+                    // Yield the block
+                    yield (block_hash, block);
                 }
 
-                // println!("Reached the beginning of the chain, dataset {}", self.dataset_id);
-
-                // Have we reached the beginning?
-                if current_sequence_number == 0 {
-                    // Report error if tail was expected, and wasn't met
-                    if !ignore_missing_tail && let Some(tail_hash) = maybe_tail_hash {
-                        Err(odf::IterBlocksError::InvalidInterval(odf::dataset::InvalidIntervalError {
-                            head: head_hash,
-                            tail: tail_hash,
-                        }))?;
-                    }
+                // Check if tail was expected but not found
+                if !ignore_missing_tail && let Some(tail_hash) = maybe_tail_hash {
+                    Err(odf::IterBlocksError::InvalidInterval(odf::dataset::InvalidIntervalError {
+                        head: head_hash,
+                        tail: tail_hash,
+                    }))?;
                 }
-
-                // println!("Iteration completed, dataset {}", self.dataset_id);
 
             } else {
                 // Data blocks cache is not available, simply forward the stream
@@ -937,14 +723,6 @@ where
         let block = self.metadata_chain.get_block(prev_block_hash).await?;
         Ok(Some((prev_block_hash.clone(), block)))
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-enum BlockLookupResult {
-    Found((odf::Multihash, odf::MetadataBlock)),
-    NotFound,
-    Stop,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

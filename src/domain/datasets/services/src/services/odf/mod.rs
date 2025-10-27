@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod metadata_chain_db_backed_config;
-mod metadata_chain_db_backed_impl;
+mod metadata_chain_db_backed;
 mod metadata_chain_ref_repo_db_backed_impl;
 
 #[cfg(feature = "lfs")]
@@ -21,6 +20,5 @@ mod dataset_s3_builder_db_backed_impl;
 pub use dataset_lfs_builder_db_backed_impl::*;
 #[cfg(feature = "s3")]
 pub use dataset_s3_builder_db_backed_impl::*;
-pub use metadata_chain_db_backed_config::*;
-pub use metadata_chain_db_backed_impl::*;
+pub use metadata_chain_db_backed::*;
 pub use metadata_chain_ref_repo_db_backed_impl::*;
