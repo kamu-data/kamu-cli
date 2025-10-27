@@ -12,7 +12,6 @@ use indoc::indoc;
 use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
-use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
@@ -605,15 +604,7 @@ impl DatasetMetadataHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&self.catalog_authorized))
-                    .data(dataset_handle_data_loader(&self.catalog_authorized))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {

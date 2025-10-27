@@ -16,7 +16,6 @@ use datafusion::arrow::record_batch::RecordBatch;
 use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
-use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
@@ -332,6 +331,7 @@ async fn test_data_query_error_sql_missing_function() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLDataHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
@@ -378,15 +378,7 @@ impl GraphQLDataHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&self.catalog_authorized))
-                    .data(dataset_handle_data_loader(&self.catalog_authorized))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     pub async fn create_test_dataset(&self, account_name: Option<odf::AccountName>) {

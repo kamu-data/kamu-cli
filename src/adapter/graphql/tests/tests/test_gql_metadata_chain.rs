@@ -13,7 +13,6 @@ use async_graphql::value;
 use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
-use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
@@ -637,24 +636,14 @@ impl GraphQLMetadataChainHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&self.catalog_authorized))
-                    .data(dataset_handle_data_loader(&self.catalog_authorized))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     pub async fn execute_anonymous_query(
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_anonymous.clone()))
-            .await
+        self.execute_query(query, &self.catalog_anonymous).await
     }
 
     async fn create_root_dataset(

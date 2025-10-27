@@ -12,7 +12,6 @@
 use async_graphql::{PathSegment, value};
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
-use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_webhooks::*;
@@ -1325,15 +1324,7 @@ impl WebhookSubscriptionsHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&self.catalog_authorized))
-                    .data(dataset_handle_data_loader(&self.catalog_authorized))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     fn make_mock_secret_generator(

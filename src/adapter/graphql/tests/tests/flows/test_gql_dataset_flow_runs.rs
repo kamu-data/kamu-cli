@@ -2456,7 +2456,7 @@ async fn test_cancel_ingest_root_dataset() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // Cancelation
+    // Cancellation
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
         .execute(&schema, &harness.catalog_authorized)
@@ -2523,7 +2523,7 @@ async fn test_cancel_running_transform_derived_dataset() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_derived_result.dataset_handle.id, flow_id)
@@ -2586,7 +2586,7 @@ async fn test_cancel_hard_compaction_root_dataset() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
@@ -2686,7 +2686,7 @@ async fn test_cancel_foreign_flow_fails() {
     let flow_id =
         harness.extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
 
-    // cancelation of foreign flow
+    // Cancellation of foreign flow
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_derived_result.dataset_handle.id, flow_id)
@@ -2739,7 +2739,7 @@ async fn test_cancel_waiting_flow() {
 
     // Note: no scheduling of tasks, waiting!
 
-    // Cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
@@ -2804,7 +2804,7 @@ async fn test_cancel_already_aborted_flow() {
         .mimic_task_running(task_id, flow_task_metadata, Utc::now())
         .await;
 
-    // First cancelation
+    // First Cancellation
 
     harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
@@ -2881,7 +2881,7 @@ async fn test_cancel_already_succeeded_flow() {
         )
         .await;
 
-    // Cancelation
+    // Cancellation
 
     let response = harness
         .cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id)
