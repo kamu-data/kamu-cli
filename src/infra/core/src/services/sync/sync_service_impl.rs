@@ -338,7 +338,6 @@ impl SyncServiceImpl {
                 let mut num_blocks = 0;
 
                 use futures::TryStreamExt;
-                use odf::dataset::MetadataChainExt;
                 let mut block_stream = src_dataset.as_metadata_chain().iter_blocks_interval(
                     (&src_head).into(),
                     None,

@@ -17,7 +17,6 @@ use futures::TryStreamExt;
 use headers::Header as _;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use odf::dataset::MetadataChainExt;
 use tar::Header;
 use thiserror::Error;
 use url::Url;

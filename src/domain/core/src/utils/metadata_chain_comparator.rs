@@ -34,7 +34,6 @@ impl MetadataChainComparator {
         listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
         use odf::MetadataChain;
-        use odf::dataset::MetadataChainExt;
 
         // When source and destination point to the same block, chains are equal, no
         // further scanning required
@@ -169,8 +168,7 @@ impl MetadataChainComparator {
         let ahead_size = ahead_sequence_number - expected_common_sequence_number;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
-        use odf::dataset::MetadataChainExt;
-
+        use odf::MetadataChain;
         let ahead_blocks: Vec<odf::dataset::HashedMetadataBlock> = ahead_chain
             .iter_blocks_interval(ahead_head.into(), None, false)
             .take(usize::try_from(ahead_size).unwrap())
@@ -237,7 +235,7 @@ impl MetadataChainComparator {
             );
         }
 
-        use odf::dataset::MetadataChainExt;
+        use odf::MetadataChain;
         let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head.into(), None, false);
         let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head.into(), None, false);
 
@@ -450,6 +448,26 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         self.chain
             .get_preceding_block_with_hint(head_block, tail_sequence_number, hint)
             .await
+    }
+
+    /// Iterates the chain in reverse order starting with specified block and
+    /// following the previous block links. The interval returned is `[head,
+    /// tail)` - tail is exclusive. If `tail` argument is provided but not
+    /// encountered the iteration will continue until first block followed by an
+    /// error. If `ignore_missing_tail` argument is provided, the exception
+    /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
+    fn iter_blocks_interval<'a>(
+        &'a self,
+        head_boundary: odf::dataset::MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> odf::dataset::DynMetadataStream<'a> {
+        self.chain
+            .iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail)
     }
 
     async fn set_ref<'b>(

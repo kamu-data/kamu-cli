@@ -104,6 +104,42 @@ where
         }
     }
 
+    fn iter_blocks_interval<'a>(
+        &'a self,
+        head_boundary: MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataStream<'a> {
+        Box::pin(async_stream::try_stream! {
+            let head_hash = match head_boundary {
+                MetadataChainIterBoundary::Hash(h) => h.clone(),
+                MetadataChainIterBoundary::Ref(r) => self.resolve_ref(r).await?,
+            };
+
+            let tail_hash = match tail_boundary {
+                None => None,
+                Some(MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
+                Some(MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
+            };
+
+            let mut current = Some(head_hash.clone());
+
+            while current.is_some() && current != tail_hash {
+                let block = self.get_block(current.as_ref().unwrap()).await?;
+                let next = block.prev_block_hash.clone();
+                yield (current.take().unwrap(), block);
+                current = next;
+            }
+
+            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
+                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
+                    head: head_hash,
+                    tail: tail_hash,
+                }))?;
+            }
+        })
+    }
+
     async fn append<'a>(
         &'a self,
         block: MetadataBlock,

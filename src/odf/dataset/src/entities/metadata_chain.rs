@@ -51,6 +51,23 @@ pub trait MetadataChain: Send + Sync {
         hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError>;
 
+    /// Iterates the chain in reverse order starting with specified block and
+    /// following the previous block links. The interval returned is `[head,
+    /// tail)` - tail is exclusive. If `tail` argument is provided but not
+    /// encountered the iteration will continue until first block followed by an
+    /// error. If `ignore_missing_tail` argument is provided, the exception
+    /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
+    fn iter_blocks_interval<'a>(
+        &'a self,
+        head_boundary: MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataStream<'a>;
+
     /// Appends the block to the chain
     async fn append<'a>(
         &'a self,
@@ -125,52 +142,6 @@ pub trait MetadataChainExt: MetadataChain {
     /// API.
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
         self.iter_blocks_interval(head.into(), None, false)
-    }
-
-    /// Iterates the chain in reverse order starting with specified block and
-    /// following the previous block links. The interval returned is `[head,
-    /// tail)` - tail is exclusive. If `tail` argument is provided but not
-    /// encountered the iteration will continue until first block followed by an
-    /// error. If `ignore_missing_tail` argument is provided, the exception
-    /// is not generated if tail is not detected while traversing from head
-    ///
-    /// PERF: iterates over blocks sequentially: O(N). If you initially
-    /// know the type of blocks, it's better to consider using accept_*()
-    /// API.
-    fn iter_blocks_interval<'a>(
-        &'a self,
-        head_boundary: MetadataChainIterBoundary<'a>,
-        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let head_hash = match head_boundary {
-                MetadataChainIterBoundary::Hash(h) => h.clone(),
-                MetadataChainIterBoundary::Ref(r) => self.resolve_ref(r).await?,
-            };
-
-            let tail_hash = match tail_boundary {
-                None => None,
-                Some(MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
-                Some(MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
-            };
-
-            let mut current = Some(head_hash.clone());
-
-            while current.is_some() && current != tail_hash {
-                let block = self.get_block(current.as_ref().unwrap()).await?;
-                let next = block.prev_block_hash.clone();
-                yield (current.take().unwrap(), block);
-                current = next;
-            }
-
-            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash,
-                    tail: tail_hash,
-                }))?;
-            }
-        })
     }
 
     /// A method for accepting visitors (see [`MetadataChainVisitor`]) that

@@ -83,7 +83,6 @@ pub(crate) async fn index_dataset_key_blocks_entirely(
         .int_err()?;
 
     use futures::stream::TryStreamExt;
-    use odf::dataset::MetadataChainExt;
 
     // Collect key metadata blocks and save them in chunks.
     let mut current_chunk = Vec::new();
@@ -162,7 +161,6 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
     tail: Option<&odf::Multihash>,
 ) -> Result<CollectKeyBlockResponse, InternalError> {
     use futures::stream::TryStreamExt;
-    use odf::dataset::MetadataChainExt;
 
     // Resulting blocks and event flags
     let mut key_blocks = Vec::new();

@@ -62,7 +62,6 @@ impl DatasetIncrementQueryServiceImpl {
         let mut latest_watermark = None;
 
         // Scan blocks (from new head to old head)
-        use odf::dataset::MetadataChainExt;
         let mut block_stream = resolved_dataset.as_metadata_chain().iter_blocks_interval(
             new_head.into(),
             old_head.map(Into::into),

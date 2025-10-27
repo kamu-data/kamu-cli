@@ -634,6 +634,17 @@ where
         .await
     }
 
+    fn iter_blocks_interval<'a>(
+        &'a self,
+        head_boundary: odf::dataset::MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> odf::dataset::DynMetadataStream<'a> {
+        // TODO: use caches to speed up iteration where possible
+        self.metadata_chain
+            .iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail)
+    }
+
     async fn append<'a>(
         &'a self,
         block: odf::MetadataBlock,

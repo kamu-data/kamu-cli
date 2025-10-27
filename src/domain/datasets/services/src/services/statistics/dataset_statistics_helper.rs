@@ -25,7 +25,6 @@ pub(crate) async fn compute_dataset_statistics_increment(
     head: &odf::Multihash,
     maybe_last_seen_block: Option<&odf::Multihash>,
 ) -> Result<DatasetStatisticsIncrement, InternalError> {
-    use odf::dataset::MetadataChainExt;
     let mut block_stream = metadata_chain.iter_blocks_interval(
         head.into(),
         maybe_last_seen_block.map(Into::into),
