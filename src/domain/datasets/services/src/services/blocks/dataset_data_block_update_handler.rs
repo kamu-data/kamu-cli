@@ -21,7 +21,7 @@ use kamu_datasets::{
 };
 use messaging_outbox::*;
 
-use crate::{CollectDataBlockResponse, collect_dataset_data_blocks_in_range};
+use crate::{CollectBlockResponse, collect_dataset_data_blocks_in_range};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -73,7 +73,7 @@ impl DatasetDataBlockUpdateHandler {
         &self,
         target: ResolvedDataset,
         message: &DatasetReferenceMessageUpdated,
-    ) -> Result<CollectDataBlockResponse, InternalError> {
+    ) -> Result<CollectBlockResponse, InternalError> {
         // Try to index in the specified range of HEAD advancement
         match collect_dataset_data_blocks_in_range(
             target.clone(),
@@ -107,7 +107,7 @@ impl DatasetDataBlockUpdateHandler {
                     .save_data_blocks_batch(
                         &message.dataset_id,
                         &message.block_ref,
-                        &data_blocks_response.data_blocks,
+                        &data_blocks_response.blocks,
                     )
                     .await
                     .int_err()?;

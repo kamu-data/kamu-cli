@@ -18,28 +18,28 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::DatasetRegistry;
 use kamu_datasets::{
     DatasetKeyBlockRepository,
-    JOB_KAMU_DATASETS_DATASET_KEY_BLOCK_INDEXER,
+    JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER,
     JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER,
 };
 
-use crate::DatasetKeyBlockIndexingJob;
+use crate::DatasetBlockIndexingJob;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetKeyBlockIndexer {
+pub struct DatasetBlockIndexer {
     catalog: Catalog,
 }
 
 #[component(pub)]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
-    job_name: JOB_KAMU_DATASETS_DATASET_KEY_BLOCK_INDEXER,
+    job_name: JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER,
     depends_on: &[
         JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER,
     ],
     requires_transaction: false,
 })]
-impl DatasetKeyBlockIndexer {
+impl DatasetBlockIndexer {
     pub fn new(catalog: Catalog) -> Self {
         Self { catalog }
     }
@@ -52,6 +52,12 @@ impl DatasetKeyBlockIndexer {
     async fn collect_datasets_to_index(
         &self,
     ) -> Result<Vec<(odf::DatasetHandle, odf::BlockRef)>, InternalError> {
+        // Note: it's enough to check key blocks for unindexed datasets.
+        // If a dataset has no key block index, it definitely has no data block index.
+        // The situation, where a dataset has key block index but no data block index,
+        // should not happen in practice, as we've reset the key blocks data at
+        // migration stage
+
         // Repository can build a report of unindexed dataset branches (id->blockRef)
         #[allow(clippy::zero_sized_map_values)]
         let unindexed_dataset_branches = dataset_key_block_repo
@@ -102,11 +108,11 @@ impl DatasetKeyBlockIndexer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl InitOnStartup for DatasetKeyBlockIndexer {
+impl InitOnStartup for DatasetBlockIndexer {
     #[tracing::instrument(
         level = "info",
         skip_all,
-        name = "DatasetKeyBlocksIndexer::run_initialization"
+        name = "DatasetBlocksIndexer::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         // Collect dataset handles that have no block index built yet
@@ -119,13 +125,14 @@ impl InitOnStartup for DatasetKeyBlockIndexer {
         // Convert handles into jobs wrapped into tokio tasks
         let mut job_results = tokio::task::JoinSet::new();
         for (dataset_handle, block_ref) in datasets_to_index {
-            let job =
-                DatasetKeyBlockIndexingJob::new(&self.catalog, dataset_handle.clone(), block_ref);
-            let job_span = tracing::info_span!("DatasetKeyBlockIndexingJob", %dataset_handle);
+            let indexing_job =
+                DatasetBlockIndexingJob::new(&self.catalog, dataset_handle.clone(), block_ref);
+            let indexing_span = tracing::info_span!("DatasetBlockIndexingJob", %dataset_handle);
 
             use tracing::Instrument;
             job_results.spawn(
-                async move { (dataset_handle, job.run().await) }.instrument(job_span.or_current()),
+                async move { (dataset_handle, indexing_job.run().await) }
+                    .instrument(indexing_span.or_current()),
             );
         }
 
@@ -135,7 +142,7 @@ impl InitOnStartup for DatasetKeyBlockIndexer {
         // Report errors, if any
         for (dataset_handle, result) in results {
             if let Err(err) = result {
-                tracing::error!(%dataset_handle, err = ?err, "Failed to index dataset key blocks");
+                tracing::error!(%dataset_handle, err = ?err, "Failed to index dataset blocks");
             }
         }
 

@@ -24,7 +24,7 @@ use kamu_datasets::{
 use messaging_outbox::*;
 
 use crate::collect_dataset_key_blocks_in_range;
-use crate::services::CollectKeyBlockResponse;
+use crate::services::CollectBlockResponse;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,9 +68,9 @@ impl DatasetKeyBlockUpdateHandler {
             Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
         }?;
 
-        let CollectKeyBlockResponse {
-            key_blocks,
-            key_event_flags,
+        let CollectBlockResponse {
+            blocks: key_blocks,
+            event_flags: key_event_flags,
             divergence_detected,
         } = self.update_dataset_key_blocks(target, message).await?;
 
@@ -100,7 +100,7 @@ impl DatasetKeyBlockUpdateHandler {
         &self,
         target: ResolvedDataset,
         message: &DatasetReferenceMessageUpdated,
-    ) -> Result<CollectKeyBlockResponse, InternalError> {
+    ) -> Result<CollectBlockResponse, InternalError> {
         // Try to index in the specified range of HEAD advancement
         match collect_dataset_key_blocks_in_range(
             target.clone(),
@@ -134,7 +134,7 @@ impl DatasetKeyBlockUpdateHandler {
                     .save_key_blocks_batch(
                         &message.dataset_id,
                         &message.block_ref,
-                        &key_blocks_response.key_blocks,
+                        &key_blocks_response.blocks,
                     )
                     .await
                     .int_err()?;

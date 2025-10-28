@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use cheap_clone::CheapClone;
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +35,7 @@ impl DatasetKeyBlocksMessage {
     ) -> Self {
         Self::Appended(DatasetKeyBlocksMessageAppended {
             dataset_id: dataset_id.clone(),
-            block_ref: block_ref.clone(),
+            block_ref: block_ref.cheap_clone(),
             tail_key_block_hash: tail_key_block_hash.clone(),
             head_key_block_hash: head_key_block_hash.clone(),
             key_blocks_event_flags,
