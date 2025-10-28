@@ -75,8 +75,7 @@ impl DatasetBaseUseCaseHarness {
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<InMemoryDatasetDataBlockRepository>()
-                .add::<DatasetKeyBlockUpdateHandler>()
-                .add::<DatasetDataBlockUpdateHandler>()
+                .add::<DatasetBlockUpdateHandler>()
                 .add::<DependencyGraphImmediateListener>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<TestDatasetOutboxListener>();

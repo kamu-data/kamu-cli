@@ -669,7 +669,7 @@ impl DependencyGraphHarness {
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<InMemoryDatasetKeyBlockRepository>()
         .add::<InMemoryDatasetDataBlockRepository>()
-        .add::<DatasetKeyBlockUpdateHandler>();
+        .add::<DatasetBlockUpdateHandler>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,

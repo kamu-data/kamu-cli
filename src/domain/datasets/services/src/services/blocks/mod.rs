@@ -9,10 +9,8 @@
 
 mod dataset_block_indexer;
 mod dataset_block_indexing_job;
-mod dataset_data_block_update_handler;
-mod dataset_key_block_update_handler;
+mod dataset_block_update_handler;
 
 pub use dataset_block_indexer::*;
 pub(crate) use dataset_block_indexing_job::*;
-pub use dataset_data_block_update_handler::*;
-pub use dataset_key_block_update_handler::*;
+pub use dataset_block_update_handler::*;

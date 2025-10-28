@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method3;
 use dill::Catalog;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{DatasetRegistry, ResolvedDataset};
 use kamu_datasets::{
     DatasetBlock,
@@ -125,7 +125,7 @@ pub(crate) async fn index_dataset_blocks_entirely(
 
     while let Some((block_hash, block)) = blocks_stream.try_next().await.int_err()? {
         let event_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
-        let block_entity = make_block(block_hash, &block);
+        let block_entity = make_dataset_block(block_hash, &block);
 
         if event_flags.has_data_flags() {
             // This is a data block (AddData, ExecuteTransform)
@@ -225,133 +225,10 @@ pub(crate) async fn index_dataset_blocks_entirely(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn collect_dataset_key_blocks_in_range(
-    target: ResolvedDataset,
-    head: &odf::Multihash,
-    tail: Option<&odf::Multihash>,
-) -> Result<CollectBlockResponse, InternalError> {
-    use futures::stream::TryStreamExt;
-
-    // Resulting blocks and event flags
-    let mut key_blocks = Vec::new();
-    let mut key_event_flags = odf::metadata::MetadataEventTypeFlags::empty();
-
-    // Iterate over blocks in the dataset in the specified range.
-    // Note: don't ignore missing tail, we want to detect InvalidInterval error.
-    //       Therefore, we need to iterate through all blocks, not only key ones,
-    //       to perform an accurate tail check.
-    let mut blocks_stream = target
-        .as_metadata_chain()
-        .as_uncached_chain()
-        .iter_blocks_interval(head.into(), tail.map(Into::into), false);
-
-    loop {
-        // Try reading next stream element
-        let try_next_result = match blocks_stream.try_next().await {
-            // Normal stream element
-            Ok(maybe_hashed_block) => maybe_hashed_block,
-
-            // Invalid interval: return so far collected result with divergence marker
-            Err(odf::dataset::IterBlocksError::InvalidInterval(_)) => {
-                return Ok(CollectBlockResponse {
-                    blocks: key_blocks,
-                    event_flags: key_event_flags,
-                    divergence_detected: true,
-                });
-            }
-
-            // Other errors are internal
-            Err(odf::IterBlocksError::Internal(e)) => return Err(e),
-            Err(e) => return Err(e.int_err()),
-        };
-
-        // Check if we've reached the end of stream
-        let Some((block_hash, block)) = try_next_result else {
-            break;
-        };
-
-        // Ignore non-key events, such as `AddData` and `ExecuteTransform`
-        let event_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
-        if !event_flags.has_data_flags() {
-            // Create a key block entity
-            key_blocks.push(make_block(block_hash, &block));
-            key_event_flags |= event_flags;
-        }
-    }
-
-    Ok(CollectBlockResponse {
-        blocks: key_blocks,
-        event_flags: key_event_flags,
-        divergence_detected: false,
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn collect_dataset_data_blocks_in_range(
-    target: ResolvedDataset,
-    head: &odf::Multihash,
-    tail: Option<&odf::Multihash>,
-) -> Result<CollectBlockResponse, InternalError> {
-    use futures::stream::TryStreamExt;
-
-    // Resulting blocks and event flags
-    let mut data_blocks = Vec::new();
-    let mut data_event_flags = odf::metadata::MetadataEventTypeFlags::empty();
-
-    // Iterate over blocks in the dataset in the specified range.
-    // Note: don't ignore missing tail, we want to detect InvalidInterval error.
-    //       Therefore, we need to iterate through all blocks, not only data ones,
-    //       to perform an accurate tail check.
-    let mut blocks_stream = target
-        .as_metadata_chain()
-        .as_uncached_chain()
-        .iter_blocks_interval(head.into(), tail.map(Into::into), false);
-
-    loop {
-        // Try reading next stream element
-        let try_next_result = match blocks_stream.try_next().await {
-            // Normal stream element
-            Ok(maybe_hashed_block) => maybe_hashed_block,
-
-            // Invalid interval: return so far collected result with divergence marker
-            Err(odf::dataset::IterBlocksError::InvalidInterval(_)) => {
-                return Ok(CollectBlockResponse {
-                    blocks: data_blocks,
-                    event_flags: data_event_flags,
-                    divergence_detected: true,
-                });
-            }
-
-            // Other errors are internal
-            Err(odf::IterBlocksError::Internal(e)) => return Err(e),
-            Err(e) => return Err(e.int_err()),
-        };
-
-        // Check if we've reached the end of stream
-        let Some((block_hash, block)) = try_next_result else {
-            break;
-        };
-
-        // Collect only data events, such as `AddData` and `ExecuteTransform`
-        let event_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
-        if event_flags.has_data_flags() {
-            // Create a data block entity
-            data_blocks.push(make_block(block_hash, &block));
-            data_event_flags |= event_flags;
-        }
-    }
-
-    Ok(CollectBlockResponse {
-        blocks: data_blocks,
-        event_flags: data_event_flags,
-        divergence_detected: false,
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn make_block(block_hash: odf::Multihash, block: &odf::MetadataBlock) -> DatasetBlock {
+pub(crate) fn make_dataset_block(
+    block_hash: odf::Multihash,
+    block: &odf::MetadataBlock,
+) -> DatasetBlock {
     let block_data = odf::storage::serialize_metadata_block(block).unwrap();
 
     DatasetBlock {
@@ -360,15 +237,6 @@ pub(crate) fn make_block(block_hash: odf::Multihash, block: &odf::MetadataBlock)
         block_hash,
         block_payload: bytes::Bytes::from(block_data),
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub(crate) struct CollectBlockResponse {
-    pub(crate) blocks: Vec<DatasetBlock>,
-    pub(crate) event_flags: odf::metadata::MetadataEventTypeFlags,
-    pub(crate) divergence_detected: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
