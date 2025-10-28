@@ -22,9 +22,11 @@ pub struct MetadataChainDatabaseBackedImpl<TMetadataChain>
 where
     TMetadataChain: odf::MetadataChain + Send + Sync,
 {
+    // --- immutable fields
     config: MetadataChainDbBackedConfig,
     dataset_id: odf::DatasetID,
     metadata_chain: TMetadataChain,
+    // --- mutable state
     state: RwLock<State>,
     key_blocks_loading_lock: tokio::sync::Mutex<()>,
     data_blocks_loading_lock: tokio::sync::Mutex<()>,
@@ -418,10 +420,6 @@ impl<TMetadataChain> odf::MetadataChain for MetadataChainDatabaseBackedImpl<TMet
 where
     TMetadataChain: odf::MetadataChain + Send + Sync,
 {
-    fn as_raw_version(&self) -> &dyn odf::MetadataChain {
-        self.metadata_chain.as_raw_version()
-    }
-
     async fn contains_block(
         &self,
         hash: &odf::Multihash,
@@ -513,15 +511,6 @@ where
         ignore_missing_tail: bool,
     ) -> odf::dataset::DynMetadataStream<'a> {
         Box::pin(async_stream::try_stream! {
-            use futures::TryStreamExt;
-            let mut stream = self.metadata_chain.iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail);
-
-            // Try reading first block to see if there is anything at all
-            let Some((head_hash, head_block)) = stream.try_next().await? else {
-                // No blocks at all
-                return;
-            };
-
             // Force loading key blocks unless it was already done
             let maybe_cached_key_blocks = self.ensure_key_blocks_are_preloaded().await?;
 
@@ -535,6 +524,19 @@ where
 
             // We should have both key blocks and data blocks cache available for optimized iteration
             if let Some(cached_key_blocks) = maybe_cached_key_blocks && let Some(data_block_repository) = maybe_data_block_repository {
+                // We need to load starting block to know the sequence number
+                let (head_hash, head_block) = match head_boundary {
+                    odf::dataset::MetadataChainIterBoundary::Hash(h) => {
+                        let block = self.get_block(h).await?;
+                        (h.clone(), block)
+                    },
+                    odf::dataset::MetadataChainIterBoundary::Ref(r) => {
+                        let h = self.resolve_ref(r).await?;
+                        let block = self.get_block(&h).await?;
+                        (h, block)
+                    },
+                };
+
                 // We need tail hash boundary
                 let maybe_tail_hash = match tail_boundary {
                     None => None,
@@ -579,7 +581,8 @@ where
 
             } else {
                 // Data blocks cache is not available, simply forward the stream
-                yield (head_hash, head_block);
+                use futures::TryStreamExt;
+                let mut stream = self.metadata_chain.iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail);
                 while let Some((block_hash, block)) = stream.try_next().await? {
                     yield (block_hash, block);
                 }
@@ -626,20 +629,6 @@ where
         opts: odf::dataset::SetRefOpts<'a>,
     ) -> Result<(), odf::dataset::SetChainRefError> {
         self.metadata_chain.set_ref(r, hash, opts).await
-    }
-
-    fn as_uncached_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
-        self.metadata_chain.as_uncached_ref_repo()
-    }
-
-    fn detach_from_transaction(&self) {
-        // Pass over to the next level chain
-        self.metadata_chain.detach_from_transaction();
-
-        // Detach the repositories, as they are holding the transaction
-        let mut write_guard = self.state.write().unwrap();
-        write_guard.maybe_dataset_key_block_repo = None;
-        write_guard.maybe_dataset_data_block_repo = None;
     }
 
     async fn get_preceding_block_with_hint(
@@ -692,8 +681,7 @@ where
                     BlockLookupResult::Found(key_block_hint),
                     BlockLookupResult::Found(data_block_hint),
                 ) => {
-                    // Both key and data blocks are available, pick the one with the higher sequence
-                    // number
+                    // Both key and data blocks present, pick the by the higher sequence number
                     if key_block_hint.1.sequence_number > data_block_hint.1.sequence_number {
                         return Ok(Some(key_block_hint));
                     }
@@ -722,6 +710,24 @@ where
         // Read the previous block without jumps, looks like caches are inaccessible
         let block = self.metadata_chain.get_block(prev_block_hash).await?;
         Ok(Some((prev_block_hash.clone(), block)))
+    }
+
+    fn detach_from_transaction(&self) {
+        // Pass over to the next level chain
+        self.metadata_chain.detach_from_transaction();
+
+        // Detach the repositories, as they are holding the transaction
+        let mut write_guard = self.state.write().unwrap();
+        write_guard.maybe_dataset_key_block_repo = None;
+        write_guard.maybe_dataset_data_block_repo = None;
+    }
+
+    fn as_uncached_chain(&self) -> &dyn odf::MetadataChain {
+        self.metadata_chain.as_uncached_chain()
+    }
+
+    fn as_uncached_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
+        self.metadata_chain.as_uncached_ref_repo()
     }
 }
 

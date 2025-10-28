@@ -402,10 +402,6 @@ impl<'a> MetadataChainWithStats<'a> {
 
 #[async_trait]
 impl odf::MetadataChain for MetadataChainWithStats<'_> {
-    fn as_raw_version(&self) -> &dyn odf::MetadataChain {
-        self.chain.as_raw_version()
-    }
-
     async fn resolve_ref(&self, r: &odf::BlockRef) -> Result<odf::Multihash, odf::GetRefError> {
         self.chain.resolve_ref(r).await
     }
@@ -489,6 +485,10 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         opts: odf::dataset::AppendOpts<'b>,
     ) -> Result<odf::Multihash, odf::dataset::AppendError> {
         self.chain.append(block, opts).await
+    }
+
+    fn as_uncached_chain(&self) -> &dyn odf::MetadataChain {
+        self.chain.as_uncached_chain()
     }
 
     fn as_uncached_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {

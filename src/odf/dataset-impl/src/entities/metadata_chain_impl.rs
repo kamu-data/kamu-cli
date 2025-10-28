@@ -57,14 +57,6 @@ where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     MetaRefRepo: MetadataChainReferenceRepository + Sync + Send,
 {
-    fn detach_from_transaction(&self) {
-        self.meta_ref_repo.detach_from_transaction();
-    }
-
-    fn as_raw_version(&self) -> &dyn MetadataChain {
-        self
-    }
-
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
         self.meta_block_repo.contains_block(hash).await
     }
@@ -264,6 +256,14 @@ where
             .await?;
 
         Ok(())
+    }
+
+    fn detach_from_transaction(&self) {
+        self.meta_ref_repo.detach_from_transaction();
+    }
+
+    fn as_uncached_chain(&self) -> &dyn MetadataChain {
+        self
     }
 
     fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository {

@@ -92,7 +92,7 @@ pub(crate) async fn index_dataset_key_blocks_entirely(
     // Iterate over blocks of the entire dataset.
     let mut blocks_stream = target
         .as_metadata_chain()
-        .as_raw_version()
+        .as_uncached_chain()
         .iter_blocks_interval((&head).into(), None, true);
 
     while let Some((block_hash, block)) = blocks_stream.try_next().await.int_err()? {
@@ -172,7 +172,7 @@ pub(crate) async fn collect_dataset_key_blocks_in_range(
     //       to perform an accurate tail check.
     let mut blocks_stream = target
         .as_metadata_chain()
-        .as_raw_version()
+        .as_uncached_chain()
         .iter_blocks_interval(head.into(), tail.map(Into::into), false);
 
     loop {

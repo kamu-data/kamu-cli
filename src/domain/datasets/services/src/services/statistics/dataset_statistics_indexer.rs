@@ -84,7 +84,7 @@ impl DatasetStatisticsIndexer {
                 .int_err()?;
 
             let increment = compute_dataset_statistics_increment(
-                dataset.as_metadata_chain().as_raw_version(),
+                dataset.as_metadata_chain().as_uncached_chain(),
                 &head,
                 None,
             )

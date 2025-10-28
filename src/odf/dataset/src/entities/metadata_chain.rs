@@ -27,9 +27,6 @@ pub trait MetadataChain: Send + Sync {
         // Nothing to do by default
     }
 
-    /// Returns raw version of the metadata chain
-    fn as_raw_version(&self) -> &dyn MetadataChain;
-
     /// Returns true if chain contains block
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;
 
@@ -88,6 +85,9 @@ pub trait MetadataChain: Send + Sync {
         hash: &Multihash,
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetChainRefError>;
+
+    /// Returns uncached version of the metadata chain
+    fn as_uncached_chain(&self) -> &dyn MetadataChain;
 
     /// Returns storage-level reference repository without any caching involved
     fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository;
