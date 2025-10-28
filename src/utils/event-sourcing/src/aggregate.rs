@@ -178,9 +178,22 @@ where
                         "Loaded aggregate",
                     );
                 }
-                Err(err) => {
-                    tracing::error!(error = ?err, error_msg = %err, "Failed to load aggregate",);
-                }
+                Err(err) => match err {
+                    LoadError::NotFound(_) => {
+                        tracing::warn!(
+                            error = ?err,
+                            error_msg = %err,
+                            "Failed to load aggregate",
+                        );
+                    }
+                    _ => {
+                        tracing::error!(
+                            error = ?err,
+                            error_msg = %err,
+                            "Failed to load aggregate",
+                        );
+                    }
+                },
             }
 
             result.push(item);

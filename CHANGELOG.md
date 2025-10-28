@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- New `try_load_multi` method for Aggregates which will always return result even if error occurs
 ### Changed
 - Improved performance of iterating over `AddData` and `ExecuteTransform` metadata nodes:
    - these data-related blocks are stored in the database similarly to key blocks
@@ -26,7 +28,8 @@ Recommendation: for ease of reading, use the following order:
 - Storing block hashes in binary form for data/key blocks and dataset references,
     while the original textual form of the hash was transformed into a virtual generated column
       (this requires upgrade to Postgres 18)
-
+### Fixed
+- Log warning instead of error for `flow_trigger_event` loading if record not found
 
 ## [0.251.3] - 2025-10-28
 ### Changed
