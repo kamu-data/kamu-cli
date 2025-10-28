@@ -9,6 +9,7 @@
 
 mod cached_blocks_range;
 mod config;
+mod load_helper;
 mod merge_iterator;
 mod metadata_chain_db_backed_impl;
 

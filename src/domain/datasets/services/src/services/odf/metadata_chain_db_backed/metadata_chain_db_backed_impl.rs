@@ -13,7 +13,8 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetDataBlockRepository, DatasetKeyBlockRepository};
 
 use super::cached_blocks_range::{BlockLookupResult, CachedBlocksRange};
-use super::merge_iterator::{CachedBlocksMergeIterator, load_data_blocks_from_repository};
+use super::load_helper::load_data_blocks_from_repository;
+use super::merge_iterator::CachedBlocksMergeIterator;
 use crate::MetadataChainDbBackedConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

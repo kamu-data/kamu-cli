@@ -9,47 +9,10 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 
 use super::cached_blocks_range::{CachedBlocksRange, CachedBlocksReverseIterator};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Helper function to load and convert data blocks from repository into
-/// metadata blocks
-pub async fn load_data_blocks_from_repository(
-    data_block_repository: &dyn kamu_datasets::DatasetDataBlockRepository,
-    dataset_id: &odf::DatasetID,
-    page_size: usize,
-    sequence_number: u64,
-) -> Result<Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>, InternalError> {
-    // Load data block records from repository
-    let data_block_records = data_block_repository
-        .get_page_of_data_blocks(dataset_id, &odf::BlockRef::Head, page_size, sequence_number)
-        .await
-        .int_err()?;
-
-    // Convert to metadata blocks
-    let data_blocks = data_block_records
-        .into_iter()
-        .map(|data_block| {
-            odf::storage::deserialize_metadata_block(
-                &data_block.block_hash,
-                &data_block.block_payload,
-            )
-            .map(|metadata_block| {
-                (
-                    data_block.block_hash,
-                    data_block.block_payload,
-                    metadata_block,
-                )
-            })
-            .int_err()
-        })
-        .collect::<Result<Vec<_>, InternalError>>()?;
-
-    Ok(data_blocks)
-}
+use super::load_helper::load_data_blocks_from_repository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,6 +31,8 @@ pub struct CachedBlocksMergeIterator<'a> {
     data_blocks_covered_range: Option<std::ops::RangeInclusive<u64>>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'a> CachedBlocksMergeIterator<'a> {
     /// Create and initialize a new merge iterator with both sub-streams ready
     pub(crate) async fn prepare(
@@ -77,9 +42,11 @@ impl<'a> CachedBlocksMergeIterator<'a> {
         cached_key_blocks: &'a CachedBlocksRange,
         start_sequence_number: u64,
     ) -> Result<Self, InternalError> {
+        // Initialize key blocks iterator
         let key_blocks_iter =
             cached_key_blocks.reverse_iter_from_sequence_number(start_sequence_number);
 
+        // Create the iterator instance
         let mut iterator = Self {
             data_block_repository,
             dataset_id,
@@ -96,6 +63,7 @@ impl<'a> CachedBlocksMergeIterator<'a> {
             .ensure_data_blocks_page_covers(start_sequence_number)
             .await?;
 
+        // Return the prepared iterator
         Ok(iterator)
     }
 
@@ -103,9 +71,11 @@ impl<'a> CachedBlocksMergeIterator<'a> {
     pub(crate) async fn next(
         &mut self,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, InternalError> {
+        // Peek sequence numbers from both iterators
         let key_seq = self.key_blocks_iter.current_sequence_number();
         let data_seq = self.data_blocks_current_sequence_number();
 
+        // Decide which block to return
         match (key_seq, data_seq) {
             (Some(key_seq_num), Some(data_seq_num)) => {
                 // Both iterators have blocks, choose the one with higher sequence number
@@ -121,7 +91,6 @@ impl<'a> CachedBlocksMergeIterator<'a> {
                 if self.should_try_loading_more_data_blocks() {
                     // Try to load more data blocks
                     let target_seq_num = self.calculate_next_data_blocks_target_sequence();
-
                     self.ensure_data_blocks_page_covers(target_seq_num).await?;
 
                     // After loading, try the decision again
@@ -165,7 +134,7 @@ impl<'a> CachedBlocksMergeIterator<'a> {
             return Ok(()); // Already covered
         }
 
-        // Load new page using shared helper
+        // Load new page
         let data_blocks = load_data_blocks_from_repository(
             self.data_block_repository,
             self.dataset_id,
@@ -174,14 +143,17 @@ impl<'a> CachedBlocksMergeIterator<'a> {
         )
         .await?;
 
+        // Tune iterator state for the new page
+
         let cached_data_blocks = Arc::new(CachedBlocksRange::new(data_blocks));
+
         self.data_blocks_covered_range = cached_data_blocks.get_covered_range(self.page_size);
 
-        // Initialize data blocks iterator index
         self.data_blocks_current_index =
             cached_data_blocks.find_last_block_index_before_or_at(sequence_number);
 
         self.data_blocks_page = Some(cached_data_blocks);
+
         Ok(())
     }
 
@@ -211,12 +183,10 @@ impl<'a> CachedBlocksMergeIterator<'a> {
 
     /// Check if we should attempt to load more data blocks
     fn should_try_loading_more_data_blocks(&self) -> bool {
-        if let Some(ref covered_range) = self.data_blocks_covered_range {
-            // If we have a covered range but our iterator is exhausted (current_index is
-            // None), we might need to load the next page (covering lower
-            // sequence numbers) Only try if we haven't reached the beginning
-            // (sequence 0 is always Seed key block)
-            self.data_blocks_current_index.is_none() && (*covered_range.start()) > 0
+        if self.data_blocks_covered_range.is_some() {
+            // If we have a covered range but our iterator is exhausted,
+            // we need to load the next page
+            self.data_blocks_current_index.is_none()
         } else {
             // No data blocks loaded yet, try loading some
             true

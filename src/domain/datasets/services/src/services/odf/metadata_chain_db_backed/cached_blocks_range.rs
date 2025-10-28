@@ -11,14 +11,6 @@ use std::collections::HashMap;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) enum BlockLookupResult {
-    Found((odf::Multihash, odf::MetadataBlock)),
-    NotFound,
-    Stop,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct CachedBlocksRange {
     /// Cached blocks with hashes in chronological order
     blocks: Vec<(odf::Multihash, odf::MetadataBlock)>,
@@ -54,7 +46,6 @@ impl CachedBlocksRange {
         }
     }
 
-    #[inline]
     pub(crate) fn len(&self) -> usize {
         self.blocks.len()
     }
@@ -84,26 +75,6 @@ impl CachedBlocksRange {
             .map(|&idx| self.original_block_payloads[idx].clone())
     }
 
-    /// Find the index of the last block with sequence number <= given value
-    /// Returns None if no such block exists
-    pub(crate) fn find_last_block_index_before_or_at(&self, sequence_number: u64) -> Option<usize> {
-        if self.blocks.is_empty() {
-            return None;
-        }
-
-        match self
-            .blocks
-            .binary_search_by_key(&sequence_number, |(_, block)| block.sequence_number)
-        {
-            Ok(idx) => Some(idx), // Exact match
-            Err(idx) => {
-                // idx is the insertion point, so idx-1 is the last element <= sequence_number
-                if idx > 0 { Some(idx - 1) } else { None }
-            }
-        }
-    }
-
-    /// Get a specific block by index
     pub(crate) fn get_block_by_index(
         &self,
         index: usize,
@@ -111,6 +82,7 @@ impl CachedBlocksRange {
         self.blocks.get(index)
     }
 
+    /// Describe a covered range of sequence numbers
     pub(crate) fn get_covered_range(
         &self,
         full_page_size: usize,
@@ -132,6 +104,7 @@ impl CachedBlocksRange {
         }
     }
 
+    /// Try extracting a slice of cached blocks satisftying given range
     pub(crate) fn get_cached_blocks_for_range(
         &self,
         range: std::ops::RangeInclusive<u64>,
@@ -161,29 +134,34 @@ impl CachedBlocksRange {
         Some(&self.blocks[start_index..end_index])
     }
 
+    /// Try finding the index of the last block with sequence number <= given
+    pub(crate) fn find_last_block_index_before_or_at(&self, sequence_number: u64) -> Option<usize> {
+        if self.blocks.is_empty() {
+            return None;
+        }
+
+        match self
+            .blocks
+            .binary_search_by_key(&sequence_number, |(_, block)| block.sequence_number)
+        {
+            Ok(idx) => Some(idx), // Exact match
+            Err(idx) => {
+                // idx is the insertion point, so idx-1 is the last element <= sequence_number
+                if idx > 0 { Some(idx - 1) } else { None }
+            }
+        }
+    }
+
     /// Create a reverse iterator starting from the highest sequence number
     /// block that is <= `start_sequence_number`
     pub(crate) fn reverse_iter_from_sequence_number(
         &self,
         start_sequence_number: u64,
     ) -> CachedBlocksReverseIterator {
-        if self.blocks.is_empty() {
-            return CachedBlocksReverseIterator::empty();
-        }
+        // Find the last block that is <= start_sequence_number (returns None if empty)
+        let start_index = self.find_last_block_index_before_or_at(start_sequence_number);
 
-        // Find the last block that is <= start_sequence_number
-        let start_index = match self
-            .blocks
-            .binary_search_by_key(&start_sequence_number, |(_, block)| block.sequence_number)
-        {
-            Ok(idx) => Some(idx),
-            Err(idx) => {
-                // idx is the insertion point, so idx-1 is the last element <=
-                // start_sequence_number
-                if idx > 0 { Some(idx - 1) } else { None }
-            }
-        };
-
+        // Launch iterator from that position
         CachedBlocksReverseIterator {
             blocks: &self.blocks,
             current_index: start_index,
@@ -193,20 +171,20 @@ impl CachedBlocksRange {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Iterator for traversing blocks in reverse sequence number order (descending)
+pub(crate) enum BlockLookupResult {
+    Found((odf::Multihash, odf::MetadataBlock)),
+    NotFound,
+    Stop,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct CachedBlocksReverseIterator<'a> {
     blocks: &'a [(odf::Multihash, odf::MetadataBlock)],
     current_index: Option<usize>,
 }
 
 impl CachedBlocksReverseIterator<'_> {
-    pub(crate) fn empty() -> Self {
-        Self {
-            blocks: &[],
-            current_index: None,
-        }
-    }
-
     /// Peek at the current block without advancing the iterator
     pub(crate) fn peek(&self) -> Option<&(odf::Multihash, odf::MetadataBlock)> {
         self.current_index.map(|idx| &self.blocks[idx])
@@ -229,3 +207,5 @@ impl CachedBlocksReverseIterator<'_> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
