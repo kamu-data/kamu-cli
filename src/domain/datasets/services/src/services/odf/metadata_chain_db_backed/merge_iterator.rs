@@ -34,37 +34,37 @@ pub struct CachedBlocksMergeIterator<'a> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'a> CachedBlocksMergeIterator<'a> {
-    /// Create and initialize a new merge iterator with both sub-streams ready
-    pub(crate) async fn prepare(
+    /// Create and initialize a new merge iterator using existing cached blocks
+    pub(crate) fn prepare(
         data_block_repository: &'a dyn kamu_datasets::DatasetDataBlockRepository,
         dataset_id: &'a odf::DatasetID,
         page_size: usize,
-        cached_key_blocks: &'a CachedBlocksRange,
+        cached_all_key_blocks: &'a CachedBlocksRange,
+        cached_data_blocks_page: Arc<CachedBlocksRange>,
         start_sequence_number: u64,
-    ) -> Result<Self, InternalError> {
-        // Initialize key blocks iterator
+    ) -> Self {
+        // Initialize key blocks reverse iterator
         let key_blocks_iter =
-            cached_key_blocks.reverse_iter_from_sequence_number(start_sequence_number);
+            cached_all_key_blocks.reverse_iter_from_sequence_number(start_sequence_number);
 
-        // Create the iterator instance
-        let mut iterator = Self {
+        // Set up data blocks state with existing cached data
+        let data_blocks_covered_range = cached_data_blocks_page.get_covered_range(page_size);
+
+        // Find starting position in data blocks
+        let data_blocks_current_index =
+            cached_data_blocks_page.find_last_block_index_before_or_at(start_sequence_number);
+
+        // Initialize the iterator with both sub-streams
+        Self {
             data_block_repository,
             dataset_id,
             page_size,
             start_sequence_number,
             key_blocks_iter,
-            data_blocks_page: None,
-            data_blocks_current_index: None,
-            data_blocks_covered_range: None,
-        };
-
-        // Load the initial data blocks page to ensure we have both streams ready
-        iterator
-            .ensure_data_blocks_page_covers(start_sequence_number)
-            .await?;
-
-        // Return the prepared iterator
-        Ok(iterator)
+            data_blocks_page: Some(cached_data_blocks_page),
+            data_blocks_current_index,
+            data_blocks_covered_range,
+        }
     }
 
     /// Get the next block with automatic data page loading

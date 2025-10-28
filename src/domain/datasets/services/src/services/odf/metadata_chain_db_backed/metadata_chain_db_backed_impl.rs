@@ -545,15 +545,23 @@ where
                     Some(odf::dataset::MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
                 };
 
+                // Ensure the first page containing the head sequence number is preloaded and cached
+                // This allows multiple concurrent iterators to reuse the same cached first page
+                let cached_data_blocks_page = self
+                    .ensure_data_blocks_are_preloaded(head_block.sequence_number..=head_block.sequence_number)
+                    .await?
+                    .expect("Data block repository is available, so data blocks should be loaded");
+
                 // Create and initialize the merge iterator for efficient traversal
+                // Always use the existing cached data blocks since we just ensured they're loaded
                 let mut merge_iterator = CachedBlocksMergeIterator::prepare(
                     data_block_repository.as_ref(),
                     &self.dataset_id,
                     self.config.data_blocks_page_size,
                     cached_key_blocks.as_ref(),
+                    cached_data_blocks_page,
                     head_block.sequence_number,
-                )
-                .await?;
+                );
 
                 // Iterate backwards from head to tail using the optimized merge iterator
                 loop {
