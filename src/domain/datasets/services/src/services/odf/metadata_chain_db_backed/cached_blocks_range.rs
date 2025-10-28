@@ -157,7 +157,7 @@ impl CachedBlocksRange {
     pub(crate) fn reverse_iter_from_sequence_number(
         &self,
         start_sequence_number: u64,
-    ) -> CachedBlocksReverseIterator {
+    ) -> CachedBlocksReverseIterator<'_> {
         // Find the last block that is <= start_sequence_number (returns None if empty)
         let start_index = self.find_last_block_index_before_or_at(start_sequence_number);
 
