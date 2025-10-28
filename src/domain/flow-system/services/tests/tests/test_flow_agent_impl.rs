@@ -6750,7 +6750,10 @@ async fn test_list_all_flow_initiators() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([foo_account_id.clone()], *foo_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&foo_account_id),
+        *foo_dataset_initiators_list
+    );
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -6762,7 +6765,10 @@ async fn test_list_all_flow_initiators() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([bar_account_id.clone()], *bar_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&bar_account_id),
+        *bar_dataset_initiators_list
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6895,7 +6901,10 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([foo_account_id.clone()], *foo_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&foo_account_id),
+        *foo_dataset_initiators_list
+    );
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -6907,7 +6916,10 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([bar_account_id.clone()], *bar_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&bar_account_id),
+        *bar_dataset_initiators_list
+    );
 
     let foo_datasets: Vec<_> = harness
         .dataset_entry_service

@@ -45,7 +45,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
         Ok(has_data != 0)
     }
 
-    fn list_all_dependencies(&self) -> DatasetDependenciesIDStream {
+    fn list_all_dependencies(&self) -> DatasetDependenciesIDStream<'_> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;

@@ -23,7 +23,7 @@ pub struct PostgresOutboxMessageConsumptionRepository {
 
 #[async_trait::async_trait]
 impl OutboxMessageConsumptionRepository for PostgresOutboxMessageConsumptionRepository {
-    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream {
+    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream<'_> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr

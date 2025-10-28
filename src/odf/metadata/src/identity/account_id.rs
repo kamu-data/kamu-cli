@@ -145,7 +145,7 @@ impl AccountID {
         Ok(Self::Pkh(DidPkh::parse_caip10_account_id(s)?))
     }
 
-    pub fn as_id_without_did_prefix(&self) -> IdWithoutDidPrefixFmt {
+    pub fn as_id_without_did_prefix(&self) -> IdWithoutDidPrefixFmt<'_> {
         IdWithoutDidPrefixFmt { value: self }
     }
 }

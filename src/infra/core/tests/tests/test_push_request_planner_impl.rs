@@ -30,7 +30,7 @@ async fn test_push_repo_target() {
     let (items, errors) = harness
         .push_request_planner
         .collect_plan(
-            &[foo.dataset_handle.clone()],
+            std::slice::from_ref(&foo.dataset_handle),
             Some(&odf::DatasetPushTarget::Repository(
                 remote_repo_data.remote_repo_name.clone(),
             )),
@@ -73,7 +73,7 @@ async fn test_push_url_target() {
     let (items, errors) = harness
         .push_request_planner
         .collect_plan(
-            &[foo.dataset_handle.clone()],
+            std::slice::from_ref(&foo.dataset_handle),
             Some(&odf::DatasetPushTarget::Url(push_url.clone())),
         )
         .await;
@@ -115,7 +115,7 @@ async fn test_push_remote_alias_target() {
     let (items, errors) = harness
         .push_request_planner
         .collect_plan(
-            &[foo.dataset_handle.clone()],
+            std::slice::from_ref(&foo.dataset_handle),
             Some(&odf::DatasetPushTarget::Alias(remote_alias.clone())),
         )
         .await;
@@ -163,7 +163,7 @@ async fn test_push_remote_no_target_presaved_push_alias() {
 
     let (items, errors) = harness
         .push_request_planner
-        .collect_plan(&[foo.dataset_handle.clone()], None)
+        .collect_plan(std::slice::from_ref(&foo.dataset_handle), None)
         .await;
     assert!(errors.is_empty());
 
@@ -196,7 +196,7 @@ async fn test_push_remote_no_target_no_alias() {
 
     let (items, errors) = harness
         .push_request_planner
-        .collect_plan(&[foo.dataset_handle.clone()], None)
+        .collect_plan(std::slice::from_ref(&foo.dataset_handle), None)
         .await;
     assert!(errors.is_empty());
 
@@ -238,7 +238,7 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
 
     let (items, errors) = harness
         .push_request_planner
-        .collect_plan(&[foo.dataset_handle.clone()], None)
+        .collect_plan(std::slice::from_ref(&foo.dataset_handle), None)
         .await;
     assert!(items.is_empty());
 
@@ -264,7 +264,7 @@ async fn test_push_remote_no_target_no_alias_no_repositories() {
 
     let (items, errors) = harness
         .push_request_planner
-        .collect_plan(&[foo.dataset_handle.clone()], None)
+        .collect_plan(std::slice::from_ref(&foo.dataset_handle), None)
         .await;
     assert!(items.is_empty());
 

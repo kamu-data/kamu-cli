@@ -49,27 +49,27 @@ impl DatasetMut {
     }
 
     /// Access to the mutable metadata of the dataset
-    async fn metadata(&self) -> DatasetMetadataMut {
+    async fn metadata(&self) -> DatasetMetadataMut<'_> {
         DatasetMetadataMut::new(&self.dataset_request_state)
     }
 
     /// Access to the mutable flow configurations of this dataset
-    async fn flows(&self, ctx: &Context<'_>) -> Result<DatasetFlowsMut> {
+    async fn flows(&self, ctx: &Context<'_>) -> Result<DatasetFlowsMut<'_>> {
         DatasetFlowsMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the mutable flow configurations of this dataset
-    async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
+    async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut<'_>> {
         DatasetEnvVarsMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to collaboration management methods
-    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaborationMut> {
+    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaborationMut<'_>> {
         DatasetCollaborationMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to webhooks management methods
-    async fn webhooks(&self, ctx: &Context<'_>) -> Result<DatasetWebhooksMut> {
+    async fn webhooks(&self, ctx: &Context<'_>) -> Result<DatasetWebhooksMut<'_>> {
         DatasetWebhooksMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
@@ -118,7 +118,7 @@ impl DatasetMut {
     /// Delete the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
     #[tracing::instrument(level = "info", name = DatasetMut_delete, skip_all)]
-    async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
+    async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult<'_>> {
         // NOTE: Access verification is handled by the use-case
 
         let delete_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::DeleteDatasetUseCase);
@@ -158,7 +158,7 @@ impl DatasetMut {
         &self,
         ctx: &Context<'_>,
         watermark: DateTime<Utc>,
-    ) -> Result<SetWatermarkResult> {
+    ) -> Result<SetWatermarkResult<'_>> {
         // NOTE: Access verification is handled by the use-case
 
         let set_watermark_use_case = from_catalog_n!(ctx, dyn SetWatermarkUseCase);
@@ -221,7 +221,7 @@ impl DatasetMut {
 
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = DatasetMut_as_versioned_file, skip_all)]
-    async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileMut>> {
+    async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileMut<'_>>> {
         let archetype = self.dataset_request_state.archetype(ctx).await?;
 
         if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
@@ -233,7 +233,7 @@ impl DatasetMut {
 
     /// Downcast a dataset to a collection interface
     #[tracing::instrument(level = "info", name = DatasetMut_as_collection, skip_all)]
-    async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<CollectionMut>> {
+    async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<CollectionMut<'_>>> {
         let archetype = self.dataset_request_state.archetype(ctx).await?;
 
         if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {

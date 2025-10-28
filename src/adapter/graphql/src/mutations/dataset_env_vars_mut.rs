@@ -87,7 +87,7 @@ impl<'a> DatasetEnvVarsMut<'a> {
         &self,
         ctx: &Context<'_>,
         id: DatasetEnvVarID<'static>,
-    ) -> Result<DeleteDatasetEnvVarResult> {
+    ) -> Result<DeleteDatasetEnvVarResult<'_>> {
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
         match dataset_env_var_service.delete_dataset_env_var(&id).await {
@@ -152,23 +152,6 @@ impl UpsertDatasetEnvVarResultUpdated {
     }
 }
 
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
-pub struct SaveDatasetEnvVarResultDuplicate<'a> {
-    pub dataset_env_var_key: String,
-    pub dataset_name: DatasetName<'a>,
-}
-
-#[ComplexObject]
-impl SaveDatasetEnvVarResultDuplicate<'_> {
-    pub async fn message(&self) -> String {
-        format!(
-            "Environment variable with {} key for dataset {} already exists",
-            self.dataset_env_var_key, self.dataset_name
-        )
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug)]
@@ -199,41 +182,6 @@ pub struct DeleteDatasetEnvVarResultNotFound<'a> {
 
 #[ComplexObject]
 impl DeleteDatasetEnvVarResultNotFound<'_> {
-    pub async fn message(&self) -> String {
-        format!("Environment variable with {} id not found", self.env_var_id)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
-pub enum ModifyDatasetEnvVarResult<'a> {
-    Success(ModifyDatasetEnvVarResultSuccess<'a>),
-    NotFound(ModifyDatasetEnvVarResultNotFound<'a>),
-}
-
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
-pub struct ModifyDatasetEnvVarResultSuccess<'a> {
-    pub env_var_id: DatasetEnvVarID<'a>,
-}
-
-#[ComplexObject]
-impl ModifyDatasetEnvVarResultSuccess<'_> {
-    async fn message(&self) -> String {
-        "Success".to_string()
-    }
-}
-
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
-pub struct ModifyDatasetEnvVarResultNotFound<'a> {
-    pub env_var_id: DatasetEnvVarID<'a>,
-}
-
-#[ComplexObject]
-impl ModifyDatasetEnvVarResultNotFound<'_> {
     pub async fn message(&self) -> String {
         format!("Environment variable with {} id not found", self.env_var_id)
     }

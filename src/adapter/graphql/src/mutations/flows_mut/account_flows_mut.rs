@@ -25,7 +25,7 @@ impl<'a> AccountFlowsMut<'a> {
         Self { account }
     }
 
-    pub async fn triggers(&self) -> AccountFlowTriggersMut {
+    pub async fn triggers(&self) -> AccountFlowTriggersMut<'_> {
         AccountFlowTriggersMut::new(self.account)
     }
 }

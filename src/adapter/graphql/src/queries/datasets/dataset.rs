@@ -74,14 +74,14 @@ impl Dataset {
 #[Object]
 impl Dataset {
     /// Unique identifier of the dataset
-    async fn id(&self) -> DatasetID {
+    async fn id(&self) -> DatasetID<'_> {
         self.dataset_request_state.dataset_id().into()
     }
 
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
-    async fn name(&self) -> DatasetName {
+    async fn name(&self) -> DatasetName<'_> {
         self.dataset_request_state.dataset_name().into()
     }
 
@@ -91,7 +91,7 @@ impl Dataset {
     }
 
     /// Returns dataset alias (user + name)
-    async fn alias(&self) -> DatasetAlias {
+    async fn alias(&self) -> DatasetAlias<'_> {
         self.dataset_request_state.dataset_alias().into()
     }
 
@@ -137,22 +137,22 @@ impl Dataset {
     }
 
     /// Access to the data of the dataset
-    async fn data(&self) -> DatasetData {
+    async fn data(&self) -> DatasetData<'_> {
         DatasetData::new(&self.dataset_request_state)
     }
 
     /// Access to the metadata of the dataset
-    async fn metadata(&self) -> DatasetMetadata {
+    async fn metadata(&self) -> DatasetMetadata<'_> {
         DatasetMetadata::new(&self.dataset_request_state)
     }
 
     /// Access to the environment variable of this dataset
-    async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
+    async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars<'_>> {
         DatasetEnvVars::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the flow configurations of this dataset
-    async fn flows(&self) -> DatasetFlows {
+    async fn flows(&self) -> DatasetFlows<'_> {
         DatasetFlows::new(&self.dataset_request_state)
     }
 
@@ -249,12 +249,12 @@ impl Dataset {
     }
 
     /// Access to the dataset collaboration data
-    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaboration> {
+    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaboration<'_>> {
         DatasetCollaboration::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the dataset's webhooks management functionality
-    async fn webhooks(&self) -> DatasetWebhooks {
+    async fn webhooks(&self) -> DatasetWebhooks<'_> {
         DatasetWebhooks::new(&self.dataset_request_state)
     }
 
@@ -267,7 +267,7 @@ impl Dataset {
 
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = Dataset_as_versioned_file, skip_all)]
-    async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
+    async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile<'_>>> {
         let archetype = self.dataset_request_state.archetype(ctx).await?;
 
         if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
@@ -279,7 +279,7 @@ impl Dataset {
 
     /// Downcast a dataset to a collection interface
     #[tracing::instrument(level = "info", name = Dataset_as_collection, skip_all)]
-    async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection>> {
+    async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection<'_>>> {
         let archetype = self.dataset_request_state.archetype(ctx).await?;
 
         if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {

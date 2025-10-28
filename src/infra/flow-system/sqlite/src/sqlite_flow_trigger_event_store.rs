@@ -28,7 +28,7 @@ pub struct SqliteFlowTriggerEventStore {
 #[async_trait::async_trait]
 impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowTriggerEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
@@ -71,11 +71,11 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
         &self,
         flow_binding: &FlowBinding,
         opts: GetEventsOpts,
-    ) -> EventStream<FlowTriggerEvent> {
+    ) -> EventStream<'_, FlowTriggerEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
-        let flow_type = flow_binding.flow_type.to_string();
+        let flow_type = flow_binding.flow_type.clone();
 
         let scope_json = serde_json::to_value(&flow_binding.scope).unwrap();
         let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
@@ -191,7 +191,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
+    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream<'_> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
 

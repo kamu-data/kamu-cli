@@ -27,7 +27,7 @@ impl ViewDatasetEnvVar {
     }
 
     /// Unique identifier of the dataset environment variable
-    async fn id(&self) -> DatasetEnvVarID {
+    async fn id(&self) -> DatasetEnvVarID<'_> {
         self.env_var.id.into()
     }
 

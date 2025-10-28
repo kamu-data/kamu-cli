@@ -450,7 +450,7 @@ impl ContainerProcess {
         }
 
         self.runtime
-            .wait_for_socket(host_port, timeout - elapsed)
+            .wait_for_socket(host_port, timeout.checked_sub(elapsed).unwrap())
             .await?;
 
         Ok(host_port)

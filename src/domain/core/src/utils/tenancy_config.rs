@@ -9,8 +9,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum TenancyConfig {
+    #[default]
     SingleTenant,
     MultiTenant,
 }
@@ -32,12 +33,6 @@ impl TenancyConfig {
             TenancyConfig::MultiTenant => odf::DatasetVisibility::Private,
             TenancyConfig::SingleTenant => odf::DatasetVisibility::Public,
         }
-    }
-}
-
-impl Default for TenancyConfig {
-    fn default() -> Self {
-        Self::SingleTenant
     }
 }
 

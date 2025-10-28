@@ -21,7 +21,7 @@ pub trait OutboxMessageRepository: Send + Sync {
         &self,
         above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
-    ) -> OutboxMessageStream;
+    ) -> OutboxMessageStream<'_>;
 
     async fn get_latest_message_ids_by_producer(
         &self,

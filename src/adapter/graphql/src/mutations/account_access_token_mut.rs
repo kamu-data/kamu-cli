@@ -32,7 +32,7 @@ impl<'a> AccountAccessTokensMut<'a> {
         &self,
         ctx: &Context<'_>,
         token_name: String,
-    ) -> Result<CreateTokenResult> {
+    ) -> Result<CreateTokenResult<'_>> {
         let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);
 
         match access_token_service
@@ -64,7 +64,7 @@ impl<'a> AccountAccessTokensMut<'a> {
         &self,
         ctx: &Context<'_>,
         token_id: AccessTokenID<'static>,
-    ) -> Result<RevokeResult> {
+    ) -> Result<RevokeResult<'_>> {
         check_access_token_valid(ctx, &token_id).await?;
 
         let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);

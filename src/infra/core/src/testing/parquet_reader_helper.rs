@@ -49,7 +49,7 @@ impl ParquetReaderHelper {
 
     #[deprecated(note = "use [`Self::get_batches`] in combination with \
                          [`odf::utils::testing::assert_data_batches_eq`]")]
-    pub fn get_row_iter(&self) -> RowIter {
+    pub fn get_row_iter(&self) -> RowIter<'_> {
         self.reader.get_row_iter(None).unwrap()
     }
 }

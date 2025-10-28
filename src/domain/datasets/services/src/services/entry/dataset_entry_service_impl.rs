@@ -522,7 +522,7 @@ impl DatasetEntryServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetEntryService for DatasetEntryServiceImpl {
-    fn all_entries(&self) -> DatasetEntryStream {
+    fn all_entries(&self) -> DatasetEntryStream<'_> {
         EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
             |_, pagination| {
@@ -532,7 +532,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         )
     }
 
-    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream {
+    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream<'_> {
         let owner_id = owner_id.clone();
 
         EntityPageStreamer::default().into_stream(
@@ -809,7 +809,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
 #[async_trait::async_trait]
 impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream {
+    fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
         EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
             |_, pagination| self.list_all_dataset_handles(pagination),
@@ -820,7 +820,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     fn all_dataset_handles_by_owner_name(
         &self,
         owner_name: &odf::AccountName,
-    ) -> odf::dataset::DatasetHandleStream {
+    ) -> odf::dataset::DatasetHandleStream<'_> {
         let owner_name = owner_name.clone();
 
         EntityPageStreamer::default().into_stream(

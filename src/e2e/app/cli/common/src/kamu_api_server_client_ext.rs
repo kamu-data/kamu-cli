@@ -161,21 +161,21 @@ pub trait KamuApiServerClientExt {
 
     fn auth(&mut self) -> AuthApi<'_>;
 
-    fn dataset(&self) -> DatasetApi;
+    fn dataset(&self) -> DatasetApi<'_>;
 
-    fn flow(&self) -> FlowApi;
+    fn flow(&self) -> FlowApi<'_>;
 
-    fn odf_core(&self) -> OdfCoreApi;
+    fn odf_core(&self) -> OdfCoreApi<'_>;
 
-    fn odf_transfer(&self) -> OdfTransferApi;
+    fn odf_transfer(&self) -> OdfTransferApi<'_>;
 
-    fn odf_query(&self) -> OdfQuery;
+    fn odf_query(&self) -> OdfQuery<'_>;
 
-    fn search(&self) -> SearchApi;
+    fn search(&self) -> SearchApi<'_>;
 
-    fn swagger(&self) -> SwaggerApi;
+    fn swagger(&self) -> SwaggerApi<'_>;
 
-    fn upload(&self) -> UploadApi;
+    fn upload(&self) -> UploadApi<'_>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -190,35 +190,35 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         AuthApi { client: self }
     }
 
-    fn dataset(&self) -> DatasetApi {
+    fn dataset(&self) -> DatasetApi<'_> {
         DatasetApi { client: self }
     }
 
-    fn flow(&self) -> FlowApi {
+    fn flow(&self) -> FlowApi<'_> {
         FlowApi { client: self }
     }
 
-    fn odf_core(&self) -> OdfCoreApi {
+    fn odf_core(&self) -> OdfCoreApi<'_> {
         OdfCoreApi { client: self }
     }
 
-    fn odf_transfer(&self) -> OdfTransferApi {
+    fn odf_transfer(&self) -> OdfTransferApi<'_> {
         OdfTransferApi { client: self }
     }
 
-    fn odf_query(&self) -> OdfQuery {
+    fn odf_query(&self) -> OdfQuery<'_> {
         OdfQuery { client: self }
     }
 
-    fn search(&self) -> SearchApi {
+    fn search(&self) -> SearchApi<'_> {
         SearchApi { client: self }
     }
 
-    fn swagger(&self) -> SwaggerApi {
+    fn swagger(&self) -> SwaggerApi<'_> {
         SwaggerApi { client: self }
     }
 
-    fn upload(&self) -> UploadApi {
+    fn upload(&self) -> UploadApi<'_> {
         UploadApi { client: self }
     }
 }
@@ -449,7 +449,7 @@ pub struct DatasetApi<'a> {
 }
 
 impl DatasetApi<'_> {
-    pub fn collaboration(&self) -> DatasetCollaborationApi {
+    pub fn collaboration(&self) -> DatasetCollaborationApi<'_> {
         DatasetCollaborationApi {
             client: self.client,
         }

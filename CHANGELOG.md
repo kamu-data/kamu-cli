@@ -11,9 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.251.3] - 2025-10-28
 ### Changed
 - Ingest flow respects `has_more` flag and trigger follow up ingest flow
+- Upgraded Rust toolchain to the latest version
 
 ## [0.251.2] - 2025-10-21
 ### Fixed

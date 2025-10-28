@@ -194,7 +194,7 @@ impl ServerHarness {
                     .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
-        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         let local_addr = listener.local_addr().unwrap();
 

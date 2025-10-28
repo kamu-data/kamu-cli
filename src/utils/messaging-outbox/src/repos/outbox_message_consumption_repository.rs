@@ -16,7 +16,7 @@ use crate::OutboxMessageID;
 
 #[async_trait::async_trait]
 pub trait OutboxMessageConsumptionRepository: Send + Sync {
-    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream;
+    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream<'_>;
 
     async fn find_consumption_boundary(
         &self,

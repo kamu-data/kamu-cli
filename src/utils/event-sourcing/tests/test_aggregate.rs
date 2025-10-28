@@ -51,7 +51,7 @@ impl CalcEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<CalcState> for CalcEventStore {
-    fn get_all_events(&self, _opts: GetEventsOpts) -> EventStream<CalcEvents> {
+    fn get_all_events(&self, _opts: GetEventsOpts) -> EventStream<'_, CalcEvents> {
         use futures::StreamExt;
         Box::pin(
             tokio_stream::iter(self.0.lock().unwrap().clone())
@@ -60,7 +60,7 @@ impl EventStore<CalcState> for CalcEventStore {
         )
     }
 
-    fn get_events(&self, _query: &(), _opts: GetEventsOpts) -> EventStream<CalcEvents> {
+    fn get_events(&self, _query: &(), _opts: GetEventsOpts) -> EventStream<'_, CalcEvents> {
         use futures::StreamExt;
         Box::pin(
             tokio_stream::iter(self.0.lock().unwrap().clone())

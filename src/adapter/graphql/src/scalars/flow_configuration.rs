@@ -162,7 +162,7 @@ pub struct FlowConfigInputResetPropagationModeToSeed {
 }
 
 impl FlowConfigResetInput {
-    pub fn new_head_hash(&self) -> Option<Multihash> {
+    pub fn new_head_hash(&self) -> Option<Multihash<'_>> {
         match &self.mode {
             FlowConfigInputResetPropagationMode::Custom(custom_args) => {
                 Some(custom_args.new_head_hash.clone())

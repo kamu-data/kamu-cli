@@ -201,7 +201,7 @@ impl PostgresFlowEventStore {
 #[async_trait::async_trait]
 impl EventStore<FlowState> for PostgresFlowEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
@@ -238,7 +238,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(flow_id = %flow_id))]
-    fn get_events(&self, flow_id: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
+    fn get_events(&self, flow_id: &FlowID, opts: GetEventsOpts) -> EventStream<'_, FlowEvent> {
         let flow_id: i64 = (*flow_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
@@ -277,7 +277,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(flow_ids = ?queries))]
-    fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<FlowID, FlowEvent> {
+    fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<'_, FlowID, FlowEvent> {
         let flow_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
 
         Box::pin(async_stream::stream! {
@@ -520,7 +520,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
         pagination: PaginationOpts,
-    ) -> FlowIDStream {
+    ) -> FlowIDStream<'_> {
         let maybe_initiators = filters
             .by_initiator
             .as_ref()
@@ -619,7 +619,10 @@ impl FlowEventStore for PostgresFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
+    fn list_scoped_flow_initiators(
+        &self,
+        flow_scope_query: FlowScopeQuery,
+    ) -> InitiatorIDStream<'_> {
         let (scope_conditions, _) =
             generate_scope_query_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
 
@@ -736,7 +739,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(usize::try_from(flows_count).unwrap())
     }
 
-    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
+    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream<'_> {
         Box::pin(async_stream::try_stream! {
             const CHUNK_SIZE: usize = 256;
             for chunk in flow_ids.chunks(CHUNK_SIZE) {

@@ -213,7 +213,7 @@ async fn test_sensor_sensitization_got_new_data() {
         ..Default::default()
     });
     harness
-        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
         .await;
 
     let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
@@ -244,7 +244,7 @@ async fn test_sensor_sensitization_breaking_change_ignored() {
 
     let harness = DerivedDatasetFlowSensorHarness::new(Default::default());
     harness
-        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
         .await;
 
     let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
@@ -281,7 +281,7 @@ async fn test_sensor_sensitization_breaking_change_recovered() {
         ..Default::default()
     });
     harness
-        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
         .await;
 
     let sensor = DerivedDatasetFlowSensorHarness::create_sensor_with_reactive_rule(

@@ -16,7 +16,7 @@ use crate::*;
 #[async_trait::async_trait]
 pub trait FlowConfigurationEventStore: EventStore<FlowConfigurationState> {
     /// Returns all existing flow bindings, where configurations exist
-    fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream;
+    fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream<'_>;
 
     /// Returns all bindings for a given scope where configs exist
     async fn all_bindings_for_scope(

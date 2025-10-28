@@ -40,7 +40,7 @@ impl<'a> MetadataChainMut<'a> {
         ctx: &Context<'_>,
         event: String,
         event_format: MetadataManifestFormat,
-    ) -> Result<CommitResult> {
+    ) -> Result<CommitResult<'_>> {
         // NOTE: Access verification is handled by the use-case
 
         let event = match event_format {

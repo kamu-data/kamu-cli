@@ -70,7 +70,7 @@ impl RecordsFormat {
         }
     }
 
-    pub fn get_column_format(&self, col: usize) -> ColumnFormatRef {
+    pub fn get_column_format(&self, col: usize) -> ColumnFormatRef<'_> {
         let cfmt = self.column_formats.get(col);
 
         ColumnFormatRef {

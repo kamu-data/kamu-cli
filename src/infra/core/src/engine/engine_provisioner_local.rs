@@ -173,7 +173,7 @@ impl EngineProvisionerLocal {
         }
     }
 
-    /// Called when [EngineHandle] is dropped
+    /// Called when `EngineHandle` is dropped
     fn release_engine(inner: &Inner, engine: &dyn Engine) {
         tracing::info!("Releasing the engine {:p}", engine);
 

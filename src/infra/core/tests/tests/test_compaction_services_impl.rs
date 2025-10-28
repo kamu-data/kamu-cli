@@ -944,8 +944,7 @@ async fn test_compact_offsets_are_sequential_impl() {
     testing_logger::validate(|capture| {
         let plan = capture
             .iter()
-            .filter(|c| c.body.contains("Optimized physical plan:"))
-            .next_back()
+            .rfind(|c| c.body.contains("Optimized physical plan:"))
             .unwrap()
             .body
             .trim();

@@ -181,12 +181,12 @@ impl MetadataChainComparator {
         // head, there is no divergence
         let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
         let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash.as_ref();
-        if boundary_block_prev_hash.is_some()
-            && boundary_block_prev_hash != Some(expected_common_ancestor_hash)
+        if let Some(boundary_block_prev_hash) = boundary_block_prev_hash
+            && boundary_block_prev_hash != expected_common_ancestor_hash
         {
             let common_ancestor_sequence_number = Self::find_common_ancestor_sequence_number(
                 ahead_chain,
-                boundary_block_prev_hash.unwrap(),
+                boundary_block_prev_hash,
                 ahead_sequence_number - ahead_size,
                 reference_chain,
                 expected_common_ancestor_hash,

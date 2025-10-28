@@ -234,11 +234,11 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
         self.inner.len().await
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowEvent> {
         self.inner.get_all_events(opts)
     }
 
-    fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
+    fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<'_, FlowEvent> {
         self.inner.get_events(query, opts)
     }
 
@@ -412,7 +412,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
         pagination: PaginationOpts,
-    ) -> FlowIDStream {
+    ) -> FlowIDStream<'_> {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -479,7 +479,10 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
-    fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
+    fn list_scoped_flow_initiators(
+        &self,
+        flow_scope_query: FlowScopeQuery,
+    ) -> InitiatorIDStream<'_> {
         let flow_initiators: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -512,7 +515,11 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Box::pin(futures::stream::iter(flow_initiators))
     }
 
-    fn get_all_flow_ids(&self, filters: &FlowFilters, pagination: PaginationOpts) -> FlowIDStream {
+    fn get_all_flow_ids(
+        &self,
+        filters: &FlowFilters,
+        pagination: PaginationOpts,
+    ) -> FlowIDStream<'_> {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -537,7 +544,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .count())
     }
 
-    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
+    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream<'_> {
         Box::pin(async_stream::try_stream! {
             const CHUNK_SIZE: usize = 256;
             for chunk in flow_ids.chunks(CHUNK_SIZE) {

@@ -91,7 +91,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Ok(flow_configuration.into())
     }
 
-    fn list_active_configurations(&self) -> FlowConfigurationStateStream {
+    fn list_active_configurations(&self) -> FlowConfigurationStateStream<'_> {
         // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             use futures::stream::{self, StreamExt, TryStreamExt};

@@ -18,7 +18,7 @@ use odf::utils::data::DataFrameExt;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A common interface for readers that implement support for various formats
-/// defined in the [ReadStep].
+/// defined in the `ReadStep.
 #[async_trait::async_trait]
 pub trait Reader: Send + Sync {
     /// Returns schema that the input will be coerced into, if such schema

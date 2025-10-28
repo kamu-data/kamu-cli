@@ -79,7 +79,7 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
         &self,
         above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
-    ) -> OutboxMessageStream {
+    ) -> OutboxMessageStream<'_> {
         let minimal_above_id = above_boundaries_by_producer
             .iter()
             .map(|(_, boundary_id)| boundary_id)

@@ -45,7 +45,7 @@ async fn test_dataset_dependency_update() {
         },
     );
     harness
-        .define_dataset_dependencies(&foo_id, &[bar_id.clone()])
+        .define_dataset_dependencies(&foo_id, std::slice::from_ref(&bar_id))
         .await;
 
     harness.scope_remover.expecting_removals_count(0);

@@ -178,7 +178,7 @@ where
         )
         .split_for_parts();
 
-    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
     let server = axum::serve(listener, router.into_make_service());
@@ -237,7 +237,7 @@ async fn test_routing_root() {
         )
         .split_for_parts();
 
-    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
     let server = axum::serve(listener, router.into_make_service()).into_future();

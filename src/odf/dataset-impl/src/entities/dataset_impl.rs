@@ -267,7 +267,7 @@ where
         })
     }
 
-    /// Helper function to commit AddData event into a local dataset.
+    /// Helper function to commit `AddData` event into a local dataset.
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
@@ -316,7 +316,7 @@ where
         .await
     }
 
-    /// Helper function to commit ExecuteTransform event into a local dataset.
+    /// Helper function to commit `ExecuteTransform` event into a local dataset.
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.

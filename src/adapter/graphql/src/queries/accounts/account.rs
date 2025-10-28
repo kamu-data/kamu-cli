@@ -139,7 +139,7 @@ impl Account {
             .map(AsRef::as_ref)
     }
 
-    pub(crate) fn account_name_internal(&self) -> &AccountName {
+    pub(crate) fn account_name_internal(&self) -> &AccountName<'_> {
         &self.account_name
     }
 
@@ -154,12 +154,12 @@ impl Account {
 #[Object]
 impl Account {
     /// Unique and stable identifier of this account
-    async fn id(&self) -> &AccountID {
+    async fn id(&self) -> &AccountID<'_> {
         &self.account_id
     }
 
     /// Symbolic account name
-    async fn account_name(&self) -> &AccountName {
+    async fn account_name(&self) -> &AccountName<'_> {
         &self.account_name
     }
 
@@ -217,7 +217,7 @@ impl Account {
     }
 
     /// Access to the flow configurations of this account
-    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlows> {
+    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlows<'_>> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(AccountFlows::new(full_account_info))
@@ -225,7 +225,7 @@ impl Account {
 
     /// Access to the flow configurations of this account
     #[expect(clippy::unused_async)]
-    async fn access_tokens(&self) -> Result<AccountAccessTokens> {
+    async fn access_tokens(&self) -> Result<AccountAccessTokens<'_>> {
         Ok(AccountAccessTokens::new(&self.account_id))
     }
 

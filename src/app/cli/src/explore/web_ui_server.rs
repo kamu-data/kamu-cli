@@ -84,7 +84,7 @@ impl WebUIServer {
         password_policy_config: &PasswordPolicyConfig,
     ) -> Result<Self, InternalError> {
         let addr = SocketAddr::from((
-            address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            address.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST)),
             port.unwrap_or(0),
         ));
         let listener = tokio::net::TcpListener::bind(addr).await.int_err()?;

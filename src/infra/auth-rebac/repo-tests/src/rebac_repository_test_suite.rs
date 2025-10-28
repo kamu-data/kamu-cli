@@ -61,7 +61,7 @@ pub async fn test_set_property(catalog: &Catalog) {
             if [anon_read_property.clone()] == *actual_properties
     );
     assert_matches!(
-        rebac_repo.get_entities_properties(&[entity.clone()]).await,
+        rebac_repo.get_entities_properties(std::slice::from_ref(&entity)).await,
         Ok(actual_properties)
             if [(entity, anon_read_property.0, anon_read_property.1)] == *actual_properties
     );
@@ -157,7 +157,10 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
                 panic!("A successful result was expected, but an error was received: {e}");
             }
         }
-        match rebac_repo.get_entities_properties(&[entity.clone()]).await {
+        match rebac_repo
+            .get_entities_properties(std::slice::from_ref(&entity))
+            .await
+        {
             Ok(mut actual_properties) => {
                 let mut expected_properties = vec![
                     (
@@ -205,7 +208,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
             if [public_read_property.clone()] == *actual_properties
     );
     assert_matches!(
-        rebac_repo.get_entities_properties(&[entity.clone()]).await,
+        rebac_repo.get_entities_properties(std::slice::from_ref(&entity)).await,
         Ok(actual_properties)
             if [(entity, public_read_property.0, public_read_property.1)] == *actual_properties
     );
@@ -253,7 +256,10 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             panic!("A successful result was expected, but an error was received: {e}");
         }
     }
-    match rebac_repo.get_entities_properties(&[entity.clone()]).await {
+    match rebac_repo
+        .get_entities_properties(std::slice::from_ref(&entity))
+        .await
+    {
         Ok(mut actual_properties) => {
             let mut expected_properties = vec![
                 (entity.clone(), anon_read_property.0, anon_read_property.1),
@@ -284,7 +290,7 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             if actual_properties.is_empty()
     );
     assert_matches!(
-        rebac_repo.get_entities_properties(&[entity.clone()]).await,
+        rebac_repo.get_entities_properties(std::slice::from_ref(&entity)).await,
         Ok(actual_properties)
             if actual_properties.is_empty()
     );
@@ -948,7 +954,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
                 E::new_account_dataset_relation("account3", reader, "dataset1"),
                 E::new_account_dataset_relation("account4", maintainer, "dataset1"),
             ],
-            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_1.clone()]),
+            *get_object_entities_relations_sorted!(&rebac_repo, std::slice::from_ref(&dataset_1)),
         );
         // [dataset2]
         assert_eq!(
@@ -956,12 +962,12 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
                 E::new_account_dataset_relation("account2", maintainer, "dataset2"),
                 E::new_account_dataset_relation("account3", maintainer, "dataset2"),
             ],
-            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_2.clone()]),
+            *get_object_entities_relations_sorted!(&rebac_repo, std::slice::from_ref(&dataset_2)),
         );
         // [dataset3]
         assert_eq!(
             *Vec::<E>::new(),
-            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_3.clone()]),
+            *get_object_entities_relations_sorted!(&rebac_repo, std::slice::from_ref(&dataset_3)),
         );
         // [dataset1, dataset3]
         assert_eq!(
@@ -1007,7 +1013,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
             [E::new_account_dataset_relation(
                 "account1", reader, "dataset1"
             )],
-            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_1.clone()]),
+            *get_subject_entities_relations_sorted!(&rebac_repo, std::slice::from_ref(&account_1)),
         );
         // [account2]
         assert_eq!(
@@ -1015,7 +1021,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
                 E::new_account_dataset_relation("account2", editor, "dataset1"),
                 E::new_account_dataset_relation("account2", maintainer, "dataset2"),
             ],
-            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_2.clone()]),
+            *get_subject_entities_relations_sorted!(&rebac_repo, std::slice::from_ref(&account_2)),
         );
         // [account3]
         assert_eq!(
@@ -1023,7 +1029,7 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
                 E::new_account_dataset_relation("account3", reader, "dataset1"),
                 E::new_account_dataset_relation("account3", maintainer, "dataset2"),
             ],
-            *get_subject_entities_relations_sorted!(&rebac_repo, &[account_3.clone()]),
+            *get_subject_entities_relations_sorted!(&rebac_repo, std::slice::from_ref(&account_3)),
         );
         // [account1, account2]
         assert_eq!(
@@ -1150,7 +1156,7 @@ struct CrossoverTestState {
 }
 
 impl CrossoverTestState {
-    pub fn get_object_entities_with_relation(&self) -> Vec<EntityWithRelation> {
+    pub fn get_object_entities_with_relation(&self) -> Vec<EntityWithRelation<'_>> {
         self.relation_map
             .iter()
             .fold(Vec::new(), |mut acc, (relation, dataset_ids)| {
@@ -1174,10 +1180,10 @@ impl CrossoverTestState {
                 ]
                 .into_iter()
                 .fold(Vec::new(), |mut acc, relation| {
-                    if let Some(dataset_ids) = self.relation_map.get(&relation) {
-                        if dataset_ids.contains(dataset_id) {
-                            acc.push(relation);
-                        }
+                    if let Some(dataset_ids) = self.relation_map.get(&relation)
+                        && dataset_ids.contains(dataset_id)
+                    {
+                        acc.push(relation);
                     }
 
                     acc

@@ -250,13 +250,13 @@ impl Default for EngineConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[merge(strategy = overwrite_none)]
 pub struct EngineImagesConfig {
-    /// UNSTABLE: Spark engine image
+    /// UNSTABLE: `Spark` engine image
     pub spark: Option<String>,
-    /// UNSTABLE: Flink engine image
+    /// UNSTABLE: `Flink` engine image
     pub flink: Option<String>,
-    /// UNSTABLE: Datafusion engine image
+    /// UNSTABLE: `Datafusion` engine image
     pub datafusion: Option<String>,
-    /// UNSTABLE: RisingWave engine image
+    /// UNSTABLE: `RisingWave` engine image
     pub risingwave: Option<String>,
 }
 
@@ -294,7 +294,7 @@ impl Default for EngineImagesConfig {
 #[merge(strategy = overwrite_none)]
 pub struct EngineConfigDatafution {
     /// Base configuration options
-    /// See: https://datafusion.apache.org/user-guide/configs.html
+    /// See: `<https://datafusion.apache.org/user-guide/configs.html>`
     pub base: Option<BTreeMap<String, String>>,
 
     /// Ingest-specific overrides to the base config
@@ -660,7 +660,7 @@ pub struct ProtocolConfig {
     #[merge(strategy = merge_recursive)]
     pub ipfs: Option<IpfsConfig>,
 
-    /// FlightSQL configuration
+    /// `FlightSQL` configuration
     #[merge(strategy = merge_recursive)]
     pub flight_sql: Option<FlightSqlConfig>,
 }
@@ -704,8 +704,8 @@ pub struct IpfsConfig {
     /// List of public gateways can be found here: `https://ipfs.github.io/public-gateway-checker/`
     pub http_gateway: Option<Url>,
 
-    /// Whether kamu should pre-resolve IPNS DNSLink names using DNS or leave it
-    /// to the Gateway.
+    /// Whether kamu should pre-resolve IPNS `DNSLink` names using DNS or leave
+    /// it to the Gateway.
     pub pre_resolve_dnslink: Option<bool>,
 }
 
@@ -741,20 +741,20 @@ pub struct FlightSqlConfig {
     /// Whether clients can authenticate as 'anonymous' user
     pub allow_anonymous: Option<bool>,
 
-    /// Time after which FlightSQL client session will be forgotten and client
+    /// Time after which `FlightSQL` client session will be forgotten and client
     /// will have to re-authroize (for authenticated clients)
     pub authed_session_expiration_timeout: Option<DurationString>,
 
-    /// Time after which FlightSQL session context will be released to free the
-    /// resources (for authenticated clients)
+    /// Time after which `FlightSQL` session context will be released to free
+    /// the resources (for authenticated clients)
     pub authed_session_inactivity_timeout: Option<DurationString>,
 
-    /// Time after which FlightSQL client session will be forgotten and client
+    /// Time after which `FlightSQL` client session will be forgotten and client
     /// will have to re-authroize (for anonymous clients)
     pub anon_session_expiration_timeout: Option<DurationString>,
 
-    /// Time after which FlightSQL session context will be released to free the
-    /// resources (for anonymous clients)
+    /// Time after which `FlightSQL` session context will be released to free
+    /// the resources (for anonymous clients)
     pub anon_session_inactivity_timeout: Option<DurationString>,
 }
 
@@ -1494,11 +1494,13 @@ pub struct WebhooksConfig {
     /// digits (0-9).
     ///
     /// # Example
+    /// ```
     /// let config = WebhooksConfig {
     ///     ...
     ///     secret_encryption_enabled: Some(true),
     ///     encryption_key:
-    /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) }; ```
+    /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
+    /// ```
     pub secret_encryption_key: Option<String>,
 }
 

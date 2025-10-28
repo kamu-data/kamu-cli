@@ -130,9 +130,9 @@ impl OutboxConsumptionIterationPlanner {
             .into_iter()
             .map(|(producer_name, producer_boundaries)| {
                 (
-                    producer_name.to_string(),
+                    producer_name.clone(),
                     producer_boundaries
-                        .map(|b| (b.consumer_name.to_string(), b.last_consumed_message_id))
+                        .map(|b| (b.consumer_name.clone(), b.last_consumed_message_id))
                         .collect(),
                 )
             })

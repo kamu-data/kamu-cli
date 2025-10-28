@@ -44,7 +44,7 @@ impl InMemoryOutboxMessageConsumptionRepository {
 
 #[async_trait::async_trait]
 impl OutboxMessageConsumptionRepository for InMemoryOutboxMessageConsumptionRepository {
-    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream {
+    fn list_consumption_boundaries(&self) -> OutboxMessageConsumptionBoundariesStream<'_> {
         let boundaries = {
             let guard = self.state.lock().unwrap();
             guard
@@ -83,8 +83,8 @@ impl OutboxMessageConsumptionRepository for InMemoryOutboxMessageConsumptionRepo
             Err(
                 CreateConsumptionBoundaryError::DuplicateConsumptionBoundary(
                     DuplicateConsumptionBoundaryError {
-                        consumer_name: boundary.consumer_name.to_string(),
-                        producer_name: boundary.producer_name.to_string(),
+                        consumer_name: boundary.consumer_name.clone(),
+                        producer_name: boundary.producer_name.clone(),
                     },
                 ),
             )
@@ -106,8 +106,8 @@ impl OutboxMessageConsumptionRepository for InMemoryOutboxMessageConsumptionRepo
         } else {
             Err(UpdateConsumptionBoundaryError::ConsumptionBoundaryNotFound(
                 ConsumptionBoundaryNotFoundError {
-                    consumer_name: boundary.consumer_name.to_string(),
-                    producer_name: boundary.producer_name.to_string(),
+                    consumer_name: boundary.consumer_name.clone(),
+                    producer_name: boundary.producer_name.clone(),
                 },
             ))
         }

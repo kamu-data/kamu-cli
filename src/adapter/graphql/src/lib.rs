@@ -9,7 +9,6 @@
 
 #![feature(error_generic_member_access)]
 #![feature(int_roundings)]
-#![feature(let_chains)]
 
 pub mod config;
 pub mod extensions;

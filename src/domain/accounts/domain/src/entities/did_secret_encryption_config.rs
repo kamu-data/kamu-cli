@@ -25,6 +25,7 @@ pub struct DidSecretEncryptionConfig {
     /// digits (0-9).
     ///
     /// # Example
+    /// ```
     /// let config = DidSecretEncryptionConfig {
     ///     encryption_key: String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")
     /// };

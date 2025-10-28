@@ -9,7 +9,6 @@
 
 #![feature(assert_matches)]
 #![feature(exit_status_error)]
-#![feature(let_chains)]
 
 mod tests;
 pub mod utils;

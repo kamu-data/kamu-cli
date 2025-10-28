@@ -92,7 +92,7 @@ pub trait ExpensiveAccountRepository: AccountRepository {
 
 #[async_trait::async_trait]
 pub trait ExpensiveAccountRepositoryExt: ExpensiveAccountRepository {
-    fn all_accounts(&self) -> AccountPageStream;
+    fn all_accounts(&self) -> AccountPageStream<'_>;
 }
 
 #[async_trait::async_trait]
@@ -101,7 +101,7 @@ where
     T: ExpensiveAccountRepository,
     T: ?Sized,
 {
-    fn all_accounts(&self) -> AccountPageStream {
+    fn all_accounts(&self) -> AccountPageStream<'_> {
         EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
             move |_, pagination| async move {

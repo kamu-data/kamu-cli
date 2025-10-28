@@ -14,8 +14,10 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+type FlowTriggerEventStoreStatic = dyn FlowTriggerEventStore + 'static;
+
 #[derive(Aggregate, Debug)]
-pub struct FlowTrigger(Aggregate<FlowTriggerState, (dyn FlowTriggerEventStore + 'static)>);
+pub struct FlowTrigger(Aggregate<FlowTriggerState, FlowTriggerEventStoreStatic>);
 
 impl FlowTrigger {
     /// Creates a flow trigger rule

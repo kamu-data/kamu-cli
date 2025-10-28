@@ -82,17 +82,11 @@ impl InMemoryWebhookSubscriptionEventStore {
             WebhookSubscriptionEvent::Modified(e) => {
                 if let Some(subscription) =
                     state.webhook_subscription_data.get(event.subscription_id())
+                    && let Some(dataset_id) = subscription.dataset_id()
+                    && subscription.label() != &e.new_label
                 {
-                    if let Some(dataset_id) = subscription.dataset_id() {
-                        if subscription.label() != &e.new_label {
-                            // Check if the new label is unique for the dataset
-                            Self::check_unique_label_within_dataset(
-                                state,
-                                dataset_id,
-                                &e.new_label,
-                            )?;
-                        }
-                    }
+                    // Check if the new label is unique for the dataset
+                    Self::check_unique_label_within_dataset(state, dataset_id, &e.new_label)?;
                 }
                 Self::update_subscription_state(state, event);
             }
@@ -112,29 +106,29 @@ impl InMemoryWebhookSubscriptionEventStore {
             return Ok(());
         }
 
-        if let Some(ids) = state.webhook_subscriptions_by_dataset.get(dataset_id) {
-            if ids.iter().any(|id| {
+        if let Some(ids) = state.webhook_subscriptions_by_dataset.get(dataset_id)
+            && ids.iter().any(|id| {
                 state
                     .webhook_subscription_data
                     .get(id)
                     .map(|subscription| subscription.label() == label)
                     .unwrap_or(false)
-            }) {
-                #[derive(Error, Debug)]
-                #[error(
-                    "Webhook subscription label `{label}` is not unique for dataset `{dataset_id}`"
-                )]
-                struct NonUniqueLabelError {
-                    label: WebhookSubscriptionLabel,
-                    dataset_id: odf::DatasetID,
-                }
-
-                return Err(NonUniqueLabelError {
-                    label: label.clone(),
-                    dataset_id: dataset_id.clone(),
-                }
-                .int_err());
+            })
+        {
+            #[derive(Error, Debug)]
+            #[error(
+                "Webhook subscription label `{label}` is not unique for dataset `{dataset_id}`"
+            )]
+            struct NonUniqueLabelError {
+                label: WebhookSubscriptionLabel,
+                dataset_id: odf::DatasetID,
             }
+
+            return Err(NonUniqueLabelError {
+                label: label.clone(),
+                dataset_id: dataset_id.clone(),
+            }
+            .int_err());
         }
 
         Ok(())
@@ -149,12 +143,11 @@ impl InMemoryWebhookSubscriptionEventStore {
                 WebhookSubscriptionState::apply(Some(subscription_state.clone()), event.clone())
                     .unwrap();
 
-            if subscription_state.status() == WebhookSubscriptionStatus::Removed {
-                if let Some(dataset_id) = subscription_state.dataset_id() {
-                    if let Some(ids) = state.webhook_subscriptions_by_dataset.get_mut(dataset_id) {
-                        ids.retain(|id| id != event.subscription_id());
-                    }
-                }
+            if subscription_state.status() == WebhookSubscriptionStatus::Removed
+                && let Some(dataset_id) = subscription_state.dataset_id()
+                && let Some(ids) = state.webhook_subscriptions_by_dataset.get_mut(dataset_id)
+            {
+                ids.retain(|id| id != event.subscription_id());
             }
         } else {
             panic!(
@@ -174,7 +167,7 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
         self.inner.len().await
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<WebhookSubscriptionEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, WebhookSubscriptionEvent> {
         self.inner.get_all_events(opts)
     }
 
@@ -182,7 +175,7 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
         &self,
         subscription_id: &WebhookSubscriptionID,
         opts: GetEventsOpts,
-    ) -> EventStream<WebhookSubscriptionEvent> {
+    ) -> EventStream<'_, WebhookSubscriptionEvent> {
         self.inner.get_events(subscription_id, opts)
     }
 

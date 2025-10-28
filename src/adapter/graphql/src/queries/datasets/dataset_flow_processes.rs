@@ -74,7 +74,7 @@ impl<'a> DatasetFlowProcesses<'a> {
     // TODO: other secondary processes in future
 
     #[allow(clippy::unused_async)]
-    pub async fn webhooks(&self) -> Result<WebhookFlowSubProcessGroup> {
+    pub async fn webhooks(&self) -> Result<WebhookFlowSubProcessGroup<'_>> {
         // Form a subprocess group from those that point to
         // webhooks bound to this dataset
         Ok(WebhookFlowSubProcessGroup::new(

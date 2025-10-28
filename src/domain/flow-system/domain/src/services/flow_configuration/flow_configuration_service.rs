@@ -32,7 +32,7 @@ pub trait FlowConfigurationService: Sync + Send {
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError>;
 
     /// Lists all active flow configurations
-    fn list_active_configurations(&self) -> FlowConfigurationStateStream;
+    fn list_active_configurations(&self) -> FlowConfigurationStateStream<'_>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

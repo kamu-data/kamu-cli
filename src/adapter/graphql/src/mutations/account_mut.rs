@@ -171,7 +171,7 @@ impl AccountMut {
 
     /// Access to the mutable flow configurations of this account
     #[expect(clippy::unused_async)]
-    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut> {
+    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut<'_>> {
         utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
 
         Ok(AccountFlowsMut::new(&self.account))
@@ -179,7 +179,7 @@ impl AccountMut {
 
     /// Access to the mutable flow configurations of this account
     #[expect(clippy::unused_async)]
-    async fn access_tokens(&self) -> Result<AccountAccessTokensMut> {
+    async fn access_tokens(&self) -> Result<AccountAccessTokensMut<'_>> {
         Ok(AccountAccessTokensMut::new(&self.account))
     }
 }

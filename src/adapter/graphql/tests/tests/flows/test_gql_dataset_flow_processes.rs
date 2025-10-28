@@ -599,7 +599,7 @@ async fn test_ingest_process_with_multiple_webhooks() {
                 .unwrap_or_else(|| panic!("Missing webhook {webhook_name}")),
             &FlowWebhookSubprocessSummary {
                 id: *webhook_subscription_id,
-                name: webhook_name.to_string(),
+                name: webhook_name.clone(),
                 summary: FlowProcessSummaryBasic {
                     effective_state: "ACTIVE".to_string(),
                     consecutive_failures: 0,

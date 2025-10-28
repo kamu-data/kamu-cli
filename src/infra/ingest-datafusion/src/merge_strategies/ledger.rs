@@ -49,7 +49,11 @@ impl MergeStrategy for MergeStrategyLedger {
         prev: Option<DataFrameExt>,
         new: DataFrameExt,
     ) -> Result<DataFrameExt, MergeError> {
-        let new_records = if prev.is_none() {
+        let new_records = if let Some(prev) = prev {
+            let cols: Vec<_> = self.primary_key.iter().map(String::as_str).collect();
+            new.join(prev, JoinType::LeftAnti, &cols, &cols, None)
+                .int_err()?
+        } else {
             // Validate PK columns exist
             new.clone()
                 .select(
@@ -59,13 +63,7 @@ impl MergeStrategy for MergeStrategyLedger {
                         .collect(),
                 )
                 .int_err()?;
-
             new
-        } else {
-            let cols: Vec<_> = self.primary_key.iter().map(String::as_str).collect();
-
-            new.join(prev.unwrap(), JoinType::LeftAnti, &cols, &cols, None)
-                .int_err()?
         };
 
         let res = new_records

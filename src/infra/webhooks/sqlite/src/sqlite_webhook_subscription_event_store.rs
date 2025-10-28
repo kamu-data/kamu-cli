@@ -236,7 +236,7 @@ impl SqliteWebhookSubscriptionEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStore {
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<WebhookSubscriptionEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, WebhookSubscriptionEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
@@ -286,7 +286,7 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
         &self,
         subscription_id: &WebhookSubscriptionID,
         opts: GetEventsOpts,
-    ) -> EventStream<WebhookSubscriptionEvent> {
+    ) -> EventStream<'_, WebhookSubscriptionEvent> {
         let subscription_id = *subscription_id.as_ref();
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
@@ -335,7 +335,7 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
     fn get_events_multi(
         &self,
         queries: &[WebhookSubscriptionID],
-    ) -> MultiEventStream<WebhookSubscriptionID, WebhookSubscriptionEvent> {
+    ) -> MultiEventStream<'_, WebhookSubscriptionID, WebhookSubscriptionEvent> {
         let subscription_ids: Vec<uuid::Uuid> = queries.iter().map(|id| *id.as_ref()).collect();
 
         Box::pin(async_stream::stream! {

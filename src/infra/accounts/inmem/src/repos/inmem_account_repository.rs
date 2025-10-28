@@ -315,7 +315,7 @@ impl AccountRepository for InMemoryAccountRepository {
         name_pattern: &str,
         filters: SearchAccountsByNamePatternFilters,
         pagination: PaginationOpts,
-    ) -> AccountPageStream {
+    ) -> AccountPageStream<'_> {
         let exclude_accounts_by_ids_set = filters
             .exclude_accounts_by_ids
             .into_iter()

@@ -68,7 +68,7 @@ impl KamuApiServerClient {
         }
     }
 
-    pub fn e2e(&self) -> E2EApi {
+    pub fn e2e(&self) -> E2EApi<'_> {
         E2EApi { client: self }
     }
 

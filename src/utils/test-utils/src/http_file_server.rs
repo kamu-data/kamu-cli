@@ -25,7 +25,7 @@ impl HttpFileServer {
     where
         P: AsRef<Path>,
     {
-        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
         let listener = tokio::net::TcpListener::bind(&addr)
             .await
             .expect("Error binding TCP listener");

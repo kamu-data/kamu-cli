@@ -12,7 +12,6 @@
 #![feature(box_patterns)]
 #![feature(exit_status_error)]
 #![feature(error_generic_member_access)]
-#![feature(let_chains)]
 #![feature(iter_collect_into)]
 
 // Re-exports

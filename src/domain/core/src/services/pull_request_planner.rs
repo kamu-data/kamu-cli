@@ -223,7 +223,7 @@ impl PullRequest {
         }
     }
 
-    pub fn local_ref(&self) -> Option<Cow<odf::DatasetRef>> {
+    pub fn local_ref(&self) -> Option<Cow<'_, odf::DatasetRef>> {
         match self {
             PullRequest::Local(local_ref) => Some(Cow::Borrowed(local_ref)),
             PullRequest::Remote(remote) => remote

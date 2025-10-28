@@ -55,7 +55,7 @@ impl DidPkh {
     }
 
     /// Formats DID as a canonical `did:pkh:<account_id(CAIP-10)>` string
-    pub fn as_did_str(&self) -> DidPkhFmt {
+    pub fn as_did_str(&self) -> DidPkhFmt<'_> {
         DidPkhFmt::new(self)
     }
 
