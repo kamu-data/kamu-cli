@@ -60,6 +60,7 @@ pub struct CachedBlocksMergeIterator<'a> {
     dataset_id: &'a odf::DatasetID,
     data_block_repository: &'a dyn kamu_datasets::DatasetDataBlockRepository,
     page_size: usize,
+    start_sequence_number: u64,
     // Mutable part
     key_blocks_iter: CachedBlocksReverseIterator<'a>,
     data_blocks_page: Option<Arc<CachedBlocksRange>>,
@@ -83,6 +84,7 @@ impl<'a> CachedBlocksMergeIterator<'a> {
             data_block_repository,
             dataset_id,
             page_size,
+            start_sequence_number,
             key_blocks_iter,
             data_blocks_page: None,
             data_blocks_current_index: None,
@@ -230,7 +232,7 @@ impl<'a> CachedBlocksMergeIterator<'a> {
         } else {
             // No data blocks loaded yet, start from the highest available
             // Let's use a high number that will trigger loading from the top
-            u64::MAX
+            self.start_sequence_number
         }
     }
 }
