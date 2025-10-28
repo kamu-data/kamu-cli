@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::DatasetRegistry;
 use kamu_datasets::{
     DatasetKeyBlockRepository,
@@ -47,38 +49,53 @@ impl DatasetKeyBlockIndexer {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_key_block_repo: Arc<dyn DatasetKeyBlockRepository>
     )]
-    async fn collect_datasets_to_index(&self) -> Result<Vec<odf::DatasetHandle>, InternalError> {
-        let mut dataset_handles_stream = dataset_registry.all_dataset_handles();
+    async fn collect_datasets_to_index(
+        &self,
+    ) -> Result<Vec<(odf::DatasetHandle, odf::BlockRef)>, InternalError> {
+        // Repository can build a report of unindexed dataset branches (id->blockRef)
+        #[allow(clippy::zero_sized_map_values)]
+        let unindexed_dataset_branches = dataset_key_block_repo
+            .list_unindexed_dataset_branches()
+            .await?
+            .into_iter()
+            .collect::<HashMap<odf::DatasetID, odf::BlockRef>>();
 
-        let mut datasets_to_index = Vec::new();
-        let mut included_count = 0;
-        let mut skipped_count = 0;
+        // Resolve dataset handles for unindexed dataset IDs
 
-        use tokio_stream::StreamExt;
-        while let Some(dataset_handle) = dataset_handles_stream.try_next().await? {
-            included_count += 1;
-            tracing::debug!(%dataset_handle, "Checking if dataset index exists");
-            let has_blocks = dataset_key_block_repo
-                .has_key_blocks_for_ref(&dataset_handle.id, &odf::BlockRef::Head)
-                .await?;
+        let dataset_id_cows = unindexed_dataset_branches
+            .keys()
+            .map(Cow::Borrowed)
+            .collect::<Vec<_>>();
 
-            if !has_blocks {
-                tracing::debug!(%dataset_handle, "Dataset key block index does not exist");
-                datasets_to_index.push(dataset_handle);
-            } else {
-                skipped_count += 1;
-                tracing::debug!(%dataset_handle, "Dataset key block index already exists");
-            }
-        }
+        let dataset_handles_map = dataset_registry
+            .resolve_multiple_dataset_handles_by_ids(&dataset_id_cows)
+            .await
+            .int_err()?;
+
+        assert!(dataset_handles_map.unresolved_datasets.is_empty());
+        assert!(dataset_handles_map.resolved_handles.len() == unindexed_dataset_branches.len());
+
+        // Combine handles with block refs
+
+        let dataset_branches_2_index = dataset_handles_map
+            .resolved_handles
+            .into_iter()
+            .map(|dataset_handle| {
+                let block_ref = unindexed_dataset_branches
+                    .get(&dataset_handle.id)
+                    .cloned()
+                    .expect("Dataset ID must exist in unindexed branches map");
+
+                (dataset_handle, block_ref)
+            })
+            .collect::<Vec<_>>();
 
         tracing::debug!(
-            included_count,
-            skipped_count,
-            collected_count = datasets_to_index.len(),
+            unindexed_count = dataset_branches_2_index.len(),
             "Finished collecting datasets to index"
         );
 
-        Ok(datasets_to_index)
+        Ok(dataset_branches_2_index)
     }
 }
 
@@ -101,8 +118,9 @@ impl InitOnStartup for DatasetKeyBlockIndexer {
 
         // Convert handles into jobs wrapped into tokio tasks
         let mut job_results = tokio::task::JoinSet::new();
-        for dataset_handle in datasets_to_index {
-            let job = DatasetKeyBlockIndexingJob::new(&self.catalog, dataset_handle.clone());
+        for (dataset_handle, block_ref) in datasets_to_index {
+            let job =
+                DatasetKeyBlockIndexingJob::new(&self.catalog, dataset_handle.clone(), block_ref);
             let job_span = tracing::info_span!("DatasetKeyBlockIndexingJob", %dataset_handle);
 
             use tracing::Instrument;

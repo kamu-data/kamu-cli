@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::vec;
 
 use cheap_clone::CheapClone;
 use dill::*;
@@ -44,6 +45,13 @@ impl InMemoryDatasetKeyBlockRepository {
 
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
+    async fn list_unindexed_dataset_branches(
+        &self,
+    ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError> {
+        // Not implemented, however, not really required for usage in tests
+        Ok(vec![])
+    }
+
     async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,

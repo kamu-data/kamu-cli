@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT e.dataset_id, $1 AS \"block_ref_name!: String\"\n            FROM dataset_entries e\n            LEFT JOIN dataset_key_blocks kb\n                ON e.dataset_id = kb.dataset_id AND kb.block_ref_name = $1\n            WHERE kb.dataset_id IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "dataset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "block_ref_name!: String",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "8560695505f639d0ad746fb1ff25631d1c4e09c54905cf069503b0c0e01d5513"
+}

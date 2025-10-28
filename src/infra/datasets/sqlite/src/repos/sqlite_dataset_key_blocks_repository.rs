@@ -54,6 +54,39 @@ impl DatasetKeyBlockRow {
 
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
+    async fn list_unindexed_dataset_branches(
+        &self,
+    ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let block_ref_name = odf::BlockRef::Head.as_str();
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT e.dataset_id, $1 AS "block_ref_name!: String"
+            FROM dataset_entries e
+            LEFT JOIN dataset_key_blocks kb
+                ON e.dataset_id = kb.dataset_id AND kb.block_ref_name = $1
+            WHERE kb.dataset_id IS NULL
+            "#,
+            block_ref_name
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    odf::DatasetID::from_did_str(&r.dataset_id).unwrap(),
+                    odf::BlockRef::Head,
+                )
+            })
+            .collect())
+    }
+
     async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,

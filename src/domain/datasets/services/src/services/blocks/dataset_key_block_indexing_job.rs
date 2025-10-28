@@ -20,13 +20,19 @@ use kamu_datasets::{DatasetBlock, DatasetKeyBlockRepository, MetadataEventType};
 pub(crate) struct DatasetKeyBlockIndexingJob {
     catalog: Catalog,
     hdl_to_index: odf::DatasetHandle,
+    block_ref: odf::BlockRef,
 }
 
 impl DatasetKeyBlockIndexingJob {
-    pub(crate) fn new(catalog: &Catalog, hdl_to_index: odf::DatasetHandle) -> Self {
+    pub(crate) fn new(
+        catalog: &Catalog,
+        hdl_to_index: odf::DatasetHandle,
+        block_ref: odf::BlockRef,
+    ) -> Self {
         Self {
             catalog: catalog.clone(),
             hdl_to_index,
+            block_ref,
         }
     }
 
@@ -49,13 +55,9 @@ impl DatasetKeyBlockIndexingJob {
         // Run the indexing job for entire dataset
         // Note: we don't need to handle invalid interval error,
         //  as we are scanning the entire dataset from HEAD to SEED
-        index_dataset_key_blocks_entirely(
-            dataset_key_block_repo.as_ref(),
-            target,
-            &odf::BlockRef::Head,
-        )
-        .await
-        .int_err()
+        index_dataset_key_blocks_entirely(dataset_key_block_repo.as_ref(), target, &self.block_ref)
+            .await
+            .int_err()
     }
 }
 

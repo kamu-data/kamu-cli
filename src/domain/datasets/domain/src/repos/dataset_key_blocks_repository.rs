@@ -16,6 +16,10 @@ use crate::{DatasetBlock, MetadataEventType};
 
 #[async_trait::async_trait]
 pub trait DatasetKeyBlockRepository: Send + Sync {
+    async fn list_unindexed_dataset_branches(
+        &self,
+    ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError>;
+
     async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
