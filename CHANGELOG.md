@@ -11,19 +11,20 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Feature: GQL federation]
+### Added
+- GQL: Activation of federation mechanisms to use GQL API as a subgraph (#1410).
+- SQL: Added DataFusion `to_table()` UDTF that projects data from ledger datasets (#1428).
+### Changed
+- GQL: Optimization: apply DataLoader to solve N+1 problem for federation entity resolvers (#1410).
+
 ## [Molecule-specific]
 ### Added
 - GQL: `BigInt` scalar
-- GQL: Activation of federation mechanisms to use GQL API as a subgraph (#1410).
 ### Changed
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
-- GQL: Optimization: apply DataLoader to solve N+1 problem for federation entity resolvers (#1410).
-
-## [Feature: GQL federation]
-### Added
-- SQL: Added DataFusion `to_table()` UDTF that projects data from ledger datasets (#1428).
 
 ## [Unreleased]
 ### Added
