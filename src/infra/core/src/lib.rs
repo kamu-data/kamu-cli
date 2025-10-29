@@ -14,6 +14,7 @@
 #![feature(error_generic_member_access)]
 #![feature(let_chains)]
 #![feature(iter_collect_into)]
+#![feature(generic_arg_infer)]
 
 // Re-exports
 pub use kamu_core as domain;

@@ -39,6 +39,7 @@ odf = { workspace = true, features = ["datafusion"] }
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.22", default-features = false }
+bon = { version = "3", default-features = false }
 bytes = "1"
 cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false }

@@ -19,6 +19,8 @@ use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Support different engines and query dialects
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
@@ -91,6 +93,14 @@ pub trait QueryService: Send + Sync {
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError>;
 
+    /// Extended version of [get_data()](Self::get_data()) that allows
+    /// retrieving requested metadata as well.
+    async fn get_data_with_metadata(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataWithMetadataOptions,
+    ) -> Result<GetDataWithMetadataResponse, QueryError>;
+
     // TODO: Consider replacing this function with a more sophisticated session
     // context builder that can be reused for multiple queries
     /// Returns [`DataFrameExt`]s representing the contents of multiple datasets
@@ -114,6 +124,30 @@ pub struct GetDataOptions {
     /// as no matter what updates happen in the datasets - the query will
     /// only consider a specific subset of the data ledger.
     pub block_hash: Option<odf::Multihash>,
+}
+
+#[derive(Debug, Clone, Default, bon::Builder)]
+pub struct GetDataWithMetadataOptions {
+    /// Last block hash of an input dataset that should be used for query
+    /// execution. This is used to achieve full reproducibility of queries
+    /// as no matter what updates happen in the datasets - the query will
+    /// only consider a specific subset of the data ledger.
+    pub block_hash: Option<odf::Multihash>,
+
+    /// Resolve [`odf::metadata::DatasetVocabulary`] in the dataset if such
+    /// a metadata event exists.
+    #[builder(default)]
+    pub resolve_dataset_vocabulary: bool,
+
+    /// Resolve [`odf::schema::DataSchema`] in the dataset if such
+    /// a metadata event exists.
+    #[builder(default)]
+    pub resolve_schema: bool,
+
+    /// Resolve [`odf::metadata::MergeStrategy`] of the dataset if active source
+    /// data exists.
+    #[builder(default)]
+    pub resolve_merge_strategy: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -191,7 +225,7 @@ pub struct QueryStateDataset {
 #[derive(Debug, Clone)]
 pub struct GetDataResponse {
     /// A [`DataFrameExt`] that can be used to read schema and access the data.
-    /// `None` when dataset schema was not yet defined. Note that the data
+    /// `None` when the dataset schema was not yet defined. Note that the data
     /// frames are "lazy". They are a representation of a logical query
     /// plan. The actual query is executed only when you pull the resulting
     /// data from it.
@@ -202,6 +236,32 @@ pub struct GetDataResponse {
 
     /// Last block hash that was considered during the query planning
     pub block_hash: odf::Multihash,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct GetDataWithMetadataResponse {
+    /// A [`DataFrameExt`] that can be used to read schema and access the data.
+    /// `None` when the dataset schema was not yet defined. Note that the data
+    /// frames are "lazy". They are a representation of a logical query
+    /// plan. The actual query is executed only when you pull the resulting
+    /// data from it.
+    pub df: Option<DataFrameExt>,
+
+    /// Handle of the resolved dataset.
+    pub dataset_handle: odf::DatasetHandle,
+
+    /// Last block hash that was considered during the query planning.
+    pub block_hash: odf::Multihash,
+
+    /// Dataset vocabulary that was resolved for the dataset if requested.
+    pub dataset_vocabulary: Option<odf::metadata::DatasetVocabulary>,
+
+    /// Data schema that was resolved for the dataset if requested.
+    pub data_schema: Option<odf::schema::DataSchema>,
+
+    /// Merge strategy that was resolved for the dataset if requested.
+    pub merge_strategy: Option<odf::metadata::MergeStrategy>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
