@@ -1,0 +1,4 @@
+# Note: dangerous setting, but we are getting too many of these:
+#   warning: the following packages contain code that will be rejected by a future version of Rust: num-bigint-dig v0.8.4
+[future-incompat-report]
+frequency = "never"

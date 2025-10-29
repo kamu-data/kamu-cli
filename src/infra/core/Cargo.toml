@@ -138,7 +138,7 @@ curl = { optional = true, version = "0.4", features = [
 curl-sys = { optional = true, version = "0.4" }
 datafusion-ethers = { optional = true, version = "50" }
 datafusion-functions-json = { optional = true, version = "0.50" }
-rumqttc = { optional = true, version = "0.24", default-features = false, features = [
+rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
 mockall = { optional = true, version = "0.13", default-features = false }
 oop = { optional = true, version = "0.0.2" }

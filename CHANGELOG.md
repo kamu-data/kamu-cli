@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.252.0] - 2025-10-29
 ### Added
 - New `try_load_multi` method for Aggregates which will always return result even if error occurs
 ### Changed
