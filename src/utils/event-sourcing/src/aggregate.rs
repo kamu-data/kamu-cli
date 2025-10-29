@@ -123,6 +123,68 @@ where
         }
     }
 
+    /// Try to load multiple aggregations
+    ///
+    /// Returns collection of aggregation results
+    ///
+    /// Vector contains results for every item from `queries` argument.
+    /// Order is preserved.
+    pub async fn try_load_multi(
+        queries: &[Proj::Query],
+        event_store: &Store,
+    ) -> Vec<Result<Self, LoadError<Proj>>>
+    where
+        Proj::Query: std::hash::Hash + Eq + Clone,
+    {
+        use tokio_stream::StreamExt;
+
+        let mut event_stream = event_store.get_events_multi(queries);
+        let mut agg_results: HashMap<Proj::Query, Result<Self, LoadError<Proj>>> = HashMap::new();
+
+        while let Some(res) = event_stream.next().await {
+            if let Ok((query, event_id, event)) = res {
+                let agg_result =
+                    Self::from_stored_event(query.clone(), event_id, event).map_err(Into::into);
+                agg_results.insert(query, agg_result);
+            }
+        }
+
+        let mut result: Vec<Result<Self, LoadError<Proj>>> = vec![];
+        for query in queries {
+            let item = match agg_results.remove(query) {
+                None => Err(AggregateNotFoundError::new(query.clone()).into()),
+                Some(agg) => agg,
+            };
+
+            match &item {
+                Ok(agg) => {
+                    tracing::debug!(
+                        last_stored_event_id = %agg.last_stored_event_id.unwrap(),
+                        "Loaded aggregate",
+                    );
+                }
+                Err(err) => match err {
+                    LoadError::NotFound(_) => {
+                        tracing::warn!(
+                            query = ?query,
+                            "Aggregate not found",
+                        );
+                    }
+                    _ => {
+                        tracing::error!(
+                            error = ?err,
+                            error_msg = %err,
+                            "Failed to load aggregate",
+                        );
+                    }
+                },
+            }
+
+            result.push(item);
+        }
+        result
+    }
+
     /// Loads multiple aggregations
     ///
     /// Returns either collection of aggregation results or an error, when
@@ -179,7 +241,11 @@ where
                     );
                 }
                 Err(err) => {
-                    tracing::error!(error = ?err, error_msg = %err, "Failed to load aggregate",);
+                    tracing::error!(
+                        error = ?err,
+                        error_msg = %err,
+                        "Failed to load aggregate",
+                    );
                 }
             }
 

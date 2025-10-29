@@ -97,6 +97,24 @@ async fn test_aggregate_load() {
 }
 
 #[tokio::test]
+async fn test_aggregate_load_multi() {
+    let store = CalcEventStore::new(vec![CalcEvents::Add(10), CalcEvents::Sub(6)]);
+    let results = Calc::try_load_multi(&[()], &store).await;
+    assert_eq!(results.len(), 1);
+    assert!(results.first().unwrap().is_ok());
+    assert_eq!(
+        results
+            .first()
+            .as_ref()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .last_stored_event_id(),
+        Some(EventID::new(1))
+    );
+}
+
+#[tokio::test]
 async fn test_aggregate_debug() {
     let store = CalcEventStore::new(vec![CalcEvents::Add(1), CalcEvents::Add(1)]);
     let actual = format!("{:?}", Calc::load((), &store).await.unwrap());

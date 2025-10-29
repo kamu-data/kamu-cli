@@ -76,11 +76,8 @@ impl Flow {
             .collect::<Vec<_>>();
 
         let flow_triggers_res =
-            fs::FlowTrigger::load_multi(&unique_bindings, flow_trigger_event_store.as_ref())
-                .await
-                .map_err(|e| match e {
-                    fs::GetEventsError::Internal(e) => e,
-                })?;
+            fs::FlowTrigger::try_load_multi(&unique_bindings, flow_trigger_event_store.as_ref())
+                .await;
 
         let mut result = HashMap::new();
         for res in flow_triggers_res {
