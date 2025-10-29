@@ -123,6 +123,12 @@ where
         }
     }
 
+    /// Try to load multiple aggregations
+    ///
+    /// Returns collection of aggregation results
+    ///
+    /// Vector contains results for every item from `queries` argument.
+    /// Order is preserved.
     pub async fn try_load_multi(
         queries: &[Proj::Query],
         event_store: &Store,
@@ -157,11 +163,21 @@ where
                         "Loaded aggregate",
                     );
                 }
-                Err(err) => tracing::warn!(
-                    error = ?err,
-                    error_msg = %err,
-                    "Failed to load aggregate",
-                ),
+                Err(err) => match err {
+                    LoadError::NotFound(_) => {
+                        tracing::warn!(
+                            query = ?query,
+                            "Aggregate not found",
+                        );
+                    }
+                    _ => {
+                        tracing::error!(
+                            error = ?err,
+                            error_msg = %err,
+                            "Failed to load aggregate",
+                        );
+                    }
+                },
             }
 
             result.push(item);
