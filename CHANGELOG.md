@@ -21,6 +21,10 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 - GQL: Optimization: apply DataLoader to solve N+1 problem for federation entity resolvers (#1410).
 
+## [Feature: GQL federation]
+### Added
+- SQL: Added DataFusion `to_table()` UDTF that projects data from ledger datasets (#1428).
+
 ## [Unreleased]
 ### Added
 - GQL: Added new `webhookSubscription::rotateSecret()` method to replace current secret
