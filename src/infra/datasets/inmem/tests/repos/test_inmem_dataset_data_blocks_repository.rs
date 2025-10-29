@@ -17,7 +17,55 @@ use kamu_datasets_repo_tests::dataset_data_blocks_repo;
 
 database_transactional_test!(
     storage = inmem,
-    fixture = dataset_data_blocks_repo::test_no_blocks,
+    fixture = dataset_data_blocks_repo::test_has_data_blocks,
+    harness = InMemoryDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_data_blocks_repo::test_save_data_blocks_batch,
+    harness = InMemoryDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_data_blocks_repo::test_save_data_blocks_batch_duplicate_sequence_number,
+    harness = InMemoryDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_data_blocks_repo::test_get_data_block_by_hash,
+    harness = InMemoryDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_data_blocks_repo::test_get_page_of_data_blocks,
+    harness = InMemoryDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_data_blocks_repo::test_delete_data_blocks,
+    harness = InMemoryDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_data_blocks_repo::test_remove_dataset_entry_removes_data_blocks,
     harness = InMemoryDatasetDataBlockRepositoryHarness
 );
 

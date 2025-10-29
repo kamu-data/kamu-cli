@@ -20,7 +20,8 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
+use kamu_datasets::{DatasetBlock, DatasetEntry, DatasetEntryRepository, MetadataEventType};
+use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -120,6 +121,97 @@ pub(crate) async fn remove_dataset_entry(catalog: &Catalog, dataset_id: &odf::Da
         .delete_dataset_entry(dataset_id)
         .await
         .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn make_add_data_block(sequence_number: u64) -> DatasetBlock {
+    let event = MetadataFactory::add_data()
+        .prev_offset(if sequence_number > 1 {
+            Some(sequence_number * 10 - 1)
+        } else {
+            None
+        })
+        .some_new_data_with_offset(sequence_number * 10, sequence_number * 10 + 9)
+        .build();
+
+    let block = MetadataFactory::metadata_block(event).build();
+
+    make_block(sequence_number, &block, MetadataEventType::AddData)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn make_execute_transform_block(sequence_number: u64) -> DatasetBlock {
+    let event = MetadataFactory::execute_transform()
+        .empty_query_inputs_from_seeded_ids(["upstream-1", "upstream-2"])
+        .prev_offset(if sequence_number > 1 {
+            Some(sequence_number * 10 - 1)
+        } else {
+            None
+        })
+        .some_new_data_with_offset(sequence_number * 10, sequence_number * 10 + 9)
+        .build();
+
+    let block = MetadataFactory::metadata_block(event).build();
+
+    make_block(sequence_number, &block, MetadataEventType::ExecuteTransform)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn make_seed_block(kind: odf::DatasetKind) -> DatasetBlock {
+    let event = MetadataFactory::seed(kind).build();
+
+    let block = MetadataFactory::metadata_block(event).build();
+
+    make_block(0, &block, MetadataEventType::Seed)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn make_info_block(sequence_number: u64) -> DatasetBlock {
+    let event = MetadataFactory::set_info()
+        .description("Test dataset")
+        .keyword("demo")
+        .build();
+
+    let block = MetadataFactory::metadata_block(event).build();
+
+    make_block(sequence_number, &block, MetadataEventType::SetInfo)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn make_license_block(sequence_number: u64) -> DatasetBlock {
+    let event = MetadataFactory::set_license()
+        .short_name("MIT")
+        .name("MIT License")
+        .build();
+
+    let block = MetadataFactory::metadata_block(event).build();
+
+    make_block(sequence_number, &block, MetadataEventType::SetLicense)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_block(
+    sequence_number: u64,
+    block: &odf::MetadataBlock,
+    kind: MetadataEventType,
+) -> DatasetBlock {
+    let block_hash =
+        odf::Multihash::from_digest_sha3_256(format!("block-{sequence_number}").as_bytes());
+
+    let block_payload = bytes::Bytes::from(odf::storage::serialize_metadata_block(block).unwrap());
+
+    DatasetBlock {
+        event_kind: kind,
+        sequence_number,
+        block_hash,
+        block_payload,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

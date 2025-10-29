@@ -19,7 +19,55 @@ use sqlx::SqlitePool;
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = dataset_data_blocks_repo::test_no_blocks,
+    fixture = dataset_data_blocks_repo::test_has_data_blocks,
+    harness = SqliteDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_data_blocks_repo::test_save_data_blocks_batch,
+    harness = SqliteDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_data_blocks_repo::test_save_data_blocks_batch_duplicate_sequence_number,
+    harness = SqliteDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_data_blocks_repo::test_get_data_block_by_hash,
+    harness = SqliteDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_data_blocks_repo::test_get_page_of_data_blocks,
+    harness = SqliteDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_data_blocks_repo::test_delete_data_blocks,
+    harness = SqliteDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_data_blocks_repo::test_remove_dataset_entry_removes_data_blocks,
     harness = SqliteDatasetDataBlockRepositoryHarness
 );
 
