@@ -107,22 +107,28 @@ impl CachedBlocksRange {
     /// Try extracting a slice of cached blocks satisftying given range
     pub(crate) fn get_cached_blocks_for_range(
         &self,
-        range: std::ops::RangeInclusive<u64>,
+        range: std::ops::Range<u64>,
     ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
         // No blocks yet?
         if self.blocks.is_empty() {
             return None;
         }
 
+        // Range is completely after the cached blocks?
+        let min_sequence_number = self.blocks.first().unwrap().1.sequence_number;
+        if min_sequence_number >= range.end {
+            return None;
+        }
+
         // Find the first block that is greater than or equal to the min boundary
         let start_index = self
             .blocks
-            .binary_search_by_key(range.start(), |(_, block)| block.sequence_number)
+            .binary_search_by_key(&range.start, |(_, block)| block.sequence_number)
             .unwrap_or_else(|x| x);
 
         // Use the start_index to reduce the search space for the max boundary
         let end_index = self.blocks[start_index..]
-            .binary_search_by_key(range.end(), |(_, block)| block.sequence_number)
+            .binary_search_by_key(&range.end, |(_, block)| block.sequence_number)
             .map(|x| x + start_index)
             .unwrap_or_else(|x| x + start_index);
 

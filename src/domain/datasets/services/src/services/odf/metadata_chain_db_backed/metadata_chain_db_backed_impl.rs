@@ -192,7 +192,7 @@ where
 
     async fn ensure_data_blocks_are_preloaded(
         &self,
-        interested_range: std::ops::RangeInclusive<u64>,
+        interested_range: std::ops::Range<u64>,
     ) -> Result<Option<Arc<CachedBlocksRange>>, InternalError> {
         // Try getting access to repository
         let maybe_data_block_repository = {
@@ -201,7 +201,7 @@ where
             if let Some(cached_data_blocks) = &read_guard.cached_data_blocks
                 && cached_data_blocks
                     .get_covered_range(self.config.data_blocks_page_size)
-                    .is_some_and(|cached_range| cached_range.contains(interested_range.end()))
+                    .is_some_and(|cached_range| cached_range.contains(&(interested_range.end - 1)))
             {
                 return Ok(Some(cached_data_blocks.clone()));
             }
@@ -222,7 +222,9 @@ where
                 if let Some(cached_data_blocks) = &read_guard.cached_data_blocks
                     && cached_data_blocks
                         .get_covered_range(self.config.data_blocks_page_size)
-                        .is_some_and(|cached_range| cached_range.contains(interested_range.end()))
+                        .is_some_and(|cached_range| {
+                            cached_range.contains(&(interested_range.end - 1))
+                        })
                 {
                     return Ok(Some(cached_data_blocks.clone()));
                 }
@@ -236,7 +238,7 @@ where
                 data_block_repository.as_ref(),
                 &self.dataset_id,
                 self.config.data_blocks_page_size,
-                *interested_range.end(),
+                interested_range.end,
             )
             .await?;
 
@@ -340,7 +342,7 @@ where
 
     async fn get_key_block_with_hint(
         &self,
-        requested_range: std::ops::RangeInclusive<u64>,
+        requested_range: std::ops::Range<u64>,
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
         // Force loading key blocks unless it was already done
@@ -376,7 +378,7 @@ where
 
     async fn get_data_block_with_hint(
         &self,
-        requested_range: std::ops::RangeInclusive<u64>,
+        requested_range: std::ops::Range<u64>,
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<BlockLookupResult, odf::storage::GetBlockError> {
         // Force loading data blocks unless it was already done
@@ -385,29 +387,29 @@ where
             .await?;
 
         // Read what's in the data blocks cache
-        if let Some(cached_data_blocks) = maybe_cached_data_blocks
-            && let Some(cached_blocks_in_range) =
+        if let Some(cached_data_blocks) = maybe_cached_data_blocks {
+            if let Some(cached_blocks_in_range) =
                 cached_data_blocks.get_cached_blocks_for_range(requested_range)
-        {
-            // Report cache hit
-            tracing::trace!(
-                dataset_id=%self.dataset_id,
-                num_blocks = cached_blocks_in_range.len(),
-                "Found data blocks in the cache"
-            );
-
-            // We have cached blocks in the requested range
-            // Filter them by the requested flags, starting from the last one.
-            if let Some(found_block_hint) =
-                Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
             {
-                return Ok(BlockLookupResult::Found(found_block_hint));
+                // Report cache hit
+                tracing::trace!(
+                    dataset_id=%self.dataset_id,
+                    num_blocks = cached_blocks_in_range.len(),
+                    "Found data blocks in the cache"
+                );
+
+                // We have cached blocks in the requested range
+                // Filter them by the requested flags, starting from the last one.
+                if let Some(found_block_hint) =
+                    Self::try_select_prev_block_satisfying_hints(cached_blocks_in_range, hint_flags)
+                {
+                    return Ok(BlockLookupResult::Found(found_block_hint));
+                }
             }
 
-            // Note that if there is no cached block matching the hints, this
-            // does not mean anything, unlike key blocks.
-            // There might be still data blocks in the earlier pages,
-            // we don't know that for sure.
+            // Note that if there is no cached block matching the hints,
+            // it means we can stop searching in general
+            return Ok(BlockLookupResult::Stop);
         }
 
         Ok(BlockLookupResult::NotFound)
@@ -548,7 +550,7 @@ where
                 // Ensure the first page containing the head sequence number is preloaded and cached
                 // This allows multiple concurrent iterators to reuse the same cached first page
                 let cached_data_blocks_page = self
-                    .ensure_data_blocks_are_preloaded(head_block.sequence_number..=head_block.sequence_number)
+                    .ensure_data_blocks_are_preloaded(head_block.sequence_number..head_block.sequence_number)
                     .await?
                     .expect("Data block repository is available, so data blocks should be loaded");
 
@@ -663,8 +665,8 @@ where
 
         // This is the working range of our iteration [min, max).
         // We should not return blocks outside of this range.
-        let requested_boundary: std::ops::RangeInclusive<u64> =
-            tail_sequence_number..=head_block.sequence_number;
+        let requested_boundary: std::ops::Range<u64> =
+            tail_sequence_number..head_block.sequence_number;
 
         // If we are looking for specific block types, try to use the caches first
         if let odf::dataset::MetadataVisitorDecision::NextOfType(hint_flags) = hint {
