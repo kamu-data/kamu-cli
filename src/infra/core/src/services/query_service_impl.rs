@@ -31,6 +31,7 @@ use crate::utils::docker_images;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 #[dill::component]
 #[dill::interface(dyn QueryService)]
 pub struct QueryServiceImpl {
@@ -42,6 +43,10 @@ pub struct QueryServiceImpl {
 }
 
 impl QueryServiceImpl {
+    fn to_arc(&self) -> Arc<dyn QueryService> {
+        Arc::new(self.clone())
+    }
+
     async fn session_context(
         &self,
         options: QueryOptions,
@@ -80,6 +85,8 @@ impl QueryServiceImpl {
                 datafusion_functions_json::register_all(&mut ctx).unwrap();
             }
         }
+
+        kamu_datafusion_udf::ToTableUdtf::register(&ctx, self.to_arc());
 
         Ok(ctx)
     }

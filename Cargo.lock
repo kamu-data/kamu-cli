@@ -6662,6 +6662,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-services",
  "kamu-core",
+ "kamu-datafusion-udf",
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
