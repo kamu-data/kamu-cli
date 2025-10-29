@@ -46,8 +46,8 @@ pub(crate) async fn load_data_blocks_from_repository(
         %dataset_id,
         page_size,
         sequence_number,
-        min_bound = ?data_blocks.first().map(|(_, _, b)| b.sequence_number()),
-        max_bound = ?data_blocks.last().map(|(_, _, b)| b.sequence_number()),
+        min_bound = ?data_blocks.first().map(|(_, _, b)| b.sequence_number),
+        max_bound = ?data_blocks.last().map(|(_, _, b)| b.sequence_number),
         "Loaded data blocks page",
     );
 
