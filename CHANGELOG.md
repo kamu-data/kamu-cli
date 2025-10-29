@@ -11,6 +11,23 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Improved performance of iterating over `AddData` and `ExecuteTransform` metadata nodes:
+   - these data-related blocks are stored in the database similarly to key blocks
+   - supporting data nodes in hint-aware visiting algorithms similarly to key blocks,
+      however, loading data blocks by pages of N events
+   - `iter_blocks` family of algorithms also uses data events from the database to speed up
+   - individual block accesses attempt to lookup in the database first, before going to storage 
+   - the indexing happens automatically at startup, as well as incrementally after updates,
+      while a need to index datasets is now detected via a single database query in anti-join style
+- Audited existing uses of `iter_blocks` family of algorithms all over the project,
+    and replaced a few detected irrational cases with faster approach
+- Storing block hashes in binary form for data/key blocks and dataset references,
+    while the original textual form of the hash was transformed into a virtual generated column
+      (this requires upgrade to Postgres 18)
+
+
 ## [0.251.3] - 2025-10-28
 ### Changed
 - Ingest flow respects `has_more` flag and trigger follow up ingest flow

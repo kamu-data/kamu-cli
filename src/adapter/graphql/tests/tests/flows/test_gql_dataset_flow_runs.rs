@@ -400,11 +400,10 @@ async fn test_trigger_reset_root_dataset_flow() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_root_result = harness.create_root_dataset(foo_alias).await;
 
-    use odf::dataset::MetadataChainExt;
     let root_dataset_blocks: Vec<_> = create_root_result
         .dataset
         .as_metadata_chain()
-        .iter_blocks_interval(&create_root_result.head, None, false)
+        .iter_blocks_interval((&create_root_result.head).into(), None, false)
         .try_collect()
         .await
         .unwrap();
@@ -584,12 +583,10 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         })
     );
 
-    use odf::dataset::MetadataChainExt;
-
     let root_dataset_blocks: Vec<_> = create_root_result
         .dataset
         .as_metadata_chain()
-        .iter_blocks_interval(&create_root_result.head, None, false)
+        .iter_blocks_interval((&create_root_result.head).into(), None, false)
         .try_collect()
         .await
         .unwrap();

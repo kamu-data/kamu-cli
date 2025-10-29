@@ -33,6 +33,7 @@ use kamu_auth_rebac_services::{
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
+    InMemoryDatasetDataBlockRepository,
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
@@ -78,6 +79,7 @@ async fn setup_repo() -> RepoFixture {
             datasets_dir,
         ))
         .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
+        .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
@@ -88,6 +90,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<DatasetEntryServiceImpl>()
         .add::<InMemoryDatasetEntryRepository>()
         .add::<InMemoryDatasetKeyBlockRepository>()
+        .add::<InMemoryDatasetDataBlockRepository>()
         .add::<AccountServiceImpl>()
         .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()

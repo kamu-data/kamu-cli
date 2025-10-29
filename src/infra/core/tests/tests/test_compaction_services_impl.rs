@@ -1262,10 +1262,9 @@ impl CompactTestHarness {
             .unwrap();
         let head = self.get_dataset_head(dataset_ref).await;
 
-        use odf::dataset::MetadataChainExt;
         resolved_dataset
             .as_metadata_chain()
-            .iter_blocks_interval(&head, None, false)
+            .iter_blocks_interval((&head).into(), None, false)
             .map_ok(|(_, b)| b)
             .try_collect()
             .await

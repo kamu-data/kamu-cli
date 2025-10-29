@@ -7926,6 +7926,7 @@ dependencies = [
 name = "kamu-datasets-services"
 version = "0.251.3"
 dependencies = [
+ "async-stream",
  "async-trait",
  "bytes",
  "cheap-clone",

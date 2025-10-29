@@ -18,8 +18,6 @@ use http_common::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use odf::metadata::serde::MetadataBlockSerializer;
-use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use url::Url;
 
 use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
@@ -123,12 +121,11 @@ pub async fn dataset_blocks_handler(
         Err(e) => Err(e.api_err()),
     }?;
 
-    let block_bytes = FlatbuffersMetadataBlockSerializer
-        .write_manifest(&block)
+    let block_bytes = odf::storage::serialize_metadata_block(&block)
         .int_err()
         .api_err()?;
 
-    Ok(block_bytes.collapse_vec())
+    Ok(block_bytes)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

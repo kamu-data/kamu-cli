@@ -61,6 +61,7 @@ impl DatasetBaseUseCaseHarness {
                     datasets_dir,
                 ))
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
@@ -73,7 +74,8 @@ impl DatasetBaseUseCaseHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<DatasetKeyBlockUpdateHandler>()
+                .add::<InMemoryDatasetDataBlockRepository>()
+                .add::<DatasetBlockUpdateHandler>()
                 .add::<DependencyGraphImmediateListener>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<TestDatasetOutboxListener>();

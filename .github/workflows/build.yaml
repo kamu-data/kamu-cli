@@ -130,7 +130,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     services:
       postgres:
-        image: ${{ matrix.database && 'postgres:16' || '' }}
+        image: ${{ matrix.database && 'postgres:18' || '' }}
         env:
           POSTGRES_USER: root
           POSTGRES_PASSWORD: root

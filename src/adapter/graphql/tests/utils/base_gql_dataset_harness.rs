@@ -63,6 +63,7 @@ impl BaseGQLDatasetHarness {
                     datasets_dir,
                 ))
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
@@ -78,8 +79,9 @@ impl BaseGQLDatasetHarness {
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
-                .add::<DatasetKeyBlockUpdateHandler>()
+                .add::<DatasetBlockUpdateHandler>()
                 .add_value(RunInfoDir::new(run_info_dir));
 
             if let Some(mock) = mock_dataset_action_authorizer {

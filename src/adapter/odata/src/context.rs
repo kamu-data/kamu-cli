@@ -159,19 +159,15 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     async fn last_updated_time(&self) -> DateTime<Utc> {
-        use futures::TryStreamExt;
-        use odf::dataset::MetadataChainExt;
+        let chain = self.resolved_dataset.as_metadata_chain();
+        let Ok(head) = chain.resolve_ref(&odf::BlockRef::Head).await else {
+            panic!("Head block must be resolvable")
+        };
+        let Ok(head_block) = chain.get_block(&head).await else {
+            panic!("Head block must be retrievable")
+        };
 
-        let (_, last_block) = self
-            .resolved_dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .try_next()
-            .await
-            .unwrap()
-            .unwrap();
-
-        last_block.system_time
+        head_block.system_time
     }
 
     async fn schema(&self) -> Result<SchemaRef, ODataError> {

@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT * FROM (\n                SELECT\n                    event_type as \"event_type: MetadataEventType\",\n                    sequence_number,\n                    block_hash_bin,\n                    block_payload\n                FROM dataset_data_blocks\n                WHERE dataset_id = $1 AND block_ref_name = $2 AND sequence_number <= $3\n                ORDER BY sequence_number DESC\n                LIMIT $4\n            )\n            ORDER BY sequence_number\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_type: MetadataEventType",
+        "type_info": {
+          "Custom": {
+            "name": "metadata_event_type",
+            "kind": {
+              "Enum": [
+                "AddData",
+                "ExecuteTransform",
+                "Seed",
+                "SetPollingSource",
+                "SetTransform",
+                "SetVocab",
+                "SetAttachments",
+                "SetInfo",
+                "SetLicense",
+                "SetDataSchema",
+                "AddPushSource",
+                "DisablePushSource",
+                "DisablePollingSource"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sequence_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "block_hash_bin",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "block_payload",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6456ded2a6db37e17c779efcadc255142c34235092de48449006d7d5077a6ec1"
+}

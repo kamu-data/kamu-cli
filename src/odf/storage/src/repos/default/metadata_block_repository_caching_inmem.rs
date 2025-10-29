@@ -11,8 +11,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use dashmap::DashMap;
 use internal_error::ResultIntoInternal;
-use odf_metadata::serde::MetadataBlockSerializer;
-use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::*;
 
 use crate::*;
@@ -128,9 +126,7 @@ where
         block: &MetadataBlock,
         options: InsertOpts<'a>,
     ) -> Result<InsertBlockResult, InsertBlockError> {
-        let block_data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(block)
-            .int_err()?;
+        let block_data = serialize_metadata_block(block).int_err()?;
         let insert_block_data_result = self.insert_block_data(&block_data, options).await;
 
         if let Ok(result) = &insert_block_data_result {

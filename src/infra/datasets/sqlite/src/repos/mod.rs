@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod sqlite_dataset_data_blocks_repository;
 mod sqlite_dataset_dependency_repository;
 mod sqlite_dataset_entry_repository;
 mod sqlite_dataset_env_var_repository;
@@ -14,6 +15,7 @@ mod sqlite_dataset_key_blocks_repository;
 mod sqlite_dataset_reference_repository;
 mod sqlite_dataset_statistics_repository;
 
+pub use sqlite_dataset_data_blocks_repository::*;
 pub use sqlite_dataset_dependency_repository::*;
 pub use sqlite_dataset_entry_repository::*;
 pub use sqlite_dataset_env_var_repository::*;

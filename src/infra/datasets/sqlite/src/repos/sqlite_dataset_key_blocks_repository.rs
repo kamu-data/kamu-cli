@@ -31,16 +31,20 @@ pub struct SqliteDatasetKeyBlockRepository {
 struct DatasetKeyBlockRow {
     event_type: String,
     sequence_number: i64,
-    block_hash: String,
+    block_hash_bin: Vec<u8>,
     block_payload: Vec<u8>,
 }
 
 impl DatasetKeyBlockRow {
-    fn into_domain(self) -> DatasetKeyBlock {
-        DatasetKeyBlock {
+    fn into_domain(self) -> DatasetBlock {
+        DatasetBlock {
             event_kind: MetadataEventType::from_str(&self.event_type).unwrap(),
             sequence_number: u64::try_from(self.sequence_number).unwrap(),
-            block_hash: odf::Multihash::from_multibase(&self.block_hash).unwrap(),
+            block_hash: odf::Multihash::new(
+                odf::metadata::Multicodec::Sha3_256,
+                &self.block_hash_bin,
+            )
+            .unwrap(),
             block_payload: bytes::Bytes::from(self.block_payload),
         }
     }
@@ -50,7 +54,40 @@ impl DatasetKeyBlockRow {
 
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
-    async fn has_blocks(
+    async fn list_unindexed_dataset_branches(
+        &self,
+    ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let block_ref_name = odf::BlockRef::Head.as_str();
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT e.dataset_id, $1 AS "block_ref_name!: String"
+            FROM dataset_entries e
+            LEFT JOIN dataset_key_blocks kb
+                ON e.dataset_id = kb.dataset_id AND kb.block_ref_name = $1
+            WHERE kb.dataset_id IS NULL
+            "#,
+            block_ref_name
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    odf::DatasetID::from_did_str(&r.dataset_id).unwrap(),
+                    odf::BlockRef::Head,
+                )
+            })
+            .collect())
+    }
+
+    async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -62,7 +99,12 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let block_ref_str = block_ref.as_str();
 
         let result: Option<i32> = sqlx::query_scalar(
-            "SELECT 1 FROM dataset_key_blocks WHERE dataset_id = ? AND block_ref_name = ? LIMIT 1",
+            r#"
+            SELECT 1
+            FROM dataset_key_blocks
+            WHERE dataset_id = $1 AND block_ref_name = $2
+            LIMIT 1
+            "#,
         )
         .bind(dataset_id_str)
         .bind(block_ref_str)
@@ -77,7 +119,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+    ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -90,10 +132,10 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             SELECT
                 event_type,
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             FROM dataset_key_blocks
-            WHERE dataset_id = ? AND block_ref_name = ?
+            WHERE dataset_id = $1 AND block_ref_name = $2
             ORDER BY sequence_number
             "#,
             dataset_id_str,
@@ -109,12 +151,12 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn match_datasets_having_blocks(
+    async fn match_datasets_having_key_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
+    ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -125,7 +167,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             pub dataset_id: String,
             pub event_type: String,
             pub sequence_number: i64,
-            pub block_hash: String,
+            pub block_hash_bin: Vec<u8>,
             pub block_payload: Vec<u8>,
         }
 
@@ -135,7 +177,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 dkb.dataset_id,
                 dkb.event_type,
                 dkb.sequence_number,
-                dkb.block_hash,
+                dkb.block_hash_bin,
                 dkb.block_payload
             FROM dataset_key_blocks dkb
             JOIN (
@@ -174,10 +216,14 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .into_iter()
             .map(|r| {
                 let dataset_id = odf::DatasetID::from_did_str(&r.dataset_id).unwrap();
-                let key_block = DatasetKeyBlock {
+                let key_block = DatasetBlock {
                     event_kind: MetadataEventType::from_str(&r.event_type).unwrap(),
                     sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                    block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                    block_hash: odf::Multihash::new(
+                        odf::metadata::Multicodec::Sha3_256,
+                        &r.block_hash_bin,
+                    )
+                    .unwrap(),
                     block_payload: bytes::Bytes::from(r.block_payload),
                 };
                 (dataset_id, key_block)
@@ -185,11 +231,11 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn save_blocks_batch(
+    async fn save_key_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-        blocks: &[DatasetKeyBlock],
+        blocks: &[DatasetBlock],
     ) -> Result<(), DatasetKeyBlockSaveError> {
         if blocks.is_empty() {
             return Ok(());
@@ -204,7 +250,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 block_ref_name,
                 event_type,
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             ) ",
         );
@@ -214,7 +260,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 .push_bind(block_ref.as_str())
                 .push_bind(block.event_kind.to_string())
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
-                .push_bind(block.block_hash.to_string())
+                .push_bind(block.block_hash.digest())
                 .push_bind(block.block_payload.as_ref());
         });
 
@@ -244,7 +290,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(())
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

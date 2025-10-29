@@ -51,6 +51,23 @@ pub trait MetadataChain: Send + Sync {
         hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError>;
 
+    /// Iterates the chain in reverse order starting with specified block and
+    /// following the previous block links. The interval returned is `[head,
+    /// tail)` - tail is exclusive. If `tail` argument is provided but not
+    /// encountered the iteration will continue until first block followed by an
+    /// error. If `ignore_missing_tail` argument is provided, the exception
+    /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
+    fn iter_blocks_interval<'a>(
+        &'a self,
+        head_boundary: MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataStream<'a>;
+
     /// Appends the block to the chain
     async fn append<'a>(
         &'a self,
@@ -68,6 +85,9 @@ pub trait MetadataChain: Send + Sync {
         hash: &Multihash,
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetChainRefError>;
+
+    /// Returns uncached version of the metadata chain
+    fn as_uncached_chain(&self) -> &dyn MetadataChain;
 
     /// Returns storage-level reference repository without any caching involved
     fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository;
@@ -114,7 +134,7 @@ pub trait MetadataChainExt: MetadataChain {
     /// know the type of blocks, it's better to consider using accept_*()
     /// API.
     fn iter_blocks(&self) -> DynMetadataStream<'_> {
-        self.iter_blocks_interval_ref(&BlockRef::Head, None)
+        self.iter_blocks_interval((&BlockRef::Head).into(), None, false)
     }
 
     /// Convenience function to iterate blocks starting with the specified
@@ -124,112 +144,7 @@ pub trait MetadataChainExt: MetadataChain {
     /// know the type of blocks, it's better to consider using accept_*()
     /// API.
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
-        self.iter_blocks_interval_ref(head, None)
-    }
-
-    /// Iterates the chain in reverse order starting with specified block and
-    /// following the previous block links. The interval returned is `[head,
-    /// tail)` - tail is exclusive. If `tail` argument is provided but not
-    /// encountered the iteration will continue until first block followed by an
-    /// error. If `ignore_missing_tail` argument is provided, the exception
-    /// is not generated if tail is not detected while traversing from head
-    ///
-    /// PERF: iterates over blocks sequentially: O(N). If you initially
-    /// know the type of blocks, it's better to consider using accept_*()
-    /// API.
-    fn iter_blocks_interval<'a>(
-        &'a self,
-        head_hash: &'a Multihash,
-        tail_hash: Option<&'a Multihash>,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let mut current = Some(head_hash.clone());
-
-            while current.is_some() && current.as_ref() != tail_hash {
-                let block = self.get_block(current.as_ref().unwrap()).await?;
-                let next = block.prev_block_hash.clone();
-                yield (current.take().unwrap(), block);
-                current = next;
-            }
-
-            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash.clone(),
-                    tail: tail_hash.clone(),
-                }))?;
-            }
-        })
-    }
-
-    /// Iterates the chain in reverse order starting with specified block and
-    /// following the previous block links. The interval returned is `[head,
-    /// tail]` - tail is inclusive. If `tail` argument is provided but not
-    /// encountered the iteration will continue until first block followed by an
-    /// error. If `ignore_missing_tail` argument is provided, the exception
-    /// is not generated if tail is not detected while traversing from head
-    ///
-    /// PERF: iterates over blocks sequentially: O(N). If you initially
-    /// know the type of blocks, it's better to consider using accept_*()
-    /// API.
-    fn iter_blocks_interval_inclusive<'a>(
-        &'a self,
-        head_hash: &'a Multihash,
-        tail_hash: &'a Multihash,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let mut current = head_hash.clone();
-
-            loop {
-                let block = self.get_block(&current).await?;
-                let next = block.prev_block_hash.clone();
-                let done = current == *tail_hash;
-                yield (current.clone(), block);
-                if done || next.is_none() {
-                    break;
-                }
-                current = next.unwrap();
-            }
-
-            if !ignore_missing_tail && current != *tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash.clone(),
-                    tail: tail_hash.clone(),
-                }))?;
-            }
-        })
-    }
-
-    // TODO: Remove this method by allowing BlockRefs to be either tags or hashes
-    fn iter_blocks_interval_ref<'a>(
-        &'a self,
-        head: &'a BlockRef,
-        tail: Option<&'a BlockRef>,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let head_hash = self.resolve_ref(head).await?;
-            let tail_hash = match tail {
-                None => None,
-                Some(r) => Some(self.resolve_ref(r).await?),
-            };
-
-            let mut current = Some(head_hash.clone());
-
-            while current.is_some() && current != tail_hash {
-                let block = self.get_block(current.as_ref().unwrap()).await?;
-                let next = block.prev_block_hash.clone();
-                yield (current.take().unwrap(), block);
-                current = next;
-            }
-
-            if current.is_none() && let Some(tail_hash) = tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash,
-                    tail: tail_hash
-                }))?;
-            }
-        })
+        self.iter_blocks_interval(head.into(), None, false)
     }
 
     /// A method for accepting visitors (see [`MetadataChainVisitor`]) that

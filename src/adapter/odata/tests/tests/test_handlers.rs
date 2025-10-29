@@ -400,6 +400,7 @@ impl TestHarness {
                     datasets_dir,
                 ))
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add_value(SystemTimeSourceStub::new_set(
@@ -420,6 +421,7 @@ impl TestHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()

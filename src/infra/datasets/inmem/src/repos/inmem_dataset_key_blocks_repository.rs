@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::vec;
 
 use cheap_clone::CheapClone;
 use dill::*;
@@ -19,7 +20,7 @@ use kamu_datasets::*;
 
 #[derive(Default)]
 struct State {
-    key_blocks: HashMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetKeyBlock>>,
+    key_blocks: HashMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +45,14 @@ impl InMemoryDatasetKeyBlockRepository {
 
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
-    async fn has_blocks(
+    async fn list_unindexed_dataset_branches(
+        &self,
+    ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError> {
+        // Not implemented, however, not really required for usage in tests
+        Ok(vec![])
+    }
+
+    async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -56,11 +64,11 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .is_some_and(|v| !v.is_empty()))
     }
 
-    async fn save_blocks_batch(
+    async fn save_key_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-        blocks: &[DatasetKeyBlock],
+        blocks: &[DatasetBlock],
     ) -> Result<(), DatasetKeyBlockSaveError> {
         if blocks.is_empty() {
             return Ok(());
@@ -92,7 +100,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+    ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
             .key_blocks
@@ -101,12 +109,12 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .unwrap_or_default())
     }
 
-    async fn match_datasets_having_blocks(
+    async fn match_datasets_having_key_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
+    ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
         let guard = self.state.lock().unwrap();
         let mut result = Vec::new();
 
@@ -126,7 +134,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         Ok(result)
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

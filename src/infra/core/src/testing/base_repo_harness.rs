@@ -25,8 +25,6 @@ use kamu_core::{
 use kamu_datasets::CreateDatasetResult;
 use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::metadata::serde::MetadataBlockSerializer;
-use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 
@@ -208,9 +206,7 @@ impl BaseRepoHarness {
     }
 
     pub fn hash_from_block(block: &odf::MetadataBlock) -> odf::Multihash {
-        let block_data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(block)
-            .unwrap();
+        let block_data = odf::storage::serialize_metadata_block(block).unwrap();
 
         odf::Multihash::from_digest::<sha3::Sha3_256>(
             odf::metadata::Multicodec::Sha3_256,

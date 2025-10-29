@@ -34,7 +34,6 @@ impl MetadataChainComparator {
         listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
         use odf::MetadataChain;
-        use odf::dataset::MetadataChainExt;
 
         // When source and destination point to the same block, chains are equal, no
         // further scanning required
@@ -70,7 +69,7 @@ impl MetadataChainComparator {
             lhs_chain.expecting_to_read_blocks(lhs_sequence_number + 1);
             return Ok(CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: lhs_chain
-                    .iter_blocks_interval(lhs_head, None, false)
+                    .iter_blocks_interval(lhs_head.into(), None, false)
                     .try_collect()
                     .await?,
             });
@@ -169,10 +168,9 @@ impl MetadataChainComparator {
         let ahead_size = ahead_sequence_number - expected_common_sequence_number;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
-        use odf::dataset::MetadataChainExt;
-
+        use odf::MetadataChain;
         let ahead_blocks: Vec<odf::dataset::HashedMetadataBlock> = ahead_chain
-            .iter_blocks_interval(ahead_head, None, false)
+            .iter_blocks_interval(ahead_head.into(), None, false)
             .take(usize::try_from(ahead_size).unwrap())
             .try_collect()
             .await?;
@@ -237,9 +235,9 @@ impl MetadataChainComparator {
             );
         }
 
-        use odf::dataset::MetadataChainExt;
-        let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head, None, false);
-        let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head, None, false);
+        use odf::MetadataChain;
+        let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head.into(), None, false);
+        let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head.into(), None, false);
 
         let mut curr_lhs_block_sequence_number = lhs_start_block_sequence_number;
         while curr_lhs_block_sequence_number > rhs_start_block_sequence_number {
@@ -452,6 +450,26 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
             .await
     }
 
+    /// Iterates the chain in reverse order starting with specified block and
+    /// following the previous block links. The interval returned is `[head,
+    /// tail)` - tail is exclusive. If `tail` argument is provided but not
+    /// encountered the iteration will continue until first block followed by an
+    /// error. If `ignore_missing_tail` argument is provided, the exception
+    /// is not generated if tail is not detected while traversing from head
+    ///
+    /// PERF: iterates over blocks sequentially: O(N). If you initially
+    /// know the type of blocks, it's better to consider using accept_*()
+    /// API.
+    fn iter_blocks_interval<'a>(
+        &'a self,
+        head_boundary: odf::dataset::MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> odf::dataset::DynMetadataStream<'a> {
+        self.chain
+            .iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail)
+    }
+
     async fn set_ref<'b>(
         &'b self,
         r: &odf::BlockRef,
@@ -467,6 +485,10 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         opts: odf::dataset::AppendOpts<'b>,
     ) -> Result<odf::Multihash, odf::dataset::AppendError> {
         self.chain.append(block, opts).await
+    }
+
+    fn as_uncached_chain(&self) -> &dyn odf::MetadataChain {
+        self.chain.as_uncached_chain()
     }
 
     fn as_uncached_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
