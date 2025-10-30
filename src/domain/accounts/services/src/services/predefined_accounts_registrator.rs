@@ -22,6 +22,7 @@ use odf::AccountID;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A service that aims to register accounts on a one-time basis
+#[derive(Clone)]
 pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_service: Arc<dyn AccountService>,
@@ -55,6 +56,26 @@ impl PredefinedAccountsRegistrator {
             update_account_use_case,
             create_account_use_case,
         }
+    }
+
+    async fn process_account(&self, account_config: &AccountConfig) -> Result<(), InternalError> {
+        let account_id = account_config.get_id();
+
+        match self.account_service.get_account_by_id(&account_id).await {
+            Ok(account) => {
+                self.compare_and_update_account(account, account_config)
+                    .await?;
+            }
+            Err(GetAccountByIdError::NotFound(_)) => {
+                self.register_unknown_account(account_config).await?;
+            }
+            Err(GetAccountByIdError::Internal(e)) => return Err(e),
+        }
+
+        self.set_rebac_properties(&account_id, account_config)
+            .await?;
+
+        Ok(())
     }
 
     async fn set_rebac_properties(
@@ -162,7 +183,7 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
             let account_id = account_config.get_id();
             match account_config_by_id.entry(account_id.clone()) {
                 Entry::Vacant(entry) => {
-                    entry.insert(account_config);
+                    entry.insert(account_config.clone());
                 }
                 Entry::Occupied(_) => {
                     tracing::warn!(
@@ -173,23 +194,38 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
             }
         }
 
-        for account_config in account_config_by_id.values() {
-            let account_id = account_config.get_id();
-            match self.account_service.get_account_by_id(&account_id).await {
-                Ok(account) => {
-                    self.compare_and_update_account(account, account_config)
-                        .await?;
-                }
-                Err(GetAccountByIdError::NotFound(_)) => {
-                    self.register_unknown_account(account_config).await?;
-                }
-                Err(GetAccountByIdError::Internal(e)) => return Err(e),
-            }
-            self.set_rebac_properties(&account_id, account_config)
-                .await?;
+        // Process accounts in parallel using tasks
+        // Note: these are heavy operations, because of password hashing, ReBAC activity
+        let mut join_set = tokio::task::JoinSet::new();
+        for account_config in account_config_by_id.into_values() {
+            let registrator = self.clone();
+            join_set.spawn(async move { registrator.process_account(&account_config).await });
         }
 
-        Ok(())
+        // Execute jobs in parallel
+        let results = join_set.join_all().await;
+
+        // Report errors, if any
+        let mut had_errors = false;
+        for result in results {
+            if let Err(err) = result {
+                had_errors = true;
+                tracing::error!(
+                    error = ?err,
+                    error_msg = %err,
+                    "Failed to process predefined account",
+                );
+            }
+        }
+
+        // Interrupt initialization if there were errors
+        if had_errors {
+            Err(InternalError::new(
+                "One or more predefined accounts failed to register/update.",
+            ))
+        } else {
+            Ok(())
+        }
     }
 }
 
