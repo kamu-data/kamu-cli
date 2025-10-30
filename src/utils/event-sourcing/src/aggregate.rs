@@ -129,6 +129,14 @@ where
     ///
     /// Vector contains results for every item from `queries` argument.
     /// Order is preserved.
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(
+            agg_type = %std::any::type_name::<Proj>(),
+            agg_queries_cnt = ?queries.len(),
+        )
+    )]
     pub async fn try_load_multi(
         queries: &[Proj::Query],
         event_store: &Store,
@@ -143,9 +151,17 @@ where
 
         while let Some(res) = event_stream.next().await {
             if let Ok((query, event_id, event)) = res {
-                let agg_result =
-                    Self::from_stored_event(query.clone(), event_id, event).map_err(Into::into);
-                agg_results.insert(query, agg_result);
+                if let Some(agg_result) = agg_results.get_mut(&query)
+                    && let Ok(agg) = agg_result
+                {
+                    if let Err(err) = agg.apply_stored(event_id, event) {
+                        *agg_result = Err(err.into());
+                    }
+                } else {
+                    let agg_result =
+                        Self::from_stored_event(query.clone(), event_id, event).map_err(Into::into);
+                    agg_results.insert(query, agg_result);
+                }
             }
         }
 
