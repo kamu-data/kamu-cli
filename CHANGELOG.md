@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Executing init script for predefined accounts in parallel. Solves a noticeable slowdown 
+   of CLI commands in multi-tenant workspaces
+
 ## [0.252.1] - 2025-10-30
 ### Fixed
 - Hotfix: Event aggregation for flow triggers correctly works in `try_load_multi` method
