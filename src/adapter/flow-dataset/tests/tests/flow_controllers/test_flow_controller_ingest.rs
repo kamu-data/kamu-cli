@@ -14,11 +14,12 @@ use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
 use kamu_core::{PollingIngestResultUpToDate, PullResult, PullResultUpToDate};
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
+use kamu_datasets::DatasetIncrementQueryService;
 use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrementQueryService};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_task_system::LogicalPlan;
+use odf::dataset::MetadataChainIncrementInterval;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -117,7 +118,7 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
             foo_dataset_id.clone(),
             None,
             new_head.clone(),
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,

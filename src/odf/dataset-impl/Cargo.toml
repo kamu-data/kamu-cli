@@ -49,6 +49,7 @@ bytes = "1"
 cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }
+futures = { version = "0.3", default-features = false }
 hickory-resolver = "0.25"
 http = { version = "1", default-features = false }
 mockall = { optional = true, version = "0.13", default-features = false }

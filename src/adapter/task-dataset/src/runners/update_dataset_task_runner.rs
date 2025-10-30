@@ -13,6 +13,7 @@ use database_common_macros::transactional_method1;
 use internal_error::InternalError;
 use kamu_core::engine::EngineError;
 use kamu_core::*;
+use kamu_datasets::DatasetIncrementQueryService;
 use kamu_task_system::*;
 
 use crate::{
@@ -35,6 +36,7 @@ pub struct UpdateDatasetTaskRunner {
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
     sync_service: Arc<dyn SyncService>,
+    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
 #[common_macros::method_names_consts]
@@ -218,12 +220,15 @@ impl UpdateDatasetTaskRunner {
                             .await?;
                         }
 
-                        Ok(TaskOutcome::Success(
-                            TaskResultDatasetUpdate {
-                                pull_result: transform_result.into(),
-                            }
-                            .into_task_result(),
-                        ))
+                        let task_result = TaskResultDatasetUpdate::from_pull_result(
+                            transform_result.into(),
+                            self.dataset_increment_query_service.as_ref(),
+                            &transform_item.target.get_handle().id,
+                        )
+                        .await
+                        .int_err()?;
+
+                        Ok(TaskOutcome::Success(task_result.into_task_result()))
                     }
                     Err(e) => {
                         tracing::error!(error = ?e, "Transform execution failed");

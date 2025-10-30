@@ -13,11 +13,11 @@ use std::sync::Arc;
 use async_graphql::value;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
 use kamu_core::{PullResult, TenancyConfig};
-use kamu_datasets::DatasetIntervalIncrement;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_webhooks::*;
+use odf::dataset::MetadataChainIncrementInterval;
 use uuid::Uuid;
 
 use crate::utils::*;
@@ -765,7 +765,7 @@ impl DatasetFlowProcessesHarness {
             FlowRunsHarnessOverrides {
                 dataset_changes_mock: Some(
                     MockDatasetIncrementQueryService::with_increment_between(
-                        DatasetIntervalIncrement {
+                        MetadataChainIncrementInterval {
                             num_blocks: 1,
                             num_records: 10,
                             updated_watermark: None,

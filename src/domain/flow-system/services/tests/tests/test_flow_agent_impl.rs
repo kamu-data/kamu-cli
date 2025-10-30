@@ -15,10 +15,11 @@ use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TransformStatus};
-use kamu_datasets::{DatasetEntryServiceExt, DatasetIntervalIncrement};
+use kamu_datasets::DatasetEntryServiceExt;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
+use odf::dataset::MetadataChainIncrementInterval;
 
 use super::{
     FlowHarness,
@@ -901,7 +902,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 3,
                 updated_watermark: None,
@@ -3442,7 +3443,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 3,
                 updated_watermark: None,
@@ -3696,7 +3697,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 3,
                 updated_watermark: None,
@@ -4134,7 +4135,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
         mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 7,
                 updated_watermark: None,
@@ -4720,7 +4721,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -4732,7 +4733,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 7,
                 updated_watermark: None,
@@ -4744,7 +4745,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 12,
                 updated_watermark: None,
@@ -4757,7 +4758,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -4769,7 +4770,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -4781,7 +4782,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 10,
                 updated_watermark: None,
@@ -5312,7 +5313,7 @@ async fn test_batching_condition_timeout() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -5325,7 +5326,7 @@ async fn test_batching_condition_timeout() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 3,
                 updated_watermark: None,
@@ -5337,7 +5338,7 @@ async fn test_batching_condition_timeout() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 8,
                 updated_watermark: None,
@@ -5630,7 +5631,7 @@ async fn test_batching_condition_watermark() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0,
                 updated_watermark: None,
@@ -5643,7 +5644,7 @@ async fn test_batching_condition_watermark() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0, // no records, just watermark
                 updated_watermark: Some(Utc::now()),
@@ -5655,7 +5656,7 @@ async fn test_batching_condition_watermark() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0, // no records, just watermark
                 updated_watermark: Some(Utc::now()),
@@ -5947,7 +5948,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -5959,7 +5960,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -5972,7 +5973,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 7,
                 updated_watermark: None,
@@ -5984,7 +5985,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 8,
                 updated_watermark: None,
@@ -5996,7 +5997,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 7,
                 updated_watermark: None,
@@ -6008,7 +6009,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 32,
                 updated_watermark: None,
@@ -7255,7 +7256,7 @@ async fn test_abort_flow_after_task_finishes() {
         .expect_get_increment_between()
         .times(2)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -7728,7 +7729,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
         .expect_get_increment_between()
         .times(5)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -8111,7 +8112,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
         .times(3)
         .in_sequence(&mut sequence_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -8123,7 +8124,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
         .times(1)
         .in_sequence(&mut sequence_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -9734,7 +9735,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0,
                 updated_watermark: None,
