@@ -21,17 +21,23 @@ use pretty_assertions::assert_matches;
 async fn test_wrong_arguments() {
     let ctx = create_session_context();
 
-    assert_matches!(
-        ctx.sql(indoc!(
-            "
-            SELECT *
-            FROM to_table()
-            "
-        ))
-        .await,
-        Err(DFError::Plan(msg))
-            if msg == "to_table() accepts only one argument: dataset_ref"
-    );
+    for arguments in [
+        "",                           // no arguments
+        "`kamu/unknown-table`, path", // more than one argument
+    ] {
+        assert_matches!(
+            ctx.sql(&formatdoc!(
+                "
+                SELECT *
+                FROM to_table({arguments})
+                "
+            ))
+            .await,
+            Err(DFError::Plan(e))
+                if e == "to_table() accepts only one argument: dataset_ref",
+            "Arguments: {}", arguments
+        );
+    }
 
     for arguments in [
         "1",                    // number
@@ -69,6 +75,25 @@ async fn test_dataset_not_found() {
         .await,
         Err(DFError::External(e))
             if e.to_string() == "Dataset not found: kamu/unknown-table"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_dataset_unauthorized() {
+    let ctx = create_session_context();
+
+    assert_matches!(
+        ctx.sql(indoc!(
+            "
+            SELECT *
+            FROM to_table(`kamu/unauthorized-table`)
+            "
+        ))
+        .await,
+        Err(DFError::External(e))
+            if e.to_string() == "Dataset not found: kamu/unauthorized-table"
     );
 }
 
