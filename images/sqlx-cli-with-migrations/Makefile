@@ -6,7 +6,7 @@ ifndef KAMU_VERSION
 $(error KAMU_VERSION is not set)
 endif
 
-IMAGE_TAG = $(KAMU_VERSION).2
+IMAGE_TAG = $(KAMU_VERSION).5
 IMAGE_SQLX_TAG = latest
 
 ################################################################################
