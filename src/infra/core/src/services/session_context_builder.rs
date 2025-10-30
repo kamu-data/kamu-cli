@@ -34,12 +34,12 @@ impl SessionContextBuilder {
     ) -> Result<SessionContext, InternalError> {
         assert!(
             options.input_datasets.is_some(),
-            "QueryService should resolve all inputs"
+            "SessionContextBuilder should resolve all inputs"
         );
         for opts in options.input_datasets.as_ref().unwrap().values() {
             assert!(
                 opts.hints.handle.is_some(),
-                "QueryService should pre-resolve handles"
+                "SessionContextBuilder should pre-resolve handles"
             );
         }
 
@@ -73,6 +73,8 @@ impl SessionContextBuilder {
                 datafusion::functions_nested::register_all(&mut ctx).unwrap();
             }
         }
+
+        kamu_datafusion_udf::ToTableUdtf::register(&ctx, self.to_arc());
 
         Ok(ctx)
     }

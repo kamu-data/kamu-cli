@@ -59,6 +59,7 @@ kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
+kamu-datafusion-udf = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
