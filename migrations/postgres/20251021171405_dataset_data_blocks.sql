@@ -8,7 +8,7 @@ CREATE TABLE dataset_data_blocks (
     ),
     sequence_number    BIGINT NOT NULL,
     block_hash_bin     BYTEA NOT NULL,
-    block_hash_hex     TEXT GENERATED ALWAYS AS (('f1620' || encode(block_hash_bin, 'hex'))) VIRTUAL NOT NULL,
+    block_hash_hex     TEXT GENERATED ALWAYS AS (('f1620' || encode(block_hash_bin, 'hex'))) NOT NULL,
     block_payload      BYTEA NOT NULL,
     PRIMARY KEY (dataset_id, block_ref_name, sequence_number)
 );
@@ -33,7 +33,7 @@ CREATE TABLE dataset_key_blocks (
     ),
     sequence_number    BIGINT NOT NULL,
     block_hash_bin     BYTEA NOT NULL,
-    block_hash_hex     TEXT GENERATED ALWAYS AS (('f1620' || encode(block_hash_bin, 'hex'))) VIRTUAL NOT NULL,
+    block_hash_hex     TEXT GENERATED ALWAYS AS (('f1620' || encode(block_hash_bin, 'hex'))) NOT NULL,
     block_payload      BYTEA NOT NULL,
     PRIMARY KEY (dataset_id, block_ref_name, sequence_number)
 );
@@ -65,7 +65,7 @@ ALTER TABLE dataset_references
 
 -- Add the virtual generated hex column
 ALTER TABLE dataset_references
-    ADD COLUMN block_hash_hex TEXT GENERATED ALWAYS AS (('f1620' || encode(block_hash_bin, 'hex'))) VIRTUAL NOT NULL;
+    ADD COLUMN block_hash_hex TEXT GENERATED ALWAYS AS (('f1620' || encode(block_hash_bin, 'hex'))) NOT NULL;
 
 -- Drop the old textual column
 ALTER TABLE dataset_references
