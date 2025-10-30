@@ -15,7 +15,6 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - Hotfix: Event aggregation for flow triggers correctly works in `try_load_multi` method
 
-
 ## [0.252.0] - 2025-10-29
 ### Added
 - New `try_load_multi` method for Aggregates which will always return result even if error occurs
