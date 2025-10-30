@@ -6662,6 +6662,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-services",
  "kamu-core",
+ "kamu-datafusion-udf",
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
@@ -7769,6 +7770,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "base64 0.22.1",
+ "bon",
  "bytes",
  "cheap-clone",
  "chrono",
@@ -7815,6 +7817,19 @@ dependencies = [
  "rustyline",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "kamu-datafusion-udf"
+version = "0.251.0"
+dependencies = [
+ "datafusion",
+ "indoc 2.0.6",
+ "kamu-core",
+ "opendatafabric",
+ "pretty_assertions",
+ "test-log",
+ "tokio",
 ]
 
 [[package]]
