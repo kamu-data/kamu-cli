@@ -167,9 +167,10 @@ impl FlowDescriptionUpdateResult {
                     | TaskResultDatasetReset::TYPE_ID => Ok(None),
 
                     TaskResultDatasetUpdate::TYPE_ID => {
-                        // TODO: consider caching the increment in the task result itself
                         let update = TaskResultDatasetUpdate::from_task_result(result)?;
                         if let Some((old_head, new_head)) = update.try_as_increment() {
+                            // TODO: consider removing fallback if we will completely migrate
+                            // existing flows to new structure
                             let data_increment = if let Some(increment) = &update.data_increment {
                                 *increment
                             } else {
@@ -177,7 +178,13 @@ impl FlowDescriptionUpdateResult {
                                     .get_increment_between(dataset_id, old_head, new_head)
                                     .await
                                 {
-                                    Ok(increment) => increment,
+                                    Ok(increment) => {
+                                        tracing::warn!(
+                                            ?dataset_id,
+                                            "Call fetching increment fallback"
+                                        );
+                                        increment
+                                    }
                                     Err(err) => {
                                         let unknown_message = match err {
                                             GetIncrementError::BlockNotFound(e) => format!(
