@@ -138,6 +138,10 @@ pub trait MetadataChainExt: MetadataChain {
         self.iter_blocks_interval((&BlockRef::Head).into(), None, false)
     }
 
+    /// Computes incremental stats between two given blocks of the dataset
+    ///
+    /// Returns amount of records and blocks between blocks and latest watermark
+    /// in a given range
     // TODO: PERF: Avoid multiple passes over metadata chain
     async fn get_increment_for_interval<'a>(
         &'a self,
