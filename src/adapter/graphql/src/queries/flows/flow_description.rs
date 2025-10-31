@@ -171,7 +171,7 @@ impl FlowDescriptionUpdateResult {
                         let update = TaskResultDatasetUpdate::from_task_result(result)?;
                         if let Some((old_head, new_head)) = update.try_as_increment() {
                             let data_increment = if let Some(increment) = &update.data_increment {
-                                increment.clone()
+                                *increment
                             } else {
                                 match increment_query_service
                                     .get_increment_between(dataset_id, old_head, new_head)

@@ -302,6 +302,7 @@ async fn test_ingest_process_several_runs() {
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         has_more: false,
                     },
+                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -391,6 +392,7 @@ async fn test_ingest_process_several_runs() {
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                         has_more: false,
                     },
+                    data_increment: None,
                 }
                 .into_task_result(),
             ),

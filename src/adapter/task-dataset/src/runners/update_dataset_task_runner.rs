@@ -36,7 +36,6 @@ pub struct UpdateDatasetTaskRunner {
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
     sync_service: Arc<dyn SyncService>,
-    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
 #[common_macros::method_names_consts]
@@ -87,22 +86,18 @@ impl UpdateDatasetTaskRunner {
             .await;
         match sync_response {
             Ok(sync_result) => {
-                let task_result = if let SyncRef::Local(local_ref) = &sync_request.dst {
-                    TaskResultDatasetUpdate::from_pull_result(
-                        sync_result.into(),
-                        self.dataset_increment_query_service.as_ref(),
-                        &local_ref.get_handle().id,
-                    )
-                    .await
-                    .int_err()?
+                if let SyncRef::Local(local_ref) = &sync_request.dst {
+                    self.combine_task_result(sync_result.into(), &local_ref.get_handle().id)
+                        .await
                 } else {
-                    TaskResultDatasetUpdate {
-                        pull_result: sync_result.into(),
-                        data_increment: None,
-                    }
-                };
-
-                Ok(TaskOutcome::Success(task_result.into_task_result()))
+                    Ok(TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: sync_result.into(),
+                            data_increment: None,
+                        }
+                        .into_task_result(),
+                    ))
+                }
             }
             Err(_) =>
             // TODO: classify sync errors as recoverable/unrecoverable
@@ -142,15 +137,11 @@ impl UpdateDatasetTaskRunner {
                     .await?;
                 }
 
-                let task_result = TaskResultDatasetUpdate::from_pull_result(
+                self.combine_task_result(
                     ingest_res.result.into(),
-                    self.dataset_increment_query_service.as_ref(),
                     &ingest_item.target.get_handle().id,
                 )
                 .await
-                .int_err()?;
-
-                Ok(TaskOutcome::Success(task_result.into_task_result()))
             }
             Err(e) => match e {
                 PollingIngestError::ParameterNotFound(_)
@@ -238,15 +229,11 @@ impl UpdateDatasetTaskRunner {
                             .await?;
                         }
 
-                        let task_result = TaskResultDatasetUpdate::from_pull_result(
+                        self.combine_task_result(
                             transform_result.into(),
-                            self.dataset_increment_query_service.as_ref(),
                             &transform_item.target.get_handle().id,
                         )
                         .await
-                        .int_err()?;
-
-                        Ok(TaskOutcome::Success(task_result.into_task_result()))
                     }
                     Err(e) => {
                         tracing::error!(error = ?e, "Transform execution failed");
@@ -267,6 +254,23 @@ impl UpdateDatasetTaskRunner {
             }
             TransformElaboration::UpToDate => Ok(TaskOutcome::Success(TaskResult::empty())),
         }
+    }
+
+    #[transactional_method1(dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>)]
+    async fn combine_task_result(
+        &self,
+        pull_result: PullResult,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<TaskOutcome, InternalError> {
+        let task_result = TaskResultDatasetUpdate::from_pull_result(
+            pull_result,
+            dataset_increment_query_service.as_ref(),
+            dataset_id,
+        )
+        .await
+        .int_err()?;
+
+        Ok(TaskOutcome::Success(task_result.into_task_result()))
     }
 
     #[tracing::instrument(name = UpdateDatasetTaskRunner_update_dataset_head, level = "debug", skip_all, fields(%dataset_handle, %new_head))]

@@ -42,7 +42,7 @@ impl Flow {
             Self::load_flow_related_triggers(&flow_states, ctx).await?;
 
         for flow_state in flow_states {
-            // We could possibly have an associated triger as well
+            // We could possibly have an associated trigger as well
             let maybe_related_flow_trigger_state =
                 flow_related_trigger_states_by_id.remove(&flow_state.flow_binding);
 

@@ -977,6 +977,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
                                 has_more: true,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1007,6 +1008,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice-1"),
                                 has_more: true,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3534,6 +3536,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3806,6 +3809,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4226,6 +4230,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4255,6 +4260,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4302,6 +4308,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4349,6 +4356,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4868,6 +4876,7 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4897,6 +4906,7 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4926,6 +4936,7 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4955,6 +4966,7 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4984,6 +4996,7 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5013,6 +5026,7 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5424,6 +5438,7 @@ async fn test_batching_condition_timeout() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5453,6 +5468,7 @@ async fn test_batching_condition_timeout() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5484,6 +5500,7 @@ async fn test_batching_condition_timeout() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5741,6 +5758,7 @@ async fn test_batching_condition_watermark() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5770,6 +5788,7 @@ async fn test_batching_condition_watermark() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5801,6 +5820,7 @@ async fn test_batching_condition_watermark() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -6111,6 +6131,7 @@ async fn test_batching_condition_with_2_inputs() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -6140,6 +6161,7 @@ async fn test_batching_condition_with_2_inputs() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -6169,6 +6191,7 @@ async fn test_batching_condition_with_2_inputs() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -6198,6 +6221,7 @@ async fn test_batching_condition_with_2_inputs() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -6227,6 +6251,7 @@ async fn test_batching_condition_with_2_inputs() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -6256,6 +6281,7 @@ async fn test_batching_condition_with_2_inputs() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7351,6 +7377,7 @@ async fn test_abort_flow_after_task_finishes() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7423,6 +7450,7 @@ async fn test_abort_flow_after_task_finishes() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7838,6 +7866,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7885,6 +7914,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -8232,6 +8262,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -8261,6 +8292,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -9824,6 +9856,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
                                 has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),

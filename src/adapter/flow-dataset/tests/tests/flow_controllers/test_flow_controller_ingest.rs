@@ -101,6 +101,7 @@ async fn test_ingest_propagate_success_up_to_date_causes_no_interaction() {
             PullResult::UpToDate(PullResultUpToDate::PollingIngest(
                 PollingIngestResultUpToDate { uncacheable: false },
             )),
+            None,
         )
         .await;
 }
@@ -168,6 +169,7 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
                 new_head,
                 has_more: false,
             },
+            None,
         )
         .await;
 }
@@ -241,8 +243,17 @@ impl FlowControllerIngestHarness {
             .unwrap()
     }
 
-    async fn propagate_success(&self, flow_state: &FlowState, pull_result: PullResult) {
-        let task_result = TaskResultDatasetUpdate { pull_result }.into_task_result();
+    async fn propagate_success(
+        &self,
+        flow_state: &FlowState,
+        pull_result: PullResult,
+        data_increment: Option<MetadataChainIncrementInterval>,
+    ) {
+        let task_result = TaskResultDatasetUpdate {
+            pull_result,
+            data_increment,
+        }
+        .into_task_result();
 
         self.controller
             .propagate_success(flow_state, &task_result, Utc::now())
