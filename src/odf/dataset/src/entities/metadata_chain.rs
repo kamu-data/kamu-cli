@@ -10,6 +10,7 @@
 use std::error::Error;
 use std::fmt::Display;
 
+use ::serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 use internal_error::*;
 use odf_metadata::*;
@@ -135,6 +136,128 @@ pub trait MetadataChainExt: MetadataChain {
     /// API.
     fn iter_blocks(&self) -> DynMetadataStream<'_> {
         self.iter_blocks_interval((&BlockRef::Head).into(), None, false)
+    }
+
+    /// Computes incremental stats between two given blocks of the dataset
+    ///
+    /// Returns amount of records and blocks between blocks and latest watermark
+    /// in a given range
+    // TODO: PERF: Avoid multiple passes over metadata chain
+    async fn get_increment_for_interval<'a>(
+        &'a self,
+        old_head: Option<&Multihash>,
+        new_head: &Multihash,
+    ) -> Result<MetadataChainIncrementInterval, GetIncrementError> {
+        use futures::TryStreamExt;
+
+        // Analysis outputs
+        let mut num_blocks = 0;
+        let mut num_records = 0;
+        let mut updated_watermark = None;
+
+        // The watermark seen nearest to new head
+        let mut latest_watermark = None;
+
+        // Scan blocks (from new head to old head)
+        let mut block_stream =
+            self.iter_blocks_interval(new_head.into(), old_head.map(Into::into), false);
+
+        while let Some((_, block)) = block_stream.try_next().await.map_err(|err| match err {
+            IterBlocksError::BlockNotFound(e) => GetIncrementError::BlockNotFound(e),
+            IterBlocksError::InvalidInterval(e) => GetIncrementError::InvalidInterval(e),
+            _ => GetIncrementError::Internal(err.int_err()),
+        })? {
+            // Each block counts
+            num_blocks += 1;
+
+            // Count added records in data blocks
+            num_records += match &block.event {
+                MetadataEvent::AddData(add_data) => add_data
+                    .new_data
+                    .as_ref()
+                    .map(DataSlice::num_records)
+                    .unwrap_or_default(),
+                MetadataEvent::ExecuteTransform(execute_transform) => execute_transform
+                    .new_data
+                    .as_ref()
+                    .map(DataSlice::num_records)
+                    .unwrap_or_default(),
+                _ => 0,
+            };
+
+            // If we haven't decided on the updated watermark yet, analyze watermarks
+            if updated_watermark.is_none() {
+                // Extract watermark of this block, if present
+                let block_watermark = match &block.event {
+                    MetadataEvent::AddData(add_data) => add_data.new_watermark,
+                    MetadataEvent::ExecuteTransform(execute_transform) => {
+                        execute_transform.new_watermark
+                    }
+                    _ => None,
+                };
+                if let Some(block_watermark) = block_watermark {
+                    // Did we have a watermark already since the start of scanning?
+                    if let Some(latest_watermark_ref) = latest_watermark.as_ref() {
+                        // Yes, so if we see a different watermark now, it means it was
+                        // updated in this pull result
+                        if block_watermark != *latest_watermark_ref {
+                            updated_watermark = Some(*latest_watermark_ref);
+                        }
+                    } else {
+                        // No, so remember the latest watermark
+                        latest_watermark = Some(block_watermark);
+                    }
+                }
+            }
+        }
+
+        // Drop stream to unborrow old_head/new_head references
+        drop(block_stream);
+
+        // We have reach the end of pulled interval.
+        // If we've seen some watermark, but not the previous one within the changed
+        // interval, we need to look for the previous watermark earlier
+        if updated_watermark.is_none()
+            && let Some(latest_watermark_ref) = latest_watermark.as_ref()
+        {
+            // Did we have any head before?
+            if let Some(old_head) = &old_head {
+                // Yes, so try locating the previous watermark containing node
+                let previous_nearest_watermark: Option<chrono::DateTime<chrono::Utc>> = self
+                    .accept_one_by_hash(old_head, crate::SearchSingleDataBlockVisitor::next())
+                    .await
+                    .int_err()?
+                    .into_event()
+                    .and_then(|event| event.new_watermark);
+
+                // The "latest" watermark is only an update, if we can find a different
+                // watermark before the searched interval, or if it's a first watermark
+                updated_watermark = if let Some(previous_nearest_watermark) =
+                    previous_nearest_watermark
+                {
+                    // There is previous watermark
+                    if previous_nearest_watermark != *latest_watermark_ref {
+                        // It's different from what we've found on the interval, so it's an update
+                        latest_watermark
+                    } else {
+                        // It's the same as what we've found on the interval, so there is no update
+                        None
+                    }
+                } else {
+                    // There was no watermark before, so it's definitely an update
+                    latest_watermark
+                };
+            } else {
+                // It's a first pull, the latest watermark is an update, if earlier found
+                updated_watermark = latest_watermark;
+            }
+        }
+
+        Ok(MetadataChainIncrementInterval {
+            num_blocks,
+            num_records,
+            updated_watermark,
+        })
     }
 
     /// Convenience function to iterate blocks starting with the specified
@@ -915,6 +1038,41 @@ impl Display for OffsetsNotSequentialError {
             self.expected_offset, self.new_offset,
         )
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetadataChainIncrementInterval {
+    pub num_blocks: u64,
+    pub num_records: u64,
+    pub updated_watermark: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl std::ops::AddAssign for MetadataChainIncrementInterval {
+    fn add_assign(&mut self, rhs: Self) {
+        self.num_blocks += rhs.num_blocks;
+        self.num_records += rhs.num_records;
+        self.updated_watermark = match self.updated_watermark {
+            None => rhs.updated_watermark,
+            Some(self_watermark) => match rhs.updated_watermark {
+                None => Some(self_watermark),
+                Some(rhs_watermark) => Some(std::cmp::max(self_watermark, rhs_watermark)),
+            },
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum GetIncrementError {
+    #[error(transparent)]
+    BlockNotFound(BlockNotFoundError),
+
+    #[error(transparent)]
+    InvalidInterval(InvalidIntervalError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -23,6 +23,7 @@ use kamu_datasets::*;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use messaging_outbox::*;
+use odf::dataset::MetadataChainIncrementInterval;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -76,7 +77,7 @@ async fn test_http_ingest() {
             foo_id.clone(),
             Some(old_hash.clone()),
             new_hash.clone(),
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -133,7 +134,7 @@ async fn test_smart_protocol_push() {
             foo_id.clone(),
             Some(old_hash.clone()),
             new_hash.clone(),
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,

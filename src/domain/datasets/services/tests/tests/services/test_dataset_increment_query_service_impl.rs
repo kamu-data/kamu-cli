@@ -12,8 +12,9 @@ use std::sync::Arc;
 use chrono::Utc;
 use kamu::testing::BaseRepoHarness;
 use kamu_core::TenancyConfig;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
+use kamu_datasets::DatasetIncrementQueryService;
 use kamu_datasets_services::DatasetIncrementQueryServiceImpl;
+use odf::dataset::MetadataChainIncrementInterval;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,7 +39,7 @@ async fn test_initial_increment() {
         .unwrap();
     assert_eq!(
         increment_between,
-        DatasetIntervalIncrement {
+        MetadataChainIncrementInterval {
             num_blocks: 2,
             num_records: 0,
             updated_watermark: None
@@ -64,7 +65,7 @@ async fn test_no_changes_with_same_bounds() {
         .get_increment_between(&foo.dataset_handle.id, Some(&foo.head), &foo.head)
         .await
         .unwrap();
-    assert_eq!(increment_between, DatasetIntervalIncrement::default());
+    assert_eq!(increment_between, MetadataChainIncrementInterval::default());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,7 +143,7 @@ async fn test_add_data_differences() {
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_1.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0,
                 updated_watermark: None,
@@ -152,7 +153,7 @@ async fn test_add_data_differences() {
         (
             Some(&commit_result_1.new_head),
             &commit_result_2.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 10,
                 updated_watermark: None,
@@ -162,7 +163,7 @@ async fn test_add_data_differences() {
         (
             Some(&commit_result_2.new_head),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: Some(new_watermark_time),
@@ -172,7 +173,7 @@ async fn test_add_data_differences() {
         (
             Some(&commit_result_1.new_head),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 15,
                 updated_watermark: Some(new_watermark_time),
@@ -182,7 +183,7 @@ async fn test_add_data_differences() {
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 10,
                 updated_watermark: None,
@@ -192,7 +193,7 @@ async fn test_add_data_differences() {
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 3,
                 num_records: 15,
                 updated_watermark: Some(new_watermark_time),
@@ -202,7 +203,7 @@ async fn test_add_data_differences() {
         (
             None,
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 5,
                 num_records: 15,
                 updated_watermark: Some(new_watermark_time),
@@ -296,7 +297,7 @@ async fn test_execute_transform_differences() {
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_1.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0,
                 updated_watermark: None,
@@ -306,7 +307,7 @@ async fn test_execute_transform_differences() {
         (
             Some(commit_result_2.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 15,
                 updated_watermark: None,
@@ -316,7 +317,7 @@ async fn test_execute_transform_differences() {
         (
             Some(commit_result_3.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: Some(new_watermark_time),
@@ -326,7 +327,7 @@ async fn test_execute_transform_differences() {
         (
             Some(&commit_result_1.new_head),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 20,
                 updated_watermark: Some(new_watermark_time),
@@ -336,7 +337,7 @@ async fn test_execute_transform_differences() {
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 15,
                 updated_watermark: None,
@@ -346,7 +347,7 @@ async fn test_execute_transform_differences() {
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 3,
                 num_records: 20,
                 updated_watermark: Some(new_watermark_time),
@@ -356,7 +357,7 @@ async fn test_execute_transform_differences() {
         (
             None,
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 5,
                 num_records: 20,
                 updated_watermark: Some(new_watermark_time),
@@ -447,7 +448,7 @@ async fn test_multiple_watermarks_within_interval() {
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_1.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0,
                 updated_watermark: None,
@@ -457,7 +458,7 @@ async fn test_multiple_watermarks_within_interval() {
         (
             Some(commit_result_2.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 10,
                 updated_watermark: Some(watermark_1_time),
@@ -467,7 +468,7 @@ async fn test_multiple_watermarks_within_interval() {
         (
             Some(commit_result_3.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 15,
                 updated_watermark: Some(watermark_2_time),
@@ -477,7 +478,7 @@ async fn test_multiple_watermarks_within_interval() {
         (
             None,
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 5,
                 num_records: 25,
                 updated_watermark: Some(watermark_2_time),
@@ -590,7 +591,7 @@ async fn test_older_watermark_before_interval() {
         (
             Some(commit_result_2.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 10,
                 updated_watermark: Some(watermark_1_time),
@@ -600,7 +601,7 @@ async fn test_older_watermark_before_interval() {
         (
             Some(commit_result_3.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 15,
                 updated_watermark: None,
@@ -610,7 +611,7 @@ async fn test_older_watermark_before_interval() {
         (
             Some(commit_result_4.old_head.as_ref().unwrap()),
             &commit_result_4.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 12,
                 updated_watermark: Some(watermark_2_time),
@@ -620,7 +621,7 @@ async fn test_older_watermark_before_interval() {
         (
             None,
             &commit_result_3.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 5,
                 num_records: 25,
                 updated_watermark: Some(watermark_1_time),
@@ -630,7 +631,7 @@ async fn test_older_watermark_before_interval() {
         (
             None,
             &commit_result_4.new_head,
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 6,
                 num_records: 37,
                 updated_watermark: Some(watermark_2_time),
@@ -677,7 +678,7 @@ impl DatasetIncrementQueryServiceHarness {
         between_cases: &[(
             Option<&odf::Multihash>,
             &odf::Multihash,
-            DatasetIntervalIncrement,
+            MetadataChainIncrementInterval,
         )],
     ) {
         for (index, (old_head, new_head, expected_increment)) in between_cases.iter().enumerate() {

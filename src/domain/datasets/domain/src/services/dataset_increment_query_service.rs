@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+use odf::dataset::MetadataChainIncrementInterval;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,30 +21,7 @@ pub trait DatasetIncrementQueryService: Sync + Send {
         dataset_id: &'a odf::DatasetID,
         old_head: Option<&'a odf::Multihash>,
         new_head: &'a odf::Multihash,
-    ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
-pub struct DatasetIntervalIncrement {
-    pub num_blocks: u64,
-    pub num_records: u64,
-    pub updated_watermark: Option<DateTime<Utc>>,
-}
-
-impl std::ops::AddAssign for DatasetIntervalIncrement {
-    fn add_assign(&mut self, rhs: Self) {
-        self.num_blocks += rhs.num_blocks;
-        self.num_records += rhs.num_records;
-        self.updated_watermark = match self.updated_watermark {
-            None => rhs.updated_watermark,
-            Some(self_watermark) => match rhs.updated_watermark {
-                None => Some(self_watermark),
-                Some(rhs_watermark) => Some(std::cmp::max(self_watermark, rhs_watermark)),
-            },
-        }
-    }
+    ) -> Result<MetadataChainIncrementInterval, GetIncrementError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +45,20 @@ pub enum GetIncrementError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<odf::dataset::GetIncrementError> for GetIncrementError {
+    fn from(e: odf::dataset::GetIncrementError) -> Self {
+        match e {
+            odf::dataset::GetIncrementError::BlockNotFound(e) => {
+                GetIncrementError::BlockNotFound(e)
+            }
+            odf::dataset::GetIncrementError::InvalidInterval(e) => {
+                GetIncrementError::InvalidInterval(e)
+            }
+            odf::dataset::GetIncrementError::Internal(e) => GetIncrementError::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
