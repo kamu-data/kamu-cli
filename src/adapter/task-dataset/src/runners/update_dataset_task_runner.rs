@@ -81,14 +81,29 @@ impl UpdateDatasetTaskRunner {
             .refresh_dataset_from_registry(dataset_registry.as_ref())
             .await;
 
-        let sync_response = self.sync_service.sync(sync_request, sync_opts, None).await;
+        let sync_response = self
+            .sync_service
+            .sync(sync_request.clone(), sync_opts, None)
+            .await;
         match sync_response {
-            Ok(sync_result) => Ok(TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: sync_result.into(),
-                }
-                .into_task_result(),
-            )),
+            Ok(sync_result) => {
+                let task_result = if let SyncRef::Local(local_ref) = &sync_request.dst {
+                    TaskResultDatasetUpdate::from_pull_result(
+                        sync_result.into(),
+                        self.dataset_increment_query_service.as_ref(),
+                        &local_ref.get_handle().id,
+                    )
+                    .await
+                    .int_err()?
+                } else {
+                    TaskResultDatasetUpdate {
+                        pull_result: sync_result.into(),
+                        data_increment: None,
+                    }
+                };
+
+                Ok(TaskOutcome::Success(task_result.into_task_result()))
+            }
             Err(_) =>
             // TODO: classify sync errors as recoverable/unrecoverable
             {
@@ -127,12 +142,15 @@ impl UpdateDatasetTaskRunner {
                     .await?;
                 }
 
-                Ok(TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                        pull_result: ingest_res.result.into(),
-                    }
-                    .into_task_result(),
-                ))
+                let task_result = TaskResultDatasetUpdate::from_pull_result(
+                    ingest_res.result.into(),
+                    self.dataset_increment_query_service.as_ref(),
+                    &ingest_item.target.get_handle().id,
+                )
+                .await
+                .int_err()?;
+
+                Ok(TaskOutcome::Success(task_result.into_task_result()))
             }
             Err(e) => match e {
                 PollingIngestError::ParameterNotFound(_)
