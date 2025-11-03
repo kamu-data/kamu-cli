@@ -85,23 +85,23 @@ impl Query {
     // - Methods won't be shown in the GQL schema.
 
     #[graphql(entity)]
-    #[tracing::instrument(level = "info", name = Query_find_account_by_id, skip_all, fields(%account_id))]
+    #[tracing::instrument(level = "info", name = Query_find_account_by_id, skip_all, fields(%id))]
     async fn find_account_by_id(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID<'_>,
+        id: AccountID<'_>,
     ) -> Result<Option<Account>> {
-        Accounts.by_id(ctx, account_id).await
+        Accounts.by_id(ctx, id).await
     }
 
     #[graphql(entity)]
-    #[tracing::instrument(level = "info", name = Query_find_dataset_by_id, skip_all, fields(%dataset_id))]
+    #[tracing::instrument(level = "info", name = Query_find_dataset_by_id, skip_all, fields(%id))]
     async fn find_dataset_by_id(
         &self,
         ctx: &Context<'_>,
-        dataset_id: DatasetID<'_>,
+        id: DatasetID<'_>,
     ) -> Result<Option<Dataset>> {
-        Datasets.by_id(ctx, dataset_id).await
+        Datasets.by_id(ctx, id).await
     }
 }
 
