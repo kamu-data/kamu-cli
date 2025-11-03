@@ -427,22 +427,23 @@ impl S3Context {
 
     pub async fn bucket_list_folders(&self) -> Result<Vec<CommonPrefix>, InternalError> {
         self.api_call("list_objects_v2(bucket_list_folders)", || async {
-            let list_objects_resp = self
+            let mut prefixes = Vec::new();
+
+            let mut paginator = self
                 .client
                 .list_objects_v2()
                 .bucket(self.shared_state.bucket.clone())
                 .delimiter("/")
-                .send()
-                .await
-                .int_err()?;
+                .max_keys(Self::MAX_LISTED_OBJECTS)
+                .into_paginator()
+                .send();
 
-            // TODO: Support iteration
-            assert!(
-                !list_objects_resp.is_truncated.unwrap_or_default(),
-                "Cannot handle truncated response"
-            );
+            while let Some(page) = paginator.next().await {
+                let mut page_prefixes = page.int_err()?.common_prefixes.unwrap_or_default();
+                prefixes.append(&mut page_prefixes);
+            }
 
-            Ok(list_objects_resp.common_prefixes.unwrap_or_default())
+            Ok(prefixes)
         })
         .await
     }
