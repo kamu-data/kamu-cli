@@ -167,34 +167,47 @@ impl FlowDescriptionUpdateResult {
                     | TaskResultDatasetReset::TYPE_ID => Ok(None),
 
                     TaskResultDatasetUpdate::TYPE_ID => {
-                        // TODO: consider caching the increment in the task result itself
                         let update = TaskResultDatasetUpdate::from_task_result(result)?;
                         if let Some((old_head, new_head)) = update.try_as_increment() {
-                            match increment_query_service
-                                .get_increment_between(dataset_id, old_head, new_head)
-                                .await
-                            {
-                                Ok(increment) => {
-                                    Ok(Some(Self::Success(FlowDescriptionUpdateResultSuccess {
-                                        num_blocks: increment.num_blocks,
-                                        num_records: increment.num_records,
-                                        updated_watermark: increment.updated_watermark,
-                                        has_more: update.has_more(),
-                                    })))
+                            // TODO: consider removing fallback if we will completely migrate
+                            // existing flows to new structure
+                            let data_increment = if let Some(increment) = &update.data_increment {
+                                *increment
+                            } else {
+                                match increment_query_service
+                                    .get_increment_between(dataset_id, old_head, new_head)
+                                    .await
+                                {
+                                    Ok(increment) => {
+                                        tracing::warn!(
+                                            ?dataset_id,
+                                            "Call fetching increment fallback"
+                                        );
+                                        increment
+                                    }
+                                    Err(err) => {
+                                        let unknown_message = match err {
+                                            GetIncrementError::BlockNotFound(e) => format!(
+                                                "Unable to fetch increment. Block is missing: {}",
+                                                e.hash
+                                            ),
+                                            _ => "Unable to fetch increment".to_string(),
+                                        };
+                                        return Ok(Some(Self::Unknown(
+                                            FlowDescriptionUpdateResultUnknown {
+                                                message: unknown_message,
+                                            },
+                                        )));
+                                    }
                                 }
-                                Err(err) => {
-                                    let unknown_message = match err {
-                                        GetIncrementError::BlockNotFound(e) => format!(
-                                            "Unable to fetch increment. Block is missing: {}",
-                                            e.hash
-                                        ),
-                                        _ => "Unable to fetch increment".to_string(),
-                                    };
-                                    Ok(Some(Self::Unknown(FlowDescriptionUpdateResultUnknown {
-                                        message: unknown_message,
-                                    })))
-                                }
-                            }
+                            };
+
+                            Ok(Some(Self::Success(FlowDescriptionUpdateResultSuccess {
+                                num_blocks: data_increment.num_blocks,
+                                num_records: data_increment.num_records,
+                                updated_watermark: data_increment.updated_watermark,
+                                has_more: update.has_more(),
+                            })))
                         } else if let Some(up_to_date_result) = update.try_as_up_to_date() {
                             match up_to_date_result {
                                 PullResultUpToDate::PollingIngest(pi) => {

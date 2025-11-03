@@ -20,10 +20,10 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult};
-use kamu_datasets::DatasetIntervalIncrement;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{self as ts, TaskError};
+use odf::dataset::MetadataChainIncrementInterval;
 
 use crate::utils::{
     BaseGQLFlowRunsHarness,
@@ -38,7 +38,7 @@ use crate::utils::{
 async fn test_trigger_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 12,
                 updated_watermark: None,
@@ -307,6 +307,7 @@ async fn test_trigger_ingest_root_dataset() {
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         has_more: false,
                     },
+                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -625,7 +626,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -768,6 +769,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         has_more: false,
                     },
+                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -859,7 +861,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 12,
                 updated_watermark: None,
@@ -3297,7 +3299,7 @@ async fn test_history_of_completed_transform_flow() {
 async fn test_execute_transform_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 12,
                 updated_watermark: None,
@@ -3623,7 +3625,7 @@ async fn test_anonymous_operation_fails() {
 async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 12,
                 updated_watermark: None,
@@ -3744,7 +3746,7 @@ async fn test_config_snapshot_returned_correctly() {
 async fn test_trigger_ingest_root_dataset_with_retry_policy() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 12,
                 updated_watermark: None,
@@ -4046,6 +4048,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         has_more: false,
                     },
+                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -4214,7 +4217,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 async fn test_trigger_flow_automatically_via_schedule() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 12,
                 updated_watermark: None,

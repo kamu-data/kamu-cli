@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, GetIncrementError};
+use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
+use odf::dataset::MetadataChainIncrementInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,14 +23,14 @@ mockall::mock! {
             dataset_id: &'a odf::DatasetID,
             old_head: Option<&'a odf::Multihash>,
             new_head: &'a odf::Multihash,
-        ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
+        ) -> Result<MetadataChainIncrementInterval, GetIncrementError>;
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockDatasetIncrementQueryService {
-    pub fn with_increment_between(increment: DatasetIntervalIncrement) -> Self {
+    pub fn with_increment_between(increment: MetadataChainIncrementInterval) -> Self {
         let mut dataset_changes_mock = MockDatasetIncrementQueryService::default();
         dataset_changes_mock
             .expect_get_increment_between()
@@ -41,7 +42,7 @@ impl MockDatasetIncrementQueryService {
         dataset_id: odf::DatasetID,
         old_head: Option<odf::Multihash>,
         new_head: odf::Multihash,
-        increment: DatasetIntervalIncrement,
+        increment: MetadataChainIncrementInterval,
     ) -> Self {
         let mut dataset_changes_mock = MockDatasetIncrementQueryService::default();
         dataset_changes_mock

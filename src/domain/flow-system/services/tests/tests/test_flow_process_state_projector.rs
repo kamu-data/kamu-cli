@@ -501,6 +501,7 @@ async fn test_flow_succeeded() {
                             new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                             has_more: false,
                         },
+                        data_increment: None,
                     }
                     .into_task_result(),
                 ),

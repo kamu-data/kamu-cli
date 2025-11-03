@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Dataset increment now stored in flow task result to increase flow loading performance
 ### Fixed
 - Executing init script for predefined accounts in parallel. Solves a noticeable slowdown 
    of CLI commands in multi-tenant workspaces
