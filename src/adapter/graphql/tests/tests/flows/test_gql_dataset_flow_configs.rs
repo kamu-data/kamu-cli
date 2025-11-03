@@ -11,6 +11,7 @@ use async_graphql::value;
 use indoc::indoc;
 use kamu_core::TenancyConfig;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
+use pretty_assertions::assert_eq;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
@@ -51,7 +52,7 @@ async fn test_crud_ingest_root_dataset() {
     );
 
     let res = harness
-        .set_ingest_config(&create_result.dataset_handle.id, false, None)
+        .set_ingest_config(&create_result.dataset_handle.id, false, false, None)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -70,7 +71,8 @@ async fn test_crud_ingest_root_dataset() {
                                     "__typename": "FlowConfiguration",
                                     "rule": {
                                         "__typename": "FlowConfigRuleIngest",
-                                        "fetchUncacheable": false
+                                        "fetchUncacheable": false,
+                                        "fetchNextIteration": false
                                     },
                                     "retryPolicy": null
                                 }
@@ -83,7 +85,7 @@ async fn test_crud_ingest_root_dataset() {
     );
 
     let res = harness
-        .set_ingest_config(&create_result.dataset_handle.id, true, None)
+        .set_ingest_config(&create_result.dataset_handle.id, true, true, None)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -102,7 +104,8 @@ async fn test_crud_ingest_root_dataset() {
                                     "__typename": "FlowConfiguration",
                                     "rule": {
                                         "__typename": "FlowConfigRuleIngest",
-                                        "fetchUncacheable": true
+                                        "fetchUncacheable": true,
+                                        "fetchNextIteration": true
                                     },
                                     "retryPolicy": null
                                 }
@@ -245,7 +248,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let res = harness
-        .set_ingest_config(&create_derived_result.dataset_handle.id, false, None)
+        .set_ingest_config(&create_derived_result.dataset_handle.id, false, false, None)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -307,7 +310,7 @@ async fn test_anonymous_setters_fail() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let res = harness
-        .set_ingest_config(&create_root_result.dataset_handle.id, false, None)
+        .set_ingest_config(&create_root_result.dataset_handle.id, false, false, None)
         .expect_error()
         .execute(&schema, &harness.catalog_anonymous)
         .await;
@@ -363,6 +366,7 @@ impl FlowConfigHarness {
                                         __typename
                                         ... on FlowConfigRuleIngest {
                                             fetchUncacheable
+                                            fetchNextIteration
                                         }
                                         ... on FlowConfigRuleCompaction {
                                             __typename

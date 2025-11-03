@@ -62,8 +62,8 @@ impl AccountRepository for SqliteAccountRepository {
         let account_id = account.id.to_string();
         let account_name = account.prepare_account_name_for_storage();
         let email = account.email.as_ref().to_ascii_lowercase();
-        let provider = account.provider.to_string();
-        let provider_identity_key = account.provider_identity_key.to_string();
+        let provider = account.provider.clone();
+        let provider_identity_key = account.provider_identity_key.clone();
 
         sqlx::query!(
             r#"
@@ -104,8 +104,8 @@ impl AccountRepository for SqliteAccountRepository {
         let account_id = updated_account.id.to_string();
         let account_name = updated_account.prepare_account_name_for_storage();
         let email = updated_account.email.as_ref().to_ascii_lowercase();
-        let provider = updated_account.provider.to_string();
-        let provider_identity_key = updated_account.provider_identity_key.to_string();
+        let provider = updated_account.provider.clone();
+        let provider_identity_key = updated_account.provider_identity_key.clone();
 
         let update_result = sqlx::query!(
             r#"

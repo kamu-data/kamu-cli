@@ -3,7 +3,7 @@ IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
 # Keep in sync with versions of Jupyter and Minio in docker-compose.yml
-DEMO_VERSION = 0.17.7
+DEMO_VERSION = 0.17.9
 
 #########################################################################################
 

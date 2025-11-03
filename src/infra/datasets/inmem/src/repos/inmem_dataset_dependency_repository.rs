@@ -50,7 +50,7 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
         Ok(has_dependencies)
     }
 
-    fn list_all_dependencies(&self) -> DatasetDependenciesIDStream {
+    fn list_all_dependencies(&self) -> DatasetDependenciesIDStream<'_> {
         let dependencies: Vec<_> = {
             let guard = self.state.lock().unwrap();
             guard

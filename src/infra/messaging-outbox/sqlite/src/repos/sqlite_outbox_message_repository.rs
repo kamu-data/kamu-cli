@@ -56,7 +56,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         &self,
         above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
-    ) -> OutboxMessageStream {
+    ) -> OutboxMessageStream<'_> {
         let unfiltered = above_boundaries_by_producer.is_empty();
 
         let json_bounds = serde_json::to_string(

@@ -165,7 +165,7 @@ impl VectorRepository for VectorRepositoryQdrant {
                     .expect("point id options should not be empty")
                 {
                     point_id::PointIdOptions::Num(v) => v.to_string(),
-                    point_id::PointIdOptions::Uuid(v) => v.to_string(),
+                    point_id::PointIdOptions::Uuid(v) => v.clone(),
                 },
                 payload: serde_json::Value::Object(
                     p.payload

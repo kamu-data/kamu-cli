@@ -102,7 +102,7 @@ impl<'a> DatasetMetadata<'a> {
     }
 
     /// Access to the temporal metadata chain of the dataset
-    async fn chain(&self) -> MetadataChain {
+    async fn chain(&self) -> MetadataChain<'_> {
         MetadataChain::new(self.dataset_request_state)
     }
 
@@ -148,7 +148,7 @@ impl<'a> DatasetMetadata<'a> {
     async fn current_upstream_dependencies(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<Vec<DependencyDatasetResult>> {
+    ) -> Result<Vec<DependencyDatasetResult<'_>>> {
         let get_dataset_upstream_dependencies_use_case =
             from_catalog_n!(ctx, dyn GetDatasetUpstreamDependenciesUseCase);
 
@@ -177,7 +177,7 @@ impl<'a> DatasetMetadata<'a> {
     async fn current_downstream_dependencies(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<Vec<DependencyDatasetResult>> {
+    ) -> Result<Vec<DependencyDatasetResult<'_>>> {
         let get_dataset_downstream_dependencies_use_case =
             from_catalog_n!(ctx, dyn GetDatasetDownstreamDependenciesUseCase);
 

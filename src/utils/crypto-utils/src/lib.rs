@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(let_chains)]
-
 mod aes_gcm;
 mod argon2_hash;
 mod encryptor;

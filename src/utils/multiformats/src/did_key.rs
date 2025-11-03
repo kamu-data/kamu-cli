@@ -91,12 +91,12 @@ impl DidKey {
     }
 
     /// Formats DID as a canonical `did:key:<multibase>` string
-    pub fn as_did_str(&self) -> DidKeyFmt {
+    pub fn as_did_str(&self) -> DidKeyFmt<'_> {
         DidKeyFmt::new(self, DEFAULT_DID_MULTIBASE_ENCODING)
     }
 
     /// Formats DID as a multibase string (without `did:key:`) prefix
-    pub fn as_multibase(&self) -> DidKeyMultibaseFmt {
+    pub fn as_multibase(&self) -> DidKeyMultibaseFmt<'_> {
         DidKeyMultibaseFmt::new(self, DEFAULT_DID_MULTIBASE_ENCODING)
     }
 

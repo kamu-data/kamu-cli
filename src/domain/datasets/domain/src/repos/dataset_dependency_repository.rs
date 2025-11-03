@@ -19,7 +19,7 @@ use tokio_stream::Stream;
 pub trait DatasetDependencyRepository: Send + Sync {
     async fn stores_any_dependencies(&self) -> Result<bool, InternalError>;
 
-    fn list_all_dependencies(&self) -> DatasetDependenciesIDStream;
+    fn list_all_dependencies(&self) -> DatasetDependenciesIDStream<'_>;
 
     async fn add_upstream_dependencies(
         &self,

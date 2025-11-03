@@ -68,12 +68,14 @@ impl From<fs::FlowConfigurationRule> for FlowConfigRule {
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigRuleIngest {
     pub fetch_uncacheable: bool,
+    pub fetch_next_iteration: bool,
 }
 
 impl From<afs::FlowConfigRuleIngest> for FlowConfigRuleIngest {
     fn from(value: afs::FlowConfigRuleIngest) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
+            fetch_next_iteration: value.fetch_next_iteration,
         }
     }
 }
@@ -160,7 +162,7 @@ pub struct FlowConfigInputResetPropagationModeToSeed {
 }
 
 impl FlowConfigResetInput {
-    pub fn new_head_hash(&self) -> Option<Multihash> {
+    pub fn new_head_hash(&self) -> Option<Multihash<'_>> {
         match &self.mode {
             FlowConfigInputResetPropagationMode::Custom(custom_args) => {
                 Some(custom_args.new_head_hash.clone())
@@ -193,12 +195,16 @@ impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
 pub struct FlowConfigIngestInput {
     /// Flag indicates to ignore cache during ingest step for API calls
     pub fetch_uncacheable: bool,
+    /// Flag indicates to trigger next flow iteration right if `has_more` is
+    /// true
+    pub fetch_next_iteration: bool,
 }
 
 impl From<FlowConfigIngestInput> for afs::FlowConfigRuleIngest {
     fn from(value: FlowConfigIngestInput) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
+            fetch_next_iteration: value.fetch_next_iteration,
         }
     }
 }

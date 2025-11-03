@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use async_graphql::*;
-use dill::*;
+use async_graphql::value;
 use indoc::indoc;
 use internal_error::InternalError;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
@@ -25,13 +24,11 @@ use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_
 
 #[test_log::test(tokio::test)]
 async fn test_remote_push_statuses() {
-    let harness = PushStatusesTestHarness::new();
+    let harness = PushStatusesTestHarness::new().await;
 
     // Init dataset with no sources
-    let (_, catalog_authorized) =
-        authentication_catalogs(&harness.catalog, PredefinedAccountOpts::default()).await;
-
-    let create_dataset_from_snapshot = catalog_authorized
+    let create_dataset_from_snapshot = harness
+        .catalog_authorized
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
     let create_result = create_dataset_from_snapshot
@@ -68,9 +65,8 @@ async fn test_remote_push_statuses() {
     )
     .replace("<id>", &create_result.dataset_handle.id.to_string());
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(Request::new(request_code.clone()).data(catalog_authorized.clone()))
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -127,17 +123,17 @@ async fn test_remote_push_statuses() {
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct PushStatusesTestHarness {
     base_gql_harness: BaseGQLDatasetHarness,
-    catalog: Catalog,
+    catalog_authorized: dill::Catalog,
 }
 
 impl PushStatusesTestHarness {
-    fn new() -> Self {
+    pub async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
             .build();
 
         let catalog = {
-            let mut b = CatalogBuilder::new_chained(base_gql_harness.catalog());
+            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
             b.add_value(FakeRemoteStatusService {})
                 .bind::<dyn RemoteStatusService, FakeRemoteStatusService>();
@@ -145,10 +141,20 @@ impl PushStatusesTestHarness {
             b.build()
         };
 
+        let (_catalog_anonymous, catalog_authorized) =
+            authentication_catalogs(&catalog, PredefinedAccountOpts::default()).await;
+
         Self {
             base_gql_harness,
-            catalog,
+            catalog_authorized,
         }
+    }
+
+    pub async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        self.execute_query(query, &self.catalog_authorized).await
     }
 }
 

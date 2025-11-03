@@ -1347,7 +1347,7 @@ async fn test_iter_blocks() {
 
     // Full range
     let hashed_blocks: Result<Vec<_>, _> = chain
-        .iter_blocks_interval(&hash_4, None, false)
+        .iter_blocks_interval((&hash_4).into(), None, false)
         .collect()
         .await;
 
@@ -1363,7 +1363,7 @@ async fn test_iter_blocks() {
 
     // Tailed
     let hashed_blocks: Result<Vec<_>, _> = chain
-        .iter_blocks_interval(&hash_3, Some(&hash_1), false)
+        .iter_blocks_interval((&hash_3).into(), Some((&hash_1).into()), false)
         .collect()
         .await;
 
@@ -1375,32 +1375,18 @@ async fn test_iter_blocks() {
         ]
     );
 
-    // Tailed (inclusive)
-    let hashed_blocks: Result<Vec<_>, _> = chain
-        .iter_blocks_interval_inclusive(&hash_3, &hash_2, false)
-        .collect()
-        .await;
-
-    assert_eq!(
-        hashed_blocks.unwrap(),
-        [
-            (hash_3.clone(), block_3.clone()),
-            (hash_2.clone(), block_2.clone()),
-        ]
-    );
-
     // Tail not found
     let bad_hash = odf::Multihash::from_digest_sha3_256(b"does-not-exist");
 
     let hashed_blocks: Result<Vec<_>, _> = chain
-        .iter_blocks_interval(&hash_3, Some(&bad_hash), false)
+        .iter_blocks_interval((&hash_3).into(), Some((&bad_hash).into()), false)
         .collect()
         .await;
     assert_matches!(hashed_blocks, Err(IterBlocksError::InvalidInterval(_)));
 
     // Try ignoring divergence
     let hashed_blocks: Result<Vec<_>, _> = chain
-        .iter_blocks_interval(&hash_3, Some(&bad_hash), true)
+        .iter_blocks_interval((&hash_3).into(), Some((&bad_hash).into()), true)
         .collect()
         .await;
     assert_eq!(

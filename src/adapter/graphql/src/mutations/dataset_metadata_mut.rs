@@ -33,7 +33,7 @@ impl<'a> DatasetMetadataMut<'a> {
     }
 
     /// Access to the mutable metadata chain of the dataset
-    async fn chain(&self) -> MetadataChainMut {
+    async fn chain(&self) -> MetadataChainMut<'_> {
         MetadataChainMut::new(self.dataset_request_state)
     }
 
@@ -44,7 +44,7 @@ impl<'a> DatasetMetadataMut<'a> {
         &self,
         ctx: &Context<'_>,
         content: Option<String>,
-    ) -> Result<UpdateReadmeResult> {
+    ) -> Result<UpdateReadmeResult<'_>> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         let old_attachments = resolved_dataset

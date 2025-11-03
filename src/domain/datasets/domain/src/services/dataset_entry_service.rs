@@ -26,9 +26,9 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait DatasetEntryService: Sync + Send {
-    fn all_entries(&self) -> DatasetEntryStream;
+    fn all_entries(&self) -> DatasetEntryStream<'_>;
 
-    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream;
+    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream<'_>;
 
     async fn get_entry(
         &self,

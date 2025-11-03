@@ -49,6 +49,7 @@ use kamu_core::{
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
+    InMemoryDatasetDataBlockRepository,
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
@@ -146,6 +147,7 @@ impl ServerSideLocalFsHarness {
                     datasets_dir,
                 ))
                 .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
@@ -163,6 +165,7 @@ impl ServerSideLocalFsHarness {
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()

@@ -11,63 +11,15 @@ use std::assert_matches::assert_matches;
 
 use dill::Catalog;
 use kamu_datasets::*;
-use odf::metadata::testing::MetadataFactory;
-use odf::serde::MetadataBlockSerializer;
-use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 
-use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn make_info_block(sequence_number: u64) -> DatasetKeyBlock {
-    let event = MetadataFactory::set_info()
-        .description("Test dataset")
-        .keyword("demo")
-        .build();
-
-    let block = MetadataFactory::metadata_block(event).build();
-
-    make_block(sequence_number, &block, MetadataEventType::SetInfo)
-}
-
-fn make_license_block(sequence_number: u64) -> DatasetKeyBlock {
-    let event = MetadataFactory::set_license()
-        .short_name("MIT")
-        .name("MIT License")
-        .build();
-
-    let block = MetadataFactory::metadata_block(event).build();
-
-    make_block(sequence_number, &block, MetadataEventType::SetLicense)
-}
-
-fn make_seed_block() -> DatasetKeyBlock {
-    let event = MetadataFactory::seed(odf::DatasetKind::Root).build();
-
-    let block = MetadataFactory::metadata_block(event).build();
-
-    make_block(0, &block, MetadataEventType::Seed)
-}
-
-fn make_block(
-    sequence_number: u64,
-    block: &odf::MetadataBlock,
-    kind: MetadataEventType,
-) -> DatasetKeyBlock {
-    let block_hash =
-        odf::Multihash::from_digest_sha3_256(format!("block-{sequence_number}").as_bytes());
-
-    let block_data = FlatbuffersMetadataBlockSerializer
-        .write_manifest(block)
-        .unwrap();
-
-    DatasetKeyBlock {
-        event_kind: kind,
-        sequence_number,
-        block_hash,
-        block_payload: bytes::Bytes::from(block_data.collapse_vec()),
-    }
-}
+use crate::helpers::{
+    init_dataset_entry,
+    init_test_account,
+    make_info_block,
+    make_license_block,
+    make_seed_block,
+    remove_dataset_entry,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -90,17 +42,17 @@ pub async fn test_has_blocks(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
     assert!(
         !repo
-            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
 
-    let block = make_seed_block();
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[block])
+    let block = make_seed_block(odf::DatasetKind::Root);
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[block])
         .await
         .unwrap();
     assert!(
-        repo.has_blocks(&dataset_id, &odf::BlockRef::Head)
+        repo.has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -125,8 +77,12 @@ pub async fn test_save_blocks_batch(catalog: &Catalog) {
     .await;
 
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
-    let blocks = vec![make_seed_block(), make_info_block(1), make_license_block(2)];
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &blocks)
+    let blocks = vec![
+        make_seed_block(odf::DatasetKind::Root),
+        make_info_block(1),
+        make_license_block(2),
+    ];
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
@@ -165,15 +121,15 @@ pub async fn test_save_blocks_batch_duplicate_sequence_number(catalog: &Catalog)
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
 
     // Save a Seed block at sequence number 0
-    let seed_block = make_seed_block();
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[seed_block])
+    let seed_block = make_seed_block(odf::DatasetKind::Root);
+    repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[seed_block])
         .await
         .unwrap();
 
     // Attempt to save another block at sequence number 0
     let invalid_block = make_info_block(0);
     let result = repo
-        .save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[invalid_block])
+        .save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[invalid_block])
         .await;
 
     // Verify the error is DuplicateSequenceNumber
@@ -227,23 +183,31 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
     .await;
 
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
-    let blocks = vec![make_seed_block(), make_info_block(1), make_license_block(2)];
-    repo.save_blocks_batch(&dataset_id_1, &odf::BlockRef::Head, &blocks)
-        .await
-        .unwrap();
-
-    let blocks = vec![make_seed_block(), make_info_block(1), make_info_block(2)];
-    repo.save_blocks_batch(&dataset_id_2, &odf::BlockRef::Head, &blocks)
+    let blocks = vec![
+        make_seed_block(odf::DatasetKind::Root),
+        make_info_block(1),
+        make_license_block(2),
+    ];
+    repo.save_key_blocks_batch(&dataset_id_1, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
     let blocks = vec![
-        make_seed_block(),
+        make_seed_block(odf::DatasetKind::Root),
+        make_info_block(1),
+        make_info_block(2),
+    ];
+    repo.save_key_blocks_batch(&dataset_id_2, &odf::BlockRef::Head, &blocks)
+        .await
+        .unwrap();
+
+    let blocks = vec![
+        make_seed_block(odf::DatasetKind::Root),
         make_info_block(1),
         make_license_block(2),
         make_license_block(3),
     ];
-    repo.save_blocks_batch(&dataset_id_3, &odf::BlockRef::Head, &blocks)
+    repo.save_key_blocks_batch(&dataset_id_3, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
@@ -254,7 +218,7 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
     ];
 
     let matches = repo
-        .match_datasets_having_blocks(
+        .match_datasets_having_key_blocks(
             &dataset_ids,
             &odf::BlockRef::Head,
             kamu_datasets::MetadataEventType::SetLicense,
@@ -275,7 +239,7 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
     );
 
     let matches = repo
-        .match_datasets_having_blocks(
+        .match_datasets_having_key_blocks(
             &dataset_ids,
             &odf::BlockRef::Head,
             kamu_datasets::MetadataEventType::SetInfo,
@@ -320,21 +284,25 @@ pub async fn test_delete_blocks(catalog: &Catalog) {
     .await;
 
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_seed_block()])
-        .await
-        .unwrap();
+    repo.save_key_blocks_batch(
+        &dataset_id,
+        &odf::BlockRef::Head,
+        &[make_seed_block(odf::DatasetKind::Root)],
+    )
+    .await
+    .unwrap();
     for i in 1..5 {
-        repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
+        repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
             .await
             .unwrap();
     }
 
-    repo.delete_all_for_ref(&dataset_id, &odf::BlockRef::Head)
+    repo.delete_all_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
         .await
         .unwrap();
     assert!(
         !repo
-            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -361,18 +329,22 @@ pub async fn test_remove_dataset_entry_removes_key_blocks(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
 
     // Add some blocks
-    repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_seed_block()])
-        .await
-        .unwrap();
+    repo.save_key_blocks_batch(
+        &dataset_id,
+        &odf::BlockRef::Head,
+        &[make_seed_block(odf::DatasetKind::Root)],
+    )
+    .await
+    .unwrap();
     for i in 1..4 {
-        repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
+        repo.save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[make_info_block(i)])
             .await
             .unwrap();
     }
 
     // Verify blocks exist
     assert!(
-        repo.has_blocks(&dataset_id, &odf::BlockRef::Head)
+        repo.has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -383,10 +355,107 @@ pub async fn test_remove_dataset_entry_removes_key_blocks(catalog: &Catalog) {
     // Verify blocks are removed
     assert!(
         !repo
-            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .has_key_blocks_for_ref(&dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_list_unindexed_dataset_branches(catalog: &Catalog) {
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
+    // Create multiple dataset entries
+    let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"ds-unindexed-1");
+    let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"ds-unindexed-2");
+    let dataset_id_3 = odf::DatasetID::new_seeded_ed25519(b"ds-unindexed-3");
+
+    let dataset_name_1 = odf::DatasetName::new_unchecked("unindexed-ds-1");
+    let dataset_name_2 = odf::DatasetName::new_unchecked("unindexed-ds-2");
+    let dataset_name_3 = odf::DatasetName::new_unchecked("unindexed-ds-3");
+
+    // Initialize all dataset entries
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &test_account_name,
+        &dataset_id_1,
+        &dataset_name_1,
+        odf::DatasetKind::Root,
+    )
+    .await;
+
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &test_account_name,
+        &dataset_id_2,
+        &dataset_name_2,
+        odf::DatasetKind::Root,
+    )
+    .await;
+
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &test_account_name,
+        &dataset_id_3,
+        &dataset_name_3,
+        odf::DatasetKind::Derivative,
+    )
+    .await;
+
+    let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
+
+    // Initially, all datasets should appear as unindexed since no blocks are saved
+    let unindexed = repo.list_unindexed_dataset_branches().await.unwrap();
+    assert_eq!(unindexed.len(), 3);
+
+    // Verify all datasets are in the unindexed list
+    let unindexed_ids: std::collections::HashSet<_> =
+        unindexed.iter().map(|(id, _)| id.clone()).collect();
+    assert!(unindexed_ids.contains(&dataset_id_1));
+    assert!(unindexed_ids.contains(&dataset_id_2));
+    assert!(unindexed_ids.contains(&dataset_id_3));
+
+    // All should be for Head branch
+    assert!(
+        unindexed
+            .iter()
+            .all(|(_, block_ref)| *block_ref == odf::BlockRef::Head)
+    );
+
+    // Index dataset_1 by saving some key blocks
+    let blocks_1 = vec![make_seed_block(odf::DatasetKind::Root), make_info_block(1)];
+    repo.save_key_blocks_batch(&dataset_id_1, &odf::BlockRef::Head, &blocks_1)
+        .await
+        .unwrap();
+
+    // Index dataset_3 by saving some key blocks
+    let blocks_3 = vec![
+        make_seed_block(odf::DatasetKind::Derivative),
+        make_license_block(1),
+    ];
+    repo.save_key_blocks_batch(&dataset_id_3, &odf::BlockRef::Head, &blocks_3)
+        .await
+        .unwrap();
+
+    // Now only dataset_2 should be unindexed
+    let unindexed = repo.list_unindexed_dataset_branches().await.unwrap();
+    assert_eq!(unindexed.len(), 1);
+    assert_eq!(unindexed[0].0, dataset_id_2);
+    assert_eq!(unindexed[0].1, odf::BlockRef::Head);
+
+    // Index the remaining dataset
+    let blocks_2 = vec![make_seed_block(odf::DatasetKind::Root)];
+    repo.save_key_blocks_batch(&dataset_id_2, &odf::BlockRef::Head, &blocks_2)
+        .await
+        .unwrap();
+
+    // Now no datasets should be unindexed
+    let unindexed = repo.list_unindexed_dataset_branches().await.unwrap();
+    assert_eq!(unindexed.len(), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -277,6 +277,13 @@ impl CsvFlowProcessStateLoader {
                 .await
                 .expect("Failed to schedule flow");
 
+            // Then the task started running
+            let running_event_id = self.next_event_id();
+            self.flow_process_repository
+                .on_flow_task_running(running_event_id, flow_binding, event_time)
+                .await
+                .expect("Failed to mark flow task as running");
+
             // Then the event happened itself
             let flow_event_id = self.next_event_id();
             self.flow_process_repository
@@ -301,30 +308,30 @@ impl CsvFlowProcessStateLoader {
         flow_binding: &FlowBinding,
         record: &CsvFlowProcessRecord,
     ) {
-        if let Some(ref auto_stopped_reason) = record.auto_stopped_reason {
-            if let Some(auto_stopped_at) = record.auto_stopped_at {
-                match auto_stopped_reason.as_str() {
-                    "unrecoverable_failure" => {
-                        // For unrecoverable failure, we need to apply an unrecoverable failure
-                        // at the auto_stopped_at time to set the auto-stop state
-                        let event_id = self.next_event_id();
-                        self.flow_process_repository
-                            .apply_flow_result(
-                                event_id,
-                                flow_binding,
-                                &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
-                                auto_stopped_at,
-                            )
-                            .await
-                            .expect("Failed to apply unrecoverable failure");
-                    }
-                    "stop_policy" => {
-                        // For stop policy, the auto-stop should have been
-                        // triggered by the consecutive
-                        // failures. No additional action needed.
-                    }
-                    _ => panic!("Unknown auto stopped reason: {auto_stopped_reason}",),
+        if let Some(ref auto_stopped_reason) = record.auto_stopped_reason
+            && let Some(auto_stopped_at) = record.auto_stopped_at
+        {
+            match auto_stopped_reason.as_str() {
+                "unrecoverable_failure" => {
+                    // For unrecoverable failure, we need to apply an unrecoverable failure
+                    // at the auto_stopped_at time to set the auto-stop state
+                    let event_id = self.next_event_id();
+                    self.flow_process_repository
+                        .apply_flow_result(
+                            event_id,
+                            flow_binding,
+                            &FlowOutcome::Failed(TaskError::empty_unrecoverable()),
+                            auto_stopped_at,
+                        )
+                        .await
+                        .expect("Failed to apply unrecoverable failure");
                 }
+                "stop_policy" => {
+                    // For stop policy, the auto-stop should have been
+                    // triggered by the consecutive
+                    // failures. No additional action needed.
+                }
+                _ => panic!("Unknown auto stopped reason: {auto_stopped_reason}",),
             }
         }
     }

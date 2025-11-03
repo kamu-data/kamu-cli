@@ -12,7 +12,6 @@
 #![feature(exit_status_error)]
 #![feature(error_generic_member_access)]
 #![feature(panic_update_hook)]
-#![feature(let_chains)]
 #![feature(duration_constructors)]
 
 pub mod app;

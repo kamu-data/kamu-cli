@@ -199,6 +199,41 @@ impl SqliteFlowProcessStateRepository {
 
         Ok(())
     }
+
+    async fn upsert_process_state_for_flow_event(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
+        let process_state = match self.load_process_state(flow_binding).await {
+            Ok(state) => state,
+            Err(FlowProcessLoadError::NotFound(_)) => {
+                // Auto-create a process state if it doesn't exist yet (manual launch)
+                let new_process_state =
+                    FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone());
+                self.create_process_state(&new_process_state).await?;
+                new_process_state
+            }
+            Err(FlowProcessLoadError::Internal(e)) => {
+                return Err(FlowProcessFlowEventError::Internal(e));
+            }
+        };
+
+        Ok(process_state)
+    }
+
+    async fn save_process_state_from_flow_event(
+        &self,
+        state: &FlowProcessState,
+        expected_last_event_id: EventID,
+    ) -> Result<(), FlowProcessFlowEventError> {
+        match self.save_process_state(state, expected_last_event_id).await {
+            Ok(()) => Ok(()),
+            Err(FlowProcessSaveError::ConcurrentModification(e)) => {
+                Err(FlowProcessFlowEventError::ConcurrentModification(e))
+            }
+            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessFlowEventError::Internal(e)),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -277,20 +312,10 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         flow_outcome: &FlowOutcome,
         event_time: DateTime<Utc>,
     ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
-        // Load current state
-        let mut process_state = match self.load_process_state(flow_binding).await {
-            Ok(state) => state,
-            Err(FlowProcessLoadError::NotFound(_)) => {
-                // Auto-create a process state if it doesn't exist yet (manual launch)
-                let new_process_state =
-                    FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone());
-                self.create_process_state(&new_process_state).await?;
-                new_process_state
-            }
-            Err(FlowProcessLoadError::Internal(e)) => {
-                return Err(FlowProcessFlowEventError::Internal(e));
-            }
-        };
+        // Acquire state
+        let mut process_state = self
+            .upsert_process_state_for_flow_event(flow_binding)
+            .await?;
 
         // Backup current event ID for concurrency check
         let current_event_id = process_state.last_applied_event_id();
@@ -301,16 +326,9 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             .int_err()?;
 
         // Try saving back
-        match self
-            .save_process_state(&process_state, current_event_id)
-            .await
-        {
-            Ok(()) => Ok(process_state),
-            Err(FlowProcessSaveError::ConcurrentModification(e)) => {
-                Err(FlowProcessFlowEventError::ConcurrentModification(e))
-            }
-            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessFlowEventError::Internal(e)),
-        }
+        self.save_process_state_from_flow_event(&process_state, current_event_id)
+            .await?;
+        Ok(process_state)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
@@ -320,20 +338,10 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         flow_binding: &FlowBinding,
         planned_at: DateTime<Utc>,
     ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
-        // Load current state
-        let mut process_state = match self.load_process_state(flow_binding).await {
-            Ok(state) => state,
-            Err(FlowProcessLoadError::NotFound(_)) => {
-                // Auto-create a process state if it doesn't exist yet (manual launch)
-                let new_process_state =
-                    FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone());
-                self.create_process_state(&new_process_state).await?;
-                new_process_state
-            }
-            Err(FlowProcessLoadError::Internal(e)) => {
-                return Err(FlowProcessFlowEventError::Internal(e));
-            }
-        };
+        // Acquire state
+        let mut process_state = self
+            .upsert_process_state_for_flow_event(flow_binding)
+            .await?;
 
         // Backup current event ID for concurrency check
         let current_event_id = process_state.last_applied_event_id();
@@ -344,16 +352,35 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
             .int_err()?;
 
         // Try saving back
-        match self
-            .save_process_state(&process_state, current_event_id)
-            .await
-        {
-            Ok(()) => Ok(process_state),
-            Err(FlowProcessSaveError::ConcurrentModification(e)) => {
-                Err(FlowProcessFlowEventError::ConcurrentModification(e))
-            }
-            Err(FlowProcessSaveError::Internal(e)) => Err(FlowProcessFlowEventError::Internal(e)),
-        }
+        self.save_process_state_from_flow_event(&process_state, current_event_id)
+            .await?;
+        Ok(process_state)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
+    async fn on_flow_task_running(
+        &self,
+        event_id: EventID,
+        flow_binding: &FlowBinding,
+        started_at: DateTime<Utc>,
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
+        // Acquire state
+        let mut process_state = self
+            .upsert_process_state_for_flow_event(flow_binding)
+            .await?;
+
+        // Backup current event ID for concurrency check
+        let current_event_id = process_state.last_applied_event_id();
+
+        // Apply flow task running
+        process_state
+            .on_running(event_id, self.time_source.now(), started_at)
+            .int_err()?;
+
+        // Try saving back
+        self.save_process_state_from_flow_event(&process_state, current_event_id)
+            .await?;
+        Ok(process_state)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?scope))]

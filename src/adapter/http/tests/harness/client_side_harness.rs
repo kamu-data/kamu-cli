@@ -36,6 +36,7 @@ use kamu_auth_rebac_services::{
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
+    InMemoryDatasetDataBlockRepository,
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
@@ -140,6 +141,7 @@ impl ClientSideHarness {
             datasets_dir,
         ));
         b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
+        b.add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default());
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -193,6 +195,7 @@ impl ClientSideHarness {
         b.add::<DatasetEntryServiceImpl>();
         b.add::<InMemoryDatasetEntryRepository>();
         b.add::<InMemoryDatasetKeyBlockRepository>();
+        b.add::<InMemoryDatasetDataBlockRepository>();
 
         b.add::<InMemoryDidSecretKeyRepository>();
 

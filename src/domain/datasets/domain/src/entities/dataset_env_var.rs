@@ -170,6 +170,7 @@ pub struct DatasetEnvVarsConfig {
     /// digits (0-9).
     ///
     /// # Example
+    /// ```
     /// let config = DatasetEnvVarsConfig {
     ///     enabled: Some(true),
     ///     encryption_key:

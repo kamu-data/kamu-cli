@@ -52,7 +52,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
         flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
         pagination: PaginationOpts,
-    ) -> FlowIDStream;
+    ) -> FlowIDStream<'_>;
 
     /// Returns number of flows associated matching filters, if specified
     async fn get_count_flows_matching_scope_query(
@@ -62,7 +62,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     ) -> Result<usize, InternalError>;
 
     /// Returns IDs of the flow initiators, where flow scope matches the pattern
-    fn list_scoped_flow_initiators(&self, scope_query: FlowScopeQuery) -> InitiatorIDStream;
+    fn list_scoped_flow_initiators(&self, scope_query: FlowScopeQuery) -> InitiatorIDStream<'_>;
 
     /// Returns scopes having any flows associated with them
     async fn filter_flow_scopes_having_flows(
@@ -82,7 +82,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError>;
 
     /// Returns stream of flow states for the given flow IDs
-    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream;
+    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream<'_>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,10 +14,10 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+type FlowConfigurationeventStoreStatic = dyn FlowConfigurationEventStore + 'static;
+
 #[derive(Aggregate, Debug)]
-pub struct FlowConfiguration(
-    Aggregate<FlowConfigurationState, (dyn FlowConfigurationEventStore + 'static)>,
-);
+pub struct FlowConfiguration(Aggregate<FlowConfigurationState, FlowConfigurationeventStoreStatic>);
 
 impl FlowConfiguration {
     /// Creates a flow configuration

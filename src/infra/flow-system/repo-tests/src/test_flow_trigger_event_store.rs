@@ -443,12 +443,48 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         store.has_active_triggers_for_scopes(&scopes).await.unwrap()
     }
 
-    assert!(test(event_store.as_ref(), &[dataset_id_active.clone()]).await);
-    assert!(!test(event_store.as_ref(), &[dataset_id_paused.clone()]).await);
-    assert!(test(event_store.as_ref(), &[dataset_id_modified_active.clone()]).await);
-    assert!(!test(event_store.as_ref(), &[dataset_id_modified_paused.clone()]).await);
-    assert!(!test(event_store.as_ref(), &[dataset_id_removed.clone()]).await);
-    assert!(!test(event_store.as_ref(), &[unrelated_dataset_id]).await);
+    assert!(
+        test(
+            event_store.as_ref(),
+            std::slice::from_ref(&dataset_id_active)
+        )
+        .await
+    );
+    assert!(
+        !test(
+            event_store.as_ref(),
+            std::slice::from_ref(&dataset_id_paused)
+        )
+        .await
+    );
+    assert!(
+        test(
+            event_store.as_ref(),
+            std::slice::from_ref(&dataset_id_modified_active)
+        )
+        .await
+    );
+    assert!(
+        !test(
+            event_store.as_ref(),
+            std::slice::from_ref(&dataset_id_modified_paused)
+        )
+        .await
+    );
+    assert!(
+        !test(
+            event_store.as_ref(),
+            std::slice::from_ref(&dataset_id_removed)
+        )
+        .await
+    );
+    assert!(
+        !test(
+            event_store.as_ref(),
+            std::slice::from_ref(&unrelated_dataset_id)
+        )
+        .await
+    );
     assert!(
         test(
             event_store.as_ref(),

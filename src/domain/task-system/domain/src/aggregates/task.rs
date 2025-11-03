@@ -14,8 +14,10 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+type TaskEventStoreStatic = dyn TaskEventStore + 'static;
+
 #[derive(Aggregate, Debug)]
-pub struct Task(Aggregate<TaskState, (dyn TaskEventStore + 'static)>);
+pub struct Task(Aggregate<TaskState, TaskEventStoreStatic>);
 
 impl Task {
     /// Creates a task with a pending `TaskCreated` event

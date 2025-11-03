@@ -110,13 +110,13 @@ impl ObjectRepository for ObjectRepositoryInMemory {
             Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, data)
         };
 
-        if let Some(expected_hash) = options.expected_hash {
-            if *expected_hash != hash {
-                return Err(InsertError::HashMismatch(HashMismatchError {
-                    expected: expected_hash.clone(),
-                    actual: hash,
-                }));
-            }
+        if let Some(expected_hash) = options.expected_hash
+            && *expected_hash != hash
+        {
+            return Err(InsertError::HashMismatch(HashMismatchError {
+                expected: expected_hash.clone(),
+                actual: hash,
+            }));
         }
 
         let bytes = Bytes::copy_from_slice(data);

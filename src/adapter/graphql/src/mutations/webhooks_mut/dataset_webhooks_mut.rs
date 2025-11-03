@@ -201,21 +201,6 @@ impl WebhookSubscriptionInvalidTargetUrl {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct WebhookSubscriptionEventTypeUnknown {
-    pub event_type: String,
-}
-
-#[ComplexObject]
-impl WebhookSubscriptionEventTypeUnknown {
-    pub async fn message(&self) -> String {
-        format!("Event type '{}' is unknown", self.event_type)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
 pub struct WebhookSubscriptionNoEventTypesProvided {
     pub num_event_types: usize,
 }

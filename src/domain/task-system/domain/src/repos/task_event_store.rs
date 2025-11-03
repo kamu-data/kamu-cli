@@ -24,7 +24,7 @@ pub trait TaskEventStore: EventStore<TaskState> {
 
     /// Returns list of tasks, which are in Running state,
     /// from earliest to latest
-    fn get_running_tasks(&self, pagination: PaginationOpts) -> TaskIDStream;
+    fn get_running_tasks(&self, pagination: PaginationOpts) -> TaskIDStream<'_>;
 
     /// Returns total number of tasks, which are in Running state
     async fn get_count_running_tasks(&self) -> Result<usize, InternalError>;
@@ -36,7 +36,7 @@ pub trait TaskEventStore: EventStore<TaskState> {
         &self,
         dataset_id: &odf::DatasetID,
         pagination: PaginationOpts,
-    ) -> TaskIDStream;
+    ) -> TaskIDStream<'_>;
 
     /// Returns total number of tasks associated  with the specified dataset
     /// Note: no longer used, but might be used in future (admin view)

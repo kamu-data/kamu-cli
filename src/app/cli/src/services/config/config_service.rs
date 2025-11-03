@@ -193,7 +193,7 @@ impl ConfigService {
         }
     }
 
-    #[allow(clippy::only_used_in_recursion)]
+    #[allow(clippy::self_only_used_in_recursion)]
     fn unset_recursive(&self, key: &str, value: &mut serde_yaml::Mapping) -> bool {
         if let Some((head, tail)) = key.split_once('.') {
             let index = serde_yaml::Value::String(head.to_owned());
@@ -230,7 +230,7 @@ impl ConfigService {
         result
     }
 
-    #[allow(clippy::only_used_in_recursion)]
+    #[allow(clippy::self_only_used_in_recursion)]
     fn visit_keys_recursive(
         &self,
         prefix: &str,

@@ -185,11 +185,12 @@ impl KamuFlightSqlService {
 
         if !schema_only {
             for catalog_name in ctx.catalog_names() {
-                if let Some(catalog_name_filter) = &query.catalog {
-                    if catalog_name != *catalog_name_filter {
-                        continue;
-                    }
+                if let Some(catalog_name_filter) = &query.catalog
+                    && catalog_name != *catalog_name_filter
+                {
+                    continue;
                 }
+
                 let catalog = ctx.catalog(&catalog_name).unwrap();
                 for schema_name in catalog.schema_names() {
                     if like::Like::<false>::not_like(schema_name.as_str(), db_schema_filter_pattern)
@@ -253,11 +254,12 @@ impl KamuFlightSqlService {
 
         if !schema_only {
             for catalog_name in ctx.catalog_names() {
-                if let Some(catalog_name_filter) = &query.catalog {
-                    if catalog_name != *catalog_name_filter {
-                        continue;
-                    }
+                if let Some(catalog_name_filter) = &query.catalog
+                    && catalog_name != *catalog_name_filter
+                {
+                    continue;
                 }
+
                 let catalog = ctx.catalog(&catalog_name).unwrap();
                 for schema_name in catalog.schema_names() {
                     if like::Like::<false>::not_like(schema_name.as_str(), db_schema_filter_pattern)
@@ -698,8 +700,8 @@ impl FlightSqlService for KamuFlightSqlService {
         )))
     }
 
-    /// Get a FlightDataStream containing the data related to the supported XDBC
-    /// types.
+    /// Get a `FlightDataStream` containing the data related to the supported
+    /// XDBC types.
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
     async fn do_get_xdbc_type_info(
         &self,
@@ -853,7 +855,8 @@ impl FlightSqlService for KamuFlightSqlService {
         ))
     }
 
-    /// Get a FlightInfo to extract information about the supported XDBC types.
+    /// Get a `FlightInfo` to extract information about the supported XDBC
+    /// types.
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
     async fn get_flight_info_xdbc_type_info(
         &self,
@@ -1076,7 +1079,7 @@ impl FlightSqlService for KamuFlightSqlService {
         Ok(())
     }
 
-    /// Get a FlightInfo for executing a substrait plan.
+    /// Get a `FlightInfo` for executing a substrait plan.
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
     async fn get_flight_info_substrait_plan(
         &self,
@@ -1162,8 +1165,8 @@ impl FlightSqlService for KamuFlightSqlService {
         Err(Status::unimplemented("Implement do_action_cancel_query"))
     }
 
-    /// Register a new SqlInfo result, making it available when calling
-    /// GetSqlInfo.
+    /// Register a new `SqlInfo` result, making it available when calling
+    /// `GetSqlInfo`.
     #[tracing::instrument(level = "debug", skip_all, fields(%id, ?result))]
     async fn register_sql_info(&self, id: i32, result: &SqlInfo) {}
 

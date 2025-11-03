@@ -129,32 +129,43 @@ impl<'a> MetadataChain<'a> {
         let chain = resolved_dataset.as_metadata_chain();
 
         let head = chain.resolve_ref(&odf::BlockRef::Head).await.int_err()?;
-        let total_count =
-            usize::try_from(chain.get_block(&head).await.int_err()?.sequence_number).unwrap() + 1;
+        let head_block = chain.get_block(&head).await.int_err()?;
+        let total_count = usize::try_from(head_block.sequence_number).unwrap() + 1;
 
-        let mut block_stream = chain
-            .iter_blocks_interval(&head, None, false)
-            .skip(page * per_page)
-            .take(per_page);
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
 
-        let mut nodes = Vec::new();
-        while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
-            let account = Account::from_dataset_alias(
-                ctx,
-                &self.dataset_request_state.dataset_handle().alias,
-            )
-            .await?
-            .expect("Account must exist");
-            let block = MetadataBlockExtended::new(ctx, hash, block, account).await?;
-            nodes.push(block);
+        // Special case: head block request
+        if page == 0 && per_page == 1 {
+            let block = MetadataBlockExtended::new(ctx, head, head_block, account).await?;
+            Ok(MetadataBlockConnection::new(
+                vec![block],
+                page,
+                per_page,
+                total_count,
+            ))
+        } else {
+            // General case: stream blocks
+            let mut block_stream = chain
+                .iter_blocks_interval((&head).into(), None, false)
+                .skip(page * per_page)
+                .take(per_page);
+
+            let mut nodes = Vec::new();
+            while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
+                let block = MetadataBlockExtended::new(ctx, hash, block, account.clone()).await?;
+                nodes.push(block);
+            }
+
+            Ok(MetadataBlockConnection::new(
+                nodes,
+                page,
+                per_page,
+                total_count,
+            ))
         }
-
-        Ok(MetadataBlockConnection::new(
-            nodes,
-            page,
-            per_page,
-            total_count,
-        ))
     }
 }
 

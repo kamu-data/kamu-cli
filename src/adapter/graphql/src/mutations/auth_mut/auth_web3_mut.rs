@@ -21,7 +21,7 @@ impl AuthWeb3Mut {
         &self,
         ctx: &Context<'_>,
         account: EvmWalletAddress<'_>,
-    ) -> Result<Eip4361AuthNonceResponse> {
+    ) -> Result<Eip4361AuthNonceResponse<'_>> {
         let nonce_service = from_catalog_n!(ctx, dyn kamu_auth_web3::Web3AuthEip4361NonceService);
 
         let nonce_entity = nonce_service.create_nonce(account.into()).await.int_err()?;

@@ -94,11 +94,11 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
         self.inner.len().await
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<TaskEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, TaskEvent> {
         self.inner.get_all_events(opts)
     }
 
-    fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
+    fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<'_, TaskEvent> {
         self.inner.get_events(task_id, opts)
     }
 
@@ -148,7 +148,7 @@ impl TaskEventStore for InMemoryTaskEventStore {
 
     /// Returns list of tasks, which are in Running state,
     /// from earliest to latest
-    fn get_running_tasks(&self, pagination: PaginationOpts) -> TaskIDStream {
+    fn get_running_tasks(&self, pagination: PaginationOpts) -> TaskIDStream<'_> {
         let task_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -186,7 +186,7 @@ impl TaskEventStore for InMemoryTaskEventStore {
         &self,
         dataset_id: &odf::DatasetID,
         pagination: PaginationOpts,
-    ) -> TaskIDStream {
+    ) -> TaskIDStream<'_> {
         let task_ids_page: Option<Vec<_>> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();

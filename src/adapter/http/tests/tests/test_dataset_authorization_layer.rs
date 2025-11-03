@@ -368,6 +368,7 @@ impl ServerHarness {
                     odf::dataset::DatasetStorageUnitLocalFs::builder(datasets_dir)
                 )
                 .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetReferenceServiceImpl>()
@@ -375,6 +376,7 @@ impl ServerHarness {
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add::<InMemoryAccountRepository>()
@@ -442,7 +444,7 @@ impl ServerHarness {
                     )),
             );
 
-        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         let local_addr = listener.local_addr().unwrap();
 

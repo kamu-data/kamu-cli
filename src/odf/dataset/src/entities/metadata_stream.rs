@@ -15,10 +15,31 @@ use odf_metadata::*;
 use pin_project::pin_project;
 
 use super::metadata_chain::IterBlocksError;
+use crate::BlockRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub enum MetadataChainIterBoundary<'a> {
+    Ref(&'a BlockRef),
+    Hash(&'a Multihash),
+}
+
+impl<'a> From<&'a BlockRef> for MetadataChainIterBoundary<'a> {
+    fn from(r: &'a BlockRef) -> Self {
+        MetadataChainIterBoundary::Ref(r)
+    }
+}
+
+impl<'a> From<&'a Multihash> for MetadataChainIterBoundary<'a> {
+    fn from(h: &'a Multihash) -> Self {
+        MetadataChainIterBoundary::Hash(h)
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

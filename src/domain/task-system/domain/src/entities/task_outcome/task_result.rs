@@ -104,14 +104,19 @@ macro_rules! task_result_struct {
     (
         $(#[$meta:meta])*
         $vis:vis struct $name:ident {
-            $($field_vis:vis $field:ident : $ty:ty),* $(,)?
-        }
+            $(
+                $(#[$field_meta:meta])*
+                $field_vis:vis $field:ident : $ty:ty
+            ),* $(,)?        }
         => $type_id:expr
     ) => {
         $(#[$meta])*
         #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         $vis struct $name {
-            $($field_vis $field : $ty),*
+            $(
+                $(#[$field_meta])*
+                $field_vis $field : $ty
+            ),*
         }
 
         impl $name {

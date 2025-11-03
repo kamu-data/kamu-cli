@@ -744,7 +744,7 @@ async fn test_transform_with_compaction_retry() {
     let (bar_target, _) = harness
         .new_deriv(
             "bar",
-            &[foo_alias.clone()],
+            std::slice::from_ref(&foo_alias),
             harness.system_time_source.now(),
         )
         .await;

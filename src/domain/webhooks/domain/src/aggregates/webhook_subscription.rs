@@ -13,9 +13,11 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+type WebhookSubscriptionEventStoreStatic = dyn WebhookSubscriptionEventStore + 'static;
+
 #[derive(Aggregate, Debug)]
 pub struct WebhookSubscription(
-    Aggregate<WebhookSubscriptionState, (dyn WebhookSubscriptionEventStore + 'static)>,
+    Aggregate<WebhookSubscriptionState, WebhookSubscriptionEventStoreStatic>,
 );
 
 impl WebhookSubscription {

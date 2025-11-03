@@ -49,7 +49,7 @@ pub trait QueryService: Send + Sync {
     ) -> Result<GetDataResponse, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
-    /// [`DataFrameExt`] that can be used to get schema and data, and the state
+    /// `DataFrame` that can be used to get schema and data, and the state
     /// information that can be used for reproducibility.
     async fn sql_statement(
         &self,
@@ -82,9 +82,8 @@ pub trait QueryService: Send + Sync {
 
     // TODO: Introduce additional options that could be used to narrow down the
     // number of files we collect to construct the dataframe.
-    //
-    /// Returns a [`DataFrameExt`] representing the contents of an entire
-    /// dataset
+    ///
+    /// Returns a `DataFrame` representing the contents of an entire dataset
     async fn get_data(
         &self,
         dataset_ref: &odf::DatasetRef,

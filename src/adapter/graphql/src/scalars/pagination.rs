@@ -65,7 +65,7 @@ macro_rules! page_based_connection {
                 }
             }
 
-            async fn edges(&self) -> Vec<$edge_type> {
+            async fn edges(&self) -> Vec<$edge_type<'_>> {
                 self.nodes.iter().map(|node| $edge_type { node }).collect()
             }
         }
@@ -79,8 +79,6 @@ macro_rules! page_based_connection {
 
 pub(crate) use page_based_connection;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Page-based stream connection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
@@ -115,7 +113,7 @@ macro_rules! page_based_stream_connection {
                 }
             }
 
-            async fn edges(&self) -> Vec<$edge_type> {
+            async fn edges(&self) -> Vec<$edge_type<'_>> {
                 self.nodes.iter().map(|node| $edge_type { node }).collect()
             }
         }

@@ -177,7 +177,7 @@ impl ListCommand {
         fields
     }
 
-    fn stream_datasets(&self) -> odf::dataset::DatasetHandleStream {
+    fn stream_datasets(&self) -> odf::dataset::DatasetHandleStream<'_> {
         match self.tenancy_config {
             TenancyConfig::MultiTenant => match &self.related_account.target_account {
                 accounts::TargetAccountSelection::Current => self

@@ -28,6 +28,7 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
 };
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;
@@ -84,7 +85,7 @@ impl WebUIServer {
         password_policy_config: &PasswordPolicyConfig,
     ) -> Result<Self, InternalError> {
         let addr = SocketAddr::from((
-            address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            address.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST)),
             port.unwrap_or(0),
         ));
         let listener = tokio::net::TcpListener::bind(addr).await.int_err()?;
@@ -319,7 +320,11 @@ async fn graphql_handler(
     Extension(catalog): Extension<Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
-    let graphql_request = req.into_inner().data(catalog);
+    let graphql_request = req
+        .into_inner()
+        .data(account_entity_data_loader(&catalog))
+        .data(dataset_handle_data_loader(&catalog))
+        .data(catalog);
     let graphql_response = schema.execute(graphql_request).await.into();
 
     Ok(graphql_response)

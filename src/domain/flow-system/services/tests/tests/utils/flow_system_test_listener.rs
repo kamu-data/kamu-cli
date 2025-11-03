@@ -252,6 +252,8 @@ impl std::fmt::Display for FlowSystemTestListener {
                                     FlowActivationCause::Manual(_) => String::from("Manual"),
                                     FlowActivationCause::AutoPolling(_) =>
                                         String::from("AutoPolling"),
+                                    FlowActivationCause::IterationFinished(_) =>
+                                        String::from("Iteration Finish"),
                                     FlowActivationCause::ResourceUpdate(update) => {
                                         let update_details: DatasetResourceUpdateDetails =
                                             serde_json::from_value(update.details.clone()).unwrap();

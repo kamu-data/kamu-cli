@@ -51,7 +51,7 @@ impl CalcEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<CalcState> for CalcEventStore {
-    fn get_all_events(&self, _opts: GetEventsOpts) -> EventStream<CalcEvents> {
+    fn get_all_events(&self, _opts: GetEventsOpts) -> EventStream<'_, CalcEvents> {
         use futures::StreamExt;
         Box::pin(
             tokio_stream::iter(self.0.lock().unwrap().clone())
@@ -60,7 +60,7 @@ impl EventStore<CalcState> for CalcEventStore {
         )
     }
 
-    fn get_events(&self, _query: &(), _opts: GetEventsOpts) -> EventStream<CalcEvents> {
+    fn get_events(&self, _query: &(), _opts: GetEventsOpts) -> EventStream<'_, CalcEvents> {
         use futures::StreamExt;
         Box::pin(
             tokio_stream::iter(self.0.lock().unwrap().clone())
@@ -94,6 +94,24 @@ async fn test_aggregate_load() {
     let c = Calc::load((), &store).await.unwrap();
     assert_eq!(c.as_ref().0, 4);
     assert_eq!(c.last_stored_event_id(), Some(EventID::new(1)));
+}
+
+#[tokio::test]
+async fn test_aggregate_load_multi() {
+    let store = CalcEventStore::new(vec![CalcEvents::Add(10), CalcEvents::Sub(6)]);
+    let results = Calc::try_load_multi(&[()], &store).await;
+    assert_eq!(results.len(), 1);
+    assert!(results.first().unwrap().is_ok());
+    assert_eq!(
+        results
+            .first()
+            .as_ref()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .last_stored_event_id(),
+        Some(EventID::new(1))
+    );
 }
 
 #[tokio::test]

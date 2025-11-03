@@ -15,10 +15,11 @@ use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TransformStatus};
-use kamu_datasets::{DatasetEntryServiceExt, DatasetIntervalIncrement};
+use kamu_datasets::DatasetEntryServiceExt;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
+use odf::dataset::MetadataChainIncrementInterval;
 
 use super::{
     FlowHarness,
@@ -49,6 +50,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -534,6 +536,7 @@ async fn test_manual_trigger() {
                 maybe_forced_flow_config_rule: Some(
                     FlowConfigRuleIngest {
                         fetch_uncacheable: true,
+                        fetch_next_iteration: false,
                     }
                     .into_flow_config(),
                 ),
@@ -680,6 +683,7 @@ async fn test_ingest_trigger_with_ingest_config() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: true,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -876,6 +880,342 @@ async fn test_ingest_trigger_with_ingest_config() {
                 Flow ID = 3 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Executor(task=3, since=160ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_flow_with_multiple_iterations() {
+    let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
+    mock_transform_flow_evaluator
+        .expect_evaluate_transform_status()
+        .times(1)
+        .returning(|_| Ok(TransformStatus::UpToDate));
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
+            MetadataChainIncrementInterval {
+                num_blocks: 1,
+                num_records: 3,
+                updated_watermark: None,
+            },
+        )),
+        ..Default::default()
+    });
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let bar_id = harness
+        .create_derived_dataset(
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+                fetch_next_iteration: true,
+            },
+            None,
+        )
+        .await;
+
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            transform_dataset_binding(&bar_id),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_buffering(1, Duration::seconds(1)).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Run scheduler concurrently with simulation script
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 30ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                // Send some PullResult with records and has_more flag to trigger another iteration
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                                has_more: true,
+                            },
+                            data_increment: None,
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            // Task 1: "foo" start running at 40ms, finish at 60ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(40),
+                // Send some PullResult with records and has_more flag to trigger another iteration
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                    b"newest-slice",
+                                )),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice-1"),
+                                has_more: true,
+                            },
+                            data_increment: None,
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
+
+            // Task 2: "foo" start running at 60ms, finish at 80ms
+            // And returns empty result
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
+
+            // Task 3: "bar" start running at 100ms, finish at 120ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(100),
+                finish_in_with: Some((
+                    Duration::milliseconds(20),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task3_handle = task3_driver.run();
+
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
+
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(700)).await;
+            };
+
+            tokio::join!(
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                task3_handle,
+                trigger0_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+            #3: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #4: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #5: +30ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting Iteration Finish
+                Flow ID = 0 Finished Success
+
+            #6: +30ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1030ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting Iteration Finish
+                Flow ID = 0 Finished Success
+
+            #7: +30ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1030ms) Activating(at=30ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting Iteration Finish
+                Flow ID = 0 Finished Success
+
+            #8: +30ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Batching(3/1, until=1030ms) Activating(at=30ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting Iteration Finish Executor(task=1, since=30ms)
+                Flow ID = 0 Finished Success
+
+            #9: +30ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=30ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting Iteration Finish Executor(task=1, since=30ms)
+                Flow ID = 0 Finished Success
+
+            #10: +40ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=30ms)
+              "foo" Ingest:
+                Flow ID = 1 Running(task=1)
+                Flow ID = 0 Finished Success
+
+            #11: +60ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=30ms)
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #12: +60ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Waiting Input(foo) Executor(task=2, since=30ms)
+              "foo" Ingest:
+                Flow ID = 3 Waiting Iteration Finish
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #13: +60ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Running(task=2)
+              "foo" Ingest:
+                Flow ID = 3 Waiting Iteration Finish
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #14: +60ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Running(task=2)
+              "foo" Ingest:
+                Flow ID = 3 Waiting Iteration Finish Executor(task=3, since=60ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #15: +80ms:
+              "bar" ExecuteTransform:
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Waiting Iteration Finish Executor(task=3, since=60ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #16: +80ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting Input(foo) Throttling(for=20ms, wakeup=100ms, shifted=60ms)
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Waiting Iteration Finish Executor(task=3, since=60ms)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #17: +100ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting Input(foo) Throttling(for=20ms, wakeup=100ms, shifted=60ms)
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Running(task=3)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #18: +100ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting Input(foo) Executor(task=4, since=100ms)
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Running(task=3)
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #19: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting Input(foo) Executor(task=4, since=100ms)
+                Flow ID = 2 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -3105,7 +3445,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 3,
                 updated_watermark: None,
@@ -3194,7 +3534,9 @@ async fn test_derived_dataset_triggered_after_input_change() {
                             pull_result: PullResult::Updated {
                                 old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3358,7 +3700,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 3,
                 updated_watermark: None,
@@ -3465,7 +3807,9 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                             pull_result: PullResult::Updated {
                                 old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3795,7 +4139,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
         mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 7,
                 updated_watermark: None,
@@ -3884,7 +4228,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3912,7 +4258,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                     b"bar-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3958,7 +4306,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4004,7 +4354,9 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                                     b"bar-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4377,7 +4729,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -4389,7 +4741,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 7,
                 updated_watermark: None,
@@ -4401,7 +4753,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 12,
                 updated_watermark: None,
@@ -4414,7 +4766,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -4426,7 +4778,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -4438,7 +4790,7 @@ async fn test_batching_condition_records_reached() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 10,
                 updated_watermark: None,
@@ -4522,7 +4874,9 @@ async fn test_batching_condition_records_reached() {
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4550,7 +4904,9 @@ async fn test_batching_condition_records_reached() {
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4578,7 +4934,9 @@ async fn test_batching_condition_records_reached() {
                                     b"bar-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4606,7 +4964,9 @@ async fn test_batching_condition_records_reached() {
                                     b"foo-new-slice-2",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4634,7 +4994,9 @@ async fn test_batching_condition_records_reached() {
                                     b"foo-new-slice-2",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4662,7 +5024,9 @@ async fn test_batching_condition_records_reached() {
                                     b"bar-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4963,7 +5327,7 @@ async fn test_batching_condition_timeout() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -4976,7 +5340,7 @@ async fn test_batching_condition_timeout() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 3,
                 updated_watermark: None,
@@ -4988,7 +5352,7 @@ async fn test_batching_condition_timeout() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 8,
                 updated_watermark: None,
@@ -5072,7 +5436,9 @@ async fn test_batching_condition_timeout() {
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5100,7 +5466,9 @@ async fn test_batching_condition_timeout() {
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5130,7 +5498,9 @@ async fn test_batching_condition_timeout() {
                                     b"bar-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5278,7 +5648,7 @@ async fn test_batching_condition_watermark() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0,
                 updated_watermark: None,
@@ -5291,7 +5661,7 @@ async fn test_batching_condition_watermark() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0, // no records, just watermark
                 updated_watermark: Some(Utc::now()),
@@ -5303,7 +5673,7 @@ async fn test_batching_condition_watermark() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0, // no records, just watermark
                 updated_watermark: Some(Utc::now()),
@@ -5386,7 +5756,9 @@ async fn test_batching_condition_watermark() {
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5414,7 +5786,9 @@ async fn test_batching_condition_watermark() {
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5444,7 +5818,9 @@ async fn test_batching_condition_watermark() {
                                     b"bar-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5592,7 +5968,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -5604,7 +5980,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -5617,7 +5993,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 7,
                 updated_watermark: None,
@@ -5629,7 +6005,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 8,
                 updated_watermark: None,
@@ -5641,7 +6017,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 7,
                 updated_watermark: None,
@@ -5653,7 +6029,7 @@ async fn test_batching_condition_with_2_inputs() {
         .times(1)
         .in_sequence(&mut seq_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 32,
                 updated_watermark: None,
@@ -5753,7 +6129,9 @@ async fn test_batching_condition_with_2_inputs() {
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5781,7 +6159,9 @@ async fn test_batching_condition_with_2_inputs() {
                                     b"bar-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5809,7 +6189,9 @@ async fn test_batching_condition_with_2_inputs() {
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5837,7 +6219,9 @@ async fn test_batching_condition_with_2_inputs() {
                                     b"bar-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5865,7 +6249,9 @@ async fn test_batching_condition_with_2_inputs() {
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -5893,7 +6279,9 @@ async fn test_batching_condition_with_2_inputs() {
                                     b"baz-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -6389,7 +6777,10 @@ async fn test_list_all_flow_initiators() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([foo_account_id.clone()], *foo_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&foo_account_id),
+        *foo_dataset_initiators_list
+    );
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -6401,7 +6792,10 @@ async fn test_list_all_flow_initiators() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([bar_account_id.clone()], *bar_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&bar_account_id),
+        *bar_dataset_initiators_list
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6534,7 +6928,10 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([foo_account_id.clone()], *foo_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&foo_account_id),
+        *foo_dataset_initiators_list
+    );
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -6546,7 +6943,10 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!([bar_account_id.clone()], *bar_dataset_initiators_list);
+    pretty_assertions::assert_eq!(
+        *std::slice::from_ref(&bar_account_id),
+        *bar_dataset_initiators_list
+    );
 
     let foo_datasets: Vec<_> = harness
         .dataset_entry_service
@@ -6882,7 +7282,7 @@ async fn test_abort_flow_after_task_finishes() {
         .expect_get_increment_between()
         .times(2)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -6975,7 +7375,9 @@ async fn test_abort_flow_after_task_finishes() {
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7046,7 +7448,9 @@ async fn test_abort_flow_after_task_finishes() {
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7353,7 +7757,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
         .expect_get_increment_between()
         .times(5)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -7460,7 +7864,9 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7506,7 +7912,9 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                                     b"foo-new-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7734,7 +8142,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
         .times(3)
         .in_sequence(&mut sequence_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -7746,7 +8154,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
         .times(1)
         .in_sequence(&mut sequence_dataset_changes)
         .returning(|_, _, _| {
-            Ok(DatasetIntervalIncrement {
+            Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -7852,7 +8260,9 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                                     b"foo-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -7880,7 +8290,9 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                                     b"bar-old-slice",
                                 )),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -8390,6 +8802,7 @@ async fn test_disable_trigger_on_flow_fail_default() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -8526,6 +8939,7 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -8758,6 +9172,7 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -8992,6 +9407,7 @@ async fn test_disable_trigger_on_flow_fail_ignores_stop_policy_for_unrecoverable
             ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             None, // No retry policy
         )
@@ -9351,7 +9767,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 0,
                 updated_watermark: None,
@@ -9438,7 +9854,9 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                             pull_result: PullResult::Updated {
                                 old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                                has_more: false,
                             },
+                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -9597,6 +10015,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             Some(RetryPolicy {
                 max_attempts: 2,
@@ -9761,6 +10180,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             Some(RetryPolicy {
                 max_attempts: 2,
@@ -9925,6 +10345,7 @@ async fn test_manual_ingest_with_retry_policy_ignored_on_unrecoverable_error() {
             foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
+                fetch_next_iteration: false,
             },
             Some(RetryPolicy {
                 max_attempts: 2,

@@ -83,9 +83,12 @@ impl DatasetStatisticsIndexer {
                 .await
                 .int_err()?;
 
-            let increment =
-                compute_dataset_statistics_increment(dataset.as_metadata_chain(), &head, None)
-                    .await?;
+            let increment = compute_dataset_statistics_increment(
+                dataset.as_metadata_chain().as_uncached_chain(),
+                &head,
+                None,
+            )
+            .await?;
 
             assert!(increment.seen_seed);
             self.dataset_statistics_repo

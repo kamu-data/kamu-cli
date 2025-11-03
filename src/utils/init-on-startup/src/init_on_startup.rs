@@ -149,10 +149,10 @@ pub async fn run_startup_jobs_ex(
     tracing::debug!("Topological order of startup jobs: {topological_order:?}");
 
     for job_name in topological_order {
-        if let Some(job_selector) = &options.job_selector {
-            if !job_selector.matches(job_name) {
-                continue;
-            }
+        if let Some(job_selector) = &options.job_selector
+            && !job_selector.matches(job_name)
+        {
+            continue;
         }
 
         let (job_builder, job_metadata) = job_builders_by_name

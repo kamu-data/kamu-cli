@@ -35,7 +35,7 @@ impl TraceServer {
     }
 
     pub async fn serve(&self, trace_path: impl Into<PathBuf>) -> Result<(), std::io::Error> {
-        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), Self::HTTP_PORT));
+        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), Self::HTTP_PORT));
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();

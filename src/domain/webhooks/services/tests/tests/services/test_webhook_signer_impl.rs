@@ -34,7 +34,7 @@ async fn test_sign_dataset_ref_updated_webhook_with_encrypted_secret() {
     let encryption_key = config
         .secret_encryption_key
         .as_ref()
-        .map(|key| SecretString::from(key.to_string()));
+        .map(|key| SecretString::from(key.clone()));
     let webhook_secret = WebhookSubscriptionSecret::try_new(
         encryption_key.as_ref(),
         &SecretString::from("test_secret"),

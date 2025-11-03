@@ -18,17 +18,17 @@ use crate::{EventID, Projection};
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
     /// Returns the event history of all aggregates in chronological order
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<Proj::Event>;
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, Proj::Event>;
 
     /// Returns the event history of an aggregate in chronological order
-    fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event>;
+    fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<'_, Proj::Event>;
 
     /// Returns event history of multiple aggregates in chronological order
     /// Created to give a room for query optimisations when needed
     fn get_events_multi(
         &self,
         queries: &[Proj::Query],
-    ) -> MultiEventStream<Proj::Query, Proj::Event> {
+    ) -> MultiEventStream<'_, Proj::Query, Proj::Event> {
         use tokio_stream::StreamExt;
         let queries = queries.to_vec();
 

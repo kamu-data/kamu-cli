@@ -359,10 +359,10 @@ impl DataWriterDataFusion {
 
         // Reorder columns for nice looks
         let mut full_columns = vec![
-            self.meta.vocab.offset_column.to_string(),
-            self.meta.vocab.operation_type_column.to_string(),
-            self.meta.vocab.system_time_column.to_string(),
-            self.meta.vocab.event_time_column.to_string(),
+            self.meta.vocab.offset_column.clone(),
+            self.meta.vocab.operation_type_column.clone(),
+            self.meta.vocab.system_time_column.clone(),
+            self.meta.vocab.event_time_column.clone(),
         ];
         full_columns.append(&mut data_columns);
         let full_columns_str: Vec<_> = full_columns.iter().map(String::as_str).collect();
@@ -1000,31 +1000,14 @@ impl DataWriter for DataWriterDataFusion {
             let new_source_state = opts.new_source_state;
             let prev_watermark = self.meta.prev_watermark;
 
-            if data_file.is_none() {
-                // Empty result - carry watermark and propagate source state
-                (
-                    odf::dataset::AddDataParams {
-                        prev_checkpoint,
-                        prev_offset,
-                        new_offset_interval: None,
-                        new_linked_objects: None,
-                        new_watermark: opts.new_watermark.or(prev_watermark),
-                        new_source_state,
-                    },
-                    Some(new_schema),
-                    None,
-                )
-            } else {
+            if let Some(data_file) = data_file {
                 let (new_offset_interval, new_watermark_from_data) = self
-                    .compute_offset_and_watermark(
-                        data_file.as_ref().unwrap().as_path(),
-                        prev_watermark,
-                    )
+                    .compute_offset_and_watermark(data_file.as_path(), prev_watermark)
                     .await?;
 
                 let new_linked_objects = self
                     .compute_linked_objects_summary(
-                        data_file.as_ref().unwrap().as_path(),
+                        data_file.as_path(),
                         self.meta.schema.as_ref().unwrap_or(&new_schema),
                         self.target.as_data_repo(),
                     )
@@ -1040,7 +1023,21 @@ impl DataWriter for DataWriterDataFusion {
                         new_source_state,
                     },
                     Some(new_schema),
-                    data_file,
+                    Some(data_file),
+                )
+            } else {
+                // Empty result - carry watermark and propagate source state
+                (
+                    odf::dataset::AddDataParams {
+                        prev_checkpoint,
+                        prev_offset,
+                        new_offset_interval: None,
+                        new_linked_objects: None,
+                        new_watermark: opts.new_watermark.or(prev_watermark),
+                        new_source_state,
+                    },
+                    Some(new_schema),
+                    None,
                 )
             }
         } else {

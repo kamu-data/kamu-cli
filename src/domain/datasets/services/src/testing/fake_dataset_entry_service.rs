@@ -62,7 +62,7 @@ impl FakeDatasetEntryService {
 
 #[async_trait::async_trait]
 impl DatasetEntryService for FakeDatasetEntryService {
-    fn all_entries(&self) -> DatasetEntryStream {
+    fn all_entries(&self) -> DatasetEntryStream<'_> {
         let ok_entries = self
             .state
             .lock()
@@ -76,7 +76,7 @@ impl DatasetEntryService for FakeDatasetEntryService {
         Box::pin(futures::stream::iter(ok_entries))
     }
 
-    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream {
+    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream<'_> {
         let guard = self.state.lock().unwrap();
         let entries = guard
             .entries_by_owner

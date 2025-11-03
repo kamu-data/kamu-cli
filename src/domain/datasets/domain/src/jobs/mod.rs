@@ -12,8 +12,8 @@
 pub const JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER: &str =
     "dev.kamu.domain.datasets.DatasetEntryIndexer";
 
-pub const JOB_KAMU_DATASETS_DATASET_KEY_BLOCK_INDEXER: &str =
-    "dev.kamu.domain.datasets.DatasetKeyBlockIndexer";
+pub const JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER: &str =
+    "dev.kamu.domain.datasets.DatasetBlockIndexer";
 
 pub const JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER: &str =
     "dev.kamu.domain.datasets.DatasetReferenceIndexer";

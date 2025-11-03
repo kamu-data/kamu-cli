@@ -93,7 +93,7 @@ where
                     .expect("Catalog not found in http server extensions");
 
                 if let Err(err_response) = Self::check_tonic_subject(base_catalog) {
-                    return Ok(Status::unauthenticated(err_response.to_string()).into_http());
+                    return Ok(Status::unauthenticated(err_response.clone()).into_http());
                 }
             }
 

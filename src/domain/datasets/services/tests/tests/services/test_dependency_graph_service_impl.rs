@@ -20,6 +20,7 @@ use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
+    InMemoryDatasetDataBlockRepository,
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
@@ -642,6 +643,7 @@ impl DependencyGraphHarness {
                 datasets_dir,
             ))
             .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+            .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<DidGeneratorDefault>()
             .add::<RebacDatasetRegistryFacadeImpl>()
@@ -666,7 +668,8 @@ impl DependencyGraphHarness {
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<InMemoryDatasetKeyBlockRepository>()
-        .add::<DatasetKeyBlockUpdateHandler>();
+        .add::<InMemoryDatasetDataBlockRepository>()
+        .add::<DatasetBlockUpdateHandler>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,

@@ -12,6 +12,7 @@
 kamu_flow_system::flow_config_struct! {
     pub struct FlowConfigRuleIngest {
         pub fetch_uncacheable: bool,
+        pub fetch_next_iteration: bool,
     }
     => "IngestRule"
 }

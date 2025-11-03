@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![feature(assert_matches)]
-#![feature(let_chains)]
 
 // Re-exports
 pub use event_sourcing::*;

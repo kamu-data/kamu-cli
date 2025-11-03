@@ -9,7 +9,6 @@
 
 #![feature(assert_matches)]
 #![feature(error_generic_member_access)]
-#![feature(let_chains)]
 
 mod repos;
 pub use repos::*;

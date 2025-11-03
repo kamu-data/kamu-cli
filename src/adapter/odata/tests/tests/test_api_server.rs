@@ -46,7 +46,7 @@ impl TestAPIServer {
             .split_for_parts();
 
         let addr = SocketAddr::from((
-            address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            address.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST)),
             port.unwrap_or(0),
         ));
 

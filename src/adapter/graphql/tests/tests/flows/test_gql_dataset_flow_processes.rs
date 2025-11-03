@@ -13,11 +13,12 @@ use std::sync::Arc;
 use async_graphql::value;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
 use kamu_core::{PullResult, TenancyConfig};
-use kamu_datasets::DatasetIntervalIncrement;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_webhooks::*;
+use odf::dataset::MetadataChainIncrementInterval;
+use pretty_assertions::assert_eq;
 use uuid::Uuid;
 
 use crate::utils::*;
@@ -300,7 +301,9 @@ async fn test_ingest_process_several_runs() {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                        has_more: false,
                     },
+                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -388,7 +391,9 @@ async fn test_ingest_process_several_runs() {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
+                        has_more: false,
                     },
+                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -597,7 +602,7 @@ async fn test_ingest_process_with_multiple_webhooks() {
                 .unwrap_or_else(|| panic!("Missing webhook {webhook_name}")),
             &FlowWebhookSubprocessSummary {
                 id: *webhook_subscription_id,
-                name: webhook_name.to_string(),
+                name: webhook_name.clone(),
                 summary: FlowProcessSummaryBasic {
                     effective_state: "ACTIVE".to_string(),
                     consecutive_failures: 0,
@@ -763,7 +768,7 @@ impl DatasetFlowProcessesHarness {
             FlowRunsHarnessOverrides {
                 dataset_changes_mock: Some(
                     MockDatasetIncrementQueryService::with_increment_between(
-                        DatasetIntervalIncrement {
+                        MetadataChainIncrementInterval {
                             num_blocks: 1,
                             num_records: 10,
                             updated_watermark: None,

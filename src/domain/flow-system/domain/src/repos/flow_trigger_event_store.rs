@@ -16,7 +16,7 @@ use crate::*;
 #[async_trait::async_trait]
 pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
     /// Returns all existing flow bindings, where triggers are active
-    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream;
+    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream<'_>;
 
     /// Returns all bindings for a given scope where triggers are defined
     /// regardless of status

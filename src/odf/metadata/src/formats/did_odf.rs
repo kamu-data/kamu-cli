@@ -67,12 +67,12 @@ impl DidOdf {
     }
 
     /// Formats DID as a canonical `did:odf:<multibase>` string
-    pub fn as_did_str(&self) -> DidOdfFmt {
+    pub fn as_did_str(&self) -> DidOdfFmt<'_> {
         DidOdfFmt::new(&self.did)
     }
 
     /// Formats DID as a multibase string (without `did:odf:`) prefix
-    pub fn as_multibase(&self) -> DidKeyMultibaseFmt {
+    pub fn as_multibase(&self) -> DidKeyMultibaseFmt<'_> {
         DidKeyMultibaseFmt::new(&self.did, Multibase::Base16)
     }
 

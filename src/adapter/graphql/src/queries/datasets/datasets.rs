@@ -13,6 +13,7 @@ use kamu_core::auth::{self, DatasetActionAuthorizer, DatasetActionAuthorizerExt}
 
 use crate::prelude::*;
 use crate::queries::*;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,33 +24,26 @@ pub struct Datasets;
 impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
 
-    async fn by_dataset_ref(
-        &self,
+    pub async fn by_dataset_ref(
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Dataset>> {
-        let rebac_dataset_registry_facade =
-            from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacDatasetRegistryFacade);
+        let dataset_handle_data_loader = utils::get_dataset_handle_data_loader(ctx);
 
-        let resolve_res = rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Read)
-            .await;
-        let handle = match resolve_res {
-            Ok(handle) => Ok(handle),
-            Err(e) => {
-                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+        let maybe_handle = dataset_handle_data_loader
+            .load_one(dataset_ref.clone())
+            .await
+            .map_err(data_loader_error_mapper)?;
 
-                match e {
-                    E::NotFound(_) | E::Access(_) => return Ok(None),
-                    e @ E::Internal(_) => Err(e.int_err()),
-                }
-            }
-        }?;
-        let account = Account::from_dataset_alias(ctx, &handle.alias)
-            .await?
-            .expect("Account must exist");
+        if let Some(handle) = maybe_handle {
+            let account = Account::from_dataset_alias(ctx, &handle.alias)
+                .await?
+                .expect("Account must exist");
 
-        Ok(Some(Dataset::new_access_checked(account, handle)))
+            Ok(Some(Dataset::new_access_checked(account, handle)))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn by_dataset_refs(
@@ -58,6 +52,8 @@ impl Datasets {
         dataset_refs: Vec<odf::DatasetRef>,
         skip_missing: bool,
     ) -> Result<Vec<Dataset>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let (rebac_dataset_registry_facade, account_service, current_account_subject) = from_catalog_n!(
             ctx,
             dyn kamu_auth_rebac::RebacDatasetRegistryFacade,
@@ -128,10 +124,14 @@ impl Datasets {
 impl Datasets {
     /// Returns a dataset by its ID, if found
     #[tracing::instrument(level = "info", name = Datasets_by_id, skip_all, fields(%dataset_id))]
-    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID<'_>) -> Result<Option<Dataset>> {
+    pub async fn by_id(
+        &self,
+        ctx: &Context<'_>,
+        dataset_id: DatasetID<'_>,
+    ) -> Result<Option<Dataset>> {
         let dataset_id: odf::DatasetID = dataset_id.into();
 
-        self.by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
+        Self::by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
     }
 
     /// Returns multiple datasets by their IDs
@@ -152,14 +152,14 @@ impl Datasets {
         self.by_dataset_refs(ctx, dataset_refs, skip_missing).await
     }
 
-    /// Returns a dataset by a ID or alias, if found
+    /// Returns a dataset by an ID or alias, if found
     #[tracing::instrument(level = "info", name = Datasets_by_ref, skip_all, fields(%dataset_ref))]
     async fn by_ref(
         &self,
         ctx: &Context<'_>,
         dataset_ref: DatasetRef<'_>,
     ) -> Result<Option<Dataset>> {
-        self.by_dataset_ref(ctx, &dataset_ref).await
+        Self::by_dataset_ref(ctx, &dataset_ref).await
     }
 
     /// Returns multiple datasets by their IDs or aliases
@@ -189,8 +189,7 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
-        self.by_dataset_ref(ctx, &dataset_alias.into_local_ref())
-            .await
+        Self::by_dataset_ref(ctx, &dataset_alias.into_local_ref()).await
     }
 
     #[graphql(skip)]
@@ -243,19 +242,17 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account_name = account_service.find_account_name_by_id(&account_id).await?;
-
-        if let Some(account_name) = maybe_account_name {
-            self.by_account_impl(
-                ctx,
-                Account::new(account_id.into(), account_name.into()),
-                page,
-                per_page,
-            )
+        let maybe_account = account_entity_data_loader
+            .load_one(account_id)
             .await
+            .map_err(data_loader_error_mapper)?;
+
+        if let Some(account) = maybe_account {
+            self.by_account_impl(ctx, Account::from_account(account), page, per_page)
+                .await
         } else {
             let page = page.unwrap_or(0);
             let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);

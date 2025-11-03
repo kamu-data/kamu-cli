@@ -33,6 +33,7 @@ use kamu_auth_rebac_services::{
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
+    InMemoryDatasetDataBlockRepository,
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
@@ -78,6 +79,7 @@ async fn setup_repo() -> RepoFixture {
             datasets_dir,
         ))
         .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
+        .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
@@ -88,6 +90,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<DatasetEntryServiceImpl>()
         .add::<InMemoryDatasetEntryRepository>()
         .add::<InMemoryDatasetKeyBlockRepository>()
+        .add::<InMemoryDatasetDataBlockRepository>()
         .add::<AccountServiceImpl>()
         .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()
@@ -178,7 +181,7 @@ where
         )
         .split_for_parts();
 
-    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
     let server = axum::serve(listener, router.into_make_service());
@@ -237,7 +240,7 @@ async fn test_routing_root() {
         )
         .split_for_parts();
 
-    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
     let server = axum::serve(listener, router.into_make_service()).into_future();

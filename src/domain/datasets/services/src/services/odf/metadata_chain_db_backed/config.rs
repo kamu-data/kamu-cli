@@ -7,16 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::MetadataEventType;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct DatasetKeyBlock {
-    pub event_kind: MetadataEventType,
-    pub sequence_number: u64,
-    pub block_hash: odf::Multihash,
-    pub block_payload: bytes::Bytes,
+#[derive(Debug, Copy, Clone)]
+pub struct MetadataChainDbBackedConfig {
+    pub data_blocks_page_size: usize,
+}
+
+impl Default for MetadataChainDbBackedConfig {
+    fn default() -> Self {
+        Self {
+            data_blocks_page_size: 100,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

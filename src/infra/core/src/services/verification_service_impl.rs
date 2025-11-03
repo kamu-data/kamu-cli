@@ -59,9 +59,8 @@ impl VerificationServiceImpl {
         // TODO: Avoid collecting and stream instead, perhaps use nonce for `num_blocks`
         // estimate
         use futures::TryStreamExt;
-        use odf::dataset::MetadataChainExt;
         let plan: Vec<_> = chain
-            .iter_blocks_interval(&head, tail.as_ref(), false)
+            .iter_blocks_interval((&head).into(), tail.as_ref().map(Into::into), false)
             .filter_data_stream_blocks()
             .try_collect()
             .await?;
@@ -213,10 +212,9 @@ impl VerificationServiceImpl {
 
         listener.begin_phase(VerificationPhase::MetadataIntegrity);
 
-        use odf::dataset::MetadataChainExt;
         let blocks: Vec<_> = resolved_dataset
             .as_metadata_chain()
-            .iter_blocks_interval(&head, tail.as_ref(), false)
+            .iter_blocks_interval((&head).into(), tail.as_ref().map(Into::into), false)
             .try_collect()
             .await?;
 

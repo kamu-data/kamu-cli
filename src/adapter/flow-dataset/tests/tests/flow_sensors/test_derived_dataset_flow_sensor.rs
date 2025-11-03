@@ -15,13 +15,13 @@ use kamu_adapter_flow_dataset::*;
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetIncrementQueryService,
-    DatasetIntervalIncrement,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
 };
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use messaging_outbox::*;
+use odf::dataset::MetadataChainIncrementInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -144,7 +144,7 @@ async fn test_sensor_activation_new_data() {
             bar_id.clone(),
             Some(odf::Multihash::from_digest_sha3_256(b"bar_prev_slice")),
             odf::Multihash::from_digest_sha3_256(b"bar_new_slice"),
-            DatasetIntervalIncrement {
+            MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
@@ -213,7 +213,7 @@ async fn test_sensor_sensitization_got_new_data() {
         ..Default::default()
     });
     harness
-        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
         .await;
 
     let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
@@ -244,7 +244,7 @@ async fn test_sensor_sensitization_breaking_change_ignored() {
 
     let harness = DerivedDatasetFlowSensorHarness::new(Default::default());
     harness
-        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
         .await;
 
     let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
@@ -281,7 +281,7 @@ async fn test_sensor_sensitization_breaking_change_recovered() {
         ..Default::default()
     });
     harness
-        .declare_dependency(&foo_id, &[bar_id.clone()], &[])
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
         .await;
 
     let sensor = DerivedDatasetFlowSensorHarness::create_sensor_with_reactive_rule(

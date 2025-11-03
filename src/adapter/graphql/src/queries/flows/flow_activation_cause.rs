@@ -25,6 +25,7 @@ pub(crate) enum FlowActivationCause {
     Manual(FlowActivationCauseManual),
     AutoPolling(FlowActivationCauseAutoPolling),
     DatasetUpdate(FlowActivationCauseDatasetUpdate),
+    IterationFinished(FlowActivationCauseIterationFinished),
 }
 
 impl FlowActivationCause {
@@ -40,6 +41,9 @@ impl FlowActivationCause {
             }
             fs::FlowActivationCause::AutoPolling(auto_polling) => {
                 Self::AutoPolling(auto_polling.clone().into())
+            }
+            fs::FlowActivationCause::IterationFinished(iteration_finished) => {
+                Self::IterationFinished(iteration_finished.clone().into())
             }
             fs::FlowActivationCause::ResourceUpdate(update) => {
                 assert!(
@@ -112,6 +116,17 @@ pub(crate) struct FlowActivationCauseAutoPolling {
 
 impl From<fs::FlowActivationCauseAutoPolling> for FlowActivationCauseAutoPolling {
     fn from(_: fs::FlowActivationCauseAutoPolling) -> Self {
+        Self { dummy: true }
+    }
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowActivationCauseIterationFinished {
+    dummy: bool,
+}
+
+impl From<fs::FlowActivationCauseIterationFinished> for FlowActivationCauseIterationFinished {
+    fn from(_: fs::FlowActivationCauseIterationFinished) -> Self {
         Self { dummy: true }
     }
 }

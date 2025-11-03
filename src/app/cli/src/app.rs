@@ -440,6 +440,8 @@ pub fn configure_base_catalog(
     ));
     b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
 
+    b.add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default());
+
     b.add::<odf::dataset::DatasetFactoryImpl>();
 
     b.add::<RemoteRepositoryRegistryImpl>();
@@ -839,7 +841,7 @@ pub fn register_config_in_catalog(
                 .set_display_name(AccountService::default_user_name(
                     TenancyConfig::MultiTenant,
                 ))
-                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
             );
 
             if is_e2e_testing {

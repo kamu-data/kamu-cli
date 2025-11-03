@@ -138,7 +138,7 @@ impl PostgresTaskEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<TaskState> for PostgresTaskEventStore {
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<TaskEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, TaskEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
@@ -174,7 +174,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
         })
     }
 
-    fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
+    fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<'_, TaskEvent> {
         let task_id: i64 = (*task_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
@@ -212,7 +212,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
         })
     }
 
-    fn get_events_multi(&self, queries: &[TaskID]) -> MultiEventStream<TaskID, TaskEvent> {
+    fn get_events_multi(&self, queries: &[TaskID]) -> MultiEventStream<'_, TaskID, TaskEvent> {
         let task_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
 
         Box::pin(async_stream::stream! {
@@ -349,7 +349,7 @@ impl TaskEventStore for PostgresTaskEventStore {
 
     /// Returns list of tasks, which are in Running state,
     /// from earliest to latest
-    fn get_running_tasks(&self, pagination: PaginationOpts) -> TaskIDStream {
+    fn get_running_tasks(&self, pagination: PaginationOpts) -> TaskIDStream<'_> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
@@ -405,7 +405,7 @@ impl TaskEventStore for PostgresTaskEventStore {
         &self,
         dataset_id: &odf::DatasetID,
         pagination: PaginationOpts,
-    ) -> TaskIDStream {
+    ) -> TaskIDStream<'_> {
         let dataset_id = dataset_id.to_string();
 
         Box::pin(async_stream::stream! {

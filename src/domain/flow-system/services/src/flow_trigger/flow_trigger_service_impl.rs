@@ -200,7 +200,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .map_err(Into::into)
     }
 
-    fn list_enabled_triggers(&self) -> FlowTriggerStateStream {
+    fn list_enabled_triggers(&self) -> FlowTriggerStateStream<'_> {
         Box::pin(async_stream::try_stream! {
             use futures::stream::{self, StreamExt, TryStreamExt};
             let flow_bindings: Vec<_> = self.flow_trigger_event_store.stream_all_active_flow_bindings().try_collect().await.int_err()?;

@@ -297,6 +297,16 @@ impl State {
             .values()
             .filter(move |ps| ps.flow_binding().scope.matches_query(flow_scope_query))
     }
+
+    fn get_process_state_mut(
+        &mut self,
+        flow_binding: &FlowBinding,
+        current_time: DateTime<Utc>,
+    ) -> &mut FlowProcessState {
+        self.process_state_by_binding
+            .entry(flow_binding.clone())
+            .or_insert_with(|| FlowProcessState::unconfigured(current_time, flow_binding.clone()))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -417,12 +427,7 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
     ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
 
-        let process_state = state
-            .process_state_by_binding
-            .entry(flow_binding.clone())
-            .or_insert_with(|| {
-                FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone())
-            });
+        let process_state = state.get_process_state_mut(flow_binding, self.time_source.now());
 
         process_state
             .on_flow_outcome(event_id, self.time_source.now(), event_time, flow_outcome)
@@ -441,15 +446,29 @@ impl FlowProcessStateRepository for InMemoryFlowProcessState {
     ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
         let mut state = self.state.write().unwrap();
 
-        let process_state = state
-            .process_state_by_binding
-            .entry(flow_binding.clone())
-            .or_insert_with(|| {
-                FlowProcessState::unconfigured(self.time_source.now(), flow_binding.clone())
-            });
+        let process_state = state.get_process_state_mut(flow_binding, self.time_source.now());
 
         process_state
             .on_scheduled(event_id, self.time_source.now(), planned_at)
+            .int_err()?;
+
+        let result = process_state.clone();
+        process_state.take_pending_events();
+        Ok(result)
+    }
+
+    async fn on_flow_task_running(
+        &self,
+        event_id: EventID,
+        flow_binding: &FlowBinding,
+        started_at: DateTime<Utc>,
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError> {
+        let mut state = self.state.write().unwrap();
+
+        let process_state = state.get_process_state_mut(flow_binding, self.time_source.now());
+
+        process_state
+            .on_running(event_id, self.time_source.now(), started_at)
             .int_err()?;
 
         let result = process_state.clone();

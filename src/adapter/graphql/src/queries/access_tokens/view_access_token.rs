@@ -27,7 +27,7 @@ impl ViewAccessToken {
     }
 
     /// Unique identifier of the access token
-    async fn id(&self) -> AccessTokenID {
+    async fn id(&self) -> AccessTokenID<'_> {
         (&self.token.id).into()
     }
 
@@ -75,7 +75,7 @@ impl<'a> CreatedAccessToken<'a> {
     }
 
     /// Unique identifier of the access token
-    async fn id(&self) -> AccessTokenID {
+    async fn id(&self) -> AccessTokenID<'_> {
         self.token.id.into()
     }
 

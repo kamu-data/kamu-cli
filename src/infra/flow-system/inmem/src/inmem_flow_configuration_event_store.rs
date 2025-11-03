@@ -66,7 +66,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
         self.inner.len().await
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowConfigurationEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowConfigurationEvent> {
         self.inner.get_all_events(opts)
     }
 
@@ -74,7 +74,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
         &self,
         query: &FlowBinding,
         opts: GetEventsOpts,
-    ) -> EventStream<FlowConfigurationEvent> {
+    ) -> EventStream<'_, FlowConfigurationEvent> {
         self.inner.get_events(query, opts)
     }
 
@@ -116,7 +116,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
-    fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream {
+    fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream<'_> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 

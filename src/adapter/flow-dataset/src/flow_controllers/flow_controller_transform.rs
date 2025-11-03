@@ -111,7 +111,9 @@ impl fs::FlowController for FlowControllerTransform {
                 return Ok(());
             }
 
-            PullResult::Updated { old_head, new_head } => {
+            PullResult::Updated {
+                old_head, new_head, ..
+            } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 

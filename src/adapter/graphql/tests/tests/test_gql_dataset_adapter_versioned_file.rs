@@ -730,9 +730,7 @@ impl GraphQLDatasetsHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_authorized.clone()))
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     pub async fn create_versioned_file(&self, dataset_alias: &odf::DatasetAlias) -> String {

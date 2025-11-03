@@ -51,7 +51,7 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
         &self,
         above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
         batch_size: usize,
-    ) -> OutboxMessageStream {
+    ) -> OutboxMessageStream<'_> {
         let (producers, above_ids): (Vec<String>, Vec<i64>) = above_boundaries_by_producer
             .into_iter()
             .map(|(p, v)| (p, v.into_inner()))

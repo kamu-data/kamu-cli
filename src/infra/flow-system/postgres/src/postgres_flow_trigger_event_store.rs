@@ -26,7 +26,7 @@ pub struct PostgresFlowTriggerEventStore {
 #[async_trait::async_trait]
 impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowTriggerEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
@@ -67,11 +67,11 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
         &self,
         flow_binding: &FlowBinding,
         opts: GetEventsOpts,
-    ) -> EventStream<FlowTriggerEvent> {
+    ) -> EventStream<'_, FlowTriggerEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
-        let flow_type = flow_binding.flow_type.to_string();
+        let flow_type = flow_binding.flow_type.clone();
         let scope_json = serde_json::to_value(&flow_binding.scope).unwrap();
 
         Box::pin(async_stream::stream! {
@@ -184,7 +184,7 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
+    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream<'_> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;

@@ -44,6 +44,14 @@ pub trait FlowProcessStateRepository: Send + Sync {
         planned_at: DateTime<Utc>,
     ) -> Result<FlowProcessState, FlowProcessFlowEventError>;
 
+    /// React to flow task running
+    async fn on_flow_task_running(
+        &self,
+        flow_event_id: EventID,
+        flow_binding: &FlowBinding,
+        started_at: DateTime<Utc>,
+    ) -> Result<FlowProcessState, FlowProcessFlowEventError>;
+
     /// Remove all rows for the given scope.
     async fn delete_process_states_by_scope(
         &self,

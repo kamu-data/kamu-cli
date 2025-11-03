@@ -29,7 +29,7 @@ impl DatasetsMut {
         events_format: Option<MetadataManifestFormat>,
     ) -> Result<
         Vec<odf::metadata::MetadataEvent>,
-        Result<Box<CreateDatasetFromSnapshotResult>, GqlError>,
+        Result<Box<CreateDatasetFromSnapshotResult<'_>>, GqlError>,
     > {
         let mut res = Vec::new();
         match events_format.unwrap_or(MetadataManifestFormat::Yaml) {
@@ -74,6 +74,8 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         dataset_id: DatasetID<'_>,
     ) -> Result<Option<DatasetMut>> {
+        // TODO: PERF: GQL: DataLoader?
+
         use kamu_core::DatasetRegistryExt;
 
         let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
@@ -113,6 +115,8 @@ impl DatasetsMut {
         )]
         skip_missing: bool,
     ) -> Result<Vec<DatasetMut>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let rebac_dataset_registry_facade =
             from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacDatasetRegistryFacade);
 
@@ -151,7 +155,7 @@ impl DatasetsMut {
         dataset_kind: DatasetKind,
         dataset_alias: DatasetAlias<'_>,
         dataset_visibility: DatasetVisibility,
-    ) -> Result<CreateDatasetResult> {
+    ) -> Result<CreateDatasetResult<'_>> {
         match self
             .create_from_snapshot_impl(
                 ctx,
@@ -175,7 +179,7 @@ impl DatasetsMut {
         }
     }
 
-    /// Creates a new dataset from provided DatasetSnapshot manifest
+    /// Creates a new dataset from provided snapshot manifest
     #[tracing::instrument(level = "info", name = DatasetsMut_create_from_snapshot, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_from_snapshot(
@@ -184,7 +188,7 @@ impl DatasetsMut {
         snapshot: String,
         snapshot_format: MetadataManifestFormat,
         dataset_visibility: DatasetVisibility,
-    ) -> Result<CreateDatasetFromSnapshotResult> {
+    ) -> Result<CreateDatasetFromSnapshotResult<'_>> {
         use odf::metadata::serde::DatasetSnapshotDeserializer;
 
         let snapshot = match snapshot_format {
@@ -223,7 +227,7 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         snapshot: odf::DatasetSnapshot,
         dataset_visibility: odf::DatasetVisibility,
-    ) -> Result<CreateDatasetFromSnapshotResult> {
+    ) -> Result<CreateDatasetFromSnapshotResult<'_>> {
         let create_from_snapshot =
             from_catalog_n!(ctx, dyn kamu_datasets::CreateDatasetFromSnapshotUseCase);
 
@@ -297,7 +301,7 @@ impl DatasetsMut {
             MetadataManifestFormat,
         >,
         #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
-    ) -> Result<CreateDatasetFromSnapshotResult> {
+    ) -> Result<CreateDatasetFromSnapshotResult<'_>> {
         let extra_events_parsed = match self
             .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
         {
@@ -346,7 +350,7 @@ impl DatasetsMut {
             MetadataManifestFormat,
         >,
         #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
-    ) -> Result<CreateDatasetFromSnapshotResult> {
+    ) -> Result<CreateDatasetFromSnapshotResult<'_>> {
         let extra_events_parsed = match self
             .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
         {

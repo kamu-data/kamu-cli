@@ -392,6 +392,24 @@ impl FlowProcessState {
         Ok(())
     }
 
+    pub fn on_running(
+        &mut self,
+        event_id: EventID,
+        current_time: DateTime<Utc>,
+        started_at: DateTime<Utc>,
+    ) -> Result<(), FlowProcessStateError> {
+        self.validate_event_order(event_id)?;
+
+        // Clear next_planned_at only if the old value is in the past relative to the
+        // started_at time
+        self.handle_next_planned_at_update(started_at);
+
+        self.last_applied_event_id = event_id;
+        self.updated_at = current_time;
+
+        Ok(())
+    }
+
     fn actualize_effective_state_with_auto_stop_check(&mut self, event_time: DateTime<Utc>) {
         // If we already have an auto-stop reason (like unrecoverable failure), maintain
         // stopped state
@@ -931,11 +949,37 @@ mod tests {
         assert_eq!(enabled_state.next_planned_at, Some(scheduled_time));
         assert_eq!(enabled_state.last_applied_event_id, EventID::new(2));
 
-        // Test that past planned times are cleared on execution events
+        // Test realistic flow: schedule → running → outcome
+        // Schedule a flow for the near future
+        let scheduled_time = base_time + Duration::minutes(30);
+        enabled_state
+            .on_scheduled(EventID::new(3), base_time, scheduled_time)
+            .unwrap();
+        assert_eq!(enabled_state.next_planned_at, Some(scheduled_time));
+
+        // Flow starts running - should clear the past scheduled time
+        let execution_start_time = base_time + Duration::hours(1); // After scheduled time
+        enabled_state
+            .on_running(EventID::new(4), execution_start_time, execution_start_time)
+            .unwrap();
+        assert_eq!(enabled_state.next_planned_at, None); // Cleared because scheduled time was in the past
+
+        // Flow completes successfully
+        enabled_state
+            .on_flow_outcome(
+                EventID::new(5),
+                execution_start_time + Duration::minutes(5),
+                execution_start_time + Duration::minutes(5),
+                &FlowOutcome::Success(TaskResult::empty()),
+            )
+            .unwrap();
+
+        // Test that past planned times are cleared on execution events (existing
+        // behavior)
         enabled_state.next_planned_at = Some(base_time + Duration::minutes(30));
         enabled_state
             .on_flow_outcome(
-                EventID::new(3),
+                EventID::new(6),
                 base_time + Duration::hours(2),
                 base_time + Duration::hours(2),
                 &FlowOutcome::Success(TaskResult::empty()),
@@ -948,7 +992,7 @@ mod tests {
         enabled_state.next_planned_at = Some(future_time);
         enabled_state
             .on_flow_outcome(
-                EventID::new(4),
+                EventID::new(7),
                 base_time + Duration::hours(1),
                 base_time + Duration::hours(1),
                 &FlowOutcome::Success(TaskResult::empty()),
@@ -958,11 +1002,11 @@ mod tests {
 
         // Test that non-running states clear planned time
         enabled_state
-            .on_scheduled(EventID::new(5), base_time, base_time + Duration::hours(2))
+            .on_scheduled(EventID::new(8), base_time, base_time + Duration::hours(2))
             .unwrap();
         enabled_state
             .update_trigger_state(
-                EventID::new(6),
+                EventID::new(9),
                 base_time + Duration::minutes(10),
                 true, // pause
                 FlowTriggerStopPolicy::Never,
@@ -1003,6 +1047,82 @@ mod tests {
 
         assert_eq!(unconfigured_state.next_planned_at, None); // Should remain None
         assert_eq!(unconfigured_state.last_applied_event_id, EventID::new(2)); // Event ID should still update
+    }
+
+    #[test]
+    fn test_on_running_clears_past_scheduled_times() {
+        let base_time = Utc::now();
+        let mut state = FlowProcessState::new(
+            EventID::new(1),
+            base_time,
+            make_test_flow_binding(),
+            FlowProcessUserIntent::Enabled,
+            FlowTriggerStopPolicy::Never,
+        );
+
+        // Test 1: Past scheduled time should be cleared
+        let past_time = base_time + Duration::minutes(30);
+        state.next_planned_at = Some(past_time);
+
+        let execution_time = base_time + Duration::hours(1); // Later than scheduled time
+        state
+            .on_running(EventID::new(2), execution_time, execution_time)
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, None); // Cleared because past_time <= execution_time
+        assert_eq!(state.last_applied_event_id, EventID::new(2));
+
+        // Test 2: Future scheduled time should be preserved
+        let future_time = base_time + Duration::hours(3);
+        state.next_planned_at = Some(future_time);
+
+        let earlier_execution_time = base_time + Duration::hours(2); // Earlier than scheduled time
+        state
+            .on_running(
+                EventID::new(3),
+                earlier_execution_time,
+                earlier_execution_time,
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, Some(future_time)); // Preserved because future_time > execution_time
+
+        // Test 3: No scheduled time - should remain None
+        state.next_planned_at = None;
+        state
+            .on_running(
+                EventID::new(4),
+                base_time + Duration::hours(4),
+                base_time + Duration::hours(4),
+            )
+            .unwrap();
+
+        assert_eq!(state.next_planned_at, None); // Should remain None
+
+        // Test 4: Event ordering validation
+        let result = state.on_running(
+            EventID::new(4), // Duplicate event ID
+            base_time + Duration::hours(5),
+            base_time + Duration::hours(5),
+        );
+        assert!(matches!(
+            result.unwrap_err(),
+            FlowProcessStateError::DuplicateEvent { .. }
+        ));
+
+        // Test 5: Out-of-order event validation
+        let result = state.on_running(
+            EventID::new(2), // Lower than last applied (4)
+            base_time + Duration::hours(5),
+            base_time + Duration::hours(5),
+        );
+        assert!(matches!(
+            result.unwrap_err(),
+            FlowProcessStateError::OutOfOrderEvent { .. }
+        ));
+
+        // State should remain unchanged after validation errors
+        assert_eq!(state.last_applied_event_id, EventID::new(4));
     }
 
     #[test]

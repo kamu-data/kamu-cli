@@ -1115,7 +1115,7 @@ type Dataset {
 	"""
 	collaboration: DatasetCollaboration!
 	"""
-	Access to the dataset's webhooks management functionality
+	Access to the dataset's webhook management functionality
 	"""
 	webhooks: DatasetWebhooks!
 	"""
@@ -1622,7 +1622,7 @@ type Datasets {
 		skipMissing: Boolean!
 	): [Dataset!]!
 	"""
-	Returns a dataset by a ID or alias, if found
+	Returns a dataset by an ID or alias, if found
 	"""
 	byRef(datasetRef: DatasetRef!): Dataset
 	"""
@@ -1667,7 +1667,7 @@ type DatasetsMut {
 	"""
 	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!, datasetVisibility: DatasetVisibility!): CreateDatasetResult!
 	"""
-	Creates a new dataset from provided DatasetSnapshot manifest
+	Creates a new dataset from provided snapshot manifest
 	"""
 	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!, datasetVisibility: DatasetVisibility!): CreateDatasetFromSnapshotResult!
 	"""
@@ -2204,7 +2204,7 @@ type FlowAbortedResult {
 	message: String!
 }
 
-union FlowActivationCause = FlowActivationCauseManual | FlowActivationCauseAutoPolling | FlowActivationCauseDatasetUpdate
+union FlowActivationCause = FlowActivationCauseManual | FlowActivationCauseAutoPolling | FlowActivationCauseDatasetUpdate | FlowActivationCauseIterationFinished
 
 type FlowActivationCauseAutoPolling {
 	dummy: Boolean!
@@ -2234,6 +2234,10 @@ type FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
 	flowId: FlowID!
 }
 
+type FlowActivationCauseIterationFinished {
+	dummy: Boolean!
+}
+
 type FlowActivationCauseManual {
 	initiator: Account!
 }
@@ -2248,6 +2252,11 @@ input FlowConfigIngestInput {
 	Flag indicates to ignore cache during ingest step for API calls
 	"""
 	fetchUncacheable: Boolean!
+	"""
+	Flag indicates to trigger next flow iteration right if `has_more` is
+	true
+	"""
+	fetchNextIteration: Boolean!
 }
 
 input FlowConfigInputResetPropagationMode @oneOf {
@@ -2287,6 +2296,7 @@ type FlowConfigRuleCompaction {
 
 type FlowConfigRuleIngest {
 	fetchUncacheable: Boolean!
+	fetchNextIteration: Boolean!
 }
 
 type FlowConfigRuleReset {
@@ -2382,6 +2392,7 @@ type FlowDescriptionUpdateResultSuccess {
 	numBlocks: Int!
 	numRecords: Int!
 	updatedWatermark: DateTime
+	hasMore: Boolean!
 }
 
 type FlowDescriptionUpdateResultUnknown {

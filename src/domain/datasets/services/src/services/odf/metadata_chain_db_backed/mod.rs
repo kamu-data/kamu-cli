@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_key_block_indexer;
-mod dataset_key_block_indexing_job;
-mod dataset_key_block_update_handler;
+mod cached_blocks_range;
+mod config;
+mod load_helper;
+mod merge_iterator;
+mod metadata_chain_db_backed_impl;
 
-pub use dataset_key_block_indexer::*;
-pub(crate) use dataset_key_block_indexing_job::*;
-pub use dataset_key_block_update_handler::*;
+pub use config::*;
+pub use metadata_chain_db_backed_impl::*;

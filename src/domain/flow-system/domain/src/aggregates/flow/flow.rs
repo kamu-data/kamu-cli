@@ -15,8 +15,10 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+type FlowEventStoreStatic = dyn FlowEventStore + 'static;
+
 #[derive(Aggregate, Debug)]
-pub struct Flow(Aggregate<FlowState, (dyn FlowEventStore + 'static)>);
+pub struct Flow(Aggregate<FlowState, FlowEventStoreStatic>);
 
 impl Flow {
     /// Creates a flow

@@ -19,11 +19,57 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
-## [Unreleased]
+## [0.252.2] - 2025-11-03
+### Changed
+- Dataset increment now stored in flow task result to increase flow loading performance
+### Fixed
+- Executing init script for predefined accounts in parallel. Solves a noticeable slowdown 
+   of CLI commands in multi-tenant workspaces
+- Fixed S3 bucket listing issue when the number of child objects exceeds 1,000 records.   
+- GQL: Optimization: apply DataLoader to solve N+1 problem for federation entity resolvers (#1434).
+
+## [0.252.1] - 2025-10-30
+### Fixed
+- Hotfix: Event aggregation for flow triggers correctly works in `try_load_multi` method
+
+## [0.252.0] - 2025-10-29
+### Added
+- New `try_load_multi` method for Aggregates which will always return result even if error occurs
+### Changed
+- Improved performance of iterating over `AddData` and `ExecuteTransform` metadata nodes:
+   - these data-related blocks are stored in the database similarly to key blocks
+   - supporting data nodes in hint-aware visiting algorithms similarly to key blocks,
+      however, loading data blocks by pages of N events
+   - `iter_blocks` family of algorithms also uses data events from the database to speed up
+   - individual block accesses attempt to lookup in the database first, before going to storage 
+   - the indexing happens automatically at startup, as well as incrementally after updates,
+      while a need to index datasets is now detected via a single database query in anti-join style
+- Audited existing uses of `iter_blocks` family of algorithms all over the project,
+    and replaced a few detected irrational cases with faster approach
+- Storing block hashes in binary form for data/key blocks and dataset references,
+    while the original textual form of the hash was transformed into a virtual generated column
+      (this requires upgrade to Postgres 18)
+### Fixed
+- Log warning instead of error for `flow_trigger_event` loading if record not found
+
+## [0.251.3] - 2025-10-28
+### Changed
+- Ingest flow respects `has_more` flag and trigger follow up ingest flow
+- Upgraded Rust toolchain to the latest version
+
+## [0.251.2] - 2025-10-21
+### Fixed
+- Hotfix: merge error during polling ingest should be considered as unrecoverable failure
+- Hotfix: running flow task should clear "next_planned_at" field in the process state
+- Hotfix: ignore creation of remote repository for User scoped login
+
+## [0.251.1] - 2025-10-20
 ### Added
 - GQL: Added new `webhookSubscription::rotateSecret()` method to replace current secret
 ### Changed
 - Webhook subscription secrets are now stored encrypted in the database
+### Fixed
+- Flow process state projections now directly handle flow scope removal events
 
 ## [0.251.0] - 2025-10-16
 ### Added

@@ -66,7 +66,7 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
         self.inner.len().await
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowTriggerEvent> {
         self.inner.get_all_events(opts)
     }
 
@@ -74,7 +74,7 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
         &self,
         query: &FlowBinding,
         opts: GetEventsOpts,
-    ) -> EventStream<FlowTriggerEvent> {
+    ) -> EventStream<'_, FlowTriggerEvent> {
         self.inner.get_events(query, opts)
     }
 
@@ -113,7 +113,7 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
-    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
+    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream<'_> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 

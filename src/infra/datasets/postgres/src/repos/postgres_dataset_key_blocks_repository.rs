@@ -24,7 +24,38 @@ pub struct PostgresDatasetKeyBlockRepository {
 
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
-    async fn has_blocks(
+    async fn list_unindexed_dataset_branches(
+        &self,
+    ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT e.dataset_id, $1 AS block_ref_name
+            FROM dataset_entries e
+            LEFT JOIN dataset_key_blocks kb
+                ON e.dataset_id = kb.dataset_id AND kb.block_ref_name = $1
+            WHERE kb.dataset_id IS NULL
+            "#,
+            odf::BlockRef::Head.as_str()
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    odf::DatasetID::from_did_str(&r.dataset_id).unwrap(),
+                    odf::BlockRef::Head,
+                )
+            })
+            .collect())
+    }
+
+    async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
@@ -48,7 +79,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+    ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -57,7 +88,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             SELECT
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = $1 AND block_ref_name = $2
@@ -72,21 +103,25 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
 
         Ok(rows
             .into_iter()
-            .map(|r| DatasetKeyBlock {
+            .map(|r| DatasetBlock {
                 event_kind: r.event_type,
                 sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                block_hash: odf::Multihash::new(
+                    odf::metadata::Multicodec::Sha3_256,
+                    &r.block_hash_bin,
+                )
+                .unwrap(),
                 block_payload: bytes::Bytes::from(r.block_payload),
             })
             .collect())
     }
 
-    async fn match_datasets_having_blocks(
+    async fn match_datasets_having_key_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
+    ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -98,7 +133,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 dataset_id,
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             FROM dataset_key_blocks
             WHERE
@@ -120,10 +155,14 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .map(|r| {
                 (
                     odf::DatasetID::from_did_str(&r.dataset_id).unwrap(),
-                    DatasetKeyBlock {
+                    DatasetBlock {
                         event_kind: r.event_type,
                         sequence_number: u64::try_from(r.sequence_number).unwrap(),
-                        block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                        block_hash: odf::Multihash::new(
+                            odf::metadata::Multicodec::Sha3_256,
+                            &r.block_hash_bin,
+                        )
+                        .unwrap(),
                         block_payload: bytes::Bytes::from(r.block_payload),
                     },
                 )
@@ -131,11 +170,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn save_blocks_batch(
+    async fn save_key_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-        blocks: &[DatasetKeyBlock],
+        blocks: &[DatasetBlock],
     ) -> Result<(), DatasetKeyBlockSaveError> {
         if blocks.is_empty() {
             return Ok(());
@@ -152,7 +191,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 block_ref_name,
                 event_type,
                 sequence_number,
-                block_hash,
+                block_hash_bin,
                 block_payload
             )",
         );
@@ -164,7 +203,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 .push_bind_unseparated(block.event_kind.to_string())
                 .push_unseparated(")::metadata_event_type")
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
-                .push_bind(block.block_hash.to_string())
+                .push_bind(block.block_hash.digest())
                 .push_bind(block.block_payload.as_ref());
         });
 
@@ -174,6 +213,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
+                // TODO: might be a unique violation on block hash as well
                 DatasetKeyBlockSaveError::DuplicateSequenceNumber(
                     // We can't know which block caused it in batch insert
                     blocks.iter().map(|b| b.sequence_number).collect(),
@@ -194,7 +234,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         Ok(())
     }
 
-    async fn delete_all_for_ref(
+    async fn delete_all_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

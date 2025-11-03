@@ -87,8 +87,8 @@ impl AccountRepository for MySqlAccountRepository {
             account.account_type,
             account.avatar_url,
             account.registered_at,
-            account.provider.to_string(),
-            account.provider_identity_key.to_string(),
+            account.provider.clone(),
+            account.provider_identity_key.clone(),
         )
         .execute(connection_mut)
         .await
@@ -130,8 +130,8 @@ impl AccountRepository for MySqlAccountRepository {
             updated_account.account_type as AccountType,
             updated_account.avatar_url,
             updated_account.registered_at,
-            updated_account.provider.to_string(),
-            updated_account.provider_identity_key.to_string(),
+            updated_account.provider.clone(),
+            updated_account.provider_identity_key.clone(),
             updated_account.id.to_string(),
         )
         .execute(connection_mut)

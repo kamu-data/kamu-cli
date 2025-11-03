@@ -123,7 +123,7 @@ fn self_test() {
             Some(CaptureIncorrectDividingLines {
                 file_path_rel,
                 lines
-            }) if file_path_rel == PathBuf::from("./src/file.rs") && lines == vec![
+            }) if *file_path_rel == *"./src/file.rs" && lines == vec![
                 "11://///////////////////////////////////////////////////////// (len = 59)",
                 "13://///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// (len = 123)"
             ]

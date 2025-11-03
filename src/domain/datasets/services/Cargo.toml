@@ -45,6 +45,7 @@ odf = { workspace = true, features = ["http", "lfs", "s3"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 
+async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }

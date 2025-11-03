@@ -9,9 +9,9 @@
 
 #![feature(error_generic_member_access)]
 #![feature(int_roundings)]
-#![feature(let_chains)]
 
 pub mod config;
+pub mod data_loader;
 pub mod extensions;
 pub mod guards;
 pub(crate) mod mutations;

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{PullResult, PullResultUpToDate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -14,6 +15,8 @@ use kamu_core::{PullResult, PullResultUpToDate};
 kamu_task_system::task_result_struct! {
     pub struct TaskResultDatasetUpdate {
         pub pull_result: PullResult,
+        #[serde(default)]
+        pub data_increment: Option<odf::dataset::MetadataChainIncrementInterval>,
     }
     => "UpdateDatasetResult"
 }
@@ -21,7 +24,9 @@ kamu_task_system::task_result_struct! {
 impl TaskResultDatasetUpdate {
     pub fn try_as_increment(&self) -> Option<(Option<&odf::Multihash>, &odf::Multihash)> {
         match &self.pull_result {
-            PullResult::Updated { old_head, new_head } => Some((old_head.as_ref(), new_head)),
+            PullResult::Updated {
+                old_head, new_head, ..
+            } => Some((old_head.as_ref(), new_head)),
             PullResult::UpToDate(_) => None,
         }
     }
@@ -31,6 +36,36 @@ impl TaskResultDatasetUpdate {
             PullResult::UpToDate(up_to_date) => Some(up_to_date),
             PullResult::Updated { .. } => None,
         }
+    }
+
+    pub fn has_more(&self) -> bool {
+        match &self.pull_result {
+            PullResult::Updated { has_more, .. } => *has_more,
+            PullResult::UpToDate(_) => false,
+        }
+    }
+
+    pub async fn from_pull_result(
+        pull_result: PullResult,
+        dataset_increment_query_service: &dyn kamu_datasets::DatasetIncrementQueryService,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Self, InternalError> {
+        let data_increment = match &pull_result {
+            PullResult::Updated {
+                old_head, new_head, ..
+            } => Some(
+                dataset_increment_query_service
+                    .get_increment_between(dataset_id, old_head.as_ref(), new_head)
+                    .await
+                    .int_err()?,
+            ),
+            PullResult::UpToDate(_) => None,
+        };
+
+        Ok(Self {
+            pull_result,
+            data_increment,
+        })
     }
 }
 
