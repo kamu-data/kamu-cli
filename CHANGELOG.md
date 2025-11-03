@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - Executing init script for predefined accounts in parallel. Solves a noticeable slowdown 
    of CLI commands in multi-tenant workspaces
+- Fixed S3 bucket listing issue when the number of child objects exceeds 1,000 records.   
 
 ## [0.252.1] - 2025-10-30
 ### Fixed
