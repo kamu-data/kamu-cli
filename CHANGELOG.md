@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.252.2] - 2025-11-03
 ### Changed
 - Dataset increment now stored in flow task result to increase flow loading performance
 ### Fixed
