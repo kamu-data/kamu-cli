@@ -15,6 +15,7 @@ use kamu_core::{PullResult, PullResultUpToDate};
 kamu_task_system::task_result_struct! {
     pub struct TaskResultDatasetUpdate {
         pub pull_result: PullResult,
+        #[serde(default)]
         pub data_increment: Option<odf::dataset::MetadataChainIncrementInterval>,
     }
     => "UpdateDatasetResult"
