@@ -74,6 +74,8 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         dataset_id: DatasetID<'_>,
     ) -> Result<Option<DatasetMut>> {
+        // TODO: PERF: GQL: DataLoader?
+
         use kamu_core::DatasetRegistryExt;
 
         let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
@@ -113,6 +115,8 @@ impl DatasetsMut {
         )]
         skip_missing: bool,
     ) -> Result<Vec<DatasetMut>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let rebac_dataset_registry_facade =
             from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacDatasetRegistryFacade);
 

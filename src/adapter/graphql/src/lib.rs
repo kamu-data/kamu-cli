@@ -11,6 +11,7 @@
 #![feature(int_roundings)]
 
 pub mod config;
+pub mod data_loader;
 pub mod extensions;
 pub mod guards;
 pub(crate) mod mutations;

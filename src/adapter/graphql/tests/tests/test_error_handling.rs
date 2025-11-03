@@ -11,6 +11,7 @@ use indoc::indoc;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_adapter_graphql::data_loader::dataset_handle_data_loader;
 use kamu_auth_rebac::{
     ClassifyDatasetRefsByAccessResponse,
     ClassifyDatasetRefsByAllowanceResponse,
@@ -20,6 +21,7 @@ use kamu_auth_rebac::{
 };
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetAction};
 use kamu_core::{ResolvedDataset, TenancyConfig};
+use pretty_assertions::assert_eq;
 use thiserror::Error;
 use time_source::SystemTimeSourceDefault;
 
@@ -47,8 +49,7 @@ async fn test_malformed_argument() {
 
     let mut json_resp = serde_json::to_value(res).unwrap();
 
-    // Ignore extensions and error locations
-    json_resp["extensions"] = serde_json::Value::Null;
+    // Ignore error locations
     json_resp["errors"][0]["locations"] = serde_json::Value::Array(Vec::new());
 
     assert_eq!(
@@ -60,7 +61,6 @@ async fn test_malformed_argument() {
                 "path": ["datasets", "byAccountName"],
             }],
             "data": null,
-            "extensions": null,
         })
     );
 }
@@ -69,6 +69,10 @@ async fn test_malformed_argument() {
 
 #[test_log::test(tokio::test)]
 async fn test_internal_error() {
+    #[derive(Debug, Error)]
+    #[error("I'm a dummy error that should not propagate through")]
+    struct DummyError;
+
     #[dill::component]
     #[dill::interface(dyn RebacDatasetRegistryFacade)]
     struct ErrorRebacDatasetRegistryFacadeImpl {}
@@ -80,11 +84,7 @@ async fn test_internal_error() {
             _dataset_ref: &odf::DatasetRef,
             _action: DatasetAction,
         ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError> {
-            #[derive(Debug, Error)]
-            #[error("I'm a dummy error that should not propagate through")]
-            struct DummyError;
-
-            Err(DummyError.int_err().into())
+            unreachable!()
         }
 
         async fn resolve_dataset_by_ref(
@@ -108,7 +108,7 @@ async fn test_internal_error() {
             _dataset_refs: &[&odf::DatasetRef],
             _action: DatasetAction,
         ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
-            unreachable!()
+            Err(DummyError.int_err())
         }
 
         async fn classify_dataset_refs_by_access(
@@ -122,7 +122,7 @@ async fn test_internal_error() {
 
     let tempdir = tempfile::tempdir().unwrap();
 
-    let cat = dill::CatalogBuilder::new()
+    let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
@@ -145,13 +145,13 @@ async fn test_internal_error() {
                 }
             }
             "#
-        )).data(cat))
+
+        )).data(dataset_handle_data_loader(&catalog)).data(catalog))
         .await;
 
     let mut json_resp = serde_json::to_value(res).unwrap();
 
-    // Ignore extensions and error locations
-    json_resp["extensions"] = serde_json::Value::Null;
+    // Ignore error locations
     json_resp["errors"][0]["locations"] = serde_json::Value::Array(Vec::new());
 
     assert_eq!(
@@ -163,7 +163,6 @@ async fn test_internal_error() {
                 "path": ["datasets", "byId"],
             }],
             "data": null,
-            "extensions": null,
         })
     );
 }

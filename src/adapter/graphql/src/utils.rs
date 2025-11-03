@@ -14,6 +14,7 @@ use kamu_core::{TenancyConfig, auth};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
 
+use crate::data_loader::{AccountEntityDataLoader, DatasetHandleDataLoader};
 use crate::prelude::{AccessTokenID, AccountID};
 use crate::queries::DatasetRequestState;
 
@@ -51,6 +52,20 @@ macro_rules! from_catalog_n {
 }
 
 pub(crate) use from_catalog_n;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn get_account_entity_data_loader<'a>(
+    ctx: &'a Context<'a>,
+) -> &'a AccountEntityDataLoader {
+    ctx.data_unchecked::<AccountEntityDataLoader>()
+}
+
+pub(crate) fn get_dataset_handle_data_loader<'a>(
+    ctx: &'a Context<'a>,
+) -> &'a DatasetHandleDataLoader {
+    ctx.data_unchecked::<DatasetHandleDataLoader>()
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

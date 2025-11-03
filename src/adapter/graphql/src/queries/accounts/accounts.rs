@@ -9,6 +9,7 @@
 
 use crate::prelude::*;
 use crate::queries::Account;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,14 +38,20 @@ impl Accounts {
 
     /// Returns an account by its ID, if found
     #[tracing::instrument(level = "info", name = Accounts_by_id, skip_all, fields(%account_id))]
-    async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID<'_>) -> Result<Option<Account>> {
-        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+    pub async fn by_id(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID<'_>,
+    ) -> Result<Option<Account>> {
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account_name = account_service.find_account_name_by_id(&account_id).await?;
+        let maybe_account = account_entity_data_loader
+            .load_one(account_id)
+            .await
+            .map_err(data_loader_error_mapper)?;
 
-        Ok(maybe_account_name
-            .map(|account_name| Account::new(account_id.into(), account_name.into())))
+        Ok(maybe_account.map(Account::from_account))
     }
 
     /// Returns accounts by their IDs
@@ -59,6 +66,8 @@ impl Accounts {
         )]
         skip_missing: bool,
     ) -> Result<Vec<Account>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let domain_account_ids = account_ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
@@ -85,11 +94,14 @@ impl Accounts {
     /// Returns an account by its name, if found
     #[tracing::instrument(level = "info", name = Accounts_by_name, skip_all, fields(%name))]
     async fn by_name(&self, ctx: &Context<'_>, name: AccountName<'_>) -> Result<Option<Account>> {
-        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+        let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
         let account_name: odf::AccountName = name.into();
+        let maybe_account = account_entity_data_loader
+            .load_one(account_name)
+            .await
+            .map_err(data_loader_error_mapper)?;
 
-        let maybe_account = account_service.account_by_name(&account_name).await?;
         Ok(maybe_account.map(Account::from_account))
     }
 
@@ -105,6 +117,8 @@ impl Accounts {
         )]
         skip_missing: bool,
     ) -> Result<Vec<Account>> {
+        // TODO: PERF: GQL: DataLoader?
+
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let domain_account_names = account_names.iter().map(AsRef::as_ref).collect::<Vec<_>>();

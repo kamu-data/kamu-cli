@@ -10,6 +10,7 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
+use pretty_assertions::assert_eq;
 
 use crate::utils::{BaseGQLFlowRunsHarness, GraphQLQueryRequest};
 
@@ -111,43 +112,39 @@ async fn test_list_datasets_with_flow() {
         .await;
 
     // Pure datasets listing
-    let request_code = indoc!(
-        r#"
-        query($accountName: String!) {
-            accounts {
-                byName (name: $accountName) {
-                    flows {
-                        runs {
-                            listDatasetsWithFlow {
-                                nodes {
-                                    id
-                                }
-                                pageInfo {
-                                    currentPage
-                                    totalPages
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($accountName: String!) {
+                    accounts {
+                        byName (name: $accountName) {
+                            flows {
+                                runs {
+                                    listDatasetsWithFlow {
+                                        nodes {
+                                            id
+                                        }
+                                        pageInfo {
+                                            currentPage
+                                            totalPages
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-        "#
-    );
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(request_code)
-                .variables(async_graphql::Variables::from_json(serde_json::json!({
-                    "accountName": DEFAULT_ACCOUNT_NAME_STR,
-                })))
-                .data(harness.catalog_authorized.clone()),
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+            })),
         )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
+        .execute(&schema, &harness.catalog_authorized)
+        .await
+        .data,
         value!({
             "accounts": {
                 "byName": {
