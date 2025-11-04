@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use datafusion::arrow::datatypes::Schema;
 use datafusion::catalog::{TableFunctionImpl, TableProvider};
-use datafusion::common::{DataFusionError, Result as DfResult, exec_err, plan_err};
+use datafusion::common::{DataFusionError as DFError, Result as DfResult, plan_err};
 use datafusion::datasource::empty::EmptyTable;
 use datafusion::prelude::*;
-use kamu_core::{GetDataWithMetadataOptions, QueryError, QueryService};
+use kamu_core::{GetDataOptions, QueryError, QueryService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,13 +39,7 @@ impl ToTableUdtf {
     async fn main(&self, dataset_ref: odf::DatasetRef) -> DfResult<Arc<dyn TableProvider>> {
         let data_response = self
             .query_svc
-            .get_data_with_metadata(
-                &dataset_ref,
-                GetDataWithMetadataOptions::builder()
-                    .resolve_dataset_vocabulary(true)
-                    .resolve_merge_strategy(true)
-                    .build(),
-            )
+            .get_changelog_projection(&dataset_ref, GetDataOptions::default())
             .await
             .map_err(|e| {
                 // Rewrite access error
@@ -55,25 +49,14 @@ impl ToTableUdtf {
                     e
                 }
             })
-            .map_err(|e| DataFusionError::External(e.into()))?;
+            .map_err(|e| DFError::External(Box::new(e)))?;
 
-        let Some(df) = data_response.df else {
+        if let Some(df) = data_response.df {
+            Ok(df.into_view())
+        } else {
             // Dataset has no schema yet -- return empty table
-            return Ok(Arc::new(EmptyTable::new(Arc::new(Schema::empty()))));
-        };
-
-        let Some(primary_key) = data_response
-            .merge_strategy
-            .and_then(odf::metadata::MergeStrategy::primary_key)
-        else {
-            return exec_err!("{FUNCTION_NAME}: {dataset_ref} has no primary key");
-        };
-        let dataset_vocabulary = data_response.dataset_vocabulary.unwrap_or_default();
-
-        let projection_df =
-            odf::utils::data::changelog::project(df, &primary_key, &dataset_vocabulary)?;
-
-        Ok(projection_df.into_view())
+            Ok(Arc::new(EmptyTable::new(Arc::new(Schema::empty()))))
+        }
     }
 }
 
@@ -93,7 +76,7 @@ struct ToTableFunctionArgs {
 }
 
 impl TryFrom<&[Expr]> for ToTableFunctionArgs {
-    type Error = DataFusionError;
+    type Error = DFError;
 
     fn try_from(args: &[Expr]) -> Result<Self, Self::Error> {
         if args.len() != 1 {

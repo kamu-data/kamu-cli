@@ -12,7 +12,7 @@ use std::sync::Arc;
 use datafusion::error::DataFusionError as DFError;
 use datafusion::prelude::*;
 use indoc::{formatdoc, indoc};
-use kamu_core::{GetDataWithMetadataResponse, MockQueryService, QueryService};
+use kamu_core::{GetDataResponse, MockQueryService, QueryService};
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,25 +94,6 @@ async fn test_dataset_unauthorized() {
         .await,
         Err(DFError::External(e))
             if e.to_string() == "Dataset not found: kamu/unauthorized-table"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_dataset_has_no_primary_key() {
-    let ctx = create_session_context();
-
-    assert_matches!(
-        ctx.sql(indoc!(
-            "
-            SELECT *
-            FROM to_table(`kamu/table-no-pk`)
-            "
-        ))
-        .await,
-        Err(DFError::Execution(msg))
-            if msg == "to_table: kamu/table-no-pk has no primary key"
     );
 }
 
@@ -203,16 +184,15 @@ fn create_mock_query_svc() -> Arc<dyn QueryService> {
     let mut mock_query_svc = MockQueryService::new();
 
     mock_query_svc
-        .expect_get_data_with_metadata()
+        .expect_get_changelog_projection()
         .returning(|dataset_ref, _options| {
             let Some(dataset_alias) = dataset_ref.alias() else {
                 unreachable!()
             };
 
-            let (has_primary_key, has_data) = match dataset_alias.dataset_name.as_str() {
-                "table" => (true, true),
-                "table-no-pk" => (false, true),
-                "table-no-schema" => (false, false),
+            let has_data = match dataset_alias.dataset_name.as_str() {
+                "table" => true,
+                "table-no-schema" => false,
                 "unauthorized-table" => {
                     return Err(
                         odf::AccessError::Unauthorized("Dataset inaccessible".into()).into(),
@@ -226,7 +206,7 @@ fn create_mock_query_svc() -> Arc<dyn QueryService> {
                 }
             };
 
-            Ok(GetDataWithMetadataResponse {
+            Ok(GetDataResponse {
                 df: has_data.then(|| {
                     // +--------+----+------+------------+
                     // | offset | op | city | population |
@@ -240,14 +220,20 @@ fn create_mock_query_svc() -> Arc<dyn QueryService> {
                     // | 6      | +C | a    | 1500       |
                     // | 7      | -R | a    | 1500       |
                     // +--------+----+------+------------+
-                    dataframe!(
+                    let df = dataframe!(
                         "offset" => [0, 1, 2, 3, 4, 5, 6, 7],
                         "op" => [0, 0, 0, 2, 3, 2, 3, 1],
                         "city" => ["a", "b", "c", "b", "b", "a", "a", "a"],
                         "population" => [1000, 2000, 3000, 2000, 2500, 1000, 1500, 1500],
                     )
+                    .unwrap();
+
+                    odf::utils::data::changelog::project(
+                        df.into(),
+                        &["city".to_string()],
+                        &Default::default(),
+                    )
                     .unwrap()
-                    .into()
                 }),
                 dataset_handle: odf::DatasetHandle::new(
                     odf::DatasetID::new_generated_ed25519().1,
@@ -255,14 +241,6 @@ fn create_mock_query_svc() -> Arc<dyn QueryService> {
                     odf::DatasetKind::Root,
                 ),
                 block_hash: odf::Multihash::from_digest_sha3_256(b"head"),
-                dataset_vocabulary: None,
-                data_schema: None,
-                merge_strategy: has_primary_key.then(|| {
-                    odf::metadata::MergeStrategyChangelogStream {
-                        primary_key: vec!["city".to_string()],
-                    }
-                    .into()
-                }),
             })
         });
 
