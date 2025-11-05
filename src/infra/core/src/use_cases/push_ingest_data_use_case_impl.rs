@@ -30,7 +30,7 @@ pub struct PushIngestDataUseCaseImpl {
 impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
     async fn execute(
         &self,
-        target_dataset: &ResolvedDataset,
+        target: ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
@@ -38,7 +38,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         let ingest_plan = self
             .push_ingest_planner
             .plan_ingest(
-                target_dataset.clone(),
+                target.clone(),
                 options.source_name.as_deref(),
                 PushIngestOpts {
                     media_type: options.media_type,
@@ -52,19 +52,14 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
 
         let push_execute_result = self
             .push_ingest_executor
-            .execute_ingest(
-                target_dataset.clone(),
-                ingest_plan,
-                data_source,
-                listener_maybe,
-            )
+            .execute_ingest(target.clone(), ingest_plan, data_source, listener_maybe)
             .await?;
 
         if let PushIngestResult::Updated {
             old_head, new_head, ..
         } = &push_execute_result
         {
-            target_dataset
+            target
                 .as_metadata_chain()
                 .set_ref(
                     &odf::BlockRef::Head,
@@ -85,7 +80,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
                     DatasetExternallyChangedMessage::ingest_http(
-                        target_dataset.get_id(),
+                        target.get_id(),
                         options.source_name,
                         Some(old_head),
                         new_head,

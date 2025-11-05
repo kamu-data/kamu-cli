@@ -51,7 +51,7 @@ pub trait QueryService: Send + Sync {
 
     async fn tail(
         &self,
-        target: ResolvedDataset,
+        source: ResolvedDataset,
         skip: u64,
         limit: u64,
         options: GetDataOptions,
@@ -61,15 +61,9 @@ pub trait QueryService: Send + Sync {
     // number of files we collect to construct the dataframe.
     ///
     /// Returns a `DataFrame` representing the contents of an entire dataset
-    async fn get_data_old(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        options: GetDataOptions,
-    ) -> Result<GetDataResponse, QueryError>;
-
     async fn get_data(
         &self,
-        target: ResolvedDataset,
+        source: ResolvedDataset,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError>;
 
@@ -79,7 +73,7 @@ pub trait QueryService: Send + Sync {
     /// in a batch
     async fn get_data_multi(
         &self,
-        datasets: Vec<ResolvedDataset>,
+        sources: Vec<ResolvedDataset>,
     ) -> Result<Vec<GetDataResponse>, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a

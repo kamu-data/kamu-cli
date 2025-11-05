@@ -139,7 +139,7 @@ pub async fn dataset_ingest_handler(
     let push_ingest_data_use_case = catalog.get_one::<dyn PushIngestDataUseCase>().unwrap();
     push_ingest_data_use_case
         .execute(
-            &target_dataset,
+            target_dataset,
             DataSource::Stream(data_stream),
             PushIngestDataUseCaseOptions {
                 source_name: params.source_name,

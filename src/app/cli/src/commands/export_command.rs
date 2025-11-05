@@ -10,7 +10,13 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use kamu::domain::{ExportFormat, ExportOptions, ExportService, GetDataOptions, QueryService};
+use kamu::domain::{
+    ExportFormat,
+    ExportOptions,
+    ExportService,
+    GetDataOptions,
+    QueryDatasetDataUseCase,
+};
 
 use crate::{CLIError, Command};
 
@@ -20,7 +26,7 @@ use crate::{CLIError, Command};
 #[dill::interface(dyn Command)]
 pub struct ExportCommand {
     export_service: Arc<dyn ExportService>,
-    query_service: Arc<dyn QueryService>,
+    query_dataset_data: Arc<dyn QueryDatasetDataUseCase>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -42,8 +48,8 @@ pub struct ExportCommand {
 impl Command for ExportCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let res = self
-            .query_service
-            .get_data_old(&self.dataset_ref, GetDataOptions::default())
+            .query_dataset_data
+            .get_data(&self.dataset_ref, GetDataOptions::default())
             .await
             .map_err(CLIError::failure)?;
 

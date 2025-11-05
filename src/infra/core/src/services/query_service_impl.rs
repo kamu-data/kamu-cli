@@ -484,25 +484,25 @@ impl QueryService for QueryServiceImpl {
         limit: u64,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
-        let target = self.resolve_dataset(dataset_ref).await?;
-        self.tail(target, skip, limit, options).await
+        let source = self.resolve_dataset(dataset_ref).await?;
+        self.tail(source, skip, limit, options).await
     }
 
     #[tracing::instrument(
         level = "info",
         name = QueryServiceImpl_tail,
         skip_all,
-        fields(hdl=%target.get_handle(), %skip, %limit)
+        fields(hdl=%source.get_handle(), %skip, %limit)
     )]
     async fn tail(
         &self,
-        target: ResolvedDataset,
+        source: ResolvedDataset,
         skip: u64,
         limit: u64,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
         let (head, df) = self
-            .single_dataset(&target, Some(skip + limit), options.block_hash)
+            .single_dataset(&source, Some(skip + limit), options.block_hash)
             .await?;
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
@@ -511,13 +511,13 @@ impl QueryService for QueryServiceImpl {
         let Some(df) = df else {
             return Ok(GetDataResponse {
                 df: None,
-                dataset_handle: target.take_handle(),
+                dataset_handle: source.take_handle(),
                 block_hash: head,
             });
         };
 
         use odf::dataset::MetadataChainExt;
-        let vocab: odf::metadata::DatasetVocabulary = target
+        let vocab: odf::metadata::DatasetVocabulary = source
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchSetVocabVisitor::new())
             .await
@@ -540,35 +540,25 @@ impl QueryService for QueryServiceImpl {
 
         Ok(GetDataResponse {
             df: Some(df),
-            dataset_handle: target.take_handle(),
+            dataset_handle: source.take_handle(),
             block_hash: head,
         })
     }
 
-    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_old, skip_all, fields(%dataset_ref))]
-    async fn get_data_old(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        options: GetDataOptions,
-    ) -> Result<GetDataResponse, QueryError> {
-        let target = self.resolve_dataset(dataset_ref).await?;
-        self.get_data(target, options).await
-    }
-
-    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(hdl=%target.get_handle()))]
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(hdl=%source.get_handle()))]
     async fn get_data(
         &self,
-        target: ResolvedDataset,
+        source: ResolvedDataset,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
         // TODO: PERF: Limit push-down opportunity
         let (head, df) = self
-            .single_dataset(&target, None, options.block_hash)
+            .single_dataset(&source, None, options.block_hash)
             .await?;
 
         Ok(GetDataResponse {
             df,
-            dataset_handle: target.take_handle(),
+            dataset_handle: source.take_handle(),
             block_hash: head,
         })
     }
@@ -576,19 +566,21 @@ impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_multi, skip_all)]
     async fn get_data_multi(
         &self,
-        targets: Vec<ResolvedDataset>,
+        sources: Vec<ResolvedDataset>,
     ) -> Result<Vec<GetDataResponse>, QueryError> {
-        let mut targets_with_head = Vec::new();
-        for target in targets {
-            let head = target
+        let mut sources_with_head = Vec::new();
+
+        // TODO: consider vectorized head resolution
+        for source in sources {
+            let head = source
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)
                 .await
                 .int_err()?;
-            targets_with_head.push((target, head));
+            sources_with_head.push((source, head));
         }
 
-        let input_datasets = targets_with_head
+        let input_datasets = sources_with_head
             .iter()
             .map(|(ds, head)| {
                 (
@@ -614,7 +606,7 @@ impl QueryService for QueryServiceImpl {
 
         let mut results = Vec::new();
 
-        for (ds, head) in targets_with_head {
+        for (ds, head) in sources_with_head {
             let df = ctx
                 .table(TableReference::bare(ds.get_alias().to_string()))
                 .await?;
