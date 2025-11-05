@@ -369,7 +369,7 @@ impl Molecule {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
         // TODO: PERF: This "brute force" approach will not scale with growth of
         // projects and has to be revisited
@@ -400,8 +400,8 @@ impl Molecule {
         let mut announcement_dataframes = Vec::new();
         const DATASET_ID_COL: &str = "__dataset_id__";
 
-        for resp in query_svc
-            .get_data_multi_old(&announcement_dataset_refs, true)
+        for resp in query_dataset_data
+            .get_data_multi(&announcement_dataset_refs, true)
             .await
             .int_err()?
         {
