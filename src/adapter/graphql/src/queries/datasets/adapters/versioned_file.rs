@@ -100,12 +100,12 @@ impl<'a> VersionedFile<'a> {
         as_of_block_hash: Option<Multihash<'static>>,
     ) -> Result<Option<VersionedFileEntry>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let query_res = if let Some(block_hash) = as_of_block_hash {
             query_svc
                 .tail(
-                    access_checked_dataset.clone(),
+                    readable_dataset.clone(),
                     0,
                     1,
                     domain::GetDataOptions {
@@ -117,22 +117,19 @@ impl<'a> VersionedFile<'a> {
             use datafusion::logical_expr::{col, lit};
 
             query_svc
-                .get_data(
-                    access_checked_dataset.clone(),
-                    domain::GetDataOptions::default(),
-                )
+                .get_data(readable_dataset.clone(), domain::GetDataOptions::default())
                 .await
                 .map(|res| domain::GetDataResponse {
                     df: res
                         .df
                         .map(|df| df.filter(col("version").eq(lit(version))).unwrap()),
-                    dataset_handle: res.dataset_handle,
+                    source: res.source,
                     block_hash: res.block_hash,
                 })
         } else {
             query_svc
                 .tail(
-                    access_checked_dataset.clone(),
+                    readable_dataset.clone(),
                     0,
                     1,
                     domain::GetDataOptions::default(),
@@ -180,13 +177,10 @@ impl VersionedFile<'_> {
         let per_page = per_page.unwrap_or(Self::DEFAULT_VERSIONS_PER_PAGE);
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let query_res = query_svc
-            .get_data(
-                access_checked_dataset.clone(),
-                domain::GetDataOptions::default(),
-            )
+            .get_data(readable_dataset.clone(), domain::GetDataOptions::default())
             .await
             .int_err()?;
 

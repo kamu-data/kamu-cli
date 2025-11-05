@@ -137,11 +137,11 @@ impl CollectionProjection<'_> {
         use datafusion::logical_expr::{col, lit};
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let Some(df) = query_svc
             .get_data(
-                access_checked_dataset.clone(),
+                readable_dataset.clone(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -196,11 +196,11 @@ impl CollectionProjection<'_> {
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let df = query_svc
             .get_data(
-                access_checked_dataset.clone(),
+                readable_dataset.clone(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -271,11 +271,11 @@ impl CollectionProjection<'_> {
         use datafusion::logical_expr::{col, lit};
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let Some(df) = query_svc
             .get_data(
-                access_checked_dataset.clone(),
+                readable_dataset.clone(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
