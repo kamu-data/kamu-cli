@@ -163,12 +163,17 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
         let new_email = new_email.as_ref().to_string();
-        let account_id_str = account_id.to_string();
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
 
         let update_result = sqlx::query!(
             r#"
-            UPDATE accounts SET email = $1 WHERE id = $2
+            UPDATE accounts
+            SET email = $1
+            WHERE id = $2
             "#,
             new_email,
             account_id_str,
@@ -205,7 +210,10 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_str = account_id.to_string();
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
 
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
@@ -250,7 +258,7 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+        let mut query_builder = sqlx::QueryBuilder::<_>::new(
             r#"
             SELECT id,
                    account_name,
@@ -332,12 +340,11 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE provider_identity_key = $1
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE provider_identity_key = $1
             "#,
             provider_identity_key
         )
@@ -358,12 +365,11 @@ impl AccountRepository for SqliteAccountRepository {
 
         let email_str = email.as_ref();
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE lower(email) = lower($1)
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(email) = lower($1)
             "#,
             email_str,
         )
@@ -382,13 +388,13 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
-        let account_name_str = account_name.to_string();
+        let account_name_str = account_name.as_str();
+
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE lower(account_name) = lower($1)
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(account_name) = lower($1)
             "#,
             account_name_str
         )
@@ -411,8 +417,17 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+        let mut query_builder = sqlx::QueryBuilder::<_>::new(
             r#"
+            WITH input_account_names(name) AS (
+            "#,
+        );
+        query_builder.push_values(account_names, |mut b, account_name| {
+            b.push_bind(account_name.as_str());
+        });
+        query_builder.push(
+            r#"
+            )
             SELECT id,
                    account_name,
                    email,
@@ -423,13 +438,11 @@ impl AccountRepository for SqliteAccountRepository {
                    provider,
                    provider_identity_key
             FROM accounts
-            WHERE account_name IN
+            WHERE lower(account_name) IN (SELECT lower(name)
+                                          FROM input_account_names)
+            ORDER BY account_name
             "#,
         );
-        query_builder.push_tuples(account_names, |mut b, account_name| {
-            b.push_bind(account_name.as_str());
-        });
-        query_builder.push("ORDER BY account_name");
 
         let row_models = query_builder
             .build_query_as::<AccountRowModel>()
@@ -515,7 +528,7 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             DELETE
             FROM accounts
-            WHERE account_name = $1
+            WHERE id = $1
             "#,
             account_id_str
         )
@@ -638,14 +651,19 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_string = account_id.to_string();
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
         let update_result = sqlx::query!(
             r#"
-            UPDATE accounts_passwords set password_hash=$1
-                where account_id=$2
+            UPDATE accounts_passwords
+            SET password_hash = $1
+            WHERE account_id = $2
             "#,
             password_hash,
-            account_id_string
+            account_id_str
         )
         .execute(connection_mut)
         .await
