@@ -77,12 +77,6 @@ pub trait QueryService: Send + Sync {
     // context builder that can be reused for multiple queries
     /// Returns [`DataFrameExt`]s representing the contents of multiple datasets
     /// in a batch
-    async fn get_data_multi_old(
-        &self,
-        dataset_refs: &[odf::DatasetRef],
-        skip_if_missing_or_inaccessible: bool,
-    ) -> Result<Vec<GetDataResponse>, QueryError>;
-
     async fn get_data_multi(
         &self,
         datasets: Vec<ResolvedDataset>,
