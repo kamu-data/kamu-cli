@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Login method returns invalid credential error when login is invalid account name
+
 ## [0.252.2] - 2025-11-03
 ### Changed
 - Dataset increment now stored in flow task result to increase flow loading performance

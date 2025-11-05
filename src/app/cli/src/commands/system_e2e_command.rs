@@ -11,8 +11,7 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu::domain::{DatasetRegistry, DatasetRegistryExt};
-use kamu_accounts::{AccountConfig, AccountProvider, AccountRepository};
-use kamu_accounts_services::LoginPasswordAuthProvider;
+use kamu_accounts::{AccountConfig, CreateAccountUseCase};
 
 use super::{CLIError, Command};
 
@@ -22,8 +21,7 @@ use super::{CLIError, Command};
 #[dill::interface(dyn Command)]
 pub struct SystemE2ECommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    account_repo: Arc<dyn AccountRepository>,
-    login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
+    create_account_use_case: Arc<dyn CreateAccountUseCase>,
 
     #[dill::component(explicit)]
     action: String,
@@ -84,13 +82,10 @@ impl Command for SystemE2ECommand {
                     );
                     let account = (&account_config).into();
 
-                    self.account_repo.save_account(&account).await.int_err()?;
-
-                    if account_config.provider == <&'static str>::from(AccountProvider::Password) {
-                        self.login_password_auth_provider
-                            .save_password(&account, &account_config.password)
-                            .await?;
-                    }
+                    self.create_account_use_case
+                        .execute(&account, &account_config.password)
+                        .await
+                        .int_err()?;
 
                     eprintln!("{}", console::style("Done").green());
                 }
