@@ -173,7 +173,9 @@ impl AccountRepository for MySqlAccountRepository {
 
         let update_result = sqlx::query!(
             r#"
-            UPDATE accounts SET email = ? WHERE id = ?
+            UPDATE accounts
+            SET email = ?
+            WHERE id = ?
             "#,
             new_email.as_ref(),
             account_id_stack.as_str(),
@@ -210,6 +212,10 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
             r#"
@@ -226,7 +232,7 @@ impl AccountRepository for MySqlAccountRepository {
             FROM accounts
             WHERE id = ?
             "#,
-            account_id.to_string()
+            account_id_stack.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -253,7 +259,7 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = sqlx::QueryBuilder::<sqlx::MySql>::new(
+        let mut query_builder = sqlx::QueryBuilder::<_>::new(
             r#"
             SELECT id,
                    account_name,
@@ -306,9 +312,9 @@ impl AccountRepository for MySqlAccountRepository {
                 provider,
                 provider_identity_key
             FROM accounts
-            WHERE account_name = ?
+            WHERE lower(account_name) = lower(?)
             "#,
-            account_name.to_string()
+            account_name.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -349,11 +355,15 @@ impl AccountRepository for MySqlAccountRepository {
                    provider,
                    provider_identity_key
             FROM accounts
-            WHERE account_name IN
+            WHERE lower(account_name) IN
             "#,
         );
         query_builder.push_tuples(account_names, |mut b, account_name| {
+            // NOTE: Many different options were tried, from WITH to JSON_TABLE,
+            //       but this verbose variant was the only simple and working one.
+            b.push_unseparated("lower(");
             b.push_bind(account_name.as_str());
+            b.push_unseparated(")");
         });
         query_builder.push("ORDER BY account_name");
 
@@ -426,9 +436,9 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE account_name = ?
+            WHERE lower(account_name) = lower(?)
             "#,
-            account_name.to_string()
+            account_name.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -635,12 +645,14 @@ impl PasswordHashRepository for MySqlAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         use odf::metadata::AsStackString;
+
         let account_id_stack = account_id.as_stack_string();
 
         let update_result = sqlx::query!(
             r#"
-            UPDATE accounts_passwords set password_hash = ?
-                WHERE account_id = ?
+            UPDATE accounts_passwords
+            SET password_hash = ?
+            WHERE account_id = ?
             "#,
             password_hash,
             account_id_stack.as_str()
@@ -671,11 +683,11 @@ impl PasswordHashRepository for MySqlAccountRepository {
         let maybe_password_row = sqlx::query!(
             r#"
             SELECT password_hash
-              FROM accounts_passwords
-              JOIN accounts ON accounts_passwords.account_id = accounts.id
-              WHERE account_name = ?
+            FROM accounts_passwords
+            JOIN accounts ON accounts_passwords.account_id = accounts.id
+            WHERE lower(account_name) = lower(?)
             "#,
-            account_name.to_string(),
+            account_name.as_str(),
         )
         .fetch_optional(connection_mut)
         .await
