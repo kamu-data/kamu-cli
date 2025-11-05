@@ -71,8 +71,10 @@ impl QueryDatasetDataUseCaseImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = QueryDatasetDataUseCaseImpl_tail, skip_all, fields(%dataset_ref))]
     async fn tail(
         &self,
         dataset_ref: &odf::DatasetRef,
@@ -91,6 +93,7 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
         self.query_service.tail(source, skip, limit, options).await
     }
 
+    #[tracing::instrument(level = "debug", name = QueryDatasetDataUseCaseImpl_get_data, skip_all, fields(%dataset_ref))]
     async fn get_data(
         &self,
         dataset_ref: &odf::DatasetRef,
@@ -111,6 +114,7 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
     // context builder that can be reused for multiple queries
     /// Returns [`DataFrameExt`]s representing the contents of multiple datasets
     /// in a batch
+    #[tracing::instrument(level = "debug", name = QueryDatasetDataUseCaseImpl_get_data_multi, skip_all)]
     async fn get_data_multi(
         &self,
         dataset_refs: &[odf::DatasetRef],
