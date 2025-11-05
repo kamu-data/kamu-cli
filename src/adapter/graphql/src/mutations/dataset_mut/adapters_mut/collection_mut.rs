@@ -117,13 +117,13 @@ impl<'a> CollectionMut<'a> {
         }
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let access_checked_dataset = self.writable_state.resolved_dataset(ctx).await?;
+        let writable_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
         // Load current state
         // TODO: PERF: Filter paths that are relevant to operations
         let query_res = query_svc
             .get_data(
-                access_checked_dataset.clone(),
+                writable_dataset.clone(), // Writable means readable too
                 domain::GetDataOptions::default(),
             )
             .await

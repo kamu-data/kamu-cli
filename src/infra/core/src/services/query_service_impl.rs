@@ -473,23 +473,6 @@ impl QueryService for QueryServiceImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = QueryServiceImpl_tail_old,
-        skip_all,
-        fields(%dataset_ref, %skip, %limit)
-    )]
-    async fn tail_old(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        skip: u64,
-        limit: u64,
-        options: GetDataOptions,
-    ) -> Result<GetDataResponse, QueryError> {
-        let source = self.resolve_dataset(dataset_ref).await?;
-        self.tail(source, skip, limit, options).await
-    }
-
-    #[tracing::instrument(
-        level = "info",
         name = QueryServiceImpl_tail,
         skip_all,
         fields(hdl=%source.get_handle(), %skip, %limit)
@@ -511,7 +494,7 @@ impl QueryService for QueryServiceImpl {
         let Some(df) = df else {
             return Ok(GetDataResponse {
                 df: None,
-                dataset_handle: source.take_handle(),
+                source,
                 block_hash: head,
             });
         };
@@ -540,7 +523,7 @@ impl QueryService for QueryServiceImpl {
 
         Ok(GetDataResponse {
             df: Some(df),
-            dataset_handle: source.take_handle(),
+            source,
             block_hash: head,
         })
     }
@@ -558,7 +541,7 @@ impl QueryService for QueryServiceImpl {
 
         Ok(GetDataResponse {
             df,
-            dataset_handle: source.take_handle(),
+            source,
             block_hash: head,
         })
     }
@@ -606,21 +589,21 @@ impl QueryService for QueryServiceImpl {
 
         let mut results = Vec::new();
 
-        for (ds, head) in sources_with_head {
+        for (source, head) in sources_with_head {
             let df = ctx
-                .table(TableReference::bare(ds.get_alias().to_string()))
+                .table(TableReference::bare(source.get_alias().to_string()))
                 .await?;
 
             let res = if df.schema().fields().is_empty() {
                 GetDataResponse {
                     df: None,
-                    dataset_handle: ds.take_handle(),
+                    source,
                     block_hash: head,
                 }
             } else {
                 GetDataResponse {
                     df: Some(df.into()),
-                    dataset_handle: ds.take_handle(),
+                    source,
                     block_hash: head,
                 }
             };

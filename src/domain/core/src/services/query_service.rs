@@ -41,14 +41,6 @@ pub trait QueryService: Send + Sync {
     /// )
     /// order by offset
     /// ```
-    async fn tail_old(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        skip: u64,
-        limit: u64,
-        options: GetDataOptions,
-    ) -> Result<GetDataResponse, QueryError>;
-
     async fn tail(
         &self,
         source: ResolvedDataset,
@@ -204,8 +196,8 @@ pub struct GetDataResponse {
     /// data from it.
     pub df: Option<DataFrameExt>,
 
-    /// Handle of the resolved dataset
-    pub dataset_handle: odf::DatasetHandle,
+    /// Resolved source dataset
+    pub source: ResolvedDataset,
 
     /// Last block hash that was considered during the query planning
     pub block_hash: odf::Multihash,
