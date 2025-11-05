@@ -341,7 +341,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
-        .tail(&dataset_ref, 1, 1, GetDataOptions::default())
+        .tail_old(&dataset_ref, 1, 1, GetDataOptions::default())
         .await
         .unwrap();
 
@@ -361,7 +361,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
 
     // Crosses block boundary
     let res = query_svc
-        .tail(&dataset_ref, 1, 2, GetDataOptions::default())
+        .tail_old(&dataset_ref, 1, 2, GetDataOptions::default())
         .await
         .unwrap();
 
@@ -414,7 +414,7 @@ async fn test_dataset_tail_empty_dataset() {
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
-        .tail(
+        .tail_old(
             &dataset_alias.as_local_ref(),
             0,
             10,
@@ -432,7 +432,7 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let result = query_svc
-        .tail(
+        .tail_old(
             &target.get_alias().as_local_ref(),
             1,
             1,

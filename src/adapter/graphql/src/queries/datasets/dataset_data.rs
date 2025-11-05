@@ -78,7 +78,7 @@ impl<'a> DatasetData<'a> {
         let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
         let query_res = match query_svc
-            .tail(
+            .tail_old(
                 &self.dataset_request_state.dataset_handle().as_local_ref(),
                 skip.unwrap_or(0),
                 limit,

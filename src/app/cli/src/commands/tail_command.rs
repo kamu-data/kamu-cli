@@ -39,7 +39,7 @@ impl Command for TailCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let res = self
             .query_svc
-            .tail(
+            .tail_old(
                 &self.dataset_ref,
                 self.skip,
                 self.limit,

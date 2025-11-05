@@ -136,7 +136,7 @@ impl CollectionProjection<'_> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let Some(df) = query_svc
-            .get_data(
+            .get_data_old(
                 &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
@@ -194,7 +194,7 @@ impl CollectionProjection<'_> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let df = query_svc
-            .get_data(
+            .get_data_old(
                 &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
@@ -268,7 +268,7 @@ impl CollectionProjection<'_> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let Some(df) = query_svc
-            .get_data(
+            .get_data_old(
                 &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),

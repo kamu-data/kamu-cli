@@ -17,6 +17,7 @@ use internal_error::*;
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
+use crate::ResolvedDataset;
 use crate::auth::DatasetActionUnauthorizedError;
 
 // TODO: Support different engines and query dialects
@@ -40,13 +41,52 @@ pub trait QueryService: Send + Sync {
     /// )
     /// order by offset
     /// ```
-    async fn tail(
+    async fn tail_old(
         &self,
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError>;
+
+    async fn tail(
+        &self,
+        target: ResolvedDataset,
+        skip: u64,
+        limit: u64,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError>;
+
+    // TODO: Introduce additional options that could be used to narrow down the
+    // number of files we collect to construct the dataframe.
+    ///
+    /// Returns a `DataFrame` representing the contents of an entire dataset
+    async fn get_data_old(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError>;
+
+    async fn get_data(
+        &self,
+        target: ResolvedDataset,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError>;
+
+    // TODO: Consider replacing this function with a more sophisticated session
+    // context builder that can be reused for multiple queries
+    /// Returns [`DataFrameExt`]s representing the contents of multiple datasets
+    /// in a batch
+    async fn get_data_multi_old(
+        &self,
+        dataset_refs: &[odf::DatasetRef],
+        skip_if_missing_or_inaccessible: bool,
+    ) -> Result<Vec<GetDataResponse>, QueryError>;
+
+    async fn get_data_multi(
+        &self,
+        datasets: Vec<ResolvedDataset>,
+    ) -> Result<Vec<GetDataResponse>, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
     /// `DataFrame` that can be used to get schema and data, and the state
@@ -79,16 +119,6 @@ pub trait QueryService: Send + Sync {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Type>, QueryError>;
-
-    // TODO: Introduce additional options that could be used to narrow down the
-    // number of files we collect to construct the dataframe.
-    //
-    /// Returns a `DataFrame` representing the contents of an entire dataset
-    async fn get_data(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        options: GetDataOptions,
-    ) -> Result<GetDataResponse, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
