@@ -413,6 +413,8 @@ impl TestHarness {
                 .add::<PushIngestPlannerImpl>()
                 .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
                 .add::<QueryServiceImpl>()
+                .add::<SchemaServiceImpl>()
+                .add::<SessionContextBuilder>()
                 .add_value(ServerUrlConfig::new_test(None))
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()

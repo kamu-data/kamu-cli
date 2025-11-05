@@ -16,130 +16,15 @@ use chrono::Utc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use file_utils::OwnedFile;
 use kamu::domain::*;
-use kamu::testing::{MockDatasetActionAuthorizer, ParquetWriterHelper};
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::metadata::testing::MetadataFactory;
 use odf::utils::data::DataFrameExt;
-use s3_utils::S3Context;
 use tempfile::TempDir;
 use test_utils::LocalS3Server;
-use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn create_empty_dataset(
-    catalog: &dill::Catalog,
-    name: &str,
-) -> (odf::dataset::StoreDatasetResult, odf::DatasetAlias) {
-    let dataset_storage_unit_writer = catalog
-        .get_one::<dyn odf::DatasetStorageUnitWriter>()
-        .unwrap();
-    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
-    let time_source = catalog.get_one::<dyn SystemTimeSource>().unwrap();
-
-    let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(name));
-
-    let stored = create_test_dataset_from_snapshot(
-        dataset_registry.as_ref(),
-        dataset_storage_unit_writer.as_ref(),
-        MetadataFactory::dataset_snapshot()
-            .name(dataset_alias.clone())
-            .kind(odf::DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-        did_generator.generate_dataset_id().0,
-        time_source.now(),
-    )
-    .await
-    .unwrap();
-
-    (stored, dataset_alias)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn create_test_dataset(
-    catalog: &dill::Catalog,
-    tempdir: &Path,
-    name: &str,
-) -> ResolvedDataset {
-    // Empty dataset first
-    let (stored, dataset_alias) = create_empty_dataset(catalog, name).await;
-
-    // Write schema
-    let tmp_data_path = tempdir.join("data");
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("offset", DataType::UInt64, false),
-        Field::new("blah", DataType::Utf8, false),
-    ]));
-
-    stored
-        .dataset
-        .commit_event(
-            MetadataFactory::set_data_schema()
-                .schema_from_arrow(&schema)
-                .build()
-                .into(),
-            odf::dataset::CommitOpts::default(),
-        )
-        .await
-        .unwrap();
-
-    // Write data spread over two commits
-    let batches = [
-        (
-            UInt64Array::from(vec![0, 1]),
-            StringArray::from(vec!["a", "b"]),
-        ),
-        (
-            UInt64Array::from(vec![2, 3]),
-            StringArray::from(vec!["c", "d"]),
-        ),
-    ];
-
-    // TODO: Replace with DataWriter
-    let mut prev_offset = None;
-    for (a, b) in batches {
-        let record_batch =
-            RecordBatch::try_new(schema.clone(), vec![Arc::new(a), Arc::new(b)]).unwrap();
-        ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
-
-        let start_offset = prev_offset.map_or(0, |v| v + 1);
-        let end_offset = start_offset + record_batch.num_rows() as u64 - 1;
-
-        stored
-            .dataset
-            .commit_add_data(
-                odf::dataset::AddDataParams {
-                    prev_checkpoint: None,
-                    prev_offset,
-                    new_offset_interval: Some(odf::metadata::OffsetInterval {
-                        start: start_offset,
-                        end: end_offset,
-                    }),
-                    new_linked_objects: None,
-                    new_watermark: None,
-                    new_source_state: None,
-                },
-                Some(OwnedFile::new(tmp_data_path.clone())),
-                None,
-                odf::dataset::CommitOpts::default(),
-            )
-            .await
-            .unwrap();
-
-        prev_offset = Some(end_offset);
-    }
-
-    ResolvedDataset::from_stored(&stored, &dataset_alias)
-}
+use crate::tests::queries::helpers;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -147,26 +32,11 @@ fn create_catalog_with_local_workspace(
     tempdir: &Path,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
-    let datasets_dir = tempdir.join("datasets");
-    std::fs::create_dir(&datasets_dir).unwrap();
+    let base_local_catalog =
+        helpers::create_base_catalog_with_local_workspace(tempdir, dataset_action_authorizer);
 
-    dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            datasets_dir,
-        ))
-        .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
+    dill::CatalogBuilder::new_chained(&base_local_catalog)
         .add::<QueryServiceImpl>()
-        .add::<ObjectStoreRegistryImpl>()
-        .add::<ObjectStoreBuilderLocalFs>()
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(dataset_action_authorizer)
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-        .add::<RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 
@@ -176,166 +46,18 @@ async fn create_catalog_with_s3_workspace(
     s3: &LocalS3Server,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
-    let s3_context = S3Context::from_url(&s3.url).await;
+    let base_s3_catalog =
+        helpers::create_base_catalog_with_s3_workspace(s3, dataset_action_authorizer).await;
 
-    dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
-            s3_context.clone(),
-        ))
-        .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
-        .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
+    dill::CatalogBuilder::new_chained(&base_s3_catalog)
         .add::<QueryServiceImpl>()
-        .add::<ObjectStoreRegistryImpl>()
-        .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(dataset_action_authorizer)
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-        .add::<RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_dataset_parquet_schema(catalog: &dill::Catalog, tempdir: &TempDir) {
-    let target = create_test_dataset(catalog, tempdir.path(), "foo").await;
-    let dataset_ref = odf::DatasetRef::from(target.get_alias());
-
-    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let schema = query_svc
-        .get_last_data_chunk_schema_parquet(&dataset_ref)
-        .await
-        .unwrap();
-    assert!(schema.is_some());
-
-    let mut buf = Vec::new();
-    odf::utils::schema::format::write_schema_parquet_json(&mut buf, &schema.unwrap()).unwrap();
-    let schema_content = String::from_utf8(buf).unwrap();
-    let data_schema_json =
-        serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();
-
-    assert_eq!(
-        data_schema_json,
-        serde_json::json!({
-            "name": "arrow_schema",
-            "type": "struct",
-            "fields": [{
-                "name": "offset",
-                "repetition": "REQUIRED",
-                "type": "INT64",
-                "logicalType": "INTEGER(64,false)"
-            }, {
-                "name": "blah",
-                "repetition": "REQUIRED",
-                "type": "BYTE_ARRAY",
-                "logicalType": "STRING"
-            }]
-        })
-    );
-}
-
-async fn test_dataset_schema(catalog: &dill::Catalog, tempdir: &TempDir) {
-    let target = create_test_dataset(catalog, tempdir.path(), "foo").await;
-    let dataset_ref = odf::DatasetRef::from(target.get_alias());
-
-    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let schema = query_svc.get_schema(&dataset_ref).await.unwrap().unwrap();
-
-    odf::utils::testing::assert_odf_schema_eq(
-        &schema,
-        &odf::schema::DataSchema::new(vec![
-            odf::schema::DataField::u64("offset"),
-            odf::schema::DataField::string("blah"),
-        ]),
-    );
-}
-
-fn prepare_schema_test_catalog() -> (TempDir, dill::Catalog) {
-    let mut authorizer = MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true);
-    authorizer
-        .expect_filter_datasets_allowing()
-        .returning(|_, _| Ok(vec![]));
-
-    let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), authorizer);
-    (tempdir, catalog)
-}
-
-async fn prepare_schema_test_s3_catalog() -> (LocalS3Server, dill::Catalog) {
-    let mut authorizer = MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true);
-    authorizer
-        .expect_filter_datasets_allowing()
-        .returning(|_, _| Ok(vec![]));
-
-    let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(&s3, authorizer).await;
-    (s3, catalog)
-}
-
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_parquet_schema_local_fs() {
-    let (tempdir, catalog) = prepare_schema_test_catalog();
-    test_dataset_parquet_schema(&catalog, &tempdir).await;
-}
-
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_schema_local_fs() {
-    let (tempdir, catalog) = prepare_schema_test_catalog();
-    test_dataset_schema(&catalog, &tempdir).await;
-}
-
-#[test_group::group(containerized, engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_schema_s3() {
-    let (s3, catalog) = prepare_schema_test_s3_catalog().await;
-    test_dataset_schema(&catalog, &s3.tmp_dir).await;
-}
-
-#[test_group::group(containerized, engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_parquet_schema_s3() {
-    let (s3, catalog) = prepare_schema_test_s3_catalog().await;
-    test_dataset_parquet_schema(&catalog, &s3.tmp_dir).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn test_dataset_schema_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
-    let dataset_ref = odf::DatasetRef::from(target.get_alias());
-
-    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let result = query_svc.get_schema(&dataset_ref).await;
-    assert_matches!(result, Err(QueryError::Access(_)));
-}
-
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_schema_unauthorized_local_fs() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
-    test_dataset_schema_unauthorized_common(catalog, &tempdir).await;
-}
-
-#[test_group::group(containerized, engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_schema_unauthorized_s3() {
-    let s3 = LocalS3Server::new().await;
-    let catalog =
-        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
-    test_dataset_schema_unauthorized_common(catalog, &s3.tmp_dir).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
 
     // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -407,7 +129,7 @@ async fn test_dataset_tail_empty_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
         create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::new());
-    let (created, dataset_alias) = create_empty_dataset(&catalog, "foo").await;
+    let (created, dataset_alias) = helpers::create_empty_dataset(&catalog, "foo").await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
@@ -425,7 +147,7 @@ async fn test_dataset_tail_empty_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
     let dataset_alias = target.get_alias();
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -476,7 +198,7 @@ async fn test_dataset_sql_authorized_s3() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_sql_unauthorized_infer_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
     let dataset_alias = target.get_alias();
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -518,7 +240,7 @@ async fn test_dataset_sql_unauthorized_specific() {
     let catalog =
         create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
 
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
     let dataset_alias = target.get_alias();
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -555,7 +277,7 @@ async fn test_sql_statement_not_found() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let _ = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let _ = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = "select count(*) from does_not_exist";
@@ -581,7 +303,7 @@ async fn test_sql_statement_by_alias() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = "select count(*) as num_records from foobar";
@@ -627,7 +349,7 @@ async fn test_sql_statement_alias_not_found() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
     let dataset_alias = target.get_alias();
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -674,7 +396,7 @@ async fn test_sql_statement_with_state_simple() {
     let ctx = SessionContext::new();
 
     // Dataset init
-    let (foo_stored, foo_alias) = create_empty_dataset(&catalog, "foo").await;
+    let (foo_stored, foo_alias) = helpers::create_empty_dataset(&catalog, "foo").await;
     let foo_id = &foo_stored.dataset_id;
 
     let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
@@ -887,7 +609,7 @@ async fn test_sql_statement_with_state_cte() {
     let ctx = SessionContext::new();
 
     // Dataset `foo`
-    let (foo_stored, foo_alias) = create_empty_dataset(&catalog, "foo").await;
+    let (foo_stored, foo_alias) = helpers::create_empty_dataset(&catalog, "foo").await;
     let foo_id = &foo_stored.dataset_id;
 
     let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
@@ -926,7 +648,7 @@ async fn test_sql_statement_with_state_cte() {
     .await;
 
     // Dataset `bar`
-    let (bar_stored, bar_alias) = create_empty_dataset(&catalog, "bar").await;
+    let (bar_stored, bar_alias) = helpers::create_empty_dataset(&catalog, "bar").await;
     let bar_id = &bar_stored.dataset_id;
 
     let bar_target = ResolvedDataset::from_stored(&bar_stored, &bar_alias);
