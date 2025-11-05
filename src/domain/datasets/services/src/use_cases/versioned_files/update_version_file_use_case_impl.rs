@@ -50,7 +50,7 @@ impl UpdateVersionFileUseCaseImpl {
         // TODO: Consider retractions / corrections
         let query_res = self
             .query_svc
-            .tail(dataset_ref, 0, 1, GetDataOptions::default())
+            .tail_old(dataset_ref, 0, 1, GetDataOptions::default())
             .await
             .int_err()?;
 
@@ -78,7 +78,7 @@ impl UpdateVersionFileUseCaseImpl {
         // TODO: Consider retractions / corrections
         let query_res = self
             .query_svc
-            .tail(dataset_ref, 0, 1, GetDataOptions::default())
+            .tail_old(dataset_ref, 0, 1, GetDataOptions::default())
             .await
             .int_err()?;
 

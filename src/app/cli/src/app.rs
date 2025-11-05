@@ -508,6 +508,7 @@ pub fn configure_base_catalog(
     b.add::<PushIngestDataUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
     b.add::<PushDatasetUseCaseImpl>();
+    b.add::<QueryDatasetDataUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();

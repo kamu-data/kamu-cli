@@ -247,7 +247,7 @@ impl Molecule {
 
         // Query full data
         let df = match query_svc
-            .get_data(
+            .get_data_old(
                 &projects_dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
@@ -401,7 +401,7 @@ impl Molecule {
         const DATASET_ID_COL: &str = "__dataset_id__";
 
         for resp in query_svc
-            .get_data_multi(&announcement_dataset_refs, true)
+            .get_data_multi_old(&announcement_dataset_refs, true)
             .await
             .int_err()?
         {
@@ -623,7 +623,7 @@ impl MoleculeProject {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let df = match query_svc
-            .tail(
+            .tail_old(
                 &self.announcements_dataset_id.as_local_ref(),
                 0,
                 limit as u64,
@@ -668,7 +668,7 @@ impl MoleculeProject {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let df = match query_svc
-            .tail(
+            .tail_old(
                 &self.data_room_dataset_id.as_local_ref(),
                 0,
                 limit as u64,
@@ -746,7 +746,7 @@ impl MoleculeProject {
             from_catalog_n!(ctx, dyn domain::QueryService, dyn domain::DatasetRegistry);
 
         let df = match query_svc
-            .get_data(
+            .get_data_old(
                 &self.data_room_dataset_id.as_local_ref(),
                 domain::GetDataOptions::default(),
             )
@@ -783,7 +783,7 @@ impl MoleculeProject {
                 .int_err()?;
 
             let df = match query_svc
-                .tail(
+                .tail_old(
                     &resolved_dataset.get_handle().as_local_ref(),
                     0,
                     limit as u64,

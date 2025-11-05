@@ -103,7 +103,7 @@ impl<'a> VersionedFile<'a> {
 
         let query_res = if let Some(block_hash) = as_of_block_hash {
             query_svc
-                .tail(
+                .tail_old(
                     &self.state.dataset_handle().as_local_ref(),
                     0,
                     1,
@@ -116,7 +116,7 @@ impl<'a> VersionedFile<'a> {
             use datafusion::logical_expr::{col, lit};
 
             query_svc
-                .get_data(
+                .get_data_old(
                     &self.state.dataset_handle().as_local_ref(),
                     domain::GetDataOptions::default(),
                 )
@@ -130,7 +130,7 @@ impl<'a> VersionedFile<'a> {
                 })
         } else {
             query_svc
-                .tail(
+                .tail_old(
                     &self.state.dataset_handle().as_local_ref(),
                     0,
                     1,
@@ -181,7 +181,7 @@ impl VersionedFile<'_> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let query_res = query_svc
-            .get_data(
+            .get_data_old(
                 &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )

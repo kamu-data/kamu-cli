@@ -1,0 +1,130 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use internal_error::ErrorIntoInternal;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_core::{
+    GetDataOptions,
+    GetDataResponse,
+    QueryDatasetDataUseCase,
+    QueryError,
+    QueryService,
+    ResolvedDataset,
+    auth,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn QueryDatasetDataUseCase)]
+pub struct QueryDatasetDataUseCaseImpl {
+    query_service: Arc<dyn QueryService>,
+    dataset_registry: Arc<dyn kamu_core::DatasetRegistry>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl QueryDatasetDataUseCaseImpl {
+    async fn resolve_dataset(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<ResolvedDataset, QueryError> {
+        let resolved_dataset = self
+            .rebac_dataset_registry_facade
+            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .await
+            .map_err(|e| {
+                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::NotFound(e) => QueryError::DatasetNotFound(e),
+                    E::Access(e) => QueryError::Access(e),
+                    e @ E::Internal(_) => QueryError::Internal(e.int_err()),
+                }
+            })?;
+
+        Ok(resolved_dataset)
+    }
+
+    async fn resolve_multiple_datasets(
+        &self,
+        dataset_refs: &[odf::DatasetRef],
+        skip_if_missing_or_inaccessible: bool,
+    ) -> Result<Vec<ResolvedDataset>, QueryError> {
+        let refs: Vec<&odf::DatasetRef> = dataset_refs.iter().collect();
+        let classified = self
+            .rebac_dataset_registry_facade
+            .classify_dataset_refs_by_allowance(&refs, auth::DatasetAction::Read)
+            .await?;
+
+        if !skip_if_missing_or_inaccessible
+            && let Some((_, err)) = classified.inaccessible_refs.into_iter().next()
+        {
+            use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+            let err = match err {
+                E::NotFound(e) => QueryError::DatasetNotFound(e),
+                E::Access(e) => QueryError::Access(e),
+                e @ E::Internal(_) => QueryError::Internal(e.int_err()),
+            };
+            return Err(err);
+        }
+
+        let mut resolved_datasets = Vec::with_capacity(classified.accessible_resolved_refs.len());
+        for (_, hdl) in classified.accessible_resolved_refs {
+            let resolved = self.dataset_registry.get_dataset_by_handle(&hdl).await;
+            resolved_datasets.push(resolved);
+        }
+
+        Ok(resolved_datasets)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
+    async fn tail(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        skip: u64,
+        limit: u64,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        let target = self.resolve_dataset(dataset_ref).await?;
+        self.query_service.tail(target, skip, limit, options).await
+    }
+
+    async fn get_data(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        let target = self.resolve_dataset(dataset_ref).await?;
+        self.query_service.get_data(target, options).await
+    }
+
+    // TODO: Consider replacing this function with a more sophisticated session
+    // context builder that can be reused for multiple queries
+    /// Returns [`DataFrameExt`]s representing the contents of multiple datasets
+    /// in a batch
+    async fn get_data_multi(
+        &self,
+        dataset_refs: &[odf::DatasetRef],
+        skip_if_missing_or_inaccessible: bool,
+    ) -> Result<Vec<GetDataResponse>, QueryError> {
+        let targets = self
+            .resolve_multiple_datasets(dataset_refs, skip_if_missing_or_inaccessible)
+            .await?;
+        self.query_service.get_data_multi(targets).await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

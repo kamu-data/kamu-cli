@@ -43,7 +43,7 @@ impl Command for ExportCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let res = self
             .query_service
-            .get_data(&self.dataset_ref, GetDataOptions::default())
+            .get_data_old(&self.dataset_ref, GetDataOptions::default())
             .await
             .map_err(CLIError::failure)?;
 

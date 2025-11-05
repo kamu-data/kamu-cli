@@ -45,7 +45,7 @@ pub async fn dataset_tail_handler(
 
     // TODO: Support `asOfBlockHash` parameter
     let res = query_svc
-        .tail(
+        .tail_old(
             &dataset_ref,
             params.skip,
             params.limit,

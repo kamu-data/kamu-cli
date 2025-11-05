@@ -212,7 +212,7 @@ impl CollectionContext for ODataCollectionContext {
         let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
 
         let res = query_svc
-            .get_data(
+            .get_data_old(
                 &self.resolved_dataset.get_handle().as_local_ref(),
                 GetDataOptions::default(),
             )

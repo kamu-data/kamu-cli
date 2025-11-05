@@ -340,12 +340,10 @@ impl QueryServiceImpl {
 
     async fn single_dataset(
         &self,
-        dataset_ref: &odf::DatasetRef,
+        resolved_dataset: &ResolvedDataset,
         last_records_to_consider: Option<u64>,
         head: Option<odf::Multihash>,
-    ) -> Result<(ResolvedDataset, odf::Multihash, Option<DataFrameExt>), QueryError> {
-        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
-
+    ) -> Result<(odf::Multihash, Option<DataFrameExt>), QueryError> {
         let head = if let Some(head) = head {
             head
         } else {
@@ -380,9 +378,9 @@ impl QueryServiceImpl {
             .await?;
 
         if df.schema().fields().is_empty() {
-            Ok((resolved_dataset, head, None))
+            Ok((head, None))
         } else {
-            Ok((resolved_dataset, head, Some(df.into())))
+            Ok((head, Some(df.into())))
         }
     }
 
@@ -475,19 +473,36 @@ impl QueryService for QueryServiceImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = QueryServiceImpl_tail,
+        name = QueryServiceImpl_tail_old,
         skip_all,
         fields(%dataset_ref, %skip, %limit)
     )]
-    async fn tail(
+    async fn tail_old(
         &self,
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
-        let (resolved_dataset, head, df) = self
-            .single_dataset(dataset_ref, Some(skip + limit), options.block_hash)
+        let target = self.resolve_dataset(dataset_ref).await?;
+        self.tail(target, skip, limit, options).await
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = QueryServiceImpl_tail,
+        skip_all,
+        fields(hdl=%target.get_handle(), %skip, %limit)
+    )]
+    async fn tail(
+        &self,
+        target: ResolvedDataset,
+        skip: u64,
+        limit: u64,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        let (head, df) = self
+            .single_dataset(&target, Some(skip + limit), options.block_hash)
             .await?;
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
@@ -496,13 +511,13 @@ impl QueryService for QueryServiceImpl {
         let Some(df) = df else {
             return Ok(GetDataResponse {
                 df: None,
-                dataset_handle: resolved_dataset.take_handle(),
+                dataset_handle: target.take_handle(),
                 block_hash: head,
             });
         };
 
         use odf::dataset::MetadataChainExt;
-        let vocab: odf::metadata::DatasetVocabulary = resolved_dataset
+        let vocab: odf::metadata::DatasetVocabulary = target
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchSetVocabVisitor::new())
             .await
@@ -525,9 +540,136 @@ impl QueryService for QueryServiceImpl {
 
         Ok(GetDataResponse {
             df: Some(df),
-            dataset_handle: resolved_dataset.take_handle(),
+            dataset_handle: target.take_handle(),
             block_hash: head,
         })
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_old, skip_all, fields(%dataset_ref))]
+    async fn get_data_old(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        let target = self.resolve_dataset(dataset_ref).await?;
+        self.get_data(target, options).await
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(hdl=%target.get_handle()))]
+    async fn get_data(
+        &self,
+        target: ResolvedDataset,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        // TODO: PERF: Limit push-down opportunity
+        let (head, df) = self
+            .single_dataset(&target, None, options.block_hash)
+            .await?;
+
+        Ok(GetDataResponse {
+            df,
+            dataset_handle: target.take_handle(),
+            block_hash: head,
+        })
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_multi_old, skip_all)]
+    async fn get_data_multi_old(
+        &self,
+        dataset_refs: &[odf::DatasetRef],
+        skip_if_missing_or_inaccessible: bool,
+    ) -> Result<Vec<GetDataResponse>, QueryError> {
+        let refs: Vec<&odf::DatasetRef> = dataset_refs.iter().collect();
+        let classified = self
+            .rebac_dataset_registry_facade
+            .classify_dataset_refs_by_allowance(&refs, DatasetAction::Read)
+            .await?;
+
+        if !skip_if_missing_or_inaccessible
+            && let Some((_, err)) = classified.inaccessible_refs.into_iter().next()
+        {
+            use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+            let err = match err {
+                E::NotFound(e) => QueryError::DatasetNotFound(e),
+                E::Access(e) => QueryError::Access(e),
+                e @ E::Internal(_) => QueryError::Internal(e.int_err()),
+            };
+            return Err(err);
+        }
+
+        let mut resolved_datasets = Vec::with_capacity(classified.accessible_resolved_refs.len());
+        for (_, hdl) in classified.accessible_resolved_refs {
+            let resolved = self.dataset_registry.get_dataset_by_handle(&hdl).await;
+            resolved_datasets.push(resolved);
+        }
+
+        self.get_data_multi(resolved_datasets).await
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_multi, skip_all)]
+    async fn get_data_multi(
+        &self,
+        targets: Vec<ResolvedDataset>,
+    ) -> Result<Vec<GetDataResponse>, QueryError> {
+        let mut targets_with_head = Vec::new();
+        for target in targets {
+            let head = target
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?;
+            targets_with_head.push((target, head));
+        }
+
+        let input_datasets = targets_with_head
+            .iter()
+            .map(|(ds, head)| {
+                (
+                    ds.get_id().clone(),
+                    QueryOptionsDataset {
+                        alias: ds.get_alias().to_string(),
+                        block_hash: Some(head.clone()),
+                        hints: DatasetQueryHints {
+                            handle: Some(ds.get_handle().clone()),
+                            last_records_to_consider: None,
+                            does_not_need_schema: false,
+                        },
+                    },
+                )
+            })
+            .collect();
+
+        let ctx = self
+            .session_context(QueryOptions {
+                input_datasets: Some(input_datasets),
+            })
+            .await?;
+
+        let mut results = Vec::new();
+
+        for (ds, head) in targets_with_head {
+            let df = ctx
+                .table(TableReference::bare(ds.get_alias().to_string()))
+                .await?;
+
+            let res = if df.schema().fields().is_empty() {
+                GetDataResponse {
+                    df: None,
+                    dataset_handle: ds.take_handle(),
+                    block_hash: head,
+                }
+            } else {
+                GetDataResponse {
+                    df: Some(df.into()),
+                    dataset_handle: ds.take_handle(),
+                    block_hash: head,
+                }
+            };
+
+            results.push(res);
+        }
+
+        Ok(results)
     }
 
     #[tracing::instrument(level = "info", name = QueryServiceImpl_sql_statement, skip_all)]
@@ -656,110 +798,6 @@ impl QueryService for QueryServiceImpl {
         let metadata = read_data_slice_metadata(object_store, data_path).await?;
 
         Ok(Some(metadata.file_metadata().schema().clone()))
-    }
-
-    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(%dataset_ref))]
-    async fn get_data(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        options: GetDataOptions,
-    ) -> Result<GetDataResponse, QueryError> {
-        // TODO: PERF: Limit push-down opportunity
-        let (resolved_dataset, head, df) = self
-            .single_dataset(dataset_ref, None, options.block_hash)
-            .await?;
-
-        Ok(GetDataResponse {
-            df,
-            dataset_handle: resolved_dataset.take_handle(),
-            block_hash: head,
-        })
-    }
-
-    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_multi, skip_all)]
-    async fn get_data_multi(
-        &self,
-        dataset_refs: &[odf::DatasetRef],
-        skip_if_missing_or_inaccessible: bool,
-    ) -> Result<Vec<GetDataResponse>, QueryError> {
-        let refs: Vec<&odf::DatasetRef> = dataset_refs.iter().collect();
-        let classified = self
-            .rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(&refs, DatasetAction::Read)
-            .await?;
-
-        if !skip_if_missing_or_inaccessible
-            && let Some((_, err)) = classified.inaccessible_refs.into_iter().next()
-        {
-            use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
-            let err = match err {
-                E::NotFound(e) => QueryError::DatasetNotFound(e),
-                E::Access(e) => QueryError::Access(e),
-                e @ E::Internal(_) => QueryError::Internal(e.int_err()),
-            };
-            return Err(err);
-        }
-
-        let mut resolved_datasets = Vec::new();
-        for (_, hdl) in classified.accessible_resolved_refs {
-            let resolved = self.dataset_registry.get_dataset_by_handle(&hdl).await;
-            let head = resolved
-                .as_metadata_chain()
-                .resolve_ref(&odf::BlockRef::Head)
-                .await
-                .int_err()?;
-            resolved_datasets.push((resolved, head));
-        }
-
-        let input_datasets = resolved_datasets
-            .iter()
-            .map(|(ds, head)| {
-                (
-                    ds.get_id().clone(),
-                    QueryOptionsDataset {
-                        alias: ds.get_alias().to_string(),
-                        block_hash: Some(head.clone()),
-                        hints: DatasetQueryHints {
-                            handle: Some(ds.get_handle().clone()),
-                            last_records_to_consider: None,
-                            does_not_need_schema: false,
-                        },
-                    },
-                )
-            })
-            .collect();
-
-        let ctx = self
-            .session_context(QueryOptions {
-                input_datasets: Some(input_datasets),
-            })
-            .await?;
-
-        let mut results = Vec::new();
-
-        for (ds, head) in resolved_datasets {
-            let df = ctx
-                .table(TableReference::bare(ds.get_alias().to_string()))
-                .await?;
-
-            let res = if df.schema().fields().is_empty() {
-                GetDataResponse {
-                    df: None,
-                    dataset_handle: ds.take_handle(),
-                    block_hash: head,
-                }
-            } else {
-                GetDataResponse {
-                    df: Some(df.into()),
-                    dataset_handle: ds.take_handle(),
-                    block_hash: head,
-                }
-            };
-
-            results.push(res);
-        }
-
-        Ok(results)
     }
 
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {

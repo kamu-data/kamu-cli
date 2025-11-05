@@ -121,7 +121,7 @@ impl<'a> CollectionMut<'a> {
         // Load current state
         // TODO: PERF: Filter paths that are relevant to operations
         let query_res = query_svc
-            .get_data(
+            .get_data_old(
                 &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
