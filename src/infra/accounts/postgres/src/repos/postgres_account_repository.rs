@@ -64,7 +64,7 @@ impl AccountRepository for PostgresAccountRepository {
                 VALUES ($1, $2, $3, $4, ($5::text)::account_type, $6, $7, $8, $9)
             "#,
             account_id_stack.as_str(),
-            account.prepare_account_name_for_storage(),
+            account.account_name.as_str(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type as AccountType,
@@ -112,7 +112,7 @@ impl AccountRepository for PostgresAccountRepository {
             WHERE id = $1
             "#,
             account_id_stack.as_str(),
-            updated_account.prepare_account_name_for_storage(),
+            updated_account.account_name.as_str(),
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,

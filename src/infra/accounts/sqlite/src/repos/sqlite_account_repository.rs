@@ -60,7 +60,7 @@ impl AccountRepository for SqliteAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id = account.id.to_string();
-        let account_name = account.prepare_account_name_for_storage();
+        let account_name = account.account_name.as_str();
         let email = account.email.as_ref().to_ascii_lowercase();
         let provider = account.provider.clone();
         let provider_identity_key = account.provider_identity_key.clone();
@@ -102,7 +102,7 @@ impl AccountRepository for SqliteAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id = updated_account.id.to_string();
-        let account_name = updated_account.prepare_account_name_for_storage();
+        let account_name = updated_account.account_name.as_str();
         let email = updated_account.email.as_ref().to_ascii_lowercase();
         let provider = updated_account.provider.clone();
         let provider_identity_key = updated_account.provider_identity_key.clone();

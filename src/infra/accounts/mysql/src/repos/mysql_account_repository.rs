@@ -81,7 +81,7 @@ impl AccountRepository for MySqlAccountRepository {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             account.id.to_string(),
-            account.prepare_account_name_for_storage(),
+            account.account_name.as_str(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type,
@@ -124,7 +124,7 @@ impl AccountRepository for MySqlAccountRepository {
                 provider_identity_key = ?
             WHERE id = ?
             "#,
-            updated_account.prepare_account_name_for_storage(),
+            updated_account.account_name.as_str(),
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
