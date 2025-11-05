@@ -7,13 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use datafusion::error::DataFusionError as DFError;
 use datafusion::prelude::*;
 use indoc::{formatdoc, indoc};
-use kamu_core::{GetDataWithMetadataResponse, MockQueryService, QueryService};
+use kamu_core::{GetDataResponse, MockQueryService, QueryService};
 use pretty_assertions::assert_matches;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static REGULAR_TABLE_DATASET_ID: LazyLock<odf::DatasetID> =
+    LazyLock::new(|| odf::DatasetID::new_seeded_ed25519(b"REGULAR_TABLE_DATASET_ID"));
+static NO_SCHEMA_TABLE_DATASET_ID: LazyLock<odf::DatasetID> =
+    LazyLock::new(|| odf::DatasetID::new_seeded_ed25519(b"NO_SCHEMA_TABLE_DATASET_ID"));
+static UNAUTHORIZED_TABLE_DATASET_ID: LazyLock<odf::DatasetID> =
+    LazyLock::new(|| odf::DatasetID::new_seeded_ed25519(b"UNAUTHORIZED_TABLE_DATASET_ID"));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,6 +74,7 @@ async fn test_wrong_arguments() {
 async fn test_dataset_not_found() {
     let ctx = create_session_context();
 
+    // Handle
     assert_matches!(
         ctx.sql(indoc!(
             "
@@ -76,6 +86,19 @@ async fn test_dataset_not_found() {
         Err(DFError::External(e))
             if e.to_string() == "Dataset not found: kamu/unknown-table"
     );
+    // ID
+    let not_found_table_dataset_id = odf::DatasetID::new_generated_ed25519().1;
+    assert_matches!(
+        ctx.sql(&formatdoc!(
+            "
+            SELECT *
+            FROM to_table(`{not_found_table_dataset_id}`)
+            ",
+        ))
+        .await,
+        Err(DFError::External(e))
+            if e.to_string() == format!("Dataset not found: {not_found_table_dataset_id}")
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +107,7 @@ async fn test_dataset_not_found() {
 async fn test_dataset_unauthorized() {
     let ctx = create_session_context();
 
+    // Handle
     assert_matches!(
         ctx.sql(indoc!(
             "
@@ -95,24 +119,19 @@ async fn test_dataset_unauthorized() {
         Err(DFError::External(e))
             if e.to_string() == "Dataset not found: kamu/unauthorized-table"
     );
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_dataset_has_no_primary_key() {
-    let ctx = create_session_context();
-
+    // ID
     assert_matches!(
-        ctx.sql(indoc!(
+        ctx.sql(&formatdoc!(
             "
             SELECT *
-            FROM to_table(`kamu/table-no-pk`)
-            "
+            FROM to_table(`{dataset_id}`)
+            ",
+            dataset_id = *UNAUTHORIZED_TABLE_DATASET_ID
         ))
         .await,
-        Err(DFError::Execution(msg))
-            if msg == "to_table: kamu/table-no-pk has no primary key"
+        Err(DFError::External(e))
+            if e.to_string() == format!("Dataset not found: {}", *UNAUTHORIZED_TABLE_DATASET_ID)
     );
 }
 
@@ -122,12 +141,34 @@ async fn test_dataset_has_no_primary_key() {
 async fn test_empty_dataset() {
     let ctx = create_session_context();
 
+    // Handle
     odf::utils::testing::assert_data_eq(
         ctx.sql(&formatdoc!(
             "
             SELECT *
             FROM to_table(`kamu/table-no-schema`)
             "
+        ))
+        .await
+        .unwrap()
+        .into(),
+        indoc!(
+            "
+            ++
+            ++
+            "
+        ),
+    )
+    .await;
+
+    // ID
+    odf::utils::testing::assert_data_eq(
+        ctx.sql(&formatdoc!(
+            "
+            SELECT *
+            FROM to_table(`{dataset_id}`)
+            ",
+            dataset_id = *NO_SCHEMA_TABLE_DATASET_ID
         ))
         .await
         .unwrap()
@@ -148,7 +189,14 @@ async fn test_empty_dataset() {
 async fn test_function_returns_correct_results() {
     let ctx = create_session_context();
 
-    for table_arg in ["`kamu/table`", "\"kamu/table\""] {
+    for table_arg in [
+        // Handle
+        "`kamu/table`",
+        "\"kamu/table\"",
+        // ID
+        &format!("`{}`", *REGULAR_TABLE_DATASET_ID),
+        &format!("\"{}\"", *REGULAR_TABLE_DATASET_ID),
+    ] {
         // +--------+----+------+------------+
         // | offset | op | city | population |
         // +--------+----+------+------------+
@@ -203,22 +251,47 @@ fn create_mock_query_svc() -> Arc<dyn QueryService> {
     let mut mock_query_svc = MockQueryService::new();
 
     mock_query_svc
-        .expect_get_data_with_metadata()
+        .expect_get_changelog_projection()
         .returning(|dataset_ref, _options| {
-            let Some(dataset_alias) = dataset_ref.alias() else {
-                unreachable!()
+            enum MockTable {
+                Regular,
+                NoSchema,
+                Unauthorized,
+                NotFound,
+            }
+
+            let dummy_table = match dataset_ref {
+                odf::DatasetRef::ID(id) => {
+                    if *id == *REGULAR_TABLE_DATASET_ID {
+                        MockTable::Regular
+                    } else if *id == *NO_SCHEMA_TABLE_DATASET_ID {
+                        MockTable::NoSchema
+                    } else if *id == *UNAUTHORIZED_TABLE_DATASET_ID {
+                        MockTable::Unauthorized
+                    } else {
+                        MockTable::NotFound
+                    }
+                }
+                odf::DatasetRef::Alias(alias) => match alias.dataset_name.as_str() {
+                    "table" => MockTable::Regular,
+                    "table-no-schema" => MockTable::NoSchema,
+                    "unauthorized-table" => MockTable::Unauthorized,
+                    _ => MockTable::NotFound,
+                },
+                odf::DatasetRef::Handle(_) => {
+                    unreachable!()
+                }
             };
 
-            let (has_primary_key, has_data) = match dataset_alias.dataset_name.as_str() {
-                "table" => (true, true),
-                "table-no-pk" => (false, true),
-                "table-no-schema" => (false, false),
-                "unauthorized-table" => {
+            let has_data = match dummy_table {
+                MockTable::Regular => true,
+                MockTable::NoSchema => false,
+                MockTable::Unauthorized => {
                     return Err(
                         odf::AccessError::Unauthorized("Dataset inaccessible".into()).into(),
                     );
                 }
-                _ => {
+                MockTable::NotFound => {
                     return Err(odf::DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
                     }
@@ -226,7 +299,7 @@ fn create_mock_query_svc() -> Arc<dyn QueryService> {
                 }
             };
 
-            Ok(GetDataWithMetadataResponse {
+            Ok(GetDataResponse {
                 df: has_data.then(|| {
                     // +--------+----+------+------------+
                     // | offset | op | city | population |
@@ -240,29 +313,27 @@ fn create_mock_query_svc() -> Arc<dyn QueryService> {
                     // | 6      | +C | a    | 1500       |
                     // | 7      | -R | a    | 1500       |
                     // +--------+----+------+------------+
-                    dataframe!(
+                    let df = dataframe!(
                         "offset" => [0, 1, 2, 3, 4, 5, 6, 7],
                         "op" => [0, 0, 0, 2, 3, 2, 3, 1],
                         "city" => ["a", "b", "c", "b", "b", "a", "a", "a"],
                         "population" => [1000, 2000, 3000, 2000, 2500, 1000, 1500, 1500],
                     )
+                    .unwrap();
+
+                    odf::utils::data::changelog::project(
+                        df.into(),
+                        &["city".to_string()],
+                        &Default::default(),
+                    )
                     .unwrap()
-                    .into()
                 }),
-                dataset_handle: odf::DatasetHandle::new(
-                    odf::DatasetID::new_generated_ed25519().1,
-                    dataset_alias.clone(),
+                dataset_handle: odf::metadata::testing::handle(
+                    &"foo",
+                    &"bar",
                     odf::DatasetKind::Root,
                 ),
                 block_hash: odf::Multihash::from_digest_sha3_256(b"head"),
-                dataset_vocabulary: None,
-                data_schema: None,
-                merge_strategy: has_primary_key.then(|| {
-                    odf::metadata::MergeStrategyChangelogStream {
-                        primary_key: vec!["city".to_string()],
-                    }
-                    .into()
-                }),
             })
         });
 

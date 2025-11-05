@@ -683,77 +683,6 @@ impl QueryService for QueryServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_with_metadata, skip_all, fields(%dataset_ref))]
-    async fn get_data_with_metadata(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        options: GetDataWithMetadataOptions,
-    ) -> Result<GetDataWithMetadataResponse, QueryError> {
-        // TODO: PERF: Limit push-down opportunity
-        let (resolved_dataset, head, df) = self
-            .single_dataset(dataset_ref, None, options.block_hash)
-            .await?;
-
-        let mut set_vocab_visitor = options
-            .resolve_dataset_vocabulary
-            .then(odf::dataset::SearchSetVocabVisitor::new);
-        let mut set_data_schema_visitor = options
-            .resolve_schema
-            .then(odf::dataset::SearchSetDataSchemaVisitor::new);
-        // TODO: Remove these visitors once schema contains primary keys
-        let mut active_polling_source_visitor = options.resolve_merge_strategy.then(|| {
-            odf::dataset::SearchActivePollingSourceVisitor::new(resolved_dataset.get_kind())
-        });
-        let mut active_push_sources_visitor = options.resolve_merge_strategy.then(|| {
-            odf::dataset::SearchActivePushSourcesVisitor::new(resolved_dataset.get_kind())
-        });
-
-        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = _>; _] = [
-            &mut set_vocab_visitor,
-            &mut set_data_schema_visitor,
-            &mut active_polling_source_visitor,
-            &mut active_push_sources_visitor,
-        ];
-
-        use odf::dataset::MetadataChainExt;
-
-        resolved_dataset
-            .as_metadata_chain()
-            .accept_by_interval(&mut visitors, Some(&head), None)
-            .await
-            .int_err()?;
-
-        let dataset_vocabulary = set_vocab_visitor
-            .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event)
-            .map(Into::into);
-        let data_schema = set_data_schema_visitor
-            .and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event)
-            .map(|e| e.upgrade().schema);
-        // TODO: Revisit once schema contains primary keys
-        let merge_strategy = if let Some(event) = active_polling_source_visitor
-            .and_then(odf::dataset::SearchActivePollingSourceVisitor::into_event)
-        {
-            // Use the active polling source if any.
-            Some(event.merge)
-        } else if let Some(event) = active_push_sources_visitor.and_then(|v| v.into_events().pop())
-        {
-            // Use the (!) last active push source if any.
-            // It's OK until the schema starts containing primary keys.
-            Some(event.merge)
-        } else {
-            None
-        };
-
-        Ok(GetDataWithMetadataResponse {
-            df,
-            dataset_handle: resolved_dataset.take_handle(),
-            block_hash: head,
-            dataset_vocabulary,
-            data_schema,
-            merge_strategy,
-        })
-    }
-
     #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_multi, skip_all)]
     async fn get_data_multi(
         &self,
@@ -863,6 +792,80 @@ impl QueryService for QueryServiceImpl {
                 latest_image: docker_images::RISINGWAVE.to_string(),
             },
         ])
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_changelog_projection, skip_all, fields(%dataset_ref))]
+    async fn get_changelog_projection(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        // TODO: PERF: Limit push-down opportunity
+        let (resolved_dataset, head, maybe_df) = self
+            .single_dataset(dataset_ref, None, options.block_hash)
+            .await?;
+
+        let Some(df) = maybe_df else {
+            // Dataset has no schema yet.
+            return Ok(GetDataResponse {
+                df: None,
+                dataset_handle: resolved_dataset.take_handle(),
+                block_hash: head,
+            });
+        };
+
+        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
+        // TODO: Remove these visitors once schema contains primary keys -->
+        let mut active_polling_source_visitor =
+            odf::dataset::SearchActivePollingSourceVisitor::new(resolved_dataset.get_kind());
+        let mut active_push_sources_visitor =
+            odf::dataset::SearchActivePushSourcesVisitor::new(resolved_dataset.get_kind());
+        // <--
+
+        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = _>; _] = [
+            &mut set_vocab_visitor,
+            &mut active_polling_source_visitor,
+            &mut active_push_sources_visitor,
+        ];
+
+        use odf::dataset::MetadataChainExt;
+
+        resolved_dataset
+            .as_metadata_chain()
+            .accept_by_interval(&mut visitors, Some(&head), None)
+            .await
+            .int_err()?;
+
+        // TODO: Revisit once schema contains primary keys
+        let merge_strategy = if let Some(event) = active_polling_source_visitor.into_event() {
+            // Use the active polling source if any.
+            Some(event.merge)
+        } else if let Some(event) = active_push_sources_visitor.into_events().pop() {
+            // Use the (!) last active push source if any.
+            // It's OK until the schema starts containing primary keys.
+            Some(event.merge)
+        } else {
+            None
+        };
+
+        let Some(primary_key) = merge_strategy.and_then(odf::metadata::MergeStrategy::primary_key)
+        else {
+            return Err(DatasetHasNoPrimaryKeysError {
+                dataset_ref: dataset_ref.clone(),
+            }
+            .int_err()
+            .into());
+        };
+
+        let dataset_vocabulary = set_vocab_visitor.into_event().unwrap_or_default().into();
+        let projection_df =
+            odf::utils::data::changelog::project(df, &primary_key, &dataset_vocabulary)?;
+
+        Ok(GetDataResponse {
+            df: Some(projection_df),
+            dataset_handle: resolved_dataset.take_handle(),
+            block_hash: head,
+        })
     }
 }
 
