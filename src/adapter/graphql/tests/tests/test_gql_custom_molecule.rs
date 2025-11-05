@@ -1440,6 +1440,7 @@ impl GraphQLDatasetsHarness {
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
             .add::<kamu::QueryDatasetDataUseCaseImpl>()
+            .add::<kamu::SessionContextBuilder>()
             .add::<kamu::ObjectStoreRegistryImpl>()
             .add::<kamu::ObjectStoreBuilderLocalFs>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedIngest::default())

@@ -54,6 +54,7 @@ impl Harness {
             .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<QueryServiceImpl>()
             .add::<QueryDatasetDataUseCaseImpl>()
+            .add::<SessionContextBuilder>()
             .add::<EngineProvisionerNull>()
             .build();
 

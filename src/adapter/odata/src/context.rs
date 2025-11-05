@@ -83,14 +83,14 @@ impl ServiceContext for ODataServiceContext {
             .await
             .map_err(ODataError::internal)?
         {
-            let checked_dataset = registry.get_dataset_by_handle(&hdl).await;
+            let readable_dataset = registry.get_dataset_by_handle(&hdl).await;
             let context: Arc<dyn CollectionContext> = Arc::new(ODataCollectionContext {
                 catalog: self.catalog.clone(),
                 addr: CollectionAddr {
                     name: hdl.alias.dataset_name.to_string(),
                     key: None,
                 },
-                checked_dataset,
+                readable_dataset,
                 service_base_url: self.service_base_url.clone(),
             });
 
@@ -110,7 +110,7 @@ impl ServiceContext for ODataServiceContext {
 pub(crate) struct ODataCollectionContext {
     catalog: dill::Catalog,
     addr: CollectionAddr,
-    checked_dataset: ResolvedDataset,
+    readable_dataset: ResolvedDataset,
     service_base_url: String,
 }
 
@@ -118,7 +118,7 @@ impl ODataCollectionContext {
     pub(crate) fn new(
         catalog: dill::Catalog,
         addr: CollectionAddr,
-        checked_dataset: ResolvedDataset,
+        readable_dataset: ResolvedDataset,
     ) -> Self {
         let config = catalog.get_one::<ServerUrlConfig>().unwrap();
         let service_base_url = config.protocols.odata_base_url();
@@ -126,7 +126,7 @@ impl ODataCollectionContext {
         Self {
             catalog,
             addr,
-            checked_dataset,
+            readable_dataset,
             service_base_url,
         }
     }
@@ -155,11 +155,11 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     fn collection_name(&self) -> Result<String, ODataError> {
-        Ok(self.checked_dataset.get_alias().dataset_name.to_string())
+        Ok(self.readable_dataset.get_alias().dataset_name.to_string())
     }
 
     async fn last_updated_time(&self) -> DateTime<Utc> {
-        let chain = self.checked_dataset.as_metadata_chain();
+        let chain = self.readable_dataset.as_metadata_chain();
         let Ok(head) = chain.resolve_ref(&odf::BlockRef::Head).await else {
             panic!("Head block must be resolvable")
         };
@@ -171,12 +171,10 @@ impl CollectionContext for ODataCollectionContext {
     }
 
     async fn schema(&self) -> Result<SchemaRef, ODataError> {
-        let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
+        let schema_svc: Arc<dyn SchemaService> = self.catalog.get_one().unwrap();
 
-        let dataset_ref = self.checked_dataset.get_handle().as_local_ref();
-
-        let maybe_data_schema = query_svc
-            .get_schema(&dataset_ref)
+        let maybe_data_schema = schema_svc
+            .get_schema(self.readable_dataset.clone())
             .await
             .map_int_err(ODataError::internal)?;
 
@@ -200,7 +198,7 @@ impl CollectionContext for ODataCollectionContext {
 
         use odf::dataset::MetadataChainExt;
         let vocab: odf::metadata::DatasetVocabulary = self
-            .checked_dataset
+            .readable_dataset
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchSetVocabVisitor::new())
             .await
@@ -212,13 +210,13 @@ impl CollectionContext for ODataCollectionContext {
         let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
 
         let res = query_svc
-            .get_data(self.checked_dataset.clone(), GetDataOptions::default())
+            .get_data(self.readable_dataset.clone(), GetDataOptions::default())
             .await
             .unwrap();
 
         let Some(df) = res.df else {
             return Err(ODataError::CollectionNotFound(CollectionNotFound {
-                collection: self.checked_dataset.get_alias().to_string(),
+                collection: self.readable_dataset.get_alias().to_string(),
             }));
         };
 

@@ -11,7 +11,6 @@ use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::SessionContext;
 use internal_error::*;
 use odf::utils::data::DataFrameExt;
@@ -19,6 +18,8 @@ use thiserror::Error;
 
 use crate::ResolvedDataset;
 use crate::auth::DatasetActionUnauthorizedError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Support different engines and query dialects
 #[cfg_attr(feature = "testing", mockall::automock)]
@@ -76,29 +77,6 @@ pub trait QueryService: Send + Sync {
         statement: &str,
         options: QueryOptions,
     ) -> Result<QueryResponse, QueryError>;
-
-    /// Returns an ODF schema of the given dataset as specified in the metadata
-    /// chain. Returns `None` if schema was not yet defined.
-    async fn get_schema(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<Arc<odf::schema::DataSchema>>, QueryError>;
-
-    /// Returns Arrow schema of the last data file in a given dataset, if any
-    /// files were written, `None` otherwise. Unlike `get_schema` that uses
-    /// schema from metadata chain, this will return the raw Arrow schema of
-    /// data as seen by the query engine.
-    async fn get_last_data_chunk_schema_arrow(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<datafusion::arrow::datatypes::SchemaRef>, QueryError>;
-
-    /// Returns parquet schema of the last data file in a given dataset, if any
-    /// files were written, `None` otherwise
-    async fn get_last_data_chunk_schema_parquet(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<Type>, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;

@@ -492,6 +492,8 @@ pub fn configure_base_catalog(
     b.add::<ProvenanceServiceImpl>();
 
     b.add::<QueryServiceImpl>();
+    b.add::<SchemaServiceImpl>();
+    b.add::<SessionContextBuilder>();
 
     b.add::<ExportServiceImpl>();
 
@@ -505,6 +507,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<CompactDatasetUseCaseImpl>();
+    b.add::<GetDatasetSchemaUseCaseImpl>();
     b.add::<PushIngestDataUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
     b.add::<PushDatasetUseCaseImpl>();

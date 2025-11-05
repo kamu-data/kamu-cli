@@ -23,6 +23,7 @@ use kamu::{
     PushIngestExecutorImpl,
     PushIngestPlannerImpl,
     QueryServiceImpl,
+    SessionContextBuilder,
 };
 use kamu_core::{DatasetRegistry, DidGenerator, FileUploadLimitConfig, MockDidGenerator};
 use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
@@ -155,6 +156,7 @@ impl UpdateVersionFileCaseHarness {
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>()
             .add::<QueryServiceImpl>()
+            .add::<SessionContextBuilder>()
             .add_value(FileUploadLimitConfig::new_in_bytes(24))
             .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .build();

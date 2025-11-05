@@ -21,6 +21,8 @@ use kamu_core::{
     auth,
 };
 
+use super::helpers;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -34,26 +36,6 @@ pub struct QueryDatasetDataUseCaseImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl QueryDatasetDataUseCaseImpl {
-    async fn resolve_dataset(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<ResolvedDataset, QueryError> {
-        let resolved_dataset = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Read)
-            .await
-            .map_err(|e| {
-                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
-                match e {
-                    E::NotFound(e) => QueryError::DatasetNotFound(e),
-                    E::Access(e) => QueryError::Access(e),
-                    e @ E::Internal(_) => QueryError::Internal(e.int_err()),
-                }
-            })?;
-
-        Ok(resolved_dataset)
-    }
-
     async fn resolve_multiple_datasets(
         &self,
         dataset_refs: &[odf::DatasetRef],
@@ -98,8 +80,15 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
         limit: u64,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
-        let target = self.resolve_dataset(dataset_ref).await?;
-        self.query_service.tail(target, skip, limit, options).await
+        // Resolve source dataset with ReBAC check
+        let source = helpers::resolve_dataset_for_querying(
+            self.rebac_dataset_registry_facade.as_ref(),
+            dataset_ref,
+        )
+        .await?;
+
+        // Perform tail query
+        self.query_service.tail(source, skip, limit, options).await
     }
 
     async fn get_data(
@@ -107,8 +96,15 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
         dataset_ref: &odf::DatasetRef,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
-        let target = self.resolve_dataset(dataset_ref).await?;
-        self.query_service.get_data(target, options).await
+        // Resolve source dataset with ReBAC check
+        let source = helpers::resolve_dataset_for_querying(
+            self.rebac_dataset_registry_facade.as_ref(),
+            dataset_ref,
+        )
+        .await?;
+
+        // Perform get data query
+        self.query_service.get_data(source, options).await
     }
 
     // TODO: Consider replacing this function with a more sophisticated session
@@ -120,10 +116,13 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
         dataset_refs: &[odf::DatasetRef],
         skip_if_missing_or_inaccessible: bool,
     ) -> Result<Vec<GetDataResponse>, QueryError> {
-        let targets = self
+        // Resolve source datasets with ReBAC check
+        let sources = self
             .resolve_multiple_datasets(dataset_refs, skip_if_missing_or_inaccessible)
             .await?;
-        self.query_service.get_data_multi(targets).await
+
+        // Perform get data multi query
+        self.query_service.get_data_multi(sources).await
     }
 }
 

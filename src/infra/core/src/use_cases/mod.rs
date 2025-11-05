@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod queries;
+pub use queries::*;
+
 mod compact_dataset_use_case_impl;
 mod pull_dataset_use_case_impl;
 mod push_dataset_use_case_impl;
 mod push_ingest_data_use_case_impl;
-mod query_dataset_data_use_case_impl;
 mod reset_dataset_use_case_impl;
 mod set_watermark_use_case_impl;
 mod verify_dataset_use_case_impl;
@@ -20,7 +22,6 @@ pub use compact_dataset_use_case_impl::*;
 pub use pull_dataset_use_case_impl::*;
 pub use push_dataset_use_case_impl::*;
 pub use push_ingest_data_use_case_impl::*;
-pub use query_dataset_data_use_case_impl::*;
 pub use reset_dataset_use_case_impl::*;
 pub use set_watermark_use_case_impl::*;
 pub use verify_dataset_use_case_impl::*;
