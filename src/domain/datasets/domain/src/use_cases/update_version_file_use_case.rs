@@ -59,9 +59,6 @@ pub enum UpdateVersionFileUseCaseError {
     ),
 
     #[error(transparent)]
-    NotFound(#[from] odf::DatasetNotFoundError),
-
-    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
@@ -70,17 +67,6 @@ pub enum UpdateVersionFileUseCaseError {
 
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<odf::DatasetRefUnresolvedError> for UpdateVersionFileUseCaseError {
-    fn from(value: odf::DatasetRefUnresolvedError) -> Self {
-        match value {
-            odf::DatasetRefUnresolvedError::NotFound(err) => Self::NotFound(err),
-            odf::DatasetRefUnresolvedError::Internal(err) => Self::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

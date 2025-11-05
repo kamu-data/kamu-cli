@@ -109,13 +109,16 @@ impl<'a> Collection<'a> {
 
 #[derive(Debug)]
 pub struct CollectionProjection<'a> {
-    state: &'a DatasetRequestState,
+    readable_state: &'a DatasetRequestState,
     as_of: Option<odf::Multihash>,
 }
 
 impl<'a> CollectionProjection<'a> {
-    pub fn new(state: &'a DatasetRequestState, as_of: Option<odf::Multihash>) -> Self {
-        Self { state, as_of }
+    pub fn new(readable_state: &'a DatasetRequestState, as_of: Option<odf::Multihash>) -> Self {
+        Self {
+            readable_state,
+            as_of,
+        }
     }
 }
 
@@ -134,10 +137,11 @@ impl CollectionProjection<'_> {
         use datafusion::logical_expr::{col, lit};
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let Some(df) = query_svc
-            .get_data_old(
-                &self.state.dataset_handle().as_local_ref(),
+            .get_data(
+                access_checked_dataset.clone(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -192,10 +196,11 @@ impl CollectionProjection<'_> {
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let df = query_svc
-            .get_data_old(
-                &self.state.dataset_handle().as_local_ref(),
+            .get_data(
+                access_checked_dataset.clone(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -266,10 +271,11 @@ impl CollectionProjection<'_> {
         use datafusion::logical_expr::{col, lit};
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let access_checked_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let Some(df) = query_svc
-            .get_data_old(
-                &self.state.dataset_handle().as_local_ref(),
+            .get_data(
+                access_checked_dataset.clone(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },

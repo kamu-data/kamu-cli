@@ -336,12 +336,11 @@ async fn test_dataset_schema_unauthorized_s3() {
 
 async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
-    let dataset_ref = odf::DatasetRef::from(target.get_alias());
 
     // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
-        .tail_old(&dataset_ref, 1, 1, GetDataOptions::default())
+        .tail(target.clone(), 1, 1, GetDataOptions::default())
         .await
         .unwrap();
 
@@ -361,7 +360,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
 
     // Crosses block boundary
     let res = query_svc
-        .tail_old(&dataset_ref, 1, 2, GetDataOptions::default())
+        .tail(target, 1, 2, GetDataOptions::default())
         .await
         .unwrap();
 
@@ -406,16 +405,14 @@ async fn test_dataset_tail_s3() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_empty_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(
-        tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
-    );
-    let (_, dataset_alias) = create_empty_dataset(&catalog, "foo").await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::new());
+    let (created, dataset_alias) = create_empty_dataset(&catalog, "foo").await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
-        .tail_old(
-            &dataset_alias.as_local_ref(),
+        .tail(
+            ResolvedDataset::from_stored(&created, &dataset_alias),
             0,
             10,
             GetDataOptions::default(),
@@ -423,41 +420,6 @@ async fn test_dataset_tail_empty_dataset() {
         .await
         .unwrap();
     assert_matches!(res.df, None);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
-    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
-
-    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let result = query_svc
-        .tail_old(
-            &target.get_alias().as_local_ref(),
-            1,
-            1,
-            GetDataOptions::default(),
-        )
-        .await;
-    assert_matches!(result, Err(QueryError::Access(_)));
-}
-
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_tail_unauthorized_local_fs() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
-    test_dataset_tail_unauthorized_common(catalog, &tempdir).await;
-}
-
-#[test_group::group(containerized, engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_dataset_tail_unauthorized_s3() {
-    let s3 = LocalS3Server::new().await;
-    let catalog =
-        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
-    test_dataset_tail_unauthorized_common(catalog, &s3.tmp_dir).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

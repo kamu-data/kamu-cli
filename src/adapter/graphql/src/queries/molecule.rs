@@ -247,10 +247,7 @@ impl Molecule {
 
         // Query full data
         let df = match query_svc
-            .get_data_old(
-                &projects_dataset.get_handle().as_local_ref(),
-                domain::GetDataOptions::default(),
-            )
+            .get_data(projects_dataset.clone(), domain::GetDataOptions::default())
             .await
         {
             Ok(res) => Ok(res.df),
@@ -742,11 +739,10 @@ impl MoleculeProject {
         ctx: &Context<'_>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
-        let (query_svc, dataset_reg) =
-            from_catalog_n!(ctx, dyn domain::QueryService, dyn domain::DatasetRegistry);
+        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
-        let df = match query_svc
-            .get_data_old(
+        let df = match query_dataset_data
+            .get_data(
                 &self.data_room_dataset_id.as_local_ref(),
                 domain::GetDataOptions::default(),
             )
@@ -775,6 +771,9 @@ impl MoleculeProject {
             .collect();
 
         let mut events = Vec::new();
+
+        let (dataset_reg, query_svc) =
+            from_catalog_n!(ctx, dyn domain::DatasetRegistry, dyn domain::QueryService);
 
         for did in dataset_ids {
             let resolved_dataset = dataset_reg

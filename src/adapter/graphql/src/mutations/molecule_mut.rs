@@ -190,7 +190,7 @@ impl MoleculeMut {
 
         push_ingest_use_case
             .execute(
-                &projects_dataset,
+                projects_dataset,
                 kamu_core::DataSource::Buffer(
                     project.to_bytes(odf::metadata::OperationType::Append),
                 ),
@@ -321,7 +321,7 @@ impl MoleculeProjectMut {
             }
         }
 
-        let dataset = dataset_reg
+        let target_dataset = dataset_reg
             .get_dataset_by_id(&self.announcements_dataset_id)
             .await
             .int_err()?;
@@ -340,7 +340,7 @@ impl MoleculeProjectMut {
 
         push_ingest_use_case
             .execute(
-                &dataset,
+                target_dataset,
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(
                     record.to_string().into_bytes(),
                 )),

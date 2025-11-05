@@ -53,6 +53,7 @@ impl Harness {
             .add::<DataFormatRegistryImpl>()
             .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<QueryServiceImpl>()
+            .add::<QueryDatasetDataUseCaseImpl>()
             .add::<EngineProvisionerNull>()
             .build();
 

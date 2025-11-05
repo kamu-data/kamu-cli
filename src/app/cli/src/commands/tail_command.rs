@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::{Int32Array, UInt8Array};
 use datafusion::arrow::datatypes::DataType;
-use kamu::domain::{GetDataOptions, QueryService};
+use kamu::domain::{GetDataOptions, QueryDatasetDataUseCase};
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -22,7 +22,7 @@ use crate::output::*;
 #[dill::interface(dyn Command)]
 pub struct TailCommand {
     output_cfg: Arc<OutputConfig>,
-    query_svc: Arc<dyn QueryService>,
+    query_dataset_data: Arc<dyn QueryDatasetDataUseCase>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -38,8 +38,8 @@ pub struct TailCommand {
 impl Command for TailCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let res = self
-            .query_svc
-            .tail_old(
+            .query_dataset_data
+            .tail(
                 &self.dataset_ref,
                 self.skip,
                 self.limit,

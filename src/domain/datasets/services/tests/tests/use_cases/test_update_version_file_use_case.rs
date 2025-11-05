@@ -41,9 +41,7 @@ async fn test_update_versioned_file_use_case() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = UpdateVersionFileCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_check_write_dataset(&dataset_id_foo, 2, true)
-            .expect_check_read_dataset(&dataset_id_foo, 2, true),
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 2, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -80,9 +78,7 @@ async fn test_update_versioned_file_use_case_errors() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = UpdateVersionFileCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_check_read_dataset(&dataset_id_foo, 2, true)
-            .expect_check_write_dataset(&dataset_id_foo, 2, true),
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 2, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
