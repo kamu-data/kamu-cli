@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Refactor: replaced `delete_account_by_name()` with `delete_account_by_id()` across repositories and services.
 ### Fixed
 - Login method returns invalid credential error when login is invalid account name
 

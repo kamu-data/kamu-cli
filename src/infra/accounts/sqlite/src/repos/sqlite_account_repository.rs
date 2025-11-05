@@ -501,15 +501,15 @@ impl AccountRepository for SqliteAccountRepository {
         })
     }
 
-    async fn delete_account_by_name(
+    async fn delete_account_by_id(
         &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountByNameError> {
+        account_id: &odf::AccountID,
+    ) -> Result<(), DeleteAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let account_name_str = account_name.as_str();
+        let account_id_str = account_id.to_string();
 
         let delete_result = sqlx::query!(
             r#"
@@ -517,7 +517,7 @@ impl AccountRepository for SqliteAccountRepository {
             FROM accounts
             WHERE account_name = $1
             "#,
-            account_name_str
+            account_id_str
         )
         .execute(&mut *connection_mut)
         .await
@@ -526,11 +526,9 @@ impl AccountRepository for SqliteAccountRepository {
         if delete_result.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(DeleteAccountByNameError::NotFound(
-                AccountNotFoundByNameError {
-                    account_name: account_name.clone(),
-                },
-            ))
+            Err(DeleteAccountByIdError::NotFound(AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            }))
         }
     }
 }

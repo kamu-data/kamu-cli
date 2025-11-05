@@ -376,12 +376,11 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE provider_identity_key = ?
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE provider_identity_key = ?
             "#,
             provider_identity_key
         )
@@ -400,12 +399,11 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE email = ?
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE email = ?
             "#,
             email.as_ref()
         )
@@ -424,12 +422,11 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE account_name = ?
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE account_name = ?
             "#,
             account_name.to_string()
         )
@@ -499,21 +496,25 @@ impl AccountRepository for MySqlAccountRepository {
         })
     }
 
-    async fn delete_account_by_name(
+    async fn delete_account_by_id(
         &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountByNameError> {
+        account_id: &odf::AccountID,
+    ) -> Result<(), DeleteAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
 
         let delete_result = sqlx::query!(
             r#"
             DELETE
             FROM accounts
-            WHERE account_name = ?
+            WHERE id = ?
             "#,
-            account_name.as_str()
+            account_id_stack.as_str()
         )
         .execute(&mut *connection_mut)
         .await
@@ -522,11 +523,9 @@ impl AccountRepository for MySqlAccountRepository {
         if delete_result.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(DeleteAccountByNameError::NotFound(
-                AccountNotFoundByNameError {
-                    account_name: account_name.clone(),
-                },
-            ))
+            Err(DeleteAccountByIdError::NotFound(AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            }))
         }
     }
 }
