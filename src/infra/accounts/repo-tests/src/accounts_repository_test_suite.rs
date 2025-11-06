@@ -86,36 +86,7 @@ pub async fn test_insert_and_locate_password_account(catalog: &Catalog) {
 
     account_repo.save_account(&account).await.unwrap();
 
-    let maybe_account_id = account_repo
-        .find_account_id_by_email(&Email::parse("test@example.com").unwrap())
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let account_name = odf::AccountName::new_unchecked("wasya");
-    let maybe_account_id = account_repo
-        .find_account_id_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let maybe_account_id = account_repo
-        .find_account_id_by_provider_identity_key("wasya")
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let db_account = account_repo
-        .get_account_by_id(&maybe_account_id.unwrap())
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
-
-    let db_account = account_repo
-        .get_account_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
+    test_locale_account(account_repo.as_ref(), account, "password").await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,36 +109,7 @@ pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
 
     account_repo.save_account(&account).await.unwrap();
 
-    let maybe_account_id = account_repo
-        .find_account_id_by_email(&Email::parse("test@example.com").unwrap())
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let account_name = odf::AccountName::new_unchecked("wasya");
-    let maybe_account_id = account_repo
-        .find_account_id_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let maybe_account_id = account_repo
-        .find_account_id_by_provider_identity_key(GITHUB_ACCOUNT_ID)
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let db_account = account_repo
-        .get_account_by_id(&maybe_account_id.unwrap())
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
-
-    let db_account = account_repo
-        .get_account_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
+    test_locale_account(account_repo.as_ref(), account, "github").await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -737,6 +679,8 @@ pub async fn test_update_account_not_found(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_duplicate_email(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account_1 = make_test_account(
         "wasya",
         "wasya@example.com",
@@ -975,6 +919,61 @@ pub async fn test_all_accounts(catalog: &Catalog) {
             *accounts
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_locale_account(account_repo: &dyn AccountRepository, account: Account, tag: &str) {
+    // Get account(s)
+    assert_matches!(
+        account_repo.get_account_by_id(&account.id).await,
+        Ok(db_account)
+            if db_account == account,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_ids(&[&account.id]).await,
+        Ok(accounts)
+            if accounts == [account.clone()],
+        "Tag: {tag}"
+
+    );
+    assert_matches!(
+        account_repo.get_account_by_name(&account.account_name).await,
+        Ok(db_account)
+            if db_account == account,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_names(&[&account.account_name]).await,
+        Ok(accounts)
+            if accounts == [account.clone()],
+        "Tag: {tag}"
+    );
+
+    // Get account id(s)
+    assert_matches!(
+        account_repo
+            .find_account_id_by_provider_identity_key(&account.provider_identity_key)
+            .await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.find_account_id_by_email(&account.email).await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.find_account_id_by_name(&account.account_name).await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
