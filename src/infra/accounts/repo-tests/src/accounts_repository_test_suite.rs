@@ -86,7 +86,13 @@ pub async fn test_insert_and_locate_password_account(catalog: &Catalog) {
 
     account_repo.save_account(&account).await.unwrap();
 
-    test_locale_account(account_repo.as_ref(), account, "password").await;
+    test_locale_account(
+        account_repo.as_ref(),
+        account,
+        odf::AccountName::new_unchecked("wAsYa"),
+        "password",
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,7 +115,13 @@ pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
 
     account_repo.save_account(&account).await.unwrap();
 
-    test_locale_account(account_repo.as_ref(), account, "github").await;
+    test_locale_account(
+        account_repo.as_ref(),
+        account,
+        odf::AccountName::new_unchecked("wAsYa"),
+        "github",
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -948,6 +960,18 @@ async fn test_locale_account(account_repo: &dyn AccountRepository, account: Acco
     );
     assert_matches!(
         account_repo.get_accounts_by_names(&[&account.account_name]).await,
+        Ok(accounts)
+            if accounts == [account.clone()],
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.get_account_by_name(&mixed_case_account_name).await,
+        Ok(db_account)
+            if db_account == account,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_names(&[&mixed_case_account_name]).await,
         Ok(accounts)
             if accounts == [account.clone()],
         "Tag: {tag}"
