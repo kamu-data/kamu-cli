@@ -74,14 +74,19 @@ impl KamuSchema {
 
             assert_eq!(*id, hdl.id);
 
-            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
+            // Try reusing pre-resolved dataset if available
+            let source_dataset = if let Some(source_dataset) = &opts.hints.source_dataset {
+                source_dataset.clone()
+            } else {
+                self.dataset_registry.get_dataset_by_handle(&hdl).await
+            };
 
             tables.insert(
                 opts.alias.clone(),
                 Arc::new(KamuTable::new(
                     self.session_config.clone(),
                     self.table_options.clone(),
-                    resolved_dataset,
+                    source_dataset,
                     opts.block_hash.clone(),
                     opts.hints.clone(),
                 )),
