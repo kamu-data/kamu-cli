@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id           AS \"id: _\",\n                   account_name,\n                   email,\n                   display_name,\n                   account_type AS \"account_type: AccountType\",\n                   avatar_url,\n                   registered_at,\n                   provider,\n                   provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) IN (SELECT lower(input_account_name)\n                                          FROM unnest($1::text[]) AS input_account_name)\n            ORDER BY account_name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: _",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "display_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "account_type: AccountType",
+        "type_info": {
+          "Custom": {
+            "name": "account_type",
+            "kind": {
+              "Enum": [
+                "user",
+                "organization"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "avatar_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "registered_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "provider",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "provider_identity_key",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6d4f5b91246284858553a83ec00f085e48ebb9cf8169b282ce12f503f124f41f"
+}

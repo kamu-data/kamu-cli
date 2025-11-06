@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id as \"id: odf::AccountID\"\n            FROM accounts\n            WHERE lower(email) = lower($1)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: odf::AccountID",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a1de046d4356cb04267a1008c73f8b0c3cbb84076b000330a0c7b79dfa2ee2f5"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT password_hash\n            FROM accounts_passwords\n            JOIN accounts ON accounts_passwords.account_id = accounts.id\n            WHERE lower(account_name) = lower($1)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "password_hash",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c177f0e4d387595d6da2d6fa8ab8595d8dd2107babebcd543d3628c0ef15b8d6"
+}
