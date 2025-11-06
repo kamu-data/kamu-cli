@@ -28,6 +28,7 @@ pub struct InMemoryAccountRepository {
 #[derive(Default)]
 struct State {
     accounts_by_id: HashMap<odf::AccountID, Account>,
+    // NOTE: Name hash is case-insensitive
     accounts_by_name: HashMap<odf::AccountName, Account>,
     account_id_by_provider_identity_key: HashMap<String, odf::AccountID>,
     password_hash_by_account_id: HashMap<odf::AccountID, String>,
