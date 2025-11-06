@@ -823,7 +823,7 @@ pub async fn test_get_accounts_by_names(catalog: &Catalog) {
     account_repo.save_account(&account_2).await.unwrap();
     account_repo.save_account(&account_3).await.unwrap();
 
-    // Regular case
+    // Regular case.
     let accounts_names = [
         &account_1_not_saved.account_name,
         &account_2.account_name,
@@ -846,7 +846,7 @@ pub async fn test_get_accounts_by_names(catalog: &Catalog) {
         *found_accounts
     );
 
-    // Mixed case
+    // Mixed case.
     let mixed_accounts_names = [
         &odf::AccountName::new_unchecked("aCcOuNt_1_nOt_SaVeD"),
         &odf::AccountName::new_unchecked("PetyA"),

@@ -7914,6 +7914,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-datasets",
  "opendatafabric",
+ "pretty_assertions",
  "secrecy",
  "uuid",
 ]

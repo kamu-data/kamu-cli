@@ -22,6 +22,7 @@ use tokio::sync::RwLock;
 #[derive(Default)]
 struct State {
     rows: HashMap<odf::DatasetID, DatasetEntry>,
+    // NOTE: Name hash is case-insensitive
     rows_by_owner_and_name: HashMap<odf::AccountID, HashMap<odf::DatasetName, odf::DatasetID>>,
     rows_by_owner: HashMap<odf::AccountID, BTreeSet<odf::DatasetID>>,
 }

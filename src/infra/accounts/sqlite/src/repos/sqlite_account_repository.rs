@@ -10,7 +10,6 @@
 use std::num::NonZeroUsize;
 
 use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
-use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
@@ -19,10 +18,10 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
+#[dill::component]
+#[dill::interface(dyn AccountRepository)]
+#[dill::interface(dyn ExpensiveAccountRepository)]
+#[dill::interface(dyn PasswordHashRepository)]
 pub struct SqliteAccountRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
