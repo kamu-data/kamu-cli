@@ -958,6 +958,39 @@ pub async fn test_all_accounts(catalog: &Catalog) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_account(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let not_saved_account = make_test_account(
+        "account",
+        "account@example.com",
+        AccountProvider::Password.into(),
+        "account",
+    );
+
+    // 1. Delete non-existent account.
+    assert_matches!(
+        account_repo
+            .delete_account_by_id(&not_saved_account.id)
+            .await,
+        Err(DeleteAccountByIdError::NotFound(_))
+    );
+
+    let account = not_saved_account;
+    assert_matches!(account_repo.save_account(&account).await, Ok(_));
+
+    // 2. Delete existent account.
+    assert_matches!(account_repo.delete_account_by_id(&account.id).await, Ok(_));
+
+    // 3. Try to delete an already deleted account.
+    assert_matches!(
+        account_repo.delete_account_by_id(&account.id).await,
+        Err(DeleteAccountByIdError::NotFound(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
