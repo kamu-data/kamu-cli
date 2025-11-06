@@ -14,6 +14,7 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
+use rayon::prelude::*;
 use tokio::try_join;
 
 use crate::dataset_resource::*;
@@ -105,7 +106,6 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         action: DatasetAction,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
         let user_actor = self.user_actor().await?;
-        let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
 
         let dataset_ids = dataset_handles
             .iter()
@@ -124,29 +124,35 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     acc
                 });
 
-        for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
-            let is_allowed = self
-                .kamu_auth_oso
-                .is_allowed(user_actor.clone(), action, dataset_resource)
-                .int_err()?;
+        let results: Result<Vec<_>, InternalError> = dataset_resources_resolution
+            .resolved_resources
+            .into_par_iter()
+            .map(|(dataset_id, dataset_resource)| {
+                let is_allowed = self
+                    .kamu_auth_oso
+                    .is_allowed(user_actor.clone(), action, dataset_resource)
+                    .int_err()?;
 
-            if is_allowed {
-                let dataset_handle = dataset_handle_id_mapping
-                    .get(&dataset_id)
-                    .ok_or_else(|| {
-                        format!("Unexpectedly, dataset_handle not was found: {dataset_id}")
-                            .int_err()
-                    })?
-                    .clone();
+                if is_allowed {
+                    let dataset_handle = dataset_handle_id_mapping
+                        .get(&dataset_id)
+                        .ok_or_else(|| {
+                            format!("Unexpectedly, dataset_handle not was found: {dataset_id}")
+                                .int_err()
+                        })?
+                        .clone();
+                    Ok(Some(dataset_handle))
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect();
 
-                matched_dataset_handles.push(dataset_handle);
-            }
-        }
-
+        let matched_dataset_handles = results?.into_iter().flatten().collect();
         Ok(matched_dataset_handles)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles, %action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count = %dataset_handles.len(), %action))]
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
@@ -176,30 +182,53 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     acc
                 });
 
-        for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
-            let dataset_handle = dataset_handle_id_mapping
-                .get(&dataset_id)
-                .ok_or_else(|| {
-                    format!("Unexpectedly, dataset_handle not was found: {dataset_id}").int_err()
-                })?
-                .clone();
+        type HandleResult = Result<
+            (
+                odf::DatasetHandle,
+                Option<ClassifyByAllowanceDatasetActionUnauthorizedError>,
+            ),
+            InternalError,
+        >;
 
-            let is_allowed = self
-                .kamu_auth_oso
-                .is_allowed(user_actor.clone(), action, dataset_resource)
-                .int_err()?;
+        let results: Result<Vec<_>, InternalError> = dataset_resources_resolution
+            .resolved_resources
+            .into_par_iter()
+            .map(|(dataset_id, dataset_resource)| -> HandleResult {
+                let dataset_handle = dataset_handle_id_mapping
+                    .get(&dataset_id)
+                    .ok_or_else(|| {
+                        format!("Unexpectedly, dataset_handle not was found: {dataset_id}")
+                            .int_err()
+                    })?
+                    .clone();
 
-            if is_allowed {
-                authorized_handles.push(dataset_handle);
+                let is_allowed = self
+                    .kamu_auth_oso
+                    .is_allowed(user_actor.clone(), action, dataset_resource)
+                    .int_err()?;
+
+                if is_allowed {
+                    Ok((dataset_handle, None))
+                } else {
+                    let dataset_ref = dataset_handle.as_local_ref();
+                    Ok((
+                        dataset_handle,
+                        Some(
+                            ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                                dataset_ref,
+                                action,
+                            ),
+                        ),
+                    ))
+                }
+            })
+            .collect();
+
+        for (dataset_handle, maybe_error) in results? {
+            if let Some(error) = maybe_error {
+                unauthorized_handles_with_errors.push((dataset_handle, error));
             } else {
-                let dataset_ref = dataset_handle.as_local_ref();
-                unauthorized_handles_with_errors.push((
-                    dataset_handle,
-                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
-                        dataset_ref,
-                        action,
-                    ),
-                ));
+                authorized_handles.push(dataset_handle);
             }
         }
 
@@ -243,23 +272,45 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         let mut unauthorized_ids_with_errors =
             Vec::with_capacity(dataset_resources_resolution.unresolved_resources.len());
 
-        for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
-            let is_allowed = self
-                .kamu_auth_oso
-                .is_allowed(user_actor.clone(), action, dataset_resource)
-                .int_err()?;
+        type IdResult = Result<
+            (
+                odf::DatasetID,
+                Option<ClassifyByAllowanceDatasetActionUnauthorizedError>,
+            ),
+            InternalError,
+        >;
 
-            if is_allowed {
-                authorized_ids.push(dataset_id);
+        let results: Result<Vec<_>, InternalError> = dataset_resources_resolution
+            .resolved_resources
+            .into_par_iter()
+            .map(|(dataset_id, dataset_resource)| -> IdResult {
+                let is_allowed = self
+                    .kamu_auth_oso
+                    .is_allowed(user_actor.clone(), action, dataset_resource)
+                    .int_err()?;
+
+                if is_allowed {
+                    Ok((dataset_id, None))
+                } else {
+                    let dataset_ref = dataset_id.as_local_ref();
+                    Ok((
+                        dataset_id,
+                        Some(
+                            ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                                dataset_ref,
+                                action,
+                            ),
+                        ),
+                    ))
+                }
+            })
+            .collect();
+
+        for (dataset_id, maybe_error) in results? {
+            if let Some(error) = maybe_error {
+                unauthorized_ids_with_errors.push((dataset_id, error));
             } else {
-                let dataset_ref = dataset_id.as_local_ref();
-                unauthorized_ids_with_errors.push((
-                    dataset_id,
-                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
-                        dataset_ref,
-                        action,
-                    ),
-                ));
+                authorized_ids.push(dataset_id);
             }
         }
 
