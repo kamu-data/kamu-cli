@@ -653,9 +653,9 @@ impl PasswordHashRepository for PostgresAccountRepository {
         let maybe_password_row = sqlx::query!(
             r#"
             SELECT password_hash
-              FROM accounts_passwords
-              JOIN accounts ON accounts_passwords.account_id = accounts.id
-              WHERE lower(account_name) = lower($1)
+            FROM accounts_passwords
+            JOIN accounts ON accounts_passwords.account_id = accounts.id
+            WHERE lower(account_name) = lower($1)
             "#,
             account_name.as_str(),
         )
