@@ -125,6 +125,9 @@ pub struct DatasetQueryHints {
     /// Pre-resolved dataset handle
     pub handle: Option<odf::DatasetHandle>,
 
+    /// Optional pre-resolved source dataset
+    pub source_dataset: Option<ResolvedDataset>,
+
     /// Number of records that will be considered for this dataset (starting
     /// from latest entries) Setting this value allows engine to limit the
     /// number of part files examined, e.g. if limit is 100 and last data part

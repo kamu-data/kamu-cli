@@ -193,6 +193,7 @@ impl QueryServiceImpl {
                             block_hash: None,
                             hints: DatasetQueryHints {
                                 handle: Some(hdl),
+                                source_dataset: None, // not pre-resolved yet
                                 last_records_to_consider: None,
                                 does_not_need_schema: !needs_schema,
                             },
@@ -269,6 +270,7 @@ impl QueryServiceImpl {
                             block_hash: Some(block_hash),
                             hints: DatasetQueryHints {
                                 handle: Some(hdl),
+                                source_dataset: Some(resolved_dataset),
                                 last_records_to_consider: None,
                                 does_not_need_schema: !needs_schema,
                             },
@@ -314,6 +316,7 @@ impl QueryServiceImpl {
                         block_hash: Some(head.clone()),
                         hints: DatasetQueryHints {
                             handle: Some(resolved_dataset.get_handle().clone()),
+                            source_dataset: Some(resolved_dataset.clone()),
                             last_records_to_consider,
                             does_not_need_schema: false,
                         },
@@ -366,6 +369,7 @@ impl QueryService for QueryServiceImpl {
                         block_hash: None,
                         hints: DatasetQueryHints {
                             handle: Some(hdl),
+                            source_dataset: None, // not pre-resolved yet
                             last_records_to_consider: None,
                             does_not_need_schema: false,
                         },
@@ -486,6 +490,7 @@ impl QueryService for QueryServiceImpl {
                         block_hash: Some(head.clone()),
                         hints: DatasetQueryHints {
                             handle: Some(ds.get_handle().clone()),
+                            source_dataset: Some(ds.clone()),
                             last_records_to_consider: None,
                             does_not_need_schema: false,
                         },
