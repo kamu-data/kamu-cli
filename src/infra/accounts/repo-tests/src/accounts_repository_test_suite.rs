@@ -28,25 +28,44 @@ pub(crate) const GITHUB_ACCOUNT_ID_PETYA: &str = "8875908";
 pub async fn test_missing_account_not_found(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    let maybe_account_id = account_repo
-        .find_account_id_by_email(&Email::parse("test@example.com").unwrap())
-        .await
-        .unwrap();
-    assert!(maybe_account_id.is_none());
-
-    let account_name = odf::AccountName::new_unchecked("wasya");
-    let maybe_account_id = account_repo
-        .find_account_id_by_name(&account_name)
-        .await
-        .unwrap();
-    assert!(maybe_account_id.is_none());
-
     let account_id = odf::AccountID::new_seeded_ed25519(b"wrong");
-    let account_result = account_repo.get_account_by_id(&account_id).await;
-    assert_matches!(account_result, Err(GetAccountByIdError::NotFound(_)));
+    let account_name = odf::AccountName::new_unchecked("wasya");
+    let provider_identity_key = "wasya";
+    let email = Email::parse("test@example.com").unwrap();
 
-    let account_result = account_repo.get_account_by_name(&account_name).await;
-    assert_matches!(account_result, Err(GetAccountByNameError::NotFound(_)));
+    assert_matches!(
+        account_repo.get_account_by_id(&account_id).await,
+        Err(GetAccountByIdError::NotFound(_))
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_ids(&[&account_id]).await,
+        Ok(accounts)
+            if accounts.is_empty()
+    );
+    assert_matches!(
+        account_repo.get_account_by_name(&account_name).await,
+        Err(GetAccountByNameError::NotFound(_))
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_names(&[&account_name]).await,
+        Ok(accounts)
+            if accounts.is_empty()
+    );
+
+    assert_matches!(
+        account_repo
+            .find_account_id_by_provider_identity_key(&provider_identity_key)
+            .await,
+        Ok(None)
+    );
+    assert_matches!(
+        account_repo.find_account_id_by_email(&email).await,
+        Ok(None)
+    );
+    assert_matches!(
+        account_repo.find_account_id_by_name(&account_name).await,
+        Ok(None)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
