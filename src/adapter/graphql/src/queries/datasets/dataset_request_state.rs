@@ -146,6 +146,8 @@ impl DatasetRequestState {
         let archetype = self
             .archetype
             .get_or_try_init::<GqlError, _, _>(async || {
+                tracing::debug!("Resolving archetype for dataset {}", self.dataset_id());
+
                 let dataset = self.resolved_dataset(ctx).await?;
 
                 let archetype = dataset

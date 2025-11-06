@@ -42,6 +42,7 @@ impl Loader<odf::AccountID> for AccountEntityLoader {
     type Value = Account;
     type Error = Arc<InternalError>;
 
+    #[tracing::instrument(level = "debug", skip_all, fields(num_keys = keys.len()))]
     async fn load(
         &self,
         keys: &[odf::AccountID],
@@ -67,6 +68,7 @@ impl Loader<odf::AccountName> for AccountEntityLoader {
     type Value = Account;
     type Error = Arc<InternalError>;
 
+    #[tracing::instrument(level = "debug", skip_all, fields(num_keys = keys.len()))]
     async fn load(
         &self,
         keys: &[odf::AccountName],
@@ -111,6 +113,7 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
     type Value = odf::DatasetHandle;
     type Error = Arc<InternalError>;
 
+    #[tracing::instrument(level = "debug", skip_all, fields(num_keys = keys.len()))]
     async fn load(
         &self,
         keys: &[odf::DatasetRef],
