@@ -1003,8 +1003,8 @@ async fn test_locale_account(
     // 1. Get account(s)
     assert_matches!(
         account_repo.get_account_by_id(&account.id).await,
-        Ok(db_account)
-            if db_account == account,
+        Ok(actual_account)
+            if actual_account == account,
         "Tag: {tag}"
     );
     assert_matches!(
@@ -1016,27 +1016,27 @@ async fn test_locale_account(
     // 1.1. Regular case
     assert_matches!(
         account_repo.get_account_by_name(&account.account_name).await,
-        Ok(db_account)
-            if db_account == account,
+        Ok(actual_account)
+            if actual_account == account,
         "Tag: {tag}"
     );
     assert_matches!(
         account_repo.get_accounts_by_names(&[&account.account_name]).await,
-        Ok(accounts)
-            if accounts == [account.clone()],
+        Ok(actual_accounts)
+            if actual_accounts == [account.clone()],
         "Tag: {tag}"
     );
     // 1.2. Mixed case
     assert_matches!(
         account_repo.get_account_by_name(&mixed_case_account_name).await,
-        Ok(db_account)
-            if db_account == account,
+        Ok(actual_account)
+            if actual_account == account,
         "Tag: {tag}"
     );
     assert_matches!(
         account_repo.get_accounts_by_names(&[&mixed_case_account_name]).await,
-        Ok(accounts)
-            if accounts == [account.clone()],
+        Ok(actual_accounts)
+            if actual_accounts == [account.clone()],
         "Tag: {tag}"
     );
 
