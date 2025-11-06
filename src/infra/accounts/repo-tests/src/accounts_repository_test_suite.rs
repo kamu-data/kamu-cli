@@ -54,7 +54,7 @@ pub async fn test_missing_account_not_found(catalog: &Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_provider_identity_key(&provider_identity_key)
+            .find_account_id_by_provider_identity_key(provider_identity_key)
             .await,
         Ok(None)
     );
@@ -823,6 +823,7 @@ pub async fn test_get_accounts_by_names(catalog: &Catalog) {
     account_repo.save_account(&account_2).await.unwrap();
     account_repo.save_account(&account_3).await.unwrap();
 
+    // Regular case
     let accounts_names = [
         &account_1_not_saved.account_name,
         &account_2.account_name,
@@ -831,6 +832,29 @@ pub async fn test_get_accounts_by_names(catalog: &Catalog) {
     ];
     let found_accounts = account_repo
         .get_accounts_by_names(&accounts_names)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| (a.account_name, a.id))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        [
+            (account_3.account_name.clone(), account_3.id.clone()),
+            (account_2.account_name.clone(), account_2.id.clone()),
+        ],
+        *found_accounts
+    );
+
+    // Mixed case
+    let mixed_accounts_names = [
+        &odf::AccountName::new_unchecked("aCcOuNt_1_nOt_SaVeD"),
+        &odf::AccountName::new_unchecked("PetyA"),
+        &odf::AccountName::new_unchecked("WaSya"),
+        &odf::AccountName::new_unchecked("aCcOuNt_4_nOt_SaVeD"),
+    ];
+    let found_accounts = account_repo
+        .get_accounts_by_names(&mixed_accounts_names)
         .await
         .unwrap()
         .into_iter()
@@ -859,7 +883,7 @@ pub async fn test_all_accounts(catalog: &Catalog) {
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
-    assert_eq!([] as [Account; 0], *accounts);
+    assert_eq!([] as [Account; _], *accounts);
 
     let account_1 = make_test_account(
         "account_1",
@@ -937,8 +961,13 @@ pub async fn test_all_accounts(catalog: &Catalog) {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_locale_account(account_repo: &dyn AccountRepository, account: Account, tag: &str) {
-    // Get account(s)
+async fn test_locale_account(
+    account_repo: &dyn AccountRepository,
+    account: Account,
+    mixed_case_account_name: odf::AccountName,
+    tag: &str,
+) {
+    // 1. Get account(s)
     assert_matches!(
         account_repo.get_account_by_id(&account.id).await,
         Ok(db_account)
@@ -950,8 +979,8 @@ async fn test_locale_account(account_repo: &dyn AccountRepository, account: Acco
         Ok(accounts)
             if accounts == [account.clone()],
         "Tag: {tag}"
-
     );
+    // 1.1. Regular case
     assert_matches!(
         account_repo.get_account_by_name(&account.account_name).await,
         Ok(db_account)
@@ -964,6 +993,7 @@ async fn test_locale_account(account_repo: &dyn AccountRepository, account: Acco
             if accounts == [account.clone()],
         "Tag: {tag}"
     );
+    // 1.2. Mixed case
     assert_matches!(
         account_repo.get_account_by_name(&mixed_case_account_name).await,
         Ok(db_account)
@@ -977,7 +1007,7 @@ async fn test_locale_account(account_repo: &dyn AccountRepository, account: Acco
         "Tag: {tag}"
     );
 
-    // Get account id(s)
+    // 2. Get account id(s)
     assert_matches!(
         account_repo
             .find_account_id_by_provider_identity_key(&account.provider_identity_key)
@@ -992,8 +1022,16 @@ async fn test_locale_account(account_repo: &dyn AccountRepository, account: Acco
             if found_id == account.id,
         "Tag: {tag}"
     );
+    // 2.1. Regular case
     assert_matches!(
         account_repo.find_account_id_by_name(&account.account_name).await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
+    // 2.2. Mixed case
+    assert_matches!(
+        account_repo.find_account_id_by_name(&mixed_case_account_name).await,
         Ok(Some(found_id))
             if found_id == account.id,
         "Tag: {tag}"
