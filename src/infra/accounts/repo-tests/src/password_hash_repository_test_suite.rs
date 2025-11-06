@@ -41,13 +41,13 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
     let account_wasya = make_test_account(
-        "wasya",
+        "wasYA",
         "wasya@example.com",
         AccountProvider::Password.into(),
         "wasya",
     );
     let account_petya = make_test_account(
-        "petya",
+        "petYA",
         "petya@example.com",
         AccountProvider::Password.into(),
         "petya",

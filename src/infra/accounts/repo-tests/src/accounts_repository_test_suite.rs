@@ -77,7 +77,7 @@ pub async fn test_insert_and_locate_password_account(catalog: &Catalog) {
         email: Email::parse("test@example.com").unwrap(),
         display_name: String::from("Wasya Pupkin"),
         ..make_test_account(
-            "wasya",
+            "waSYa",
             "wasya@example.com",
             AccountProvider::Password.into(),
             "wasya",
@@ -106,7 +106,7 @@ pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
         email: Email::parse("test@example.com").unwrap(),
         display_name: String::from("Wasya Pupkin"),
         ..make_test_account(
-            "wasya",
+            "wAsyA",
             "wasya@example.com",
             AccountProvider::OAuthGitHub.into(),
             GITHUB_ACCOUNT_ID,
@@ -429,16 +429,21 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
         accounts.into_iter().map(|a| a.account_name).collect()
     }
 
+    const USER_1: &str = "uSer1";
+    const USER_2: &str = "usEr2";
+    const USER_3: &str = "useR3";
+    const ADMIN_1: &str = "adMin1";
+
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     use SearchAccountsByNamePatternFilters as Filters;
     use odf::metadata::testing::{account_id, account_name as name};
 
     let accounts = [
-        account("user1", "alice (deactivated)", "alice@example.com"),
-        account("user2", "alice", "alice-new@example.com"),
-        account("user3", "bob", "bob@example.com"),
-        account("admin1", "admin", "admin@example.com"),
+        account(USER_1, "alice (deactivated)", "alice@example.com"),
+        account(USER_2, "alice", "alice-new@example.com"),
+        account(USER_3, "bob", "bob@example.com"),
+        account(ADMIN_1, "admin", "admin@example.com"),
     ];
 
     for account in accounts {
@@ -450,34 +455,34 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     // All
     assert_eq!(
         [
-            name(&"admin1"),
-            name(&"user1"),
-            name(&"user2"),
-            name(&"user3"),
+            name(&"adMin1"),
+            name(&"uSer1"),
+            name(&"usEr2"),
+            name(&"useR3"),
         ],
         *search(&account_repo, "", Filters::default()).await
     );
 
     // Search by account name
     assert_eq!(
-        [name(&"user1"), name(&"user2"), name(&"user3")],
+        [name(&"uSer1"), name(&"usEr2"), name(&"useR3")],
         *search(&account_repo, "uS", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user1"), name(&"user2"), name(&"user3")],
+        [name(&"uSer1"), name(&"usEr2"), name(&"useR3")],
         *search(&account_repo, "sE", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user1")],
+        [name(&"uSer1")],
         *search(&account_repo, "r1", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user2")],
+        [name(&"usEr2")],
         *search(
             &account_repo,
             "user",
             Filters {
-                exclude_accounts_by_ids: vec![account_id(&"user1"), account_id(&"user3")]
+                exclude_accounts_by_ids: vec![account_id(&"uSer1"), account_id(&"useR3")]
             }
         )
         .await
@@ -485,11 +490,11 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
 
     // Search by display name
     assert_eq!(
-        [name(&"user1"), name(&"user2")],
+        [name(&"uSer1"), name(&"usEr2")],
         *search(&account_repo, "ali", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user3")],
+        [name(&"useR3")],
         *search(&account_repo, "ob", Filters::default()).await
     );
     assert_eq!(
@@ -498,7 +503,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
             &account_repo,
             "ob",
             Filters {
-                exclude_accounts_by_ids: vec![account_id(&"user3")]
+                exclude_accounts_by_ids: vec![account_id(&"useR3")]
             }
         )
         .await
