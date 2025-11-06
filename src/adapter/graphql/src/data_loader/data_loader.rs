@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::Future;
 use std::sync::Arc;
 
 use async_graphql::dataloader::DataLoader;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::AccountService;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use tracing::Instrument;
 
 use crate::data_loader::{AccountEntityLoader, DatasetHandleLoader};
 
@@ -23,10 +25,22 @@ pub type DatasetHandleDataLoader = DataLoader<DatasetHandleLoader>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Spawner that propagates tracing context to spawned tasks
+fn tracing_spawn<F>(f: F) -> tokio::task::JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    let span = tracing::Span::current();
+    tokio::spawn(async move { f.instrument(span).await })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn account_entity_data_loader(catalog: &dill::Catalog) -> AccountEntityDataLoader {
     let account_service = catalog.get_one::<dyn AccountService>().unwrap();
 
-    DataLoader::new(AccountEntityLoader::new(account_service), tokio::spawn)
+    DataLoader::new(AccountEntityLoader::new(account_service), tracing_spawn)
 }
 
 pub fn dataset_handle_data_loader(catalog: &dill::Catalog) -> DatasetHandleDataLoader {
@@ -35,7 +49,7 @@ pub fn dataset_handle_data_loader(catalog: &dill::Catalog) -> DatasetHandleDataL
 
     DataLoader::new(
         DatasetHandleLoader::new(rebac_dataset_registry_facade),
-        tokio::spawn,
+        tracing_spawn,
     )
 }
 

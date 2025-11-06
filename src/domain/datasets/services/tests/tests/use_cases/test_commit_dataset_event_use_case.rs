@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::MockDidGenerator;
+use kamu_core::auth::DatasetAction;
 use kamu_datasets::CommitDatasetEventUseCase;
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
@@ -124,7 +126,11 @@ async fn test_commit_event_with_same_dependencies() {
 
     let mock_authorizer = MockDatasetActionAuthorizer::new()
         .expect_check_write_dataset(&dataset_id_bar, 1, true)
-        .expect_check_read_dataset(&dataset_id_foo, 1, true);
+        .make_expect_classify_datasets_by_allowance(
+            DatasetAction::Read,
+            1,
+            HashSet::from([alias_foo.clone()]),
+        );
 
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_authorizer,

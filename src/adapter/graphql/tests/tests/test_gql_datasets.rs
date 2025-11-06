@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use bon::bon;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
@@ -979,22 +981,25 @@ async fn test_dataset_view_permissions(
     allowed_actions: &[DatasetAction],
     expected_permission: async_graphql::Value,
 ) {
+    let dataset_name = odf::DatasetName::new_unchecked("foo");
+    let dataset_alias = odf::DatasetAlias::new(None, dataset_name.clone());
+
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::SingleTenant)
         .mock_dataset_action_authorizer(
             MockDatasetActionAuthorizer::new()
-                .expect_check_read_a_dataset(1, true)
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Read,
+                    1,
+                    HashSet::from([dataset_alias]),
+                )
                 .make_expect_get_allowed_actions(allowed_actions, 1),
         )
         .build()
         .await;
 
     let foo_result = harness
-        .create_root_dataset(
-            None,
-            odf::DatasetName::new_unchecked("foo"),
-            odf::DatasetVisibility::Public,
-        )
+        .create_root_dataset(None, dataset_name, odf::DatasetVisibility::Public)
         .await;
 
     let request_code = indoc!(
