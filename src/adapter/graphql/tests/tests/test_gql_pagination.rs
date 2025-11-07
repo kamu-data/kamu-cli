@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema, value};
+use graphql_macros::page_based_connection;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -266,6 +267,6 @@ impl Item {
     }
 }
 
-kamu_adapter_graphql::page_based_connection!(Item, ItemConnection, ItemEdge);
+page_based_connection!(Item, ItemConnection, ItemEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,32 @@
+[package]
+name = "graphql-macros"
+description = "Macros for working with GQL"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+
+
+[dependencies]
+async-graphql = { version = "7", default-features = false }
+
+
+[dev-dependencies]

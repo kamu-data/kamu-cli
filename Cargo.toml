@@ -14,6 +14,7 @@ members = [
     "src/utils/event-sourcing-macros",
     "src/utils/file-utils",
     "src/utils/graphql-http",
+    "src/utils/graphql-macros",
     "src/utils/http-common",
     "src/utils/init-on-startup",
     "src/utils/internal-error",
@@ -151,6 +152,7 @@ event-sourcing = { version = "0.251.0", path = "src/utils/event-sourcing", defau
 event-sourcing-macros = { version = "0.251.0", path = "src/utils/event-sourcing-macros", default-features = false }
 file-utils = { version = "0.251.0", path = "src/utils/file-utils", default-features = false }
 graphql-http = { version = "0.251.0", path = "src/utils/graphql-http", default-features = false }
+graphql-macros = { version = "0.251.0", path = "src/utils/graphql-macros", default-features = false }
 http-common = { version = "0.251.0", path = "src/utils/http-common", default-features = false }
 init-on-startup = { version = "0.251.0", path = "src/utils/init-on-startup", default-features = false }
 internal-error = { version = "0.251.0", path = "src/utils/internal-error", default-features = false }
