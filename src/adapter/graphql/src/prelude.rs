@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub(crate) use async_graphql::*;
+pub(crate) use graphql_macros::{page_based_connection, page_based_stream_connection};
 pub(crate) use internal_error::*;
 
 pub(crate) use crate::data_loader::data_loader_error_mapper;

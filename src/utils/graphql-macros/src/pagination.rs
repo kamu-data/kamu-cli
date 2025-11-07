@@ -7,13 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::prelude::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Page-based finite connection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Public only for tests
 #[macro_export]
 macro_rules! page_based_connection {
     ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
@@ -27,7 +24,7 @@ macro_rules! page_based_connection {
             pub total_count: usize,
 
             /// Page information
-            pub page_info: $crate::scalars::PageBasedInfo,
+            pub page_info: $crate::PageBasedInfo,
         }
 
         #[async_graphql::ComplexObject]
@@ -56,7 +53,7 @@ macro_rules! page_based_connection {
                 Self {
                     nodes,
                     total_count,
-                    page_info: $crate::scalars::PageBasedInfo {
+                    page_info: $crate::PageBasedInfo {
                         has_previous_page: current_page > 0,
                         has_next_page,
                         current_page,
@@ -77,13 +74,10 @@ macro_rules! page_based_connection {
     };
 }
 
-pub(crate) use page_based_connection;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Page-based stream connection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Public only for tests
 #[macro_export]
 macro_rules! page_based_stream_connection {
     ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
@@ -94,7 +88,7 @@ macro_rules! page_based_stream_connection {
             pub nodes: Vec<$node_type>,
 
             /// Page information
-            pub page_info: $crate::scalars::PageBasedInfo,
+            pub page_info: $crate::PageBasedInfo,
         }
 
         #[async_graphql::ComplexObject]
@@ -106,7 +100,7 @@ macro_rules! page_based_stream_connection {
 
                 Self {
                     nodes,
-                    page_info: $crate::scalars::PageBasedInfo {
+                    page_info: $crate::PageBasedInfo {
                         has_previous_page: current_page > 0,
                         has_next_page,
                         current_page,
@@ -127,11 +121,9 @@ macro_rules! page_based_stream_connection {
     };
 }
 
-pub(crate) use page_based_stream_connection;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject)]
+#[derive(async_graphql::SimpleObject)]
 pub struct PageBasedInfo {
     /// When paginating backwards, are there more items?
     pub has_previous_page: bool,
