@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following order:
 - SQL: Added DataFusion `to_table()` UDTF that projects data from ledger datasets (#1428).
 ### Changed
 - GQL: Optimization: apply DataLoader to solve N+1 problem for federation entity resolvers (#1410).
+- Refactor: `graphql-macros` extracted as a utility crate (#1443).
 
 ## [Molecule-specific]
 ### Added
