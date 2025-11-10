@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Dataset statistics is now processed transactionaly and correctly appear after pulling dataset
+
 ## [0.252.3] - 2025-11-10
 ### Changed
 - Refactor: replaced `delete_account_by_name()` with `delete_account_by_id()` across repositories and services (#1442).
