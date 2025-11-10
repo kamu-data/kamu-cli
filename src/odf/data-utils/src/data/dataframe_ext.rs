@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use arrow::array::{Array, ArrowPrimitiveType, AsArray, RecordBatch};
+use arrow_schema::Field;
 use datafusion::catalog::TableProvider;
 use datafusion::common::DFSchema;
 use datafusion::config::{CsvOptions, JsonOptions, TableParquetOptions};
@@ -178,6 +179,28 @@ impl DataFrameExt {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataFrameExt {
+    /// Arrow and Datafusion have poor nullability control as nullability is
+    /// part of the schema and not of the data type. This function adds a
+    /// runtime operator to ensure that specified column does not contain nulls
+    /// and casts the result into a non-nullable field.
+    pub fn assert_collumns_not_null(self, selector: impl Fn(&Field) -> bool) -> Result<Self> {
+        let mut select = Vec::new();
+        for i in 0..self.schema().fields().len() {
+            let (relation, field) = self.schema().qualified_field(i);
+            let col = Expr::Column(Column::from((relation, field)));
+
+            let expr = if !selector(field) {
+                col
+            } else {
+                col.cast_nullability(false).alias(field.name())
+            };
+
+            select.push(expr);
+        }
+        self.select(select)
+    }
+
+    /// Brings specified columns to the beginning of the dataframe's field order
     pub fn columns_to_front(self, front_cols: &[&str]) -> Result<Self> {
         let mut columns: Vec<_> = front_cols.iter().map(|s| col(*s)).collect();
 
@@ -281,6 +304,22 @@ impl DataFrameExt {
 impl std::fmt::Debug for DataFrameExt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ExprExt {
+    fn cast_nullability(self, nullable: bool) -> Expr;
+}
+
+impl ExprExt for Expr {
+    fn cast_nullability(self, nullable: bool) -> Expr {
+        if nullable {
+            return self;
+        }
+
+        crate::data::udf::assert_not_null().call(vec![self])
     }
 }
 

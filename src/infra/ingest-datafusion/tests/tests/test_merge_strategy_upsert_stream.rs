@@ -15,8 +15,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
 use odf::utils::data::DataFrameExt;
-
-use crate::utils::*;
+use odf::utils::testing;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +30,8 @@ where
 {
     let schema = Arc::new(Schema::new(vec![
         Field::new("op", DataType::Int32, false),
-        Field::new("year", DataType::Int32, false),
+        // Nullable because event time column has special semantics in merge strategies
+        Field::new("year", DataType::Int32, true),
         Field::new("city", DataType::Utf8, false),
         Field::new("population", DataType::Int64, false),
     ]));
@@ -75,7 +75,7 @@ where
         // TODO: Replace with UInt8 after Spark is updated
         // See: https://github.com/kamu-data/kamu-cli/issues/445
         Field::new("op", DataType::Int32, false),
-        Field::new("year", DataType::Int32, false),
+        Field::new("year", DataType::Int32, true),
         Field::new("city", DataType::Utf8, false),
         Field::new("population", DataType::Int64, false),
     ]));
@@ -146,7 +146,7 @@ where
     // Sort events according to the strategy
     let actual = actual.sort(strat.sort_order()).unwrap();
 
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

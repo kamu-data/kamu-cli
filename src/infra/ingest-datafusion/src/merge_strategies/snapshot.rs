@@ -223,6 +223,19 @@ impl MergeStrategySnapshot {
         old: DataFrameExt,
         new: DataFrameExt,
     ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
+        // NOTE: We use `old` schema as presumably it will be read according to
+        // canonical schema of the whole dataset and will represent the expected
+        // nullability, while `new` schema may be inferred and needs only to be
+        // coercible into `old`.
+        let non_null_columns: std::collections::HashSet<String> = old
+            .schema()
+            .fields()
+            .iter()
+            .filter(|f| !f.is_nullable())
+            .filter(|f| *f.name() != self.vocab.event_time_column)
+            .map(|f| f.name().clone())
+            .collect();
+
         // TODO: Schema evolution
         let a_old = TableReference::bare("old");
         let a_new = TableReference::bare("new");
@@ -301,7 +314,12 @@ impl MergeStrategySnapshot {
 
         // Note: Final sorting will be done by the caller using `sort_order()`
         // expression.
-        Ok(DataFrame::new(session_state, plan).into())
+        let df: DataFrameExt = DataFrame::new(session_state, plan).into();
+
+        // Perform nullability correction, as all columns become nullable after join
+        let df = df.assert_collumns_not_null(|f| non_null_columns.contains(f.name()))?;
+
+        Ok(df)
     }
 }
 

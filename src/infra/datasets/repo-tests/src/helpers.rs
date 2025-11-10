@@ -77,7 +77,8 @@ pub(crate) fn new_dataset_entry_with(
 }
 
 pub(crate) fn new_dataset_entry(owner: &Account, dataset_kind: odf::DatasetKind) -> DatasetEntry {
-    new_dataset_entry_with(owner, "dataset", dataset_kind)
+    // NOTE: Dataset name mixed case here is intentional
+    new_dataset_entry_with(owner, "daTAseT", dataset_kind)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

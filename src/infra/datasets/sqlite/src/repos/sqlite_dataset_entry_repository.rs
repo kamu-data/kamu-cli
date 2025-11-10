@@ -205,7 +205,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
     async fn get_dataset_entry_by_owner_and_name(
         &self,
         owner_id: &odf::AccountID,
-        name: &odf::DatasetName,
+        dataset_name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
         let mut tr = self.transaction.lock().await;
 
@@ -215,7 +215,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let stack_owner_id = owner_id.as_stack_string();
         let owner_id_as_str = stack_owner_id.as_str();
-        let dataset_name_as_str = name.as_str();
+        let dataset_name_as_str = dataset_name.as_str();
 
         let maybe_dataset_entry_row = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -228,7 +228,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                    kind         as "kind: _"
             FROM dataset_entries
             WHERE owner_id = $1
-              AND dataset_name = $2
+              AND lower(dataset_name) = lower($2)
             "#,
             owner_id_as_str,
             dataset_name_as_str
@@ -240,7 +240,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         if let Some(dataset_entry_row) = maybe_dataset_entry_row {
             Ok(dataset_entry_row.into())
         } else {
-            Err(DatasetEntryByNameNotFoundError::new(owner_id.clone(), name.clone()).into())
+            Err(DatasetEntryByNameNotFoundError::new(owner_id.clone(), dataset_name.clone()).into())
         }
     }
 
@@ -256,8 +256,21 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+        let mut query_builder = sqlx::QueryBuilder::<_>::new(
             r#"
+            WITH input_arguments(input_owner_id, input_dataset_name) AS (
+            "#,
+        );
+        query_builder.push_values(
+            owner_id_dataset_name_pairs,
+            |mut b, (owner_id, dataset_name)| {
+                b.push_bind(owner_id.to_string());
+                b.push_bind(dataset_name.as_str());
+            },
+        );
+        query_builder.push(
+            r#"
+            )
             SELECT dataset_id   as id,
                    owner_id,
                    owner_name,
@@ -265,17 +278,11 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                    created_at,
                    kind
             FROM dataset_entries
-            WHERE (owner_id, dataset_name) IN
+            WHERE (owner_id, lower(dataset_name)) IN (SELECT input_owner_id, lower(input_dataset_name)
+                                                      FROM input_arguments)
+            ORDER BY owner_name, dataset_name
             "#,
         );
-        query_builder.push_tuples(
-            owner_id_dataset_name_pairs,
-            |mut b, (owner_id, dataset_name)| {
-                b.push_bind(owner_id.to_string());
-                b.push_bind(dataset_name.as_str());
-            },
-        );
-        query_builder.push("ORDER BY owner_name, dataset_name");
 
         let model_rows = query_builder
             .build_query_as::<DatasetEntryRowModel>()
@@ -374,7 +381,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 let sqlite_error_message = e.message();
                 tracing::error!(sqlite_error_message);
 
-                if sqlite_error_message.contains("dataset_entries.dataset_name") {
+                if sqlite_error_message.contains("idx_dataset_entries_owner_id_dataset_name") {
                     DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into()
                 } else {
                     SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into()
@@ -402,8 +409,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let update_result = sqlx::query!(
             r#"
             UPDATE dataset_entries
-                SET dataset_name = $1
-                WHERE dataset_id = $2
+            SET dataset_name = $1
+            WHERE dataset_id = $2
             "#,
             new_dataset_name_as_str,
             dataset_id_as_str,
@@ -441,8 +448,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         sqlx::query!(
             r#"
             UPDATE dataset_entries
-                SET owner_name = $1
-                WHERE owner_id = $2
+            SET owner_name = $1
+            WHERE owner_id = $2
             "#,
             new_owner_name_as_str,
             stack_owner_id_as_str,
@@ -467,7 +474,9 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             let dataset_id_as_str = stack_dataset_id.as_str();
             let delete_result = sqlx::query!(
                 r#"
-                DELETE FROM dataset_entries WHERE dataset_id = $1
+                DELETE
+                FROM dataset_entries
+                WHERE dataset_id = $1
                 "#,
                 dataset_id_as_str,
             )

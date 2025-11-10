@@ -199,13 +199,10 @@ impl AccountService for AccountServiceImpl {
         Ok(new_account)
     }
 
-    async fn delete_account_by_name(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), InternalError> {
-        use DeleteAccountByNameError as E;
+    async fn delete_account_by_id(&self, account_id: &odf::AccountID) -> Result<(), InternalError> {
+        use DeleteAccountByIdError as E;
 
-        match self.account_repo.delete_account_by_name(account_name).await {
+        match self.account_repo.delete_account_by_id(account_id).await {
             Ok(_) | Err(E::NotFound(_)) => Ok(()),
             Err(e @ E::Internal(_)) => Err(e.int_err()),
         }

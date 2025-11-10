@@ -25,11 +25,13 @@ pub async fn test_no_password_stored(catalog: &Catalog) {
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
     let account_name = odf::AccountName::new_unchecked("I don't exist");
-    let result = password_hash_repo
-        .find_password_hash_by_account_name(&account_name)
-        .await
-        .unwrap();
-    assert!(result.is_none());
+
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&account_name)
+            .await,
+        Ok(None)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,20 +41,20 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
     let account_wasya = make_test_account(
-        "wasya",
+        "wasYA",
         "wasya@example.com",
         AccountProvider::Password.into(),
         "wasya",
     );
     let account_petya = make_test_account(
-        "petya",
+        "petYA",
         "petya@example.com",
         AccountProvider::Password.into(),
         "petya",
     );
 
-    account_repo.save_account(&account_wasya).await.unwrap();
-    account_repo.save_account(&account_petya).await.unwrap();
+    assert_matches!(account_repo.save_account(&account_wasya).await, Ok(_));
+    assert_matches!(account_repo.save_account(&account_petya).await, Ok(_));
 
     const PASSWORD_WASYA: &str = "password_wasya";
     const PASSWORD_PETYA: &str = "password_petya";
@@ -63,33 +65,50 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let hash_wasya = make_password_hash(PASSWORD_WASYA, &salt_wasya);
     let hash_petya = make_password_hash(PASSWORD_PETYA, &salt_petya);
 
-    password_hash_repo
-        .save_password_hash(&account_wasya.id, hash_wasya.to_string())
-        .await
-        .unwrap();
+    assert_matches!(
+        password_hash_repo
+            .save_password_hash(&account_wasya.id, hash_wasya.to_string())
+            .await,
+        Ok(_)
+    );
+    assert_matches!(
+        password_hash_repo
+            .save_password_hash(&account_petya.id, hash_petya.to_string())
+            .await,
+        Ok(_)
+    );
 
-    password_hash_repo
-        .save_password_hash(&account_petya.id, hash_petya.to_string())
-        .await
-        .unwrap();
+    // Regular case.
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&account_wasya.account_name)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_wasya.to_string()
+    );
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&account_petya.account_name)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_petya.to_string()
+    );
 
-    let result = password_hash_repo
-        .find_password_hash_by_account_name(&account_wasya.account_name)
-        .await
-        .unwrap();
-    assert!(result.is_some_and(|hash| {
-        assert_eq!(hash, hash_wasya.to_string());
-        true
-    }));
-
-    let result = password_hash_repo
-        .find_password_hash_by_account_name(&account_petya.account_name)
-        .await
-        .unwrap();
-    assert!(result.is_some_and(|hash| {
-        assert_eq!(hash, hash_petya.to_string());
-        true
-    }));
+    // Mixed case.
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&odf::AccountName::new_unchecked("waSya"))
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_wasya.to_string()
+    );
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&odf::AccountName::new_unchecked("PetyA"))
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_petya.to_string()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,43 +124,54 @@ pub async fn test_modify_password(catalog: &Catalog) {
         "petya",
     );
 
-    account_repo.save_account(&account_petya).await.unwrap();
+    assert_matches!(account_repo.save_account(&account_petya).await, Ok(_));
 
     let password_petya = "password_petya";
     let salt = generate_salt();
     let hash_petya = make_password_hash(password_petya, &salt);
 
-    password_hash_repo
-        .save_password_hash(&account_petya.id, hash_petya.to_string())
-        .await
-        .unwrap();
+    assert_matches!(
+        password_hash_repo
+            .save_password_hash(&account_petya.id, hash_petya.to_string())
+            .await,
+        Ok(_)
+    );
 
-    let result = password_hash_repo
-        .find_password_hash_by_account_name(&account_petya.account_name)
-        .await
-        .unwrap();
-    assert!(result.is_some_and(|hash| {
-        assert_eq!(hash, hash_petya.to_string());
-        true
-    }));
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&account_petya.account_name)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_petya.to_string()
+    );
 
     let password_petya = "new_password_petya";
     let salt = generate_salt();
-    let hash_petya = make_password_hash(password_petya, &salt);
+    let new_hash_petya = make_password_hash(password_petya, &salt);
 
-    password_hash_repo
-        .modify_password_hash(&account_petya.id, hash_petya.to_string())
-        .await
-        .unwrap();
+    assert_matches!(
+        password_hash_repo
+            .modify_password_hash(&account_petya.id, new_hash_petya.to_string())
+            .await,
+        Ok(_)
+    );
 
-    let result = password_hash_repo
-        .find_password_hash_by_account_name(&account_petya.account_name)
-        .await
-        .unwrap();
-    assert!(result.is_some_and(|hash| {
-        assert_eq!(hash, hash_petya.to_string());
-        true
-    }));
+    // Regular case.
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&account_petya.account_name)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == new_hash_petya.to_string()
+    );
+    // Mixed case.
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_name(&odf::AccountName::new_unchecked("PetyA"))
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == new_hash_petya.to_string()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

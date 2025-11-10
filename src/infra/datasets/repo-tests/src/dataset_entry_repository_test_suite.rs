@@ -7,11 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::borrow::Cow;
 
 use database_common::PaginationOpts;
-use dill::Catalog;
 use kamu_accounts::{Account, AccountRepository};
 use kamu_datasets::{
     DatasetEntriesResolution,
@@ -25,12 +23,13 @@ use kamu_datasets::{
     SaveDatasetEntryError,
     UpdateDatasetEntryNameError,
 };
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_dataset_entry(catalog: &Catalog) {
+pub async fn test_get_dataset_entry(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -78,7 +77,7 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_stream_many_entries(catalog: &Catalog) {
+pub async fn test_stream_many_entries(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -161,7 +160,7 @@ pub async fn test_stream_many_entries(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_multiple_entries(catalog: &Catalog) {
+pub async fn test_get_multiple_entries(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -274,49 +273,57 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_dataset_entry_by_name(catalog: &Catalog) {
+pub async fn test_get_dataset_entry_by_name(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
     let account = new_account(&account_repo).await;
+    let not_saved_dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
 
-    let dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
-    {
-        let get_res = dataset_entry_repo
+    // Not saved.
+    assert_matches!(
+        dataset_entry_repo
+            .get_dataset_entry_by_owner_and_name(&not_saved_dataset_entry.owner_id, &not_saved_dataset_entry.name)
+            .await,
+        Err(GetDatasetEntryByNameError::NotFound(DatasetEntryByNameNotFoundError {
+            owner_id: actual_owner_id,
+            dataset_name: actual_dataset_name
+        }))
+            if actual_owner_id == not_saved_dataset_entry.owner_id
+                && actual_dataset_name == not_saved_dataset_entry.name
+    );
+
+    let dataset_entry = not_saved_dataset_entry;
+
+    assert_matches!(
+        dataset_entry_repo.save_dataset_entry(&dataset_entry).await,
+        Ok(_)
+    );
+
+    // Regular case.
+    assert_matches!(
+        dataset_entry_repo
             .get_dataset_entry_by_owner_and_name(&dataset_entry.owner_id, &dataset_entry.name)
-            .await;
-
-        assert_matches!(
-            get_res,
-            Err(GetDatasetEntryByNameError::NotFound(DatasetEntryByNameNotFoundError {
-                owner_id: actual_owner_id,
-                dataset_name: actual_dataset_name
-            }))
-                if actual_owner_id == dataset_entry.owner_id
-                    && actual_dataset_name == dataset_entry.name
-        );
-    }
-    {
-        let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
-
-        assert_matches!(save_res, Ok(_));
-    }
-    {
-        let get_res = dataset_entry_repo
-            .get_dataset_entry_by_owner_and_name(&dataset_entry.owner_id, &dataset_entry.name)
-            .await;
-
-        assert_matches!(
-            get_res,
-            Ok(actual_dataset_entry)
-                if actual_dataset_entry == dataset_entry
-        );
-    }
+            .await,
+        Ok(actual_dataset_entry)
+            if actual_dataset_entry == dataset_entry
+    );
+    // Mixed case.
+    assert_matches!(
+        dataset_entry_repo
+            .get_dataset_entry_by_owner_and_name(
+                &dataset_entry.owner_id,
+                &odf::DatasetName::new_unchecked("dAtAsEt"),
+            )
+            .await,
+        Ok(actual_dataset_entry)
+            if actual_dataset_entry == dataset_entry
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &Catalog) {
+pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -326,7 +333,7 @@ pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &Catalog) {
             .await
             .unwrap();
 
-        assert_eq!([] as [DatasetEntry; 0], *found_entries);
+        assert_eq!([] as [DatasetEntry; _], *found_entries);
     }
 
     let account_1 = new_account_with_name(&account_repo, "account_1").await;
@@ -339,29 +346,27 @@ pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &Catalog) {
     let account_2_dataset_3 =
         new_dataset_entry_with(&account_2, "dataset3", odf::DatasetKind::Root);
 
-    {
-        let save_res = dataset_entry_repo
+    assert_matches!(
+        dataset_entry_repo
             .save_dataset_entry(&account_1_dataset_1)
-            .await;
-
-        assert_matches!(save_res, Ok(_));
-    }
-    {
-        let save_res = dataset_entry_repo
+            .await,
+        Ok(_)
+    );
+    assert_matches!(
+        dataset_entry_repo
             .save_dataset_entry(&account_1_dataset_2)
-            .await;
-
-        assert_matches!(save_res, Ok(_));
-    }
-    {
-        let save_res = dataset_entry_repo
+            .await,
+        Ok(_)
+    );
+    assert_matches!(
+        dataset_entry_repo
             .save_dataset_entry(&account_2_dataset_3)
-            .await;
-
-        assert_matches!(save_res, Ok(_));
-    }
+            .await,
+        Ok(_)
+    );
 
     {
+        // Regular case.
         let found_entries = dataset_entry_repo
             .get_dataset_entries_by_owner_and_name(&[
                 &(account_1.id.clone(), account_1_dataset_1.name.clone()),
@@ -383,15 +388,71 @@ pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &Catalog) {
             ],
             *found_entries_for_eq
         );
+        // Mixed case.
+        let found_entries = dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(&[
+                &(
+                    account_1.id.clone(),
+                    odf::DatasetName::new_unchecked("dAtAsEt1"),
+                ),
+                &(
+                    account_1.id.clone(),
+                    odf::DatasetName::new_unchecked("dAtAsEt2"),
+                ),
+                &(
+                    account_2.id.clone(),
+                    odf::DatasetName::new_unchecked("dAtAsEt3"),
+                ),
+            ])
+            .await
+            .unwrap();
+        let found_entries_for_eq = found_entries
+            .iter()
+            .map(|e| (e.owner_name.as_str(), e.name.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            [
+                ("account_1", "dataset1"),
+                ("account_1", "dataset2"),
+                ("account_2", "dataset3")
+            ],
+            *found_entries_for_eq
+        );
     }
 
     {
         let not_found_account_id = odf::AccountID::new_seeded_ed25519(b"not-found-account-id");
 
+        // Regular case.
         let found_entries = dataset_entry_repo
             .get_dataset_entries_by_owner_and_name(&[
-                &(not_found_account_id, account_1_dataset_1.name.clone()),
+                &(
+                    not_found_account_id.clone(),
+                    account_1_dataset_1.name.clone(),
+                ),
                 &(account_1.id.clone(), account_1_dataset_2.name.clone()),
+            ])
+            .await
+            .unwrap();
+        let found_entries_for_eq = found_entries
+            .iter()
+            .map(|e| (e.owner_name.as_str(), e.name.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!([("account_1", "dataset2")], *found_entries_for_eq);
+
+        // Mixed case.
+        let found_entries = dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(&[
+                &(
+                    not_found_account_id,
+                    odf::DatasetName::new_unchecked("dAtAsEt1"),
+                ),
+                &(
+                    account_1.id.clone(),
+                    odf::DatasetName::new_unchecked("dAtAsEt2"),
+                ),
             ])
             .await
             .unwrap();
@@ -406,9 +467,28 @@ pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &Catalog) {
     {
         let not_found_dataset_name = odf::DatasetName::new_unchecked("not-found-dataset-name");
 
+        // Regular case.
         let found_entries = dataset_entry_repo
             .get_dataset_entries_by_owner_and_name(&[
                 &(account_1.id.clone(), account_1_dataset_1.name.clone()),
+                &(account_1.id.clone(), not_found_dataset_name.clone()),
+            ])
+            .await
+            .unwrap();
+        let found_entries_for_eq = found_entries
+            .iter()
+            .map(|e| (e.owner_name.as_str(), e.name.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!([("account_1", "dataset1")], *found_entries_for_eq);
+
+        // Mixed case.
+        let found_entries = dataset_entry_repo
+            .get_dataset_entries_by_owner_and_name(&[
+                &(
+                    account_1.id.clone(),
+                    odf::DatasetName::new_unchecked("dAtAsEt1"),
+                ),
                 &(account_1.id.clone(), not_found_dataset_name),
             ])
             .await
@@ -424,7 +504,7 @@ pub async fn test_get_dataset_entries_by_owner_and_name(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
+pub async fn test_get_dataset_entries_by_owner_id(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -588,7 +668,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
+pub async fn test_try_save_duplicate_dataset_entry(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -616,7 +696,7 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_try_save_dataset_entry_with_name_collision(catalog: &Catalog) {
+pub async fn test_try_save_dataset_entry_with_name_collision(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -649,7 +729,9 @@ pub async fn test_try_save_dataset_entry_with_name_collision(catalog: &Catalog) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(catalog: &Catalog) {
+pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(
+    catalog: &dill::Catalog,
+) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -711,7 +793,7 @@ pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(cata
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
+pub async fn test_update_dataset_entry_name(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -756,7 +838,7 @@ pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_owner_of_entries_renamed(catalog: &Catalog) {
+pub async fn test_owner_of_entries_renamed(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 
@@ -819,7 +901,7 @@ pub async fn test_owner_of_entries_renamed(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_delete_dataset_entry(catalog: &Catalog) {
+pub async fn test_delete_dataset_entry(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
 

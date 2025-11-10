@@ -35,7 +35,7 @@ impl Collection<'_> {
             odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
 
         let schema = odf::schema::DataSchema::builder()
-            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default())
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
                 odf::schema::DataField::string("path").description(
                     "HTTP-like path to a collection entry. Paths start with `/` and can be \

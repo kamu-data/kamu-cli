@@ -914,8 +914,24 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
         // Check system column types and names
         let vocab = self.vocab.clone().unwrap_or_default();
 
+        // Since event time column can have different types - source it from the
+        // previous or new schema
+        let event_time_type = if let Some(prev_schema) = &self.prev_schema {
+            // TODO: Avoid cloning
+            prev_schema
+                .clone()
+                .upgrade()
+                .schema
+                .field_by_name(&vocab.event_time_column)
+                .map(|f| f.r#type.clone())
+        } else {
+            new_schema
+                .field_by_name(&vocab.event_time_column)
+                .map(|f| f.r#type.clone())
+        };
+
         let expected_system_columns = DataSchema::builder()
-            .with_changelog_system_fields(vocab)
+            .with_changelog_system_fields(vocab, event_time_type)
             .build()
             .unwrap();
 

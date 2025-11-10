@@ -10,7 +10,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::*;
@@ -39,20 +39,6 @@ pub struct LoginPasswordAuthProvider {
     account_service: Arc<dyn AccountService>,
 }
 
-impl LoginPasswordAuthProvider {
-    // TODO: Remove this method during refactoring:
-    //       https://github.com/kamu-data/kamu-cli/issues/1270
-    pub async fn save_password(
-        &self,
-        account: &Account,
-        password: &Password,
-    ) -> Result<(), InternalError> {
-        self.account_service
-            .save_account_password(account, password)
-            .await
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -72,7 +58,10 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
 
         // Extract account name and password
         let account_name =
-            odf::AccountName::from_str(&password_login_credentials.login).int_err()?;
+            odf::AccountName::from_str(&password_login_credentials.login).map_err(|err| {
+                tracing::error!(%password_login_credentials.login, %err, "Failed to parse login");
+                ProviderLoginError::InvalidCredentials(InvalidCredentialsError::new(Box::new(err)))
+            })?;
         let password = Password::try_new(password_login_credentials.password).map_err(|e| {
             tracing::debug!(%account_name, %e, "Failed to instantiate a password");
             ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})

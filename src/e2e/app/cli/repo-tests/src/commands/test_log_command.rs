@@ -127,7 +127,7 @@ pub async fn test_log_command(kamu: KamuCliPuppet) {
                         DataField::i64("offset"),
                         DataField::i32("op"),
                         DataField::timestamp_millis_utc("system_time"),
-                        DataField::timestamp_millis_utc("match_time").optional(),
+                        DataField::timestamp_millis_utc("match_time"),
                         DataField::i64("match_id").optional(),
                         DataField::string("player_id").optional(),
                         DataField::i64("score").optional(),
@@ -154,7 +154,7 @@ pub async fn test_log_command(kamu: KamuCliPuppet) {
                 odf::metadata::OffsetInterval { start: 0, end: 1 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(2302, actual_new_data.size);
+            pretty_assertions::assert_eq!(2286, actual_new_data.size);
 
             pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
             pretty_assertions::assert_eq!(
@@ -179,7 +179,7 @@ pub async fn test_log_command(kamu: KamuCliPuppet) {
                 odf::metadata::OffsetInterval { start: 2, end: 3 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(2315, actual_new_data.size);
+            pretty_assertions::assert_eq!(2299, actual_new_data.size);
 
             pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
             pretty_assertions::assert_eq!(

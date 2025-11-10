@@ -80,10 +80,7 @@ pub trait AccountService: Sync + Send {
 
     async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError>;
 
-    async fn delete_account_by_name(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), InternalError>;
+    async fn delete_account_by_id(&self, account_id: &odf::AccountID) -> Result<(), InternalError>;
 
     // TODO: Remove this method during refactoring:
     //       https://github.com/kamu-data/kamu-cli/issues/1270

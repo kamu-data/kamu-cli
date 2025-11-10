@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id as \"id: odf::AccountID\"\n            FROM accounts\n            WHERE lower(email) = lower($1)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: odf::AccountID",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a1de046d4356cb04267a1008c73f8b0c3cbb84076b000330a0c7b79dfa2ee2f5"
+}

@@ -31,7 +31,8 @@ odf = { workspace = true, default-features = false, features = ["testing"] }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }
-itertools = "0.14"
 futures = "0.3"
+itertools = "0.14"
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
 secrecy = "0.10"
 uuid = "1"

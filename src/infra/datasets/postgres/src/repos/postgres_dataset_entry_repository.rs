@@ -20,7 +20,6 @@ use kamu_datasets::*;
 
 #[component]
 #[interface(dyn DatasetEntryRepository)]
-
 pub struct PostgresDatasetEntryRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
@@ -223,7 +222,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    kind         as "kind: _"
             FROM dataset_entries
             WHERE owner_id = $1
-                  AND dataset_name = $2
+              AND lower(dataset_name) = lower($2)
             "#,
             stack_owner_id.as_str(),
             name.as_str()
@@ -269,9 +268,10 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    created_at   AS "created_at: _",
                    kind         AS "kind: _"
             FROM dataset_entries
-            WHERE (owner_id, dataset_name) IN (SELECT *
-                                               FROM UNNEST($1::TEXT[],
-                                                           $2::TEXT[]))
+            WHERE (owner_id, lower(dataset_name)) IN (SELECT input_owner_id,
+                                                             lower(input_dataset_name)
+                                                      FROM unnest($1::TEXT[],
+                                                                  $2::TEXT[]) as t(input_owner_id, input_dataset_name))
             ORDER BY owner_name, dataset_name
             "#,
             &owner_ids,
@@ -346,10 +346,14 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
             let conflict_result = sqlx::query!(
                 r#"
-                SELECT 1 as res FROM dataset_entries WHERE dataset_name = $1 AND owner_id = $2 LIMIT 1
+                SELECT 1 as res
+                FROM dataset_entries
+                WHERE owner_id = $1
+                  AND lower(dataset_name) = lower($2)
+                LIMIT 1
                 "#,
-                dataset_entry.name.as_str(),
                 stack_owner_id.as_str(),
+                dataset_entry.name.as_str(),
             )
             .fetch_optional(connection_mut)
             .await
@@ -411,8 +415,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         let update_result = sqlx::query!(
             r#"
             UPDATE dataset_entries
-                SET dataset_name = $1
-                WHERE dataset_id = $2
+            SET dataset_name = $1
+            WHERE dataset_id = $2
             "#,
             new_name.as_str(),
             stack_dataset_id.as_str(),
@@ -448,8 +452,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         sqlx::query!(
             r#"
             UPDATE dataset_entries
-                SET owner_name = $1
-                WHERE owner_id = $2
+            SET owner_name = $1
+            WHERE owner_id = $2
             "#,
             new_owner_name.as_str(),
             stack_owner_id.as_str(),
@@ -474,7 +478,9 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
             let delete_result = sqlx::query!(
                 r#"
-                DELETE FROM dataset_entries WHERE dataset_id = $1
+                DELETE
+                FROM dataset_entries
+                WHERE dataset_id = $1
                 "#,
                 stack_dataset_id.as_str(),
             )
