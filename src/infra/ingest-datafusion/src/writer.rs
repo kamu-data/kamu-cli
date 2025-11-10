@@ -34,6 +34,10 @@ pub struct DataWriterDataFusion {
     target: ResolvedDataset,
     merge_strategy: Arc<dyn MergeStrategy>,
 
+    // Whether we should attempt to coerce schema of the new slice to match dataset schema, or
+    // reject upon mismatch
+    coerce_schema: bool,
+
     // Mutable
     meta: DataWriterMetadataState,
 
@@ -69,6 +73,7 @@ impl DataWriterDataFusion {
             target,
             merge_strategy,
             meta: metadata_state,
+            coerce_schema: true,
         }
     }
 
@@ -309,10 +314,8 @@ impl DataWriterDataFusion {
         let df = df
             .with_column(
                 &self.meta.vocab.event_time_column,
-                // TODO: Using `case` expression instead of `coalesce()` due to DataFusion bug
-                // See: https://github.com/apache/arrow-datafusion/issues/8790
-                when(
-                    col(Column::from_name(&self.meta.vocab.event_time_column)).is_null(),
+                datafusion::functions::core::coalesce().call(vec![
+                    col(Column::from_name(&self.meta.vocab.event_time_column)),
                     cast(
                         Expr::Literal(
                             ScalarValue::TimestampMillisecond(
@@ -323,9 +326,7 @@ impl DataWriterDataFusion {
                         ),
                         event_time_data_type,
                     ),
-                )
-                .otherwise(col(Column::from_name(&self.meta.vocab.event_time_column)))
-                .int_err()?,
+                ]),
             )
             .int_err()?;
 
@@ -378,14 +379,44 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
-    pub fn validate_output_schema_equivalence(
-        prev_schema: &SchemaRef,
+    fn coerce_schema(&self, df: DataFrameExt) -> Result<DataFrameExt, InternalError> {
+        if !self.coerce_schema {
+            return Ok(df);
+        }
+        let Some(orig_schema) = &self.meta.schema else {
+            return Ok(df);
+        };
+
+        // Currently only handling nullability coercion
+        let orig_non_null_columns: std::collections::HashSet<String> = orig_schema
+            .fields
+            .iter()
+            .filter(|f| !f.is_optional())
+            .map(|f| f.name.clone())
+            .collect();
+
+        let df = df
+            .assert_collumns_not_null(|f| orig_non_null_columns.contains(f.name()))
+            .int_err()?;
+
+        Ok(df)
+    }
+
+    // TODO: Replace this method with ODF schema comparator
+    // Rules:
+    // - New columns are allowed to be non-null if original types are nullable -
+    //   they will be coerced on read
+    // - Treat "large" variants equivalent to regular variants
+    // - Treat view types equivalent to regular types
+    pub fn validate_schema_compatible(
+        orig_schema: &SchemaRef,
         new_schema: &SchemaRef,
     ) -> Result<(), IncompatibleSchemaError> {
-        if !Self::is_schema_equivalent(prev_schema.fields(), new_schema.fields()) {
+        if !Self::is_schema_compatible(orig_schema.fields(), new_schema.fields()) {
             Err(IncompatibleSchemaError::new(
-                "Schema of the new slice differs from the schema defined by SetDataSchema event",
-                prev_schema.clone(),
+                "Schema of the new slice is not compatible with the schema defined by \
+                 SetDataSchema event",
+                orig_schema.clone(),
                 new_schema.clone(),
             ))
         } else {
@@ -393,26 +424,25 @@ impl DataWriterDataFusion {
         }
     }
 
-    fn is_schema_equivalent(lhs: &Fields, rhs: &Fields) -> bool {
-        lhs.len() == rhs.len()
-            && lhs
+    fn is_schema_compatible(orig: &Fields, new: &Fields) -> bool {
+        orig.len() == new.len()
+            && orig
                 .iter()
-                .zip(rhs.iter())
-                .all(|(l, r)| Self::is_schema_equivalent_rec(l, r))
+                .zip(new.iter())
+                .all(|(o, n)| Self::is_schema_compatible_rec(o, n))
     }
 
-    fn is_schema_equivalent_rec(lhs: &Field, rhs: &Field) -> bool {
-        // Rules:
-        // - Ignore nullability (temporarily until we regain control over it)
-        // - Treat "large" variants equivalent to regular variants
-        // - Treat view types equivalent to regular types
-        if lhs.name() != rhs.name() || lhs.metadata() != rhs.metadata() {
+    fn is_schema_compatible_rec(orig: &Field, new: &Field) -> bool {
+        if orig.name() != new.name()
+            || orig.metadata() != new.metadata()
+            || (!orig.is_nullable() && new.is_nullable())
+        {
             return false;
         }
 
         // Avoid wildcard matching - we want compiler to force us re-check our
         // assumptions whenever new type is added
-        match (lhs.data_type(), rhs.data_type()) {
+        match (orig.data_type(), new.data_type()) {
             (
                 DataType::Null
                 | DataType::Boolean
@@ -445,7 +475,7 @@ impl DataWriterDataFusion {
                 | DataType::Map(_, _)
                 | DataType::RunEndEncoded(_, _),
                 _,
-            ) => lhs.data_type() == rhs.data_type(),
+            ) => orig.data_type() == new.data_type(),
             (
                 DataType::Binary | DataType::LargeBinary | DataType::BinaryView,
                 DataType::Binary | DataType::LargeBinary | DataType::BinaryView,
@@ -463,8 +493,8 @@ impl DataWriterDataFusion {
                 | DataType::ListView(r)
                 | DataType::LargeList(r)
                 | DataType::LargeListView(r),
-            ) => Self::is_schema_equivalent_rec(l, r),
-            (DataType::Struct(l), DataType::Struct(r)) => Self::is_schema_equivalent(l, r),
+            ) => Self::is_schema_compatible_rec(l, r),
+            (DataType::Struct(l), DataType::Struct(r)) => Self::is_schema_compatible(l, r),
             (
                 DataType::Utf8
                 | DataType::LargeUtf8
@@ -521,7 +551,7 @@ impl DataWriterDataFusion {
         &self,
         path: PathBuf,
         df: DataFrameExt,
-    ) -> Result<Option<OwnedFile>, InternalError> {
+    ) -> Result<Option<OwnedFile>, StageDataError> {
         use datafusion::arrow::array::UInt64Array;
 
         // FIXME: The  extension is currently necessary for DataFusion to
@@ -532,14 +562,20 @@ impl DataWriterDataFusion {
             "Ouput file name must have an extension"
         );
 
-        let res = df
+        let res = match df
             .write_parquet(
                 path.as_os_str().to_str().unwrap(),
                 DataFrameWriteOptions::new().with_single_file_output(true),
                 Some(self.get_write_properties()),
             )
             .await
-            .int_err()?;
+        {
+            Ok(res) => Ok(res),
+            Err(datafusion::error::DataFusionError::Execution(msg)) => {
+                Err(StageDataError::ExecutionError(ExecutionError::new(msg)))
+            }
+            Err(err) => Err(err.int_err().into()),
+        }?;
 
         let file = if path.exists() {
             Some(OwnedFile::new(path))
@@ -972,6 +1008,9 @@ impl DataWriter for DataWriterDataFusion {
                 self.meta.prev_offset.map_or(0, |e| e + 1),
             )?;
 
+            // Coerce schema if needed
+            let df = self.coerce_schema(df)?;
+
             // Validate schema matches the declared one
             let new_schema_arrow = SchemaRef::new(df.schema().into());
             tracing::info!(schema = ?new_schema_arrow, "Final output schema");
@@ -982,7 +1021,8 @@ impl DataWriter for DataWriterDataFusion {
                         .to_arrow(&odf::metadata::ToArrowSettings::default())
                         .int_err()?,
                 );
-                Self::validate_output_schema_equivalence(&prev_schema_arrow, &new_schema_arrow)?;
+
+                Self::validate_schema_compatible(&prev_schema_arrow, &new_schema_arrow)?;
             }
 
             // NOTE: We strip encoding to store only logical representation of schema in the

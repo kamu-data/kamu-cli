@@ -151,6 +151,7 @@ impl UpdateDatasetTaskRunner {
                 | PollingIngestError::IncompatibleSchema(_)
                 | PollingIngestError::InvalidParameterFormat(_)
                 | PollingIngestError::MergeError(_)
+                | PollingIngestError::ExecutionError(_)
                 | PollingIngestError::TemplateError(_) => {
                     Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
                 }

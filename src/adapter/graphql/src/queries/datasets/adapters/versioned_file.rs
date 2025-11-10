@@ -39,7 +39,7 @@ impl<'a> VersionedFile<'a> {
             odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
 
         let schema = odf::schema::DataSchema::builder()
-            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default())
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
                 odf::schema::DataField::i32("version").description(
                     "Sequential identifier assigned to each entry as new versions are uploaded",

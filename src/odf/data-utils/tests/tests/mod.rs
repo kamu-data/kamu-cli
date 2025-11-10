@@ -7,4 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_assert_not_null;
+mod test_cmp;
 mod test_schema;

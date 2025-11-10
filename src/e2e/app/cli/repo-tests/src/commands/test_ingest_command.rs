@@ -83,7 +83,7 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -170,7 +170,7 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPu
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }

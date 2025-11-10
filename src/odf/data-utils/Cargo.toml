@@ -57,5 +57,6 @@ pretty_assertions = { optional = true, version = "1" }
 [dev-dependencies]
 indoc = "2"
 pretty_assertions = { version = "1" }
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

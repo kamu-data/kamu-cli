@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
@@ -22,8 +23,6 @@ use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
-use tokio::io::AsyncRead;
-use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,13 +79,14 @@ async fn test_ingest_push_url_stream() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target.clone(),
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts::default(),
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -96,7 +96,7 @@ async fn test_ingest_push_url_stream() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -137,8 +137,14 @@ async fn test_ingest_push_url_stream() {
     ));
 
     harness
-        .ingest_from_stream(target, None, Box::new(data), PushIngestOpts::default())
-        .await;
+        .ingest_from(
+            target,
+            None,
+            DataSource::Stream(Box::new(data)),
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -214,16 +220,17 @@ async fn test_ingest_push_media_type_override() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target.clone(),
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts {
                 media_type: Some(MediaType::CSV.to_owned()),
                 ..Default::default()
             },
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -233,7 +240,7 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -264,16 +271,17 @@ async fn test_ingest_push_media_type_override() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target.clone(),
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts {
                 media_type: Some(MediaType::NDJSON.to_owned()),
                 ..Default::default()
             },
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -283,7 +291,7 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -316,16 +324,17 @@ async fn test_ingest_push_media_type_override() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target,
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts {
                 media_type: Some(MediaType::JSON.to_owned()),
                 ..Default::default()
             },
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -335,7 +344,7 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -403,13 +412,14 @@ async fn test_ingest_push_schema_stability() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target,
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts::default(),
         )
-        .await;
+        .await
+        .unwrap();
 
     // This should be a lossless conversion of ODF schema in metadata chain to arrow
     let schema_in_metadata_as_arrow = Arc::new(
@@ -466,7 +476,7 @@ async fn test_ingest_push_schema_stability() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "city",
                 // NOTE: We strip the encoding details in SetDataSchema, leaving only logical types
@@ -527,7 +537,7 @@ async fn test_ingest_push_schema_stability() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "city",
                 // NOTE: Since Datafusion 49 view encoding is used by default on Parquet read and is retained here
@@ -571,9 +581,9 @@ async fn test_ingest_push_schema_stability() {
         schema: None,
     }.schema_as_arrow(&odf::metadata::ToArrowSettings::default()).map(Arc::new).unwrap();
 
-    kamu_ingest_datafusion::DataWriterDataFusion::validate_output_schema_equivalence(
-        &schema_in_metadata_as_arrow,
+    kamu_ingest_datafusion::DataWriterDataFusion::validate_schema_compatible(
         &schema_prev,
+        &schema_in_metadata_as_arrow,
     )
     .expect(
         "Schema drift detected! Schema produced by the current kamu/datafusion version is not \
@@ -582,9 +592,9 @@ async fn test_ingest_push_schema_stability() {
          changed and whether equivalence test needs to be relaxed.",
     );
 
-    kamu_ingest_datafusion::DataWriterDataFusion::validate_output_schema_equivalence(
-        &schema_on_parquet_read,
+    kamu_ingest_datafusion::DataWriterDataFusion::validate_schema_compatible(
         &schema_prev,
+        &schema_on_parquet_read,
     )
     .expect(
         "Schema drift detected! Schema produced by the current kamu/datafusion version is not \
@@ -631,10 +641,10 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target,
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts {
                 schema_inference: SchemaInferenceOpts {
                     coerce_event_time_column_type: true,
@@ -643,7 +653,8 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
                 ..Default::default()
             },
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -653,7 +664,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY foo (STRING);
                 }
                 "#
@@ -708,10 +719,10 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target,
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts {
                 schema_inference: SchemaInferenceOpts {
                     coerce_event_time_column_type: true,
@@ -720,7 +731,8 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
                 ..Default::default()
             },
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -730,7 +742,7 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY foo (STRING);
                 }
                 "#
@@ -785,10 +797,10 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target,
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts {
                 schema_inference: SchemaInferenceOpts {
                     coerce_event_time_column_type: true,
@@ -797,7 +809,8 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
                 ..Default::default()
             },
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -807,7 +820,7 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY foo (STRING);
                   OPTIONAL INT64 _op;
                 }
@@ -883,13 +896,14 @@ async fn test_ingest_sql_case_sensitivity() {
     .unwrap();
 
     harness
-        .ingest_from_url(
+        .ingest_from(
             target,
             None,
-            url::Url::from_file_path(&src_path).unwrap(),
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
             PushIngestOpts::default(),
         )
-        .await;
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -899,7 +913,7 @@ async fn test_ingest_sql_case_sensitivity() {
                   REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY lower (STRING);
                   OPTIONAL BYTE_ARRAY MIXed (STRING);
                   OPTIONAL BYTE_ARRAY mixED (STRING);
@@ -966,7 +980,7 @@ async fn test_ingest_push_with_predefined_data_schema() {
 
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
-    // Push from Stream
+    // Round 1 - Conforming data
     let data = std::io::Cursor::new(indoc!(
         r#"
         { "date": "2020-01-01", "city": "A", "population": 1000 }
@@ -976,8 +990,14 @@ async fn test_ingest_push_with_predefined_data_schema() {
     ));
 
     harness
-        .ingest_from_stream(target, None, Box::new(data), PushIngestOpts::default())
-        .await;
+        .ingest_from(
+            target.clone(),
+            None,
+            DataSource::Stream(Box::new(data)),
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -992,6 +1012,34 @@ async fn test_ingest_push_with_predefined_data_schema() {
             "#
         ))
         .await;
+
+    // Round 2 - Null in required column
+    //
+    // TODO: Currently we add one null and one non-null row to make read inference
+    // produce and optional int column. With one null value the inferred type would
+    // be Null. We should improve coercion step of the reader to allow coercing Null
+    // column into any optional column type.
+    let data = std::io::Cursor::new(indoc!(
+        r#"
+        { "date": "2020-01-04", "city": "D", "population": null }
+        { "date": "2020-01-04", "city": "E", "population": 5000 }
+        "#
+    ));
+
+    let res = harness
+        .ingest_from(
+            target,
+            None,
+            DataSource::Stream(Box::new(data)),
+            PushIngestOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(PushIngestError::ExecutionError(err))
+        if err.to_string().contains("Column population contains 1 null values while none were expected")
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1079,13 +1127,13 @@ impl IngestTestHarness {
         DatasetDataHelper::new_with_context((*resolved_dataset).clone(), self.ctx.clone())
     }
 
-    async fn ingest_from_stream(
+    async fn ingest_from(
         &self,
         target: ResolvedDataset,
         source_name: Option<&str>,
-        data: Box<dyn AsyncRead + Send + Unpin>,
+        data: DataSource,
         opts: PushIngestOpts,
-    ) {
+    ) -> Result<PushIngestResult, PushIngestError> {
         let ingest_plan = self
             .push_ingest_planner
             .plan_ingest(target.clone(), source_name, opts)
@@ -1094,9 +1142,8 @@ impl IngestTestHarness {
 
         let ingest_result = self
             .push_ingest_executor
-            .execute_ingest(target.clone(), ingest_plan, DataSource::Stream(data), None)
-            .await
-            .unwrap();
+            .execute_ingest(target.clone(), ingest_plan, data, None)
+            .await?;
 
         if let PushIngestResult::Updated {
             old_head, new_head, ..
@@ -1115,44 +1162,8 @@ impl IngestTestHarness {
                 .await
                 .unwrap();
         }
-    }
 
-    async fn ingest_from_url(
-        &self,
-        target: ResolvedDataset,
-        source_name: Option<&str>,
-        url: Url,
-        opts: PushIngestOpts,
-    ) {
-        let ingest_plan = self
-            .push_ingest_planner
-            .plan_ingest(target.clone(), source_name, opts)
-            .await
-            .unwrap();
-
-        let ingest_result = self
-            .push_ingest_executor
-            .execute_ingest(target.clone(), ingest_plan, DataSource::Url(url), None)
-            .await
-            .unwrap();
-
-        if let PushIngestResult::Updated {
-            old_head, new_head, ..
-        } = &ingest_result
-        {
-            target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    new_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
-                    },
-                )
-                .await
-                .unwrap();
-        }
+        Ok(ingest_result)
     }
 }
 

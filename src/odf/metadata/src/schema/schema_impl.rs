@@ -39,6 +39,10 @@ impl DataSchema {
             extra: extra.map_empty(),
         }
     }
+
+    pub fn field_by_name(&self, name: &str) -> Option<&DataField> {
+        self.fields.iter().find(|f| f.name == name)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,14 +60,21 @@ impl DataSchemaBuilder {
         Self::default()
     }
 
-    pub fn with_changelog_system_fields(mut self, vocab: DatasetVocabulary) -> Self {
+    pub fn with_changelog_system_fields(
+        mut self,
+        vocab: DatasetVocabulary,
+        custom_event_time_type: Option<DataType>,
+    ) -> Self {
         assert_eq!(self.fields.len(), 0);
 
         self.fields.extend([
             DataField::i64(vocab.offset_column),
             DataField::i32(vocab.operation_type_column),
             DataField::timestamp_millis_utc(vocab.system_time_column),
-            DataField::timestamp_millis_utc(vocab.event_time_column),
+            DataField::new(
+                vocab.event_time_column,
+                custom_event_time_type.unwrap_or(DataType::timestamp_millis_utc()),
+            ),
         ]);
 
         self
@@ -114,6 +125,10 @@ impl DataField {
             r#type: data_type,
             extra: None,
         }
+    }
+
+    pub fn is_optional(&self) -> bool {
+        matches!(&self.r#type, DataType::Option(_))
     }
 }
 

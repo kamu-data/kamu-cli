@@ -133,6 +133,9 @@ pub enum WriteDataError {
     MergeError(#[from] MergeError),
 
     #[error(transparent)]
+    ExecutionError(#[from] ExecutionError),
+
+    #[error(transparent)]
     DataValidation(#[from] DataValidationError),
 
     #[error(transparent)]
@@ -151,6 +154,7 @@ impl From<StageDataError> for WriteDataError {
             StageDataError::BadInputSchema(v) => WriteDataError::BadInputSchema(v),
             StageDataError::IncompatibleSchema(v) => WriteDataError::IncompatibleSchema(v),
             StageDataError::MergeError(v) => WriteDataError::MergeError(v),
+            StageDataError::ExecutionError(v) => WriteDataError::ExecutionError(v),
             StageDataError::DataValidation(v) => WriteDataError::DataValidation(v),
             StageDataError::EmptyCommit(v) => WriteDataError::EmptyCommit(v),
             StageDataError::Internal(v) => WriteDataError::Internal(v),
@@ -170,6 +174,9 @@ pub enum StageDataError {
 
     #[error(transparent)]
     MergeError(#[from] MergeError),
+
+    #[error(transparent)]
+    ExecutionError(#[from] ExecutionError),
 
     #[error(transparent)]
     DataValidation(#[from] DataValidationError),
@@ -209,6 +216,22 @@ impl std::fmt::Display for BadInputSchemaError {
             FmtSchema(&self.schema)
         )?;
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct ExecutionError {
+    message: String,
+}
+
+impl ExecutionError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
     }
 }
 
@@ -259,16 +282,16 @@ impl DanglingReferenceError {
 
 #[derive(Debug, thiserror::Error)]
 pub struct IncompatibleSchemaError {
-    pub prev_schema: SchemaRef,
+    pub orig_schema: SchemaRef,
     pub new_schema: SchemaRef,
     message: String,
     backtrace: Backtrace,
 }
 
 impl IncompatibleSchemaError {
-    pub fn new(message: impl Into<String>, prev_schema: SchemaRef, new_schema: SchemaRef) -> Self {
+    pub fn new(message: impl Into<String>, orig_schema: SchemaRef, new_schema: SchemaRef) -> Self {
         Self {
-            prev_schema,
+            orig_schema,
             new_schema,
             message: message.into(),
             backtrace: Backtrace::capture(),
@@ -279,7 +302,7 @@ impl IncompatibleSchemaError {
 impl std::fmt::Display for IncompatibleSchemaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Incompatible schema: {}", self.message)?;
-        writeln!(f, "Dataset schema:\n{}", FmtSchema(&self.prev_schema))?;
+        writeln!(f, "Dataset schema:\n{}", FmtSchema(&self.orig_schema))?;
         writeln!(f, "New slice schema:\n{}", FmtSchema(&self.new_schema))?;
         Ok(())
     }

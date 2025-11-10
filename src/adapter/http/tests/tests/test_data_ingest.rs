@@ -72,7 +72,7 @@ async fn test_data_push_ingest_handler() {
                       REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
@@ -185,7 +185,7 @@ async fn test_data_push_ingest_handler() {
                       REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
@@ -246,7 +246,7 @@ async fn test_data_push_ingest_handler() {
                       REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
@@ -334,7 +334,7 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
                       REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
@@ -425,7 +425,7 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
                       REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
@@ -508,7 +508,7 @@ async fn test_data_push_ingest_upload_content_type_not_specified() {
                       REQUIRED INT64 offset;
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }

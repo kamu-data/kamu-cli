@@ -16,8 +16,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
 use odf::utils::data::DataFrameExt;
-
-use crate::utils::*;
+use odf::utils::testing;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,7 +139,7 @@ where
     // Sort events according to the strategy
     let actual = actual.sort(strat.sort_order()).unwrap();
 
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,7 +249,7 @@ async fn test_ledger_merge_respects_pk() {
     .merge(Some(prev), new)
     .unwrap();
     let expected = make_output_empty(&ctx);
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "seattle", 3)]);
@@ -263,7 +262,7 @@ async fn test_ledger_merge_respects_pk() {
     .merge(Some(prev), new)
     .unwrap();
     let expected = make_output_empty(&ctx);
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "seattle", 3)]);
@@ -280,7 +279,7 @@ async fn test_ledger_merge_respects_pk() {
     .merge(Some(prev), new)
     .unwrap();
     let expected = make_output(&ctx, [(Op::Append, 2020, "seattle", 3)]);
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2021, "seattle", 3)]);
@@ -293,7 +292,7 @@ async fn test_ledger_merge_respects_pk() {
     .merge(Some(prev), new)
     .unwrap();
     let expected = make_output(&ctx, [(Op::Append, 2021, "seattle", 3)]);
-    assert_dfs_equivalent(expected, actual, false, true, true).await;
+    testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

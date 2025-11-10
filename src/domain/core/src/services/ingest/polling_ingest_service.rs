@@ -306,6 +306,13 @@ pub enum PollingIngestError {
     ),
 
     #[error(transparent)]
+    ExecutionError(
+        #[from]
+        #[backtrace]
+        ExecutionError,
+    ),
+
+    #[error(transparent)]
     DataValidation(
         #[from]
         #[backtrace]
