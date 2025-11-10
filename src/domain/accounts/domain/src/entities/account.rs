@@ -64,19 +64,6 @@ pub struct Account {
     pub provider_identity_key: String,
 }
 
-#[cfg(feature = "sqlx")]
-impl Account {
-    pub fn prepare_account_name_for_storage(&self) -> String {
-        if self.provider == <&'static str>::from(AccountProvider::Web3Wallet) {
-            // When storing wallet addresses, we should preserve case sensitivity
-            // as it forms the checksum address.
-            self.account_name.to_string()
-        } else {
-            self.account_name.to_ascii_lowercase()
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<&AccountConfig> for Account {

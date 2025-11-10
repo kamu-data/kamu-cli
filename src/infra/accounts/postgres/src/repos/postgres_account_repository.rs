@@ -21,7 +21,6 @@ use crate::domain::*;
 #[interface(dyn AccountRepository)]
 #[interface(dyn ExpensiveAccountRepository)]
 #[interface(dyn PasswordHashRepository)]
-
 pub struct PostgresAccountRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
@@ -55,20 +54,24 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account.id.as_stack_string();
+
         sqlx::query!(
             r#"
             INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
                 VALUES ($1, $2, $3, $4, ($5::text)::account_type, $6, $7, $8, $9)
             "#,
-            account.id.to_string(),
-            account.prepare_account_name_for_storage(),
+            account_id_stack.as_str(),
+            account.account_name.as_str(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type as AccountType,
             account.avatar_url,
             account.registered_at,
-            account.provider.clone(),
-            account.provider_identity_key.clone(),
+            account.provider,
+            account.provider_identity_key,
         )
         .execute(connection_mut)
         .await
@@ -91,6 +94,10 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = updated_account.id.as_stack_string();
+
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts SET
@@ -104,15 +111,15 @@ impl AccountRepository for PostgresAccountRepository {
                 provider_identity_key = $9
             WHERE id = $1
             "#,
-            updated_account.id.to_string(),
-            updated_account.prepare_account_name_for_storage(),
+            account_id_stack.as_str(),
+            updated_account.account_name.as_str(),
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
             updated_account.avatar_url,
             updated_account.registered_at,
-            updated_account.provider.clone(),
-            updated_account.provider_identity_key.clone(),
+            updated_account.provider,
+            updated_account.provider_identity_key,
         )
         .execute(connection_mut)
         .await
@@ -153,7 +160,9 @@ impl AccountRepository for PostgresAccountRepository {
 
         let update_result = sqlx::query!(
             r#"
-            UPDATE accounts SET email = $1 WHERE id = $2
+            UPDATE accounts
+            SET email = $1
+            WHERE id = $2
             "#,
             new_email.as_ref(),
             account_id_stack.as_str(),
@@ -289,7 +298,7 @@ impl AccountRepository for PostgresAccountRepository {
             FROM accounts
             WHERE lower(account_name) = lower($1)
             "#,
-            account_name.to_string()
+            account_name.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -314,12 +323,11 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE provider_identity_key = $1
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE provider_identity_key = $1
             "#,
             provider_identity_key
         )
@@ -338,12 +346,11 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE lower(email) = lower($1)
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(email) = lower($1)
             "#,
             email.as_ref()
         )
@@ -362,14 +369,13 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
-            SELECT id as "id: AccountID"
-              FROM accounts
-              WHERE lower(account_name) = lower($1)
+            SELECT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(account_name) = lower($1)
             "#,
-            account_name.to_string()
+            account_name.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -432,21 +438,25 @@ impl AccountRepository for PostgresAccountRepository {
         })
     }
 
-    async fn delete_account_by_name(
+    async fn delete_account_by_id(
         &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountByNameError> {
+        account_id: &odf::AccountID,
+    ) -> Result<(), DeleteAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
 
         let delete_result = sqlx::query!(
             r#"
             DELETE
             FROM accounts
-            WHERE account_name = $1
+            WHERE id = $1
             "#,
-            account_name.as_str()
+            account_id_stack.as_str()
         )
         .execute(&mut *connection_mut)
         .await
@@ -455,11 +465,9 @@ impl AccountRepository for PostgresAccountRepository {
         if delete_result.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(DeleteAccountByNameError::NotFound(
-                AccountNotFoundByNameError {
-                    account_name: account_name.clone(),
-                },
-            ))
+            Err(DeleteAccountByIdError::NotFound(AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            }))
         }
     }
 
@@ -490,7 +498,8 @@ impl AccountRepository for PostgresAccountRepository {
                    provider,
                    provider_identity_key
             FROM accounts
-            WHERE account_name = ANY($1)
+            WHERE lower(account_name) IN (SELECT lower(input_account_name)
+                                          FROM unnest($1::text[]) AS input_account_name)
             ORDER BY account_name
             "#,
             &account_names
@@ -605,13 +614,18 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+
         let update_result = sqlx::query!(
             r#"
-            UPDATE accounts_passwords set password_hash=$1
-                where account_id=$2
+            UPDATE accounts_passwords
+            SET password_hash = $1
+            WHERE account_id = $2
             "#,
             password_hash,
-            account_id.to_string()
+            account_id_stack.as_str()
         )
         .execute(connection_mut)
         .await
@@ -639,11 +653,11 @@ impl PasswordHashRepository for PostgresAccountRepository {
         let maybe_password_row = sqlx::query!(
             r#"
             SELECT password_hash
-              FROM accounts_passwords
-              JOIN accounts ON accounts_passwords.account_id = accounts.id
-              WHERE lower(account_name) = lower($1)
+            FROM accounts_passwords
+            JOIN accounts ON accounts_passwords.account_id = accounts.id
+            WHERE lower(account_name) = lower($1)
             "#,
-            account_name.to_string(),
+            account_name.as_str(),
         )
         .fetch_optional(connection_mut)
         .await

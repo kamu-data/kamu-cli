@@ -28,132 +28,107 @@ pub(crate) const GITHUB_ACCOUNT_ID_PETYA: &str = "8875908";
 pub async fn test_missing_account_not_found(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    let maybe_account_id = account_repo
-        .find_account_id_by_email(&Email::parse("test@example.com").unwrap())
-        .await
-        .unwrap();
-    assert!(maybe_account_id.is_none());
-
-    let account_name = odf::AccountName::new_unchecked("wasya");
-    let maybe_account_id = account_repo
-        .find_account_id_by_name(&account_name)
-        .await
-        .unwrap();
-    assert!(maybe_account_id.is_none());
-
     let account_id = odf::AccountID::new_seeded_ed25519(b"wrong");
-    let account_result = account_repo.get_account_by_id(&account_id).await;
-    assert_matches!(account_result, Err(GetAccountByIdError::NotFound(_)));
+    let account_name = odf::AccountName::new_unchecked("wasya");
+    let provider_identity_key = "wasya";
+    let email = Email::parse("test@example.com").unwrap();
 
-    let account_result = account_repo.get_account_by_name(&account_name).await;
-    assert_matches!(account_result, Err(GetAccountByNameError::NotFound(_)));
+    assert_matches!(
+        account_repo.get_account_by_id(&account_id).await,
+        Err(GetAccountByIdError::NotFound(_))
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_ids(&[&account_id]).await,
+        Ok(accounts)
+            if accounts.is_empty()
+    );
+    assert_matches!(
+        account_repo.get_account_by_name(&account_name).await,
+        Err(GetAccountByNameError::NotFound(_))
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_names(&[&account_name]).await,
+        Ok(accounts)
+            if accounts.is_empty()
+    );
+
+    assert_matches!(
+        account_repo
+            .find_account_id_by_provider_identity_key(provider_identity_key)
+            .await,
+        Ok(None)
+    );
+    assert_matches!(
+        account_repo.find_account_id_by_email(&email).await,
+        Ok(None)
+    );
+    assert_matches!(
+        account_repo.find_account_id_by_name(&account_name).await,
+        Ok(None)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_password_account(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account = Account {
         email: Email::parse("test@example.com").unwrap(),
         display_name: String::from("Wasya Pupkin"),
         ..make_test_account(
-            "wasya",
+            "waSYa",
             "wasya@example.com",
             AccountProvider::Password.into(),
             "wasya",
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-
     account_repo.save_account(&account).await.unwrap();
 
-    let maybe_account_id = account_repo
-        .find_account_id_by_email(&Email::parse("test@example.com").unwrap())
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let account_name = odf::AccountName::new_unchecked("wasya");
-    let maybe_account_id = account_repo
-        .find_account_id_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let maybe_account_id = account_repo
-        .find_account_id_by_provider_identity_key("wasya")
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let db_account = account_repo
-        .get_account_by_id(&maybe_account_id.unwrap())
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
-
-    let db_account = account_repo
-        .get_account_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
+    test_locale_account(
+        account_repo.as_ref(),
+        account,
+        odf::AccountName::new_unchecked("wAsYa"),
+        "password",
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let account = Account {
         email: Email::parse("test@example.com").unwrap(),
         display_name: String::from("Wasya Pupkin"),
         ..make_test_account(
-            "wasya",
+            "wAsyA",
             "wasya@example.com",
             AccountProvider::OAuthGitHub.into(),
             GITHUB_ACCOUNT_ID,
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-
     account_repo.save_account(&account).await.unwrap();
 
-    let maybe_account_id = account_repo
-        .find_account_id_by_email(&Email::parse("test@example.com").unwrap())
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let account_name = odf::AccountName::new_unchecked("wasya");
-    let maybe_account_id = account_repo
-        .find_account_id_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let maybe_account_id = account_repo
-        .find_account_id_by_provider_identity_key(GITHUB_ACCOUNT_ID)
-        .await
-        .unwrap();
-    assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
-
-    let db_account = account_repo
-        .get_account_by_id(&maybe_account_id.unwrap())
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
-
-    let db_account = account_repo
-        .get_account_by_name(&account_name)
-        .await
-        .unwrap();
-    assert_eq!(db_account, account);
+    test_locale_account(
+        account_repo.as_ref(),
+        account,
+        odf::AccountName::new_unchecked("wAsYa"),
+        "github",
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account_wasya = Account {
         email: Email::parse("wasya.test@example.com").unwrap(),
         display_name: String::from("Wasya Pupkin"),
@@ -175,8 +150,6 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-
     account_repo.save_account(&account_wasya).await.unwrap();
     account_repo.save_account(&account_petya).await.unwrap();
 
@@ -191,21 +164,19 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
         .unwrap()
         .unwrap();
 
-    let mut db_accounts = account_repo
+    let db_accounts = account_repo
         .get_accounts_by_ids(&[&account_id_wasya, &account_id_petya])
         .await
         .unwrap();
 
-    // Different databases returning different order for where in clause
-    // Such as for this specific query order is not important sort here to
-    // keep tests consistent
-    db_accounts.sort_by(|a, b| a.registered_at.cmp(&b.registered_at));
-    assert_eq!(db_accounts, [account_wasya, account_petya]);
+    assert_eq!(db_accounts, [account_petya, account_wasya]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_account_without_email(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account = Account {
         display_name: String::from("Wasya Pupkin"),
         ..make_test_account(
@@ -215,8 +186,6 @@ pub async fn test_insert_and_locate_account_without_email(catalog: &Catalog) {
             "wasya",
         )
     };
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account).await.unwrap();
 
@@ -230,6 +199,8 @@ pub async fn test_insert_and_locate_account_without_email(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_duplicate_password_account_id(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let id = odf::AccountID::new_generated_ed25519().1;
     let account = Account {
         id: id.clone(),
@@ -241,7 +212,6 @@ pub async fn test_duplicate_password_account_id(catalog: &Catalog) {
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo
         .save_account(&Account {
             id, // re-use same id
@@ -266,6 +236,8 @@ pub async fn test_duplicate_password_account_id(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_duplicate_password_account_email(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account = Account {
         email: Email::parse("test@example.com").unwrap(),
         ..make_test_account(
@@ -276,7 +248,6 @@ pub async fn test_duplicate_password_account_email(catalog: &Catalog) {
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo.save_account(&account).await.unwrap();
 
     assert_matches!(
@@ -291,6 +262,8 @@ pub async fn test_duplicate_password_account_email(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_duplicate_github_account_id(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let id = odf::AccountID::new_generated_ed25519().1;
@@ -304,7 +277,6 @@ pub async fn test_duplicate_github_account_id(catalog: &Catalog) {
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo
         .save_account(&Account {
             id, // reuse id
@@ -327,6 +299,8 @@ pub async fn test_duplicate_github_account_id(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let account = Account {
@@ -339,7 +313,6 @@ pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo.save_account(&account).await.unwrap();
 
     assert_matches!(
@@ -359,6 +332,8 @@ pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_duplicate_github_account_provider_identity(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let account = Account {
@@ -370,8 +345,6 @@ pub async fn test_duplicate_github_account_provider_identity(catalog: &Catalog) 
             GITHUB_ACCOUNT_ID,
         )
     };
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo.save_account(&account).await.unwrap();
 
     assert_matches!(
@@ -391,6 +364,8 @@ pub async fn test_duplicate_github_account_provider_identity(catalog: &Catalog) 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_duplicate_github_account_email(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let account = Account {
@@ -403,7 +378,6 @@ pub async fn test_duplicate_github_account_email(catalog: &Catalog) {
         )
     };
 
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo.save_account(&account).await.unwrap();
 
     assert_matches!(
@@ -455,16 +429,21 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
         accounts.into_iter().map(|a| a.account_name).collect()
     }
 
+    const USER_1: &str = "uSer1";
+    const USER_2: &str = "usEr2";
+    const USER_3: &str = "useR3";
+    const ADMIN_1: &str = "adMin1";
+
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     use SearchAccountsByNamePatternFilters as Filters;
     use odf::metadata::testing::{account_id, account_name as name};
 
     let accounts = [
-        account("user1", "alice (deactivated)", "alice@example.com"),
-        account("user2", "alice", "alice-new@example.com"),
-        account("user3", "bob", "bob@example.com"),
-        account("admin1", "admin", "admin@example.com"),
+        account(USER_1, "alice (deactivated)", "alice@example.com"),
+        account(USER_2, "alice", "alice-new@example.com"),
+        account(USER_3, "bob", "bob@example.com"),
+        account(ADMIN_1, "admin", "admin@example.com"),
     ];
 
     for account in accounts {
@@ -476,34 +455,34 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     // All
     assert_eq!(
         [
-            name(&"admin1"),
-            name(&"user1"),
-            name(&"user2"),
-            name(&"user3"),
+            name(&"adMin1"),
+            name(&"uSer1"),
+            name(&"usEr2"),
+            name(&"useR3"),
         ],
         *search(&account_repo, "", Filters::default()).await
     );
 
     // Search by account name
     assert_eq!(
-        [name(&"user1"), name(&"user2"), name(&"user3")],
+        [name(&"uSer1"), name(&"usEr2"), name(&"useR3")],
         *search(&account_repo, "uS", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user1"), name(&"user2"), name(&"user3")],
+        [name(&"uSer1"), name(&"usEr2"), name(&"useR3")],
         *search(&account_repo, "sE", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user1")],
+        [name(&"uSer1")],
         *search(&account_repo, "r1", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user2")],
+        [name(&"usEr2")],
         *search(
             &account_repo,
             "user",
             Filters {
-                exclude_accounts_by_ids: vec![account_id(&"user1"), account_id(&"user3")]
+                exclude_accounts_by_ids: vec![account_id(&"uSer1"), account_id(&"useR3")]
             }
         )
         .await
@@ -511,11 +490,11 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
 
     // Search by display name
     assert_eq!(
-        [name(&"user1"), name(&"user2")],
+        [name(&"uSer1"), name(&"usEr2")],
         *search(&account_repo, "ali", Filters::default()).await
     );
     assert_eq!(
-        [name(&"user3")],
+        [name(&"useR3")],
         *search(&account_repo, "ob", Filters::default()).await
     );
     assert_eq!(
@@ -524,7 +503,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
             &account_repo,
             "ob",
             Filters {
-                exclude_accounts_by_ids: vec![account_id(&"user3")]
+                exclude_accounts_by_ids: vec![account_id(&"useR3")]
             }
         )
         .await
@@ -534,14 +513,14 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_email_success(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
         AccountProvider::Password.into(),
         "wasya",
     );
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account).await.unwrap();
 
@@ -585,6 +564,8 @@ pub async fn test_update_email_success(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_email_errors(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account_1 = make_test_account(
         "wasya",
         "wasya@example.com",
@@ -597,8 +578,6 @@ pub async fn test_update_email_errors(catalog: &Catalog) {
         AccountProvider::Password.into(),
         "petya",
     );
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account_1).await.unwrap();
     account_repo.save_account(&account_2).await.unwrap();
@@ -628,14 +607,14 @@ pub async fn test_update_email_errors(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_success(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
         AccountProvider::Password.into(),
         "wasya",
     );
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account).await.unwrap();
 
@@ -692,14 +671,14 @@ pub async fn test_update_account_success(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_not_found(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
         AccountProvider::Password.into(),
         "wasya",
     );
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account).await.unwrap();
 
@@ -717,6 +696,8 @@ pub async fn test_update_account_not_found(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_duplicate_email(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account_1 = make_test_account(
         "wasya",
         "wasya@example.com",
@@ -729,8 +710,6 @@ pub async fn test_update_account_duplicate_email(catalog: &Catalog) {
         AccountProvider::Password.into(),
         "petya",
     );
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account_1).await.unwrap();
     account_repo.save_account(&account_2).await.unwrap();
@@ -751,6 +730,8 @@ pub async fn test_update_account_duplicate_email(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_duplicate_name(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account_1 = make_test_account(
         "wasya",
         "wasya@example.com",
@@ -763,8 +744,6 @@ pub async fn test_update_account_duplicate_name(catalog: &Catalog) {
         AccountProvider::Password.into(),
         "petya",
     );
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account_1).await.unwrap();
     account_repo.save_account(&account_2).await.unwrap();
@@ -785,6 +764,8 @@ pub async fn test_update_account_duplicate_name(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_duplicate_provider_identity(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let account_1 = make_test_account(
         "wasya",
         "wasya@example.com",
@@ -797,8 +778,6 @@ pub async fn test_update_account_duplicate_provider_identity(catalog: &Catalog) 
         AccountProvider::Password.into(),
         "petya",
     );
-
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     account_repo.save_account(&account_1).await.unwrap();
     account_repo.save_account(&account_2).await.unwrap();
@@ -849,6 +828,7 @@ pub async fn test_get_accounts_by_names(catalog: &Catalog) {
     account_repo.save_account(&account_2).await.unwrap();
     account_repo.save_account(&account_3).await.unwrap();
 
+    // Regular case.
     let accounts_names = [
         &account_1_not_saved.account_name,
         &account_2.account_name,
@@ -857,6 +837,29 @@ pub async fn test_get_accounts_by_names(catalog: &Catalog) {
     ];
     let found_accounts = account_repo
         .get_accounts_by_names(&accounts_names)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| (a.account_name, a.id))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        [
+            (account_3.account_name.clone(), account_3.id.clone()),
+            (account_2.account_name.clone(), account_2.id.clone()),
+        ],
+        *found_accounts
+    );
+
+    // Mixed case.
+    let mixed_accounts_names = [
+        &odf::AccountName::new_unchecked("aCcOuNt_1_nOt_SaVeD"),
+        &odf::AccountName::new_unchecked("PetyA"),
+        &odf::AccountName::new_unchecked("WaSya"),
+        &odf::AccountName::new_unchecked("aCcOuNt_4_nOt_SaVeD"),
+    ];
+    let found_accounts = account_repo
+        .get_accounts_by_names(&mixed_accounts_names)
         .await
         .unwrap()
         .into_iter()
@@ -885,7 +888,7 @@ pub async fn test_all_accounts(catalog: &Catalog) {
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
-    assert_eq!([] as [Account; 0], *accounts);
+    assert_eq!([] as [Account; _], *accounts);
 
     let account_1 = make_test_account(
         "account_1",
@@ -957,6 +960,120 @@ pub async fn test_all_accounts(catalog: &Catalog) {
             *accounts
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_account(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let not_saved_account = make_test_account(
+        "account",
+        "account@example.com",
+        AccountProvider::Password.into(),
+        "account",
+    );
+
+    // 1. Delete non-existent account.
+    assert_matches!(
+        account_repo
+            .delete_account_by_id(&not_saved_account.id)
+            .await,
+        Err(DeleteAccountByIdError::NotFound(_))
+    );
+
+    let account = not_saved_account;
+    assert_matches!(account_repo.save_account(&account).await, Ok(_));
+
+    // 2. Delete existent account.
+    assert_matches!(account_repo.delete_account_by_id(&account.id).await, Ok(_));
+
+    // 3. Try to delete an already deleted account.
+    assert_matches!(
+        account_repo.delete_account_by_id(&account.id).await,
+        Err(DeleteAccountByIdError::NotFound(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_locale_account(
+    account_repo: &dyn AccountRepository,
+    account: Account,
+    mixed_case_account_name: odf::AccountName,
+    tag: &str,
+) {
+    // 1. Get account(s)
+    assert_matches!(
+        account_repo.get_account_by_id(&account.id).await,
+        Ok(actual_account)
+            if actual_account == account,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_ids(&[&account.id]).await,
+        Ok(accounts)
+            if accounts == [account.clone()],
+        "Tag: {tag}"
+    );
+    // 1.1. Regular case
+    assert_matches!(
+        account_repo.get_account_by_name(&account.account_name).await,
+        Ok(actual_account)
+            if actual_account == account,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_names(&[&account.account_name]).await,
+        Ok(actual_accounts)
+            if actual_accounts == [account.clone()],
+        "Tag: {tag}"
+    );
+    // 1.2. Mixed case
+    assert_matches!(
+        account_repo.get_account_by_name(&mixed_case_account_name).await,
+        Ok(actual_account)
+            if actual_account == account,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.get_accounts_by_names(&[&mixed_case_account_name]).await,
+        Ok(actual_accounts)
+            if actual_accounts == [account.clone()],
+        "Tag: {tag}"
+    );
+
+    // 2. Get account id(s)
+    assert_matches!(
+        account_repo
+            .find_account_id_by_provider_identity_key(&account.provider_identity_key)
+            .await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
+    assert_matches!(
+        account_repo.find_account_id_by_email(&account.email).await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
+    // 2.1. Regular case
+    assert_matches!(
+        account_repo.find_account_id_by_name(&account.account_name).await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
+    // 2.2. Mixed case
+    assert_matches!(
+        account_repo.find_account_id_by_name(&mixed_case_account_name).await,
+        Ok(Some(found_id))
+            if found_id == account.id,
+        "Tag: {tag}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

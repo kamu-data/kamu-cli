@@ -28,6 +28,7 @@ pub struct InMemoryAccountRepository {
 #[derive(Default)]
 struct State {
     accounts_by_id: HashMap<odf::AccountID, Account>,
+    // NOTE: Name hash is case-insensitive
     accounts_by_name: HashMap<odf::AccountName, Account>,
     account_id_by_provider_identity_key: HashMap<String, odf::AccountID>,
     password_hash_by_account_id: HashMap<odf::AccountID, String>,
@@ -361,16 +362,16 @@ impl AccountRepository for InMemoryAccountRepository {
         Box::pin(futures::stream::iter(found_accounts))
     }
 
-    async fn delete_account_by_name(
+    async fn delete_account_by_id(
         &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountByNameError> {
+        account_id: &odf::AccountID,
+    ) -> Result<(), DeleteAccountByIdError> {
         let mut guard = self.state.lock().unwrap();
 
-        let maybe_deleted_account = guard.accounts_by_name.remove(account_name);
+        let maybe_deleted_account = guard.accounts_by_id.remove(account_id);
 
         if let Some(deleted_account) = maybe_deleted_account {
-            guard.accounts_by_id.remove(&deleted_account.id);
+            guard.accounts_by_name.remove(&deleted_account.account_name);
             guard
                 .account_id_by_provider_identity_key
                 .remove(&deleted_account.provider_identity_key);
@@ -380,11 +381,9 @@ impl AccountRepository for InMemoryAccountRepository {
 
             Ok(())
         } else {
-            Err(DeleteAccountByNameError::NotFound(
-                AccountNotFoundByNameError {
-                    account_name: account_name.clone(),
-                },
-            ))
+            Err(DeleteAccountByIdError::NotFound(AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            }))
         }
     }
 

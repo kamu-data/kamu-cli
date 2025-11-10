@@ -31,7 +31,7 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
             .await?;
 
         self.account_service
-            .delete_account_by_name(&account.account_name)
+            .delete_account_by_id(&account.id)
             .await?;
 
         use messaging_outbox::OutboxExt;

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT dataset_id   as \"id: _\",\n                   owner_id     as \"owner_id: _\",\n                   owner_name,\n                   dataset_name as name,\n                   created_at   as \"created_at: _\",\n                   kind         as \"kind: _\"\n            FROM dataset_entries\n            WHERE owner_id = $1\n              AND lower(dataset_name) = lower($2)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "owner_id: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "owner_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 4,
+        "type_info": "Null"
+      },
+      {
+        "name": "kind: _",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ff6ed7bf16a5e11bee717728e7cd1c45cede6d1d74853277aba77859d0d60e4c"
+}

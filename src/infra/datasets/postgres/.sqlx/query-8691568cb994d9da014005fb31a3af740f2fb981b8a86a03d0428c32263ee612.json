@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                DELETE\n                FROM dataset_entries\n                WHERE dataset_id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8691568cb994d9da014005fb31a3af740f2fb981b8a86a03d0428c32263ee612"
+}
