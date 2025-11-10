@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Fixed
-- Dataset statistics is now processed transactionaly and correctly appear after pulling dataset
+- Dataset statistics is now processed correctly without cached metadata
 
 ## [0.252.3] - 2025-11-10
 ### Changed

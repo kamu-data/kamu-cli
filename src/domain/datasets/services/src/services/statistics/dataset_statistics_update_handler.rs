@@ -35,7 +35,8 @@ use super::compute_dataset_statistics_increment;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    // Update statistics immediately with reference changes
+    delivery: MessageDeliveryMechanism::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetStatisticsUpdateHandler {
@@ -77,7 +78,7 @@ impl DatasetStatisticsUpdateHandler {
         updated_message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
         let increment = compute_dataset_statistics_increment(
-            target.as_metadata_chain(),
+            target.as_metadata_chain().as_uncached_chain(),
             &updated_message.new_block_hash,
             updated_message.maybe_prev_block_hash.as_ref(),
         )
