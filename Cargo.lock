@@ -6937,6 +6937,7 @@ dependencies = [
  "opendatafabric",
  "oso",
  "pretty_assertions",
+ "rayon",
  "test-log",
  "thiserror 2.0.17",
  "time-source",

@@ -23,6 +23,7 @@ use kamu::{
     PushIngestExecutorImpl,
     PushIngestPlannerImpl,
     QueryServiceImpl,
+    SessionContextBuilder,
 };
 use kamu_core::{DatasetRegistry, DidGenerator, FileUploadLimitConfig, MockDidGenerator};
 use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
@@ -41,9 +42,7 @@ async fn test_update_versioned_file_use_case() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = UpdateVersionFileCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_check_write_dataset(&dataset_id_foo, 2, true)
-            .expect_check_read_dataset(&dataset_id_foo, 2, true),
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 2, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -80,9 +79,7 @@ async fn test_update_versioned_file_use_case_errors() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = UpdateVersionFileCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_check_read_dataset(&dataset_id_foo, 2, true)
-            .expect_check_write_dataset(&dataset_id_foo, 2, true),
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 2, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -159,6 +156,7 @@ impl UpdateVersionFileCaseHarness {
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>()
             .add::<QueryServiceImpl>()
+            .add::<SessionContextBuilder>()
             .add_value(FileUploadLimitConfig::new_in_bytes(24))
             .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .build();

@@ -35,7 +35,7 @@ async fn test_push_ingest_data_source_not_found() {
     assert_matches!(
         harness
             .ingest_data(
-                &ResolvedDataset::from_created(&create_dataset_result),
+                ResolvedDataset::from_created(&create_dataset_result),
                 DataSource::Stream(Box::new(data_stream)),
                 PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -74,7 +74,7 @@ async fn test_push_ingest_data_from_json() {
     assert_matches!(
         harness
             .ingest_data(
-                &ResolvedDataset::from_created(&create_dataset_result),
+                ResolvedDataset::from_created(&create_dataset_result),
                 DataSource::Stream(Box::new(data_stream)),
                 PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -119,7 +119,7 @@ async fn test_push_ingest_data_from_file() {
     assert_matches!(
         harness
             .ingest_data(
-                &ResolvedDataset::from_created(&create_dataset_result),
+                ResolvedDataset::from_created(&create_dataset_result),
                 DataSource::Stream(data_stream),
                 PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -183,7 +183,7 @@ impl PushIngestDataUseCaseHarness {
 
     async fn ingest_data(
         &self,
-        target: &ResolvedDataset,
+        target: ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
     ) -> Result<PushIngestResult, PushIngestDataError> {

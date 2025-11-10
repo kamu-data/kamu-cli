@@ -12,21 +12,15 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use datafusion::execution::runtime_env::RuntimeEnvBuilder;
-use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
-use datafusion::parquet::file::metadata::ParquetMetaData;
-use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use futures::TryStreamExt;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt as _};
-use kamu_core::{auth, *};
+use kamu_core::*;
 use odf::utils::data::DataFrameExt;
 
-use crate::EngineConfigDatafusionEmbeddedBatchQuery;
-use crate::services::query::*;
+use crate::SessionContextBuilder;
 use crate::utils::docker_images;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,56 +28,12 @@ use crate::utils::docker_images;
 #[dill::component]
 #[dill::interface(dyn QueryService)]
 pub struct QueryServiceImpl {
+    session_context_builder: Arc<SessionContextBuilder>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    object_store_registry: Arc<dyn ObjectStoreRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    datafusion_engine_config: Arc<EngineConfigDatafusionEmbeddedBatchQuery>,
 }
 
 impl QueryServiceImpl {
-    async fn session_context(
-        &self,
-        options: QueryOptions,
-    ) -> Result<SessionContext, InternalError> {
-        assert!(
-            options.input_datasets.is_some(),
-            "QueryService should resolve all inputs"
-        );
-        for opts in options.input_datasets.as_ref().unwrap().values() {
-            assert!(
-                opts.hints.handle.is_some(),
-                "QueryService should pre-resolve handles"
-            );
-        }
-
-        let config = self.datafusion_engine_config.0.clone();
-
-        let runtime = Arc::new(
-            RuntimeEnvBuilder::new()
-                .with_object_store_registry(
-                    self.object_store_registry.clone().as_datafusion_registry(),
-                )
-                .build()
-                .unwrap(),
-        );
-
-        #[allow(unused_mut)]
-        let mut ctx = SessionContext::new_with_config_rt(config, runtime);
-
-        let schema = KamuSchema::prepare(&ctx, self.dataset_registry.clone(), options).await?;
-
-        ctx.register_catalog("kamu", Arc::new(KamuCatalog::new(Arc::new(schema))));
-
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "query-extensions-json")] {
-                datafusion_functions_json::register_all(&mut ctx).unwrap();
-            }
-        }
-
-        Ok(ctx)
-    }
-
     /// Unless state is already provided in the options this will attempt to
     /// parse the SQL, extract the names of all datasets mentioned in the
     /// query and affix their states in the query options to specific blocks.
@@ -243,6 +193,7 @@ impl QueryServiceImpl {
                             block_hash: None,
                             hints: DatasetQueryHints {
                                 handle: Some(hdl),
+                                source_dataset: None, // not pre-resolved yet
                                 last_records_to_consider: None,
                                 does_not_need_schema: !needs_schema,
                             },
@@ -319,6 +270,7 @@ impl QueryServiceImpl {
                             block_hash: Some(block_hash),
                             hints: DatasetQueryHints {
                                 handle: Some(hdl),
+                                source_dataset: Some(resolved_dataset),
                                 last_records_to_consider: None,
                                 does_not_need_schema: !needs_schema,
                             },
@@ -340,12 +292,10 @@ impl QueryServiceImpl {
 
     async fn single_dataset(
         &self,
-        dataset_ref: &odf::DatasetRef,
+        resolved_dataset: &ResolvedDataset,
         last_records_to_consider: Option<u64>,
         head: Option<odf::Multihash>,
-    ) -> Result<(ResolvedDataset, odf::Multihash, Option<DataFrameExt>), QueryError> {
-        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
-
+    ) -> Result<(odf::Multihash, Option<DataFrameExt>), QueryError> {
         let head = if let Some(head) = head {
             head
         } else {
@@ -357,6 +307,7 @@ impl QueryServiceImpl {
         };
 
         let ctx = self
+            .session_context_builder
             .session_context(QueryOptions {
                 input_datasets: Some(BTreeMap::from([(
                     resolved_dataset.get_id().clone(),
@@ -365,6 +316,7 @@ impl QueryServiceImpl {
                         block_hash: Some(head.clone()),
                         hints: DatasetQueryHints {
                             handle: Some(resolved_dataset.get_handle().clone()),
+                            source_dataset: Some(resolved_dataset.clone()),
                             last_records_to_consider,
                             does_not_need_schema: false,
                         },
@@ -380,49 +332,10 @@ impl QueryServiceImpl {
             .await?;
 
         if df.schema().fields().is_empty() {
-            Ok((resolved_dataset, head, None))
+            Ok((head, None))
         } else {
-            Ok((resolved_dataset, head, Some(df.into())))
+            Ok((head, Some(df.into())))
         }
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn get_schema_impl(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<Arc<odf::schema::DataSchema>>, QueryError> {
-        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
-
-        use odf::dataset::MetadataChainExt;
-        let schema = resolved_dataset
-            .as_metadata_chain()
-            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
-            .await
-            .int_err()?
-            .into_event()
-            .map(|e| Arc::new(e.upgrade().schema));
-
-        Ok(schema)
-    }
-
-    async fn resolve_dataset(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<ResolvedDataset, QueryError> {
-        let resolved_dataset = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Read)
-            .await
-            .map_err(|e| {
-                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
-                match e {
-                    E::NotFound(e) => QueryError::DatasetNotFound(e),
-                    E::Access(e) => QueryError::Access(e),
-                    e @ E::Internal(_) => QueryError::Internal(e.int_err()),
-                }
-            })?;
-
-        Ok(resolved_dataset)
     }
 }
 
@@ -456,6 +369,7 @@ impl QueryService for QueryServiceImpl {
                         block_hash: None,
                         hints: DatasetQueryHints {
                             handle: Some(hdl),
+                            source_dataset: None, // not pre-resolved yet
                             last_records_to_consider: None,
                             does_not_need_schema: false,
                         },
@@ -465,6 +379,7 @@ impl QueryService for QueryServiceImpl {
             .collect();
 
         let ctx = self
+            .session_context_builder
             .session_context(QueryOptions {
                 input_datasets: Some(input_datasets),
             })
@@ -477,17 +392,17 @@ impl QueryService for QueryServiceImpl {
         level = "info",
         name = QueryServiceImpl_tail,
         skip_all,
-        fields(%dataset_ref, %skip, %limit)
+        fields(hdl=%source.get_handle(), %skip, %limit)
     )]
     async fn tail(
         &self,
-        dataset_ref: &odf::DatasetRef,
+        source: ResolvedDataset,
         skip: u64,
         limit: u64,
         options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
-        let (resolved_dataset, head, df) = self
-            .single_dataset(dataset_ref, Some(skip + limit), options.block_hash)
+        let (head, df) = self
+            .single_dataset(&source, Some(skip + limit), options.block_hash)
             .await?;
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
@@ -496,13 +411,13 @@ impl QueryService for QueryServiceImpl {
         let Some(df) = df else {
             return Ok(GetDataResponse {
                 df: None,
-                dataset_handle: resolved_dataset.take_handle(),
+                source,
                 block_hash: head,
             });
         };
 
         use odf::dataset::MetadataChainExt;
-        let vocab: odf::metadata::DatasetVocabulary = resolved_dataset
+        let vocab: odf::metadata::DatasetVocabulary = source
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchSetVocabVisitor::new())
             .await
@@ -525,9 +440,97 @@ impl QueryService for QueryServiceImpl {
 
         Ok(GetDataResponse {
             df: Some(df),
-            dataset_handle: resolved_dataset.take_handle(),
+            source,
             block_hash: head,
         })
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(hdl=%source.get_handle()))]
+    async fn get_data(
+        &self,
+        source: ResolvedDataset,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        // TODO: PERF: Limit push-down opportunity
+        let (head, df) = self
+            .single_dataset(&source, None, options.block_hash)
+            .await?;
+
+        Ok(GetDataResponse {
+            df,
+            source,
+            block_hash: head,
+        })
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data_multi, skip_all)]
+    async fn get_data_multi(
+        &self,
+        sources: Vec<ResolvedDataset>,
+    ) -> Result<Vec<GetDataResponse>, QueryError> {
+        let mut sources_with_head = Vec::new();
+
+        // TODO: consider vectorized head resolution
+        for source in sources {
+            let head = source
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?;
+            sources_with_head.push((source, head));
+        }
+
+        let input_datasets = sources_with_head
+            .iter()
+            .map(|(ds, head)| {
+                (
+                    ds.get_id().clone(),
+                    QueryOptionsDataset {
+                        alias: ds.get_alias().to_string(),
+                        block_hash: Some(head.clone()),
+                        hints: DatasetQueryHints {
+                            handle: Some(ds.get_handle().clone()),
+                            source_dataset: Some(ds.clone()),
+                            last_records_to_consider: None,
+                            does_not_need_schema: false,
+                        },
+                    },
+                )
+            })
+            .collect();
+
+        let ctx = self
+            .session_context_builder
+            .session_context(QueryOptions {
+                input_datasets: Some(input_datasets),
+            })
+            .await?;
+
+        let mut results = Vec::new();
+
+        for (source, head) in sources_with_head {
+            let df = ctx
+                .table(TableReference::bare(source.get_alias().to_string()))
+                .await?;
+
+            let res = if df.schema().fields().is_empty() {
+                GetDataResponse {
+                    df: None,
+                    source,
+                    block_hash: head,
+                }
+            } else {
+                GetDataResponse {
+                    df: Some(df.into()),
+                    source,
+                    block_hash: head,
+                }
+            };
+
+            results.push(res);
+        }
+
+        Ok(results)
     }
 
     #[tracing::instrument(level = "info", name = QueryServiceImpl_sql_statement, skip_all)]
@@ -541,138 +544,15 @@ impl QueryService for QueryServiceImpl {
         let (state, new_options) = self.resolve_query_state(statement, options).await?;
         tracing::info!(?state, ?new_options, "Resolved SQL query state");
 
-        let ctx = self.session_context(new_options).await?;
+        let ctx = self
+            .session_context_builder
+            .session_context(new_options)
+            .await?;
         let df = ctx.sql(statement).await?;
 
         Ok(QueryResponse {
             df: df.into(),
             state,
-        })
-    }
-
-    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_schema, skip_all, fields(%dataset_ref))]
-    async fn get_schema(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<Arc<odf::schema::DataSchema>>, QueryError> {
-        self.get_schema_impl(dataset_ref).await
-    }
-
-    #[tracing::instrument(level = "info", skip_all, name = QueryServiceImpl_get_last_data_chunk_schema_arrow, fields(%dataset_ref))]
-    async fn get_last_data_chunk_schema_arrow(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<datafusion::arrow::datatypes::SchemaRef>, QueryError> {
-        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
-
-        use odf::dataset::MetadataChainExt;
-        let Some(last_data_slice_hash) = resolved_dataset
-            .as_metadata_chain()
-            .last_data_block_with_new_data()
-            .await
-            .int_err()
-            .map_err(|e| {
-                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
-                e
-            })?
-            .into_event()
-            .and_then(|event| event.new_data)
-            .map(|new_data| new_data.physical_hash)
-        else {
-            return Ok(None);
-        };
-
-        let data_url = resolved_dataset
-            .as_data_repo()
-            .get_internal_url(&last_data_slice_hash)
-            .await;
-
-        let ctx = self
-            .session_context(QueryOptions {
-                input_datasets: Some(BTreeMap::new()),
-            })
-            .await?;
-
-        let df = ctx
-            .read_parquet(
-                data_url.to_string(),
-                ParquetReadOptions {
-                    schema: None,
-                    file_sort_order: Vec::new(),
-                    file_extension: "",
-                    table_partition_cols: Vec::new(),
-                    parquet_pruning: None,
-                    skip_metadata: None,
-                    file_decryption_properties: None,
-                },
-            )
-            .await
-            .int_err()?;
-
-        Ok(Some(df.schema().inner().clone()))
-    }
-
-    #[tracing::instrument(level = "info", skip_all, name = QueryServiceImpl_get_last_data_chunk_schema_parquet, fields(%dataset_ref))]
-    async fn get_last_data_chunk_schema_parquet(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<Type>, QueryError> {
-        let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
-
-        use odf::dataset::MetadataChainExt;
-        let Some(last_data_slice_hash) = resolved_dataset
-            .as_metadata_chain()
-            .last_data_block_with_new_data()
-            .await
-            .int_err()
-            .map_err(|e| {
-                tracing::error!(error = ?e, error_msg = %e, "Resolving last data slice failed");
-                e
-            })?
-            .into_event()
-            .and_then(|event| event.new_data)
-            .map(|new_data| new_data.physical_hash)
-        else {
-            return Ok(None);
-        };
-
-        let data_url = Box::new(
-            resolved_dataset
-                .as_data_repo()
-                .get_internal_url(&last_data_slice_hash)
-                .await,
-        );
-
-        let ctx = self
-            .session_context(QueryOptions {
-                input_datasets: Some(BTreeMap::new()),
-            })
-            .await?;
-
-        let object_store = ctx.runtime_env().object_store(&data_url)?;
-
-        let data_path = object_store::path::Path::from_url_path(data_url.path()).int_err()?;
-
-        let metadata = read_data_slice_metadata(object_store, data_path).await?;
-
-        Ok(Some(metadata.file_metadata().schema().clone()))
-    }
-
-    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(%dataset_ref))]
-    async fn get_data(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        options: GetDataOptions,
-    ) -> Result<GetDataResponse, QueryError> {
-        // TODO: PERF: Limit push-down opportunity
-        let (resolved_dataset, head, df) = self
-            .single_dataset(dataset_ref, None, options.block_hash)
-            .await?;
-
-        Ok(GetDataResponse {
-            df,
-            dataset_handle: resolved_dataset.take_handle(),
-            block_hash: head,
         })
     }
 
@@ -700,32 +580,6 @@ impl QueryService for QueryServiceImpl {
             },
         ])
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tracing::instrument(level = "debug", skip_all, fields(%data_slice_store_path))]
-async fn read_data_slice_metadata(
-    object_store: Arc<dyn object_store::ObjectStore>,
-    data_slice_store_path: object_store::path::Path,
-) -> Result<Arc<ParquetMetaData>, QueryError> {
-    let mut parquet_object_reader = ParquetObjectReader::new(object_store, data_slice_store_path);
-
-    use datafusion::parquet::arrow::async_reader::AsyncFileReader;
-    let metadata = parquet_object_reader
-        .get_metadata(None)
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                error = ?e,
-                error_msg = %e,
-                "QueryService::read_data_slice_metadata: Parquet reader get metadata failed"
-            );
-            e
-        })
-        .int_err()?;
-
-    Ok(metadata)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

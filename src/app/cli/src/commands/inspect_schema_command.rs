@@ -34,7 +34,7 @@ pub enum SchemaOutputFormat {
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct InspectSchemaCommand {
-    query_svc: Arc<dyn QueryService>,
+    get_dataset_schema_use_case: Arc<dyn GetDatasetSchemaUseCase>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -338,7 +338,7 @@ impl InspectSchemaCommand {
 
     async fn get_odf_schema(&self) -> Result<Option<Arc<odf::schema::DataSchema>>, CLIError> {
         if !self.from_data_file {
-            self.query_svc
+            self.get_dataset_schema_use_case
                 .get_schema(&self.dataset_ref)
                 .await
                 .map_err(Self::query_errors)
@@ -362,7 +362,7 @@ impl InspectSchemaCommand {
             Ok(Some(Arc::new(arrow_schema)))
         } else {
             let schema = self
-                .query_svc
+                .get_dataset_schema_use_case
                 .get_last_data_chunk_schema_arrow(&self.dataset_ref)
                 .await
                 .map_err(Self::query_errors)?;
@@ -379,7 +379,7 @@ impl InspectSchemaCommand {
                 .map(odf::utils::schema::convert::arrow_schema_to_parquet_schema))
         } else {
             let schema = self
-                .query_svc
+                .get_dataset_schema_use_case
                 .get_last_data_chunk_schema_parquet(&self.dataset_ref)
                 .await
                 .map_err(Self::query_errors)?;

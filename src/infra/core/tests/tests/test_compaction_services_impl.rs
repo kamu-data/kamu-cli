@@ -1403,7 +1403,7 @@ impl CompactTestHarness {
 
         self.ingest_data_use_case
             .execute(
-                &target,
+                target,
                 DataSource::Stream(Box::new(data)),
                 PushIngestDataUseCaseOptions {
                     source_name: None,

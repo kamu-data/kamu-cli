@@ -15,7 +15,7 @@ use crate::queries::DatasetRequestState;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetData<'a> {
-    dataset_request_state: &'a DatasetRequestState,
+    readable_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -24,16 +24,14 @@ impl<'a> DatasetData<'a> {
     const DEFAULT_TAIL_LIMIT: u64 = 20;
 
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
-            dataset_request_state,
-        }
+    pub fn new(readable_state: &'a DatasetRequestState) -> Self {
+        Self { readable_state }
     }
 
     /// Total number of records in this dataset
     #[tracing::instrument(level = "info", name = DatasetData_num_records_total, skip_all)]
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let dataset_statistics = self.dataset_request_state.dataset_statistics(ctx).await?;
+        let dataset_statistics = self.readable_state.dataset_statistics(ctx).await?;
         Ok(dataset_statistics.num_records)
     }
 
@@ -41,7 +39,7 @@ impl<'a> DatasetData<'a> {
     /// caching
     #[tracing::instrument(level = "info", name = DatasetData_estimated_size, skip_all)]
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let dataset_statistics = self.dataset_request_state.dataset_statistics(ctx).await?;
+        let dataset_statistics = self.readable_state.dataset_statistics(ctx).await?;
         Ok(dataset_statistics.data_size)
     }
 
@@ -77,9 +75,11 @@ impl<'a> DatasetData<'a> {
         let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);
         let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
+
         let query_res = match query_svc
             .tail(
-                &self.dataset_request_state.dataset_handle().as_local_ref(),
+                readable_dataset.clone(),
                 skip.unwrap_or(0),
                 limit,
                 domain::GetDataOptions::default(),
@@ -91,8 +91,8 @@ impl<'a> DatasetData<'a> {
         };
 
         let state = vec![DatasetState {
-            id: query_res.dataset_handle.id.into(),
-            alias: query_res.dataset_handle.alias.to_string(),
+            id: query_res.source.get_id().clone().into(),
+            alias: query_res.source.get_alias().to_string(),
             block_hash: Some(query_res.block_hash.into()),
         }];
 

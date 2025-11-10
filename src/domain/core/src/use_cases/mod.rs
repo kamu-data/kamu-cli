@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod queries;
+pub use queries::*;
+
 mod compact_dataset_use_case;
 mod pull_dataset_use_case;
 mod push_dataset_use_case;

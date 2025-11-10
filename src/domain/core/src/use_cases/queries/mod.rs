@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod kamu_catalog;
-mod kamu_schema;
-mod kamu_table;
+pub use get_dataset_schema_use_case::*;
+pub use query_dataset_data_use_case::*;
 
-pub(crate) use kamu_catalog::KamuCatalog;
-pub(crate) use kamu_schema::KamuSchema;
-pub(crate) use kamu_table::KamuTable;
+mod get_dataset_schema_use_case;
+mod query_dataset_data_use_case;

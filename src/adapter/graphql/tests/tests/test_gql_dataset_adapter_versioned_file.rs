@@ -702,6 +702,7 @@ impl GraphQLDatasetsHarness {
             .add::<DeleteDatasetUseCaseImpl>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
+            .add::<kamu::SessionContextBuilder>()
             .add::<kamu::ObjectStoreRegistryImpl>()
             .add::<kamu::ObjectStoreBuilderLocalFs>()
             .add_value(FileUploadLimitConfig::new_in_bytes(24))

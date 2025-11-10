@@ -353,6 +353,7 @@ impl GraphQLDataHarness {
 
             b.add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
                 .add::<QueryServiceImpl>()
+                .add::<SessionContextBuilder>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>();
 

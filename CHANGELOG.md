@@ -12,6 +12,12 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Refactor: QueryService was split on 3 parts (queries, schema, and session context builder)
+    + 2 extracted use cases (get schema and query data), clearly separating security checks from core operations
+- Concurrent execution for OSO checks and related resource loads when N datasets are requested simultaneously
+- KamuSchema: try reusing pre-resolved dataset, if hint is externally provided
+- Improved telemetry for entity loaders and spawned load tasks
 ### Fixed
 - Dataset statistics is now processed correctly without cached metadata
 
