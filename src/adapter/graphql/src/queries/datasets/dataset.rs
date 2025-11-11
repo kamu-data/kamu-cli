@@ -249,7 +249,7 @@ impl Dataset {
 
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = Dataset_as_versioned_file, skip_all)]
-    async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
+    pub async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
         let archetype = self.dataset_request_state.archetype(ctx).await?;
 
         if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {

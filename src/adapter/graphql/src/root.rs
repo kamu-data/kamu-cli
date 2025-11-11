@@ -75,11 +75,6 @@ impl Query {
         Admin
     }
 
-    /// Temporary: Molecule-specific functionality group
-    async fn molecule(&self) -> Molecule {
-        Molecule
-    }
-
     // Federation:
     // - These methods must be in Query root.
     // - Methods won't be shown in the GQL schema.
@@ -91,6 +86,7 @@ impl Query {
         ctx: &Context<'_>,
         id: AccountID<'_>,
     ) -> Result<Option<Account>> {
+        // NOTE: DataLoader-friendly
         Accounts.by_id(ctx, id).await
     }
 
@@ -101,7 +97,28 @@ impl Query {
         ctx: &Context<'_>,
         id: DatasetID<'_>,
     ) -> Result<Option<Dataset>> {
+        // NOTE: DataLoader-friendly
         Datasets.by_id(ctx, id).await
+    }
+
+    #[graphql(entity)]
+    #[tracing::instrument(level = "info", name = Query_find_versioned_file_entry_by_id, skip_all, fields(%id))]
+    async fn find_versioned_file_entry_by_id(
+        &self,
+        ctx: &Context<'_>,
+        id: DatasetID<'_>,
+    ) -> Result<Option<VersionedFileEntry>> {
+        let Some(dataset) = Datasets.by_id(ctx, id).await? else {
+            return Ok(None);
+        };
+        // TODO: omit this check?
+        let Some(versioned_file) = dataset.as_versioned_file(ctx).await? else {
+            // TODO: error?
+            return Ok(None);
+        };
+
+        // TODO: version? hash?
+        versioned_file.get_entry(ctx, None, None).await
     }
 }
 
