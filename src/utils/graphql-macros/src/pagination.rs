@@ -124,6 +124,7 @@ macro_rules! page_based_stream_connection {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(async_graphql::SimpleObject)]
+#[graphql(shareable)]
 pub struct PageBasedInfo {
     /// When paginating backwards, are there more items?
     pub has_previous_page: bool,
