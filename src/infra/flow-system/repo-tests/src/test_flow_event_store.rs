@@ -1155,6 +1155,33 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     )
     .await;
 
+    let mut expected_ids_list = vec![
+        system_case.gc_flow_ids.flow_id_running,
+        system_case.gc_flow_ids.flow_id_waiting,
+        foo_cases.compaction_flow_ids.flow_id_running,
+        foo_cases.ingest_flow_ids.flow_id_running,
+        foo_cases.compaction_flow_ids.flow_id_waiting,
+        foo_cases.ingest_flow_ids.flow_id_waiting,
+    ];
+    expected_ids_list.sort();
+    expected_ids_list.reverse();
+
+    assert_all_flow_expectations(
+        flow_event_store.clone(),
+        FlowFilters {
+            by_flow_types: None,
+            by_flow_statuses: Some(vec![FlowStatus::Waiting, FlowStatus::Running]),
+            by_initiator: None,
+        },
+        PaginationOpts {
+            offset: 0,
+            limit: 100,
+        },
+        6,
+        expected_ids_list,
+    )
+    .await;
+
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters {
