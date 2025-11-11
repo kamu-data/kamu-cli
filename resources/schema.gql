@@ -117,7 +117,7 @@ type AccountFieldNonUnique implements CreateAccountResult {
 }
 
 input AccountFlowFilters {
-	byStatus: FlowStatus
+	byStatus: [FlowStatus!]
 	byInitiator: InitiatorFilterInput
 	byDatasetIds: [DatasetID!]!
 	byProcessType: FlowProcessTypeFilterInput
@@ -1227,7 +1227,7 @@ type DatasetFlowConfigsMut {
 }
 
 input DatasetFlowFilters {
-	byStatus: FlowStatus
+	byStatus: [FlowStatus!]
 	byInitiator: InitiatorFilterInput
 	byProcessType: FlowProcessTypeFilterInput
 }

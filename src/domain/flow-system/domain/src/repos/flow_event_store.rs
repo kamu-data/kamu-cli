@@ -90,7 +90,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
 #[derive(Default, Debug, Clone)]
 pub struct FlowFilters {
     pub by_flow_types: Option<Vec<String>>,
-    pub by_flow_status: Option<FlowStatus>,
+    pub by_flow_statuses: Option<Vec<FlowStatus>>,
     pub by_initiator: Option<InitiatorFilter>,
 }
 
