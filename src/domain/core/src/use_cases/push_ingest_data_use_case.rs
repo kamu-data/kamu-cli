@@ -30,7 +30,7 @@ use crate::{
 pub trait PushIngestDataUseCase: Send + Sync {
     async fn execute(
         &self,
-        resolved_dataset: &ResolvedDataset,
+        target: ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,

@@ -19,6 +19,16 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## [0.252.4] - 2025-11-10
+### Changed
+- Refactor: QueryService was split on 3 parts (queries, schema, and session context builder)
+    + 2 extracted use cases (get schema and query data), clearly separating security checks from core operations
+- Concurrent execution for OSO checks and related resource loads when N datasets are requested simultaneously
+- KamuSchema: try reusing pre-resolved dataset, if hint is externally provided
+- Improved telemetry for entity loaders and spawned load tasks
+### Fixed
+- Dataset statistics is now processed correctly without cached metadata
+
 ## [0.252.3] - 2025-11-10
 ### Changed
 - Refactor: replaced `delete_account_by_name()` with `delete_account_by_id()` across repositories and services (#1442).

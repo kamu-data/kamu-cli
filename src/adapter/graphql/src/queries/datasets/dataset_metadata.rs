@@ -21,7 +21,7 @@ use crate::scalars::DatasetPushStatuses;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 pub struct DatasetMetadata<'a> {
-    dataset_request_state: &'a DatasetRequestState,
+    readable_state: &'a DatasetRequestState,
 }
 
 impl<'a> DatasetMetadata<'a> {
@@ -37,7 +37,7 @@ impl<'a> DatasetMetadata<'a> {
     > {
         let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
         let result = metadata_query_service
             .get_active_polling_source(resolved_dataset)
             .await
@@ -58,7 +58,7 @@ impl<'a> DatasetMetadata<'a> {
     > {
         let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let result = metadata_query_service
             .get_active_push_sources(resolved_dataset)
@@ -80,7 +80,7 @@ impl<'a> DatasetMetadata<'a> {
     > {
         let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
         let result = metadata_query_service
             .get_active_transform(resolved_dataset)
             .await?;
@@ -95,21 +95,19 @@ impl<'a> DatasetMetadata<'a> {
 #[Object]
 impl<'a> DatasetMetadata<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
-            dataset_request_state,
-        }
+    pub fn new(readable_state: &'a DatasetRequestState) -> Self {
+        Self { readable_state }
     }
 
     /// Access to the temporal metadata chain of the dataset
     async fn chain(&self) -> MetadataChain<'_> {
-        MetadataChain::new(self.dataset_request_state)
+        MetadataChain::new(self.readable_state)
     }
 
     /// Last recorded watermark
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_watermark, skip_all)]
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -127,13 +125,14 @@ impl<'a> DatasetMetadata<'a> {
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
     ) -> Result<Option<DataSchema>> {
-        let query_svc = from_catalog_n!(ctx, dyn kamu_core::QueryService);
+        let schema_svc = from_catalog_n!(ctx, dyn kamu_core::SchemaService);
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         // TODO: Default to Arrow eventually
         let format = format.unwrap_or(DataSchemaFormat::Parquet);
 
-        if let Some(schema) = query_svc
-            .get_schema(&self.dataset_request_state.dataset_handle().as_local_ref())
+        if let Some(schema) = schema_svc
+            .get_schema(readable_dataset.clone())
             .await
             .int_err()?
         {
@@ -153,7 +152,7 @@ impl<'a> DatasetMetadata<'a> {
             from_catalog_n!(ctx, dyn GetDatasetUpstreamDependenciesUseCase);
 
         let upstream_dependencies = get_dataset_upstream_dependencies_use_case
-            .execute(&self.dataset_request_state.dataset_handle().id)
+            .execute(&self.readable_state.dataset_handle().id)
             .await
             .int_err()?
             .into_iter()
@@ -182,7 +181,7 @@ impl<'a> DatasetMetadata<'a> {
             from_catalog_n!(ctx, dyn GetDatasetDownstreamDependenciesUseCase);
 
         let downstream_dependencies = get_dataset_downstream_dependencies_use_case
-            .execute(&self.dataset_request_state.dataset_handle().id)
+            .execute(&self.readable_state.dataset_handle().id)
             .await
             .int_err()?
             .into_iter()
@@ -229,7 +228,7 @@ impl<'a> DatasetMetadata<'a> {
         let service = from_catalog_n!(ctx, dyn kamu_core::RemoteStatusService);
 
         let statuses = service
-            .check_remotes_status(self.dataset_request_state.dataset_handle())
+            .check_remotes_status(self.readable_state.dataset_handle())
             .await?;
 
         Ok(statuses.into())
@@ -254,7 +253,7 @@ impl<'a> DatasetMetadata<'a> {
     /// Current descriptive information about the dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_info, skip_all)]
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -275,7 +274,7 @@ impl<'a> DatasetMetadata<'a> {
     /// dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_readme, skip_all)]
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -297,7 +296,7 @@ impl<'a> DatasetMetadata<'a> {
     /// Current license associated with the dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_license, skip_all)]
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -311,7 +310,7 @@ impl<'a> DatasetMetadata<'a> {
     /// Current vocabulary associated with the dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_vocab, skip_all)]
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -329,11 +328,10 @@ impl<'a> DatasetMetadata<'a> {
         event_types: Vec<MetadataEventType>,
         head: Option<Multihash<'_>>,
     ) -> Result<Vec<MetadataBlockExtended>> {
-        let account =
-            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
-                .await?
-                .expect("Account must exist");
-        let dataset_kind = self.dataset_request_state.dataset_handle().kind;
+        let account = Account::from_dataset_alias(ctx, &self.readable_state.dataset_handle().alias)
+            .await?
+            .expect("Account must exist");
+        let dataset_kind = self.readable_state.dataset_handle().kind;
 
         let mut attachments_visitor = event_types
             .contains(&MetadataEventType::SetAttachments)
@@ -363,7 +361,7 @@ impl<'a> DatasetMetadata<'a> {
             .contains(&MetadataEventType::AddPushSource)
             .then(|| odf::dataset::SearchActivePushSourcesVisitor::new(dataset_kind));
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>;
             9] = [
@@ -443,7 +441,7 @@ impl<'a> DatasetMetadata<'a> {
     /// if any
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_readme, skip_all)]
     async fn current_archetype(&self, ctx: &Context<'_>) -> Result<Option<DatasetArchetype>> {
-        let archetype = self.dataset_request_state.archetype(ctx).await?;
+        let archetype = self.readable_state.archetype(ctx).await?;
         Ok(archetype.map(Into::into))
     }
 }

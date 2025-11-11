@@ -18,14 +18,14 @@ use crate::queries::{CollectionEntry, DatasetRequestState};
 
 #[derive(Debug)]
 pub struct CollectionMut<'a> {
-    state: &'a DatasetRequestState,
+    writable_state: &'a DatasetRequestState,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'a> CollectionMut<'a> {
-    pub fn new(state: &'a DatasetRequestState) -> Self {
-        Self { state }
+    pub fn new(writable_state: &'a DatasetRequestState) -> Self {
+        Self { writable_state }
     }
 
     // Push ingest the new record
@@ -39,7 +39,7 @@ impl<'a> CollectionMut<'a> {
     ) -> Result<CollectionUpdateResult> {
         use std::io::Write;
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
+        let target = self.writable_state.resolved_dataset(ctx).await?;
 
         let push_ingest_use_case = from_catalog_n!(ctx, dyn domain::PushIngestDataUseCase);
 
@@ -52,7 +52,7 @@ impl<'a> CollectionMut<'a> {
 
         let ingest_result = match push_ingest_use_case
             .execute(
-                dataset,
+                target.clone(),
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(ndjson)),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -117,12 +117,13 @@ impl<'a> CollectionMut<'a> {
         }
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let writable_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
         // Load current state
         // TODO: PERF: Filter paths that are relevant to operations
         let query_res = query_svc
             .get_data(
-                &self.state.dataset_handle().as_local_ref(),
+                writable_dataset.clone(), // Writable means readable too
                 domain::GetDataOptions::default(),
             )
             .await

@@ -17,12 +17,12 @@ use crate::queries::DatasetRequestState;
 
 #[derive(Debug)]
 pub struct VersionedFile<'a> {
-    state: &'a DatasetRequestState,
+    readable_state: &'a DatasetRequestState,
 }
 
 impl<'a> VersionedFile<'a> {
-    pub fn new(state: &'a DatasetRequestState) -> Self {
-        Self { state }
+    pub fn new(readable_state: &'a DatasetRequestState) -> Self {
+        Self { readable_state }
     }
 
     pub fn dataset_snapshot(
@@ -100,11 +100,12 @@ impl<'a> VersionedFile<'a> {
         as_of_block_hash: Option<Multihash<'static>>,
     ) -> Result<Option<VersionedFileEntry>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let query_res = if let Some(block_hash) = as_of_block_hash {
             query_svc
                 .tail(
-                    &self.state.dataset_handle().as_local_ref(),
+                    readable_dataset.clone(),
                     0,
                     1,
                     domain::GetDataOptions {
@@ -116,22 +117,19 @@ impl<'a> VersionedFile<'a> {
             use datafusion::logical_expr::{col, lit};
 
             query_svc
-                .get_data(
-                    &self.state.dataset_handle().as_local_ref(),
-                    domain::GetDataOptions::default(),
-                )
+                .get_data(readable_dataset.clone(), domain::GetDataOptions::default())
                 .await
                 .map(|res| domain::GetDataResponse {
                     df: res
                         .df
                         .map(|df| df.filter(col("version").eq(lit(version))).unwrap()),
-                    dataset_handle: res.dataset_handle,
+                    source: res.source,
                     block_hash: res.block_hash,
                 })
         } else {
             query_svc
                 .tail(
-                    &self.state.dataset_handle().as_local_ref(),
+                    readable_dataset.clone(),
                     0,
                     1,
                     domain::GetDataOptions::default(),
@@ -151,7 +149,7 @@ impl<'a> VersionedFile<'a> {
 
         assert_eq!(records.len(), 1);
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
+        let dataset = self.readable_state.resolved_dataset(ctx).await?;
         let entry =
             VersionedFileEntry::from_json(dataset.clone(), records.into_iter().next().unwrap())?;
 
@@ -179,12 +177,10 @@ impl VersionedFile<'_> {
         let per_page = per_page.unwrap_or(Self::DEFAULT_VERSIONS_PER_PAGE);
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let query_res = query_svc
-            .get_data(
-                &self.state.dataset_handle().as_local_ref(),
-                domain::GetDataOptions::default(),
-            )
+            .get_data(readable_dataset.clone(), domain::GetDataOptions::default())
             .await
             .int_err()?;
 
@@ -214,7 +210,7 @@ impl VersionedFile<'_> {
 
         let records = df.collect_json_aos().await.int_err()?;
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
+        let dataset = self.readable_state.resolved_dataset(ctx).await?;
         let nodes = records
             .into_iter()
             .map(|r| VersionedFileEntry::from_json(dataset.clone(), r))

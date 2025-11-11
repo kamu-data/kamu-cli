@@ -174,7 +174,7 @@ impl Command for IngestCommand {
             let ingest_result = self
                 .push_ingest_data_use_case
                 .execute(
-                    &target_dataset,
+                    target_dataset.clone(),
                     DataSource::Url(url),
                     PushIngestDataUseCaseOptions {
                         source_name: self.source_name.clone(),

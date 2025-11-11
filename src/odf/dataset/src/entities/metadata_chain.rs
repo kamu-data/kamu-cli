@@ -319,7 +319,6 @@ pub trait MetadataChainExt: MetadataChain {
     /// interval under which we will be making the traverse.
     ///
     /// Note: the interval is `[head, tail)` - tail is exclusive
-    #[tracing::instrument(level = "debug", skip_all, fields(?head_hash, ?tail_hash))]
     async fn accept_by_interval<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],

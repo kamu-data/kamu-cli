@@ -35,7 +35,8 @@ mod provenance_service_impl;
 mod pull_request_planner_impl;
 mod push_request_planner_impl;
 mod query_service_impl;
-
+mod schema_service_impl;
+mod session_context_builder;
 mod verification_service_impl;
 
 pub use dataset_registry_solo_unit_bridge::*;
@@ -45,4 +46,6 @@ pub use provenance_service_impl::*;
 pub use pull_request_planner_impl::*;
 pub use push_request_planner_impl::*;
 pub use query_service_impl::*;
+pub use schema_service_impl::*;
+pub use session_context_builder::*;
 pub use verification_service_impl::*;

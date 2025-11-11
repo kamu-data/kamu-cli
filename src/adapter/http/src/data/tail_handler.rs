@@ -41,10 +41,10 @@ pub async fn dataset_tail_handler(
 ) -> Result<Json<DatasetTailResponse>, ApiError> {
     tracing::debug!(request = ?params, "Tail");
 
-    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let query_dataset_data = catalog.get_one::<dyn QueryDatasetDataUseCase>().unwrap();
 
     // TODO: Support `asOfBlockHash` parameter
-    let res = query_svc
+    let res = query_dataset_data
         .tail(
             &dataset_ref,
             params.skip,

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
@@ -17,7 +18,8 @@ use kamu_auth_rebac::{
     RebacDatasetRefUnresolvedError,
     RebacDatasetRegistryFacade,
 };
-use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
+use kamu_core::auth::{self, ClassifyByAllowanceDatasetActionUnauthorizedError};
+use kamu_core::{DatasetRegistry, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -128,23 +130,44 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         let mut accessible_resolved_refs =
             Vec::with_capacity(dataset_refs.len() - inaccessible_refs.len());
 
-        for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
-            use kamu_core::auth::DatasetActionAuthorizerExt;
+        // Build mapping of resolved handles to ref
+        let mut resolved_handles_to_refs = handles_resolution
+            .resolved_handles
+            .into_iter()
+            .map(|(dataset_ref, handle)| (handle, dataset_ref))
+            .collect::<HashMap<_, _>>();
 
-            let allowed = self
-                .dataset_action_authorizer
-                .is_action_allowed(&dataset_handle.id, action)
-                .await?;
+        // Extract handles for action classification
+        let resolved_handles = resolved_handles_to_refs.keys().cloned().collect();
 
-            if allowed {
-                accessible_resolved_refs.push((dataset_ref, dataset_handle));
-            } else {
-                let e = RebacDatasetRefUnresolvedError::not_enough_permissions(
-                    dataset_ref.clone(),
-                    action,
-                );
-                inaccessible_refs.push((dataset_ref, e));
-            }
+        // Run vectorized classification
+        let classification = self
+            .dataset_action_authorizer
+            .classify_dataset_handles_by_allowance(resolved_handles, action)
+            .await?;
+
+        // Collect authorized handles
+        for handle in classification.authorized_handles {
+            let handle_ref = resolved_handles_to_refs.remove(&handle).unwrap();
+            accessible_resolved_refs.push((handle_ref, handle));
+        }
+
+        // Create errors for unauthorized handles
+        for (handle, error) in classification.unauthorized_handles_with_errors {
+            let handle_ref = resolved_handles_to_refs.remove(&handle).unwrap();
+            let e = match error {
+                ClassifyByAllowanceDatasetActionUnauthorizedError::NotFound(e) => {
+                    RebacDatasetRefUnresolvedError::NotFound(e)
+                }
+                ClassifyByAllowanceDatasetActionUnauthorizedError::Access(e) => {
+                    RebacDatasetRefUnresolvedError::Access(e)
+                }
+                ClassifyByAllowanceDatasetActionUnauthorizedError::Internal(e) => {
+                    RebacDatasetRefUnresolvedError::Internal(e)
+                }
+            };
+
+            inaccessible_refs.push((handle_ref, e));
         }
 
         Ok(ClassifyDatasetRefsByAllowanceResponse {
