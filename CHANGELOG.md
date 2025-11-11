@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- GQL: `list_flows` accepts list of flow statuses for filtering
+
 ## [0.252.4] - 2025-11-10
 ### Changed
 - Refactor: QueryService was split on 3 parts (queries, schema, and session context builder)
