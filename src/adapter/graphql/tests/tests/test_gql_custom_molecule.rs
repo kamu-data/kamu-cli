@@ -76,7 +76,7 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_provision_project() {
-    let harness = GraphQLDatasetsHarness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -295,7 +295,7 @@ async fn test_molecule_provision_project() {
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_data_room_operations() {
-    let harness = GraphQLDatasetsHarness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -475,7 +475,7 @@ async fn test_molecule_data_room_operations() {
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_announcements_operations() {
-    let harness = GraphQLDatasetsHarness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -784,7 +784,7 @@ async fn test_molecule_announcements_operations() {
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_activity() {
-    let harness = GraphQLDatasetsHarness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -1414,14 +1414,14 @@ async fn test_molecule_activity() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-struct GraphQLDatasetsHarness {
+struct GraphQLMoleculeHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
     molecule_account_id: odf::AccountID,
 }
 
 #[bon]
-impl GraphQLDatasetsHarness {
+impl GraphQLMoleculeHarness {
     #[builder]
     pub async fn new(
         tenancy_config: TenancyConfig,
@@ -1439,6 +1439,8 @@ impl GraphQLDatasetsHarness {
             .add::<kamu_datasets_services::UpdateVersionFileUseCaseImpl>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
+            .add::<kamu::QueryDatasetDataUseCaseImpl>()
+            .add::<kamu::SessionContextBuilder>()
             .add::<kamu::ObjectStoreRegistryImpl>()
             .add::<kamu::ObjectStoreBuilderLocalFs>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedIngest::default())

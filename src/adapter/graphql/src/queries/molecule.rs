@@ -13,8 +13,8 @@ use chrono::{DateTime, Utc};
 use kamu::domain;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::ResolvedDataset;
 use kamu_core::auth::DatasetAction;
-use kamu_core::{DatasetRegistryExt, ResolvedDataset};
 use odf::utils::data::DataFrameExt;
 
 use super::{CollectionEntry, VersionedFileEntry};
@@ -247,10 +247,7 @@ impl Molecule {
 
         // Query full data
         let df = match query_svc
-            .get_data(
-                &projects_dataset.get_handle().as_local_ref(),
-                domain::GetDataOptions::default(),
-            )
+            .get_data(projects_dataset.clone(), domain::GetDataOptions::default())
             .await
         {
             Ok(res) => Ok(res.df),
@@ -369,7 +366,7 @@ impl Molecule {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
         // TODO: PERF: This "brute force" approach will not scale with growth of
         // projects and has to be revisited
@@ -400,7 +397,7 @@ impl Molecule {
         let mut announcement_dataframes = Vec::new();
         const DATASET_ID_COL: &str = "__dataset_id__";
 
-        for resp in query_svc
+        for resp in query_dataset_data
             .get_data_multi(&announcement_dataset_refs, true)
             .await
             .int_err()?
@@ -412,7 +409,7 @@ impl Molecule {
 
             // Attach dataset ID as a column to records to associate them later
             let df = df
-                .with_column(DATASET_ID_COL, lit(resp.dataset_handle.id.to_string()))
+                .with_column(DATASET_ID_COL, lit(resp.source.get_id().to_string()))
                 .int_err()?;
 
             announcement_dataframes.push(df);
@@ -620,9 +617,9 @@ impl MoleculeProject {
         ctx: &Context<'_>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
-        let df = match query_svc
+        let df = match query_dataset_data
             .tail(
                 &self.announcements_dataset_id.as_local_ref(),
                 0,
@@ -665,9 +662,9 @@ impl MoleculeProject {
         ctx: &Context<'_>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
-        let df = match query_svc
+        let df = match query_dataset_data
             .tail(
                 &self.data_room_dataset_id.as_local_ref(),
                 0,
@@ -742,10 +739,9 @@ impl MoleculeProject {
         ctx: &Context<'_>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
-        let (query_svc, dataset_reg) =
-            from_catalog_n!(ctx, dyn domain::QueryService, dyn domain::DatasetRegistry);
+        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
-        let df = match query_svc
+        let df = match query_dataset_data
             .get_data(
                 &self.data_room_dataset_id.as_local_ref(),
                 domain::GetDataOptions::default(),
@@ -777,14 +773,9 @@ impl MoleculeProject {
         let mut events = Vec::new();
 
         for did in dataset_ids {
-            let resolved_dataset = dataset_reg
-                .get_dataset_by_ref(&did.as_local_ref())
-                .await
-                .int_err()?;
-
-            let df = match query_svc
+            let (df, source) = match query_dataset_data
                 .tail(
-                    &resolved_dataset.get_handle().as_local_ref(),
+                    &did.as_local_ref(),
                     0,
                     limit as u64,
                     domain::GetDataOptions::default(),
@@ -792,7 +783,7 @@ impl MoleculeProject {
                 .await
             {
                 Ok(res) => match res.df {
-                    Some(df) => df,
+                    Some(df) => (df, res.source),
                     None => continue,
                 },
                 // Skip datasets we don't have access to
@@ -806,12 +797,10 @@ impl MoleculeProject {
 
             // TODO: Assuming every collection entry is a versioned file
             for record in records {
-                let dataset = Dataset::new_access_checked(
-                    project_account.clone(),
-                    resolved_dataset.get_handle().clone(),
-                );
+                let dataset =
+                    Dataset::from_resolved_authorized_dataset(project_account.clone(), &source);
 
-                let entry = VersionedFileEntry::from_json(resolved_dataset.clone(), record)?;
+                let entry = VersionedFileEntry::from_json(source.clone(), record)?;
 
                 events.push(MoleculeProjectEvent::FileUpdated(
                     MoleculeProjectEventFileUpdated {
