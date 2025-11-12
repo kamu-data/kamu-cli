@@ -13,7 +13,7 @@ use kamu_core::DatasetRegistryExt;
 use kamu_core::auth::DatasetAction;
 
 use crate::prelude::*;
-use crate::queries::{Molecule, MoleculeProject, molecule_subject};
+use crate::queries::{MoleculeProject, MoleculeV1, molecule_subject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,7 +65,7 @@ impl MoleculeMut {
 
         // Resolve projects dataset
         let (projects_dataset, df) =
-            Molecule::get_projects_snapshot(ctx, DatasetAction::Write, true).await?;
+            MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Write, true).await?;
 
         // Check for conflicts
         if let Some(df) = df {
@@ -126,7 +126,7 @@ impl MoleculeMut {
         };
 
         // Create `data-room` dataset
-        let snapshot = Molecule::dataset_snapshot_data_room(odf::DatasetAlias::new(
+        let snapshot = MoleculeV1::dataset_snapshot_data_room(odf::DatasetAlias::new(
             Some(project_account_name.clone()),
             odf::DatasetName::new_unchecked("data-room"),
         ));
@@ -141,7 +141,7 @@ impl MoleculeMut {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = Molecule::dataset_snapshot_announcements(odf::DatasetAlias::new(
+        let snapshot = MoleculeV1::dataset_snapshot_announcements(odf::DatasetAlias::new(
             Some(project_account_name.clone()),
             odf::DatasetName::new_unchecked("announcements"),
         ));
@@ -220,7 +220,7 @@ impl MoleculeMut {
     ) -> Result<Option<MoleculeProjectMut>> {
         use datafusion::logical_expr::{col, lit};
 
-        let Some(df) = Molecule::get_projects_snapshot(ctx, DatasetAction::Read, false)
+        let Some(df) = MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
             .await?
             .1
         else {

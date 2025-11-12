@@ -76,7 +76,7 @@ impl Query {
 
     /// Temporary: Molecule-specific functionality group
     async fn molecule(&self) -> Molecule {
-        Molecule
+        Molecule::default()
     }
 }
 
