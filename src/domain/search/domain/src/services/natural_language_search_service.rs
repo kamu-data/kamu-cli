@@ -14,7 +14,7 @@ use internal_error::InternalError;
 /// Provides search functionality for datasets and other objects managed by the
 /// current node
 #[async_trait::async_trait]
-pub trait SearchServiceLocal: Send + Sync {
+pub trait NaturalLanguageSearchService: Send + Sync {
     /// Search for datasets using a natural language prompt.
     ///
     /// Note that currently this API does NOT perform deduplication and

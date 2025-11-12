@@ -41,11 +41,11 @@ pub struct SearchServiceLocalIndexerConfig {
 #[dill::component(pub)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
-    job_name: "dev.kamu.search.SearchServiceLocalIndexer",
+    job_name: "dev.kamu.search.NaturalLanguageSearchIndexer",
     depends_on: &[JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER],
     requires_transaction: true,
 })]
-pub struct SearchServiceLocalIndexer {
+pub struct NaturalLanguageSearchIndexer {
     config: Arc<SearchServiceLocalIndexerConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
@@ -53,7 +53,7 @@ pub struct SearchServiceLocalIndexer {
     vector_repo: Arc<dyn VectorRepository>,
 }
 
-impl SearchServiceLocalIndexer {
+impl NaturalLanguageSearchIndexer {
     async fn dataset_metadata_as_document(
         &self,
         dataset: ResolvedDataset,
@@ -132,7 +132,7 @@ impl SearchServiceLocalIndexer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl InitOnStartup for SearchServiceLocalIndexer {
+impl InitOnStartup for NaturalLanguageSearchIndexer {
     #[tracing::instrument(level = "info", skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         if self.config.clear_on_start {

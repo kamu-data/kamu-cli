@@ -1066,8 +1066,8 @@ pub fn register_config_in_catalog(
         overfetch_amount,
     } = config.search.clone().unwrap();
 
-    catalog_builder.add::<kamu_search_services::SearchServiceLocalImplLazyInit>();
-    catalog_builder.add_value(kamu_search_services::SearchServiceLocalConfig {
+    catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
         overfetch_factor: overfetch_factor.unwrap(),
         overfetch_amount: overfetch_amount.unwrap(),
     });
