@@ -17,6 +17,8 @@ pub struct DatasetStatistics {
     pub num_records: u64,
     pub data_size: u64,
     pub checkpoints_size: u64,
+    pub num_object_links: u64,
+    pub object_links_size: u64,
 }
 
 impl std::ops::Add for DatasetStatistics {
@@ -28,8 +30,21 @@ impl std::ops::Add for DatasetStatistics {
             num_records: self.num_records + other.num_records,
             data_size: self.data_size + other.data_size,
             checkpoints_size: self.checkpoints_size + other.checkpoints_size,
+            num_object_links: self.num_object_links + other.num_object_links,
+            object_links_size: self.object_links_size + other.object_links_size,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TotalStatistic {
+    pub num_records: u64,
+    pub data_size: u64,
+    pub checkpoints_size: u64,
+    pub num_object_links: u64,
+    pub object_links_size: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

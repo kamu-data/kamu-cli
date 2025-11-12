@@ -16,6 +16,7 @@ use kamu_datasets::{
     DatasetStatisticsRepository,
     DatasetStatisticsService,
     GetDatasetStatisticsError,
+    TotalStatistic,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,6 +51,15 @@ impl DatasetStatisticsService for DatasetStatisticsServiceImpl {
             Err(GetDatasetStatisticsError::NotFound(_)) => Ok(DatasetStatistics::default()),
             Err(GetDatasetStatisticsError::Internal(e)) => Err(e),
         }
+    }
+
+    async fn get_total_statistic_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<TotalStatistic, InternalError> {
+        self.dataset_statistics_repo
+            .get_total_statistic_by_account_id(account_id)
+            .await
     }
 }
 
