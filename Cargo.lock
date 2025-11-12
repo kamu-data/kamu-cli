@@ -4710,6 +4710,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "elasticsearch"
+version = "9.1.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12bb303aa6e1d28c0c86b6fbfe484fd0fd3f512629aeed1ac4f6b85f81d9834a"
+dependencies = [
+ "base64 0.22.1",
+ "bytes",
+ "dyn-clone",
+ "flate2",
+ "lazy_static",
+ "parking_lot",
+ "percent-encoding",
+ "reqwest",
+ "rustc_version 0.4.1",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "tokio",
+ "url",
+ "void",
+]
+
+[[package]]
 name = "elliptic-curve"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7601,6 +7624,7 @@ dependencies = [
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
  "kamu-search",
+ "kamu-search-elasticsearch",
  "kamu-search-openai",
  "kamu-search-qdrant",
  "kamu-search-services",
@@ -8319,6 +8343,24 @@ dependencies = [
  "opendatafabric",
  "serde_json",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "kamu-search-elasticsearch"
+version = "0.252.4"
+dependencies = [
+ "async-trait",
+ "container-runtime",
+ "dill",
+ "elasticsearch",
+ "init-on-startup",
+ "internal-error",
+ "kamu-datasets",
+ "kamu-search",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -14240,6 +14282,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "void"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vsimd"

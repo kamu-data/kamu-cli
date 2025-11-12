@@ -187,6 +187,56 @@ sqlx-add-migration:
 	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add -r $$NAME --source $(dir) );)
 
 ###############################################################################
+# ElasticSsearch
+###############################################################################
+
+.PHONY: elasticsearch-setup
+elasticsearch-setup:
+	$(KAMU_CONTAINER_RUNTIME_TYPE) network create kamu-elastic-net || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull docker.io/library/elasticsearch:9.2.1
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull docker.io/library/kibana:9.2.1
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-elasticsearch || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-elasticsearch || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-kibana || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-kibana || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run \
+		--name kamu-elasticsearch \
+		--network kamu-elastic-net \
+		-p 9200:9200 \
+		-p 9300:9300 \
+		-e "ES_JAVA_OPTS=-Xms1024m -Xmx1024m" \
+  		-e "xpack.security.enabled=false" \
+  		-e "xpack.security.http.ssl.enabled=false" \
+  		-e "xpack.security.transport.ssl.enabled=false" \
+  		-e "xpack.ml.enabled=false" \
+		-e "discovery.type=single-node" \
+		-e ELASTIC_PASSWORD=root \
+		-v kamu-elastic-data:/usr/share/elasticsearch/data \
+		-d \
+		docker.io/library/elasticsearch:9.2.1
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run \
+		--name kamu-kibana \
+		--network kamu-elastic-net \
+		-e "ELASTICSEARCH_HOSTS=http://kamu-elasticsearch:9200" \
+  		-e "XPACK_SECURITY_ENABLED=false" \
+  		-e "NODE_OPTIONS=--max-old-space-size=512" \
+		-p 5601:5601 \
+		-d \
+		docker.io/library/kibana:9.2.1	
+	sleep 10  # Letting the containers to start
+
+# Stops and removes the ElasticSearch and Kibana containers + network
+.PHONY: elasticsearch-stop
+elasticsearch-stop:
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-elasticsearch || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-elasticsearch || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-kibana || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-kibana || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) network rm kamu-elastic-net || true
+
+# Stop actions + removes the ElasticSearch data volume
+.PHONY: elasticsearch-clean
+elasticsearch-clean:
+	$(MAKE) elasticsearch-stop
+	$(KAMU_CONTAINER_RUNTIME_TYPE) volume rm kamu-elastic-data || true
+
+###############################################################################
 # Podman cleanups (run from time to time to preserve tests performance)
 ###############################################################################
 

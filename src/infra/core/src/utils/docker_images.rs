@@ -14,7 +14,8 @@ pub const RISINGWAVE: &str = "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwa
 
 pub const LIVY: &str = SPARK;
 pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.7.1";
-pub const QDRANT: &str = "docker.io/qdrant/qdrant:v1.13.4";
+pub const QDRANT: &str = "docker.io/qdrant/qdrant:v1.15.0";
+pub const ELASTICSEARCH: &str = "docker.io/elasticsearch:9.2.1";
 pub const BUSYBOX: &str = "docker.io/busybox:latest";
 
 #[cfg(feature = "ingest-mqtt")]

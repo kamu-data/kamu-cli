@@ -1072,6 +1072,9 @@ pub struct SearchConfig {
     /// requested from vector store to compensate for filtering out results that
     /// may be inaccessible to user.
     pub overfetch_amount: Option<usize>,
+
+    /// Full-text search configuration
+    pub full_text: Option<FullTextSearchConfig>,
 }
 
 impl SearchConfig {
@@ -1100,6 +1103,14 @@ impl SearchConfig {
             })),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
+            full_text: Some(FullTextSearchConfig::ElasticSearch(
+                FullTextSearchConfigElasticSearch {
+                    url: "http://localhost:9200".to_string(),
+                    password: Some("root".to_string()),
+                    timeout_secs: Some(30),
+                    enable_compression: Some(false),
+                },
+            )),
         }
     }
 }
@@ -1119,6 +1130,9 @@ impl Default for SearchConfig {
             )),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
+            full_text: Some(FullTextSearchConfig::ElasticSearchContainer(
+                FullTextSearchConfigElasticSearchContainer::default(),
+            )),
         }
     }
 }
@@ -1282,6 +1296,65 @@ impl Default for VectorRepoConfigQdrantContainer {
         Self {
             image: Some(kamu::utils::docker_images::QDRANT.to_string()),
             dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum FullTextSearchConfig {
+    ElasticSearch(FullTextSearchConfigElasticSearch),
+    ElasticSearchContainer(FullTextSearchConfigElasticSearchContainer),
+}
+
+impl Default for FullTextSearchConfig {
+    fn default() -> Self {
+        Self::ElasticSearchContainer(FullTextSearchConfigElasticSearchContainer::default())
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
+pub struct FullTextSearchConfigElasticSearch {
+    #[merge(skip)]
+    pub url: String,
+    pub password: Option<String>,
+    pub timeout_secs: Option<u64>,
+    pub enable_compression: Option<bool>,
+}
+
+impl Default for FullTextSearchConfigElasticSearch {
+    fn default() -> Self {
+        Self {
+            url: "http://localhost:9200".to_string(),
+            password: None,
+            timeout_secs: Some(30),
+            enable_compression: Some(false),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
+pub struct FullTextSearchConfigElasticSearchContainer {
+    pub image: Option<String>,
+    pub start_timeout: Option<DurationString>,
+}
+
+impl Default for FullTextSearchConfigElasticSearchContainer {
+    fn default() -> Self {
+        Self {
+            image: Some(kamu::utils::docker_images::ELASTICSEARCH.to_string()),
             start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
         }
     }
