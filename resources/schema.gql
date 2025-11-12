@@ -3619,6 +3619,11 @@ type Search {
 	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
 	"""
 	Searches for datasets and other objects managed by the
+	current node using a full text prompt in natural language
+	"""
+	queryFullText: String!
+	"""
+	Searches for datasets and other objects managed by the
 	current node using a prompt in natural language
 	"""
 	queryNaturalLanguage(prompt: String!, perPage: Int): SearchResultExConnection!
