@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    (COALESCE(SUM(ds.num_records), 0))::BIGINT         AS num_records,\n                    (COALESCE(SUM(ds.data_size), 0))::BIGINT           AS data_size,\n                    (COALESCE(SUM(ds.checkpoints_size), 0))::BIGINT    AS checkpoints_size,\n                    (COALESCE(SUM(ds.num_object_links), 0))::BIGINT    AS num_object_links,\n                    (COALESCE(SUM(ds.object_links_size), 0))::BIGINT   AS object_links_size\n                FROM dataset_statistics ds\n                    LEFT JOIN dataset_entries de ON ds.dataset_id = de.dataset_id\n                WHERE de.owner_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "num_records",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "data_size",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "checkpoints_size",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "num_object_links",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "object_links_size",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "14959d5c3f9a66033127ab02ea6dbbe8a4ea1612e2bbc82605801e4732212087"
+}

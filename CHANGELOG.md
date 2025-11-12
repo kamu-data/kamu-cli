@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - GQL: `list_flows` accepts list of flow statuses for filtering
+- Dataset statistics now stores information about object links
+### Added
+- GQL: new entity `usage` for account which return full combined account statistic
 
 ## [0.252.4] - 2025-11-10
 ### Changed

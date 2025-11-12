@@ -15,6 +15,7 @@ use kamu_accounts::{
 };
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
+use kamu_datasets::DatasetStatisticsService;
 use tokio::sync::OnceCell;
 
 use super::AccountFlows;
@@ -275,6 +276,16 @@ impl Account {
             .collect();
 
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
+    }
+
+    async fn owned_dataset_statistic(&self, ctx: &Context<'_>) -> Result<TotalDatasetsStatistic> {
+        let dataset_statistic_service = from_catalog_n!(ctx, dyn DatasetStatisticsService);
+
+        let total_statistic = dataset_statistic_service
+            .get_total_statistic_by_account_id(&self.account_id)
+            .await?;
+
+        Ok(total_statistic.into())
     }
 }
 

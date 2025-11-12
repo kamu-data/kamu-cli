@@ -72,6 +72,7 @@ type Account {
 	Returns datasets belonging to this account
 	"""
 	ownedDatasets(page: Int, perPage: Int): DatasetConnection!
+	ownedDatasetStatistic: TotalDatasetsStatistic!
 }
 
 type AccountAccessTokens {
@@ -1162,6 +1163,14 @@ type DatasetData {
 	caching
 	"""
 	estimatedSize: Int!
+	"""
+	Total number of object links in this dataset
+	"""
+	numObjectLinksTotal: Int!
+	"""
+	An estimated size of object links
+	"""
+	estimatedObjectLinksSize: Int!
 	"""
 	Returns the specified number of the latest records in the dataset
 	This is equivalent to SQL query like:
@@ -4085,6 +4094,14 @@ enum TimeUnit {
 	HOURS
 	DAYS
 	WEEKS
+}
+
+type TotalDatasetsStatistic {
+	numRecords: Int!
+	dataSize: Int!
+	checkpointsSize: Int!
+	numObjectLinks: Int!
+	objectLinksSize: Int!
 }
 
 """
