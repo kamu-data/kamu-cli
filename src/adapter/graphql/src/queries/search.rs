@@ -111,8 +111,20 @@ impl Search {
     }
 
     /// Searches for datasets and other objects managed by the
+    /// current node using a full text prompt in natural language
+    #[tracing::instrument(level = "info", name = Search_query_full_text, skip_all)]
+    async fn query_full_text(&self, ctx: &Context<'_>) -> Result<String> {
+        let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
+
+        // TODO: support real queries
+        let health = full_text_search_service.health().await.int_err()?;
+        let health_as_string = serde_json::to_string_pretty(&health).int_err()?;
+        Ok(health_as_string)
+    }
+
+    /// Searches for datasets and other objects managed by the
     /// current node using a prompt in natural language
-    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?per_page))]
+    #[tracing::instrument(level = "info", name = Search_query_natural_language, skip_all, fields(?per_page))]
     async fn query_natural_language(
         &self,
         ctx: &Context<'_>,

@@ -1,0 +1,40 @@
+[package]
+name = "kamu-search-elasticsearch"
+description = "Implementation of full-text search using Elasticsearch"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+container-runtime = { workspace = true }
+init-on-startup = { workspace = true }
+internal-error = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-search = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+dill = { version = "0.14", default-features = false }
+elasticsearch = { version = "9.1.0-alpha.1", default-features = false, features = ["rustls-tls"] }
+serde_json = { version = "1", default-features = false }
+tokio = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+url = { version = "2", default-features = false }
+
+
+[dev-dependencies]

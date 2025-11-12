@@ -1064,6 +1064,7 @@ pub fn register_config_in_catalog(
         vector_repo,
         overfetch_factor,
         overfetch_amount,
+        full_text,
     } = config.search.clone().unwrap();
 
     catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
@@ -1127,6 +1128,33 @@ pub fn register_config_in_catalog(
         }
     }
     //
+
+    catalog_builder.add::<kamu_search_services::FullTextSearchImplLazyInit>();
+
+    match full_text.unwrap_or_default() {
+        config::FullTextSearchConfig::ElasticSearch(mut cfg) => {
+            cfg.merge(config::FullTextSearchConfigElasticSearch::default());
+
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchFullTextRepo>();
+            catalog_builder.add_value(
+                kamu_search_elasticsearch::ElasticSearchFullTextSearchConfig {
+                    url: url::Url::parse(&cfg.url).int_err()?,
+                    password: cfg.password,
+                    timeout_secs: cfg.timeout_secs.unwrap(),
+                    enable_compression: cfg.enable_compression.unwrap(),
+                },
+            );
+        }
+        config::FullTextSearchConfig::ElasticSearchContainer(cfg) => {
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchFullTextRepoContainer>();
+            catalog_builder.add_value(
+                kamu_search_elasticsearch::ElasticSearchFullTextSearchContainerConfig {
+                    image: cfg.image.unwrap(),
+                    start_timeout: cfg.start_timeout.unwrap().into(),
+                },
+            );
+        }
+    }
 
     catalog_builder.add_value(PasswordPolicyConfig::default());
 

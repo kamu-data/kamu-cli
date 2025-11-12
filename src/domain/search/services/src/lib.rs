@@ -10,11 +10,17 @@
 #![feature(error_generic_member_access)]
 
 mod embeddings_chunker_simple;
+mod full_text_search_indexer;
+mod full_text_search_lazy_init_impl;
+mod full_text_search_service_impl;
 mod natural_language_search_indexer;
 mod natural_language_search_lazy_init;
 mod natural_language_search_service_impl;
 
 pub use embeddings_chunker_simple::*;
+pub use full_text_search_indexer::*;
+pub use full_text_search_lazy_init_impl::*;
+pub use full_text_search_service_impl::*;
 pub use natural_language_search_indexer::*;
 pub use natural_language_search_lazy_init::*;
 pub use natural_language_search_service_impl::*;
