@@ -18,7 +18,7 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct SearchServiceLocalConfig {
+pub struct NaturalLanguageSearchConfig {
     /// The multiplication factor that determines how many more points will be
     /// requested from vector store to compensate for filtering out results that
     /// may be inaccessible to user.
@@ -32,8 +32,8 @@ pub struct SearchServiceLocalConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchServiceLocalImpl {
-    config: Arc<SearchServiceLocalConfig>,
+pub struct NaturalLanguageSearchServiceImpl {
+    config: Arc<NaturalLanguageSearchConfig>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
     vector_repo: Option<Arc<dyn VectorRepository>>,
@@ -42,10 +42,10 @@ pub struct SearchServiceLocalImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn SearchServiceLocal)]
-impl SearchServiceLocalImpl {
+#[dill::interface(dyn NaturalLanguageSearchService)]
+impl NaturalLanguageSearchServiceImpl {
     pub fn new(
-        config: Arc<SearchServiceLocalConfig>,
+        config: Arc<NaturalLanguageSearchConfig>,
         rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
         embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
         vector_repo: Option<Arc<dyn VectorRepository>>,
@@ -62,7 +62,7 @@ impl SearchServiceLocalImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl SearchServiceLocal for SearchServiceLocalImpl {
+impl NaturalLanguageSearchService for NaturalLanguageSearchServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn search_natural_language(
         &self,

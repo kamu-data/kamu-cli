@@ -10,11 +10,11 @@
 #![feature(error_generic_member_access)]
 
 mod embeddings_chunker_simple;
-mod search_service_local_impl;
-mod search_service_local_indexer;
-mod search_service_local_lazy_init;
+mod natural_language_search_indexer;
+mod natural_language_search_lazy_init;
+mod natural_language_search_service_impl;
 
 pub use embeddings_chunker_simple::*;
-pub use search_service_local_impl::*;
-pub use search_service_local_indexer::*;
-pub use search_service_local_lazy_init::*;
+pub use natural_language_search_indexer::*;
+pub use natural_language_search_lazy_init::*;
+pub use natural_language_search_service_impl::*;

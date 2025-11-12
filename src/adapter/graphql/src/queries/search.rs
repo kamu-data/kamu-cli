@@ -120,7 +120,8 @@ impl Search {
         // page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultExConnection> {
-        let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchServiceLocal);
+        let natural_language_search_service =
+            from_catalog_n!(ctx, dyn kamu_search::NaturalLanguageSearchService);
 
         // TODO: Support "next page token" style pagination
         let page = 0;
@@ -128,7 +129,7 @@ impl Search {
 
         let limit = per_page;
 
-        let res = search_service
+        let res = natural_language_search_service
             .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { limit })
             .await
             .map_err(|e| match e {

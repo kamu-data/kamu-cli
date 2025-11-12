@@ -18,14 +18,14 @@ use crate::*;
 
 /// This is a temporary solution that initializes the search index upon the
 /// first call.
-pub struct SearchServiceLocalImplLazyInit {
+pub struct NaturalLanguageSearchImplLazyInit {
     catalog: dill::Catalog,
     is_initialized: tokio::sync::OnceCell<()>,
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn SearchServiceLocal)]
-impl SearchServiceLocalImplLazyInit {
+#[dill::interface(dyn NaturalLanguageSearchService)]
+impl NaturalLanguageSearchImplLazyInit {
     pub fn new(catalog: dill::Catalog) -> Self {
         Self {
             catalog,
@@ -41,7 +41,7 @@ impl SearchServiceLocalImplLazyInit {
     }
 
     async fn init(&self) -> Result<(), InternalError> {
-        let indexer = SearchServiceLocalIndexer::builder()
+        let indexer = NaturalLanguageSearchIndexer::builder()
             .get(&self.catalog)
             .int_err()?;
 
@@ -50,7 +50,7 @@ impl SearchServiceLocalImplLazyInit {
 }
 
 #[async_trait::async_trait]
-impl SearchServiceLocal for SearchServiceLocalImplLazyInit {
+impl NaturalLanguageSearchService for NaturalLanguageSearchImplLazyInit {
     async fn search_natural_language(
         &self,
         prompt: &str,
@@ -58,7 +58,7 @@ impl SearchServiceLocal for SearchServiceLocalImplLazyInit {
     ) -> Result<SearchLocalNatLangResult, SearchLocalNatLangError> {
         self.maybe_init().await?;
 
-        let inner = SearchServiceLocalImpl::builder()
+        let inner = NaturalLanguageSearchServiceImpl::builder()
             .get(&self.catalog)
             .int_err()?;
 
