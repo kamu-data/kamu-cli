@@ -79,13 +79,13 @@ impl Molecule {
         self.v1.activity(ctx, page, per_page).await
     }
 
-    /// 1-st Molecule API version.
+    /// 1-st Molecule API version (query).
     #[graphql(deprecation = "Use `v2` instead")]
     async fn v1(&self) -> MoleculeV1 {
         MoleculeV1
     }
 
-    /// 2-nd Molecule API version.
+    /// 2-nd Molecule API version (query).
     async fn v2(&self) -> MoleculeV2 {
         MoleculeV2
     }

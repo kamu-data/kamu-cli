@@ -2794,6 +2794,10 @@ type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 	message: String!
 }
 
+type FoundSearchEntry {
+	dummy: String!
+}
+
 interface GetFlowResult {
 	message: String!
 }
@@ -3084,21 +3088,57 @@ type Molecule {
 	"""
 	activity(page: Int, perPage: Int): MoleculeProjectEventConnection! @deprecated(reason: "Use `v2 { activity }` instead.")
 	"""
-	1-st Molecule API version.
+	1-st Molecule API version (query).
 	"""
 	v1: MoleculeV1! @deprecated(reason: "Use `v2` instead")
 	"""
-	2-nd Molecule API version.
+	2-nd Molecule API version (query).
 	"""
 	v2: MoleculeV2!
 }
 
 type MoleculeMut {
+	"""
+	Shortcut for `v1 { create_project() }`.
+	"""
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult! @deprecated(reason: "Use `v2 { create_project() }` instead.")
+	"""
+	Looks up the project
+	
+	Shortcut for `v1 { project() }`.
+	"""
+	project(ipnftUid: String!): MoleculeProjectMut @deprecated(reason: "Use `v2 { project }` instead.")
+	"""
+	1-st Molecule API version (mutation).
+	"""
+	v1: MoleculeMutV1! @deprecated(reason: "Use `v2` instead")
+	"""
+	2-nd Molecule API version (mutation).
+	"""
+	v2: MoleculeMutV2!
+}
+
+type MoleculeMutV1 {
 	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
 	"""
 	Looks up the project
 	"""
 	project(ipnftUid: String!): MoleculeProjectMut
+}
+
+type MoleculeMutV2 {
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
+	"""
+	Retracts a project from the `projects` dataset.
+	History of this project existing will be preserved,
+	its symbol will remain reserved, data will remain intact,
+	but the project will no longer appear in the listing.
+	"""
+	removeProject(ipnftUid: String!): String!
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectMutV2
 }
 
 type MoleculeProject {
@@ -3261,6 +3301,18 @@ type MoleculeProjectMut {
 	): CreateAnnouncementResult!
 }
 
+type MoleculeProjectMutV2 {
+	"""
+	Creates an announcement record for the project
+	"""
+	createAnnouncement(		headline: String!,		body: String!,
+		"""
+		List of dataset DIDs to link
+		"""
+		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
+	): CreateAnnouncementResult!
+}
+
 type MoleculeProjectV2 {
 	"""
 	System time when this version was created/updated
@@ -3334,6 +3386,14 @@ type MoleculeV2 {
 	order
 	"""
 	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+	"""
+	Performs a semantic search
+	Using `filters` parameters, a search can be narrowed down to:
+	- a specific set of projects
+	- specific categories and tags
+	- only returning files or announcements
+	"""
+	search(prompt: String!, filters: String!, page: Int, perPage: Int): FoundSearchEntry!
 }
 
 """

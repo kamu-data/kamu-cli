@@ -111,7 +111,7 @@ impl Mutation {
 
     /// Temporary: Molecule-specific functionality group
     async fn molecule(&self) -> MoleculeMut {
-        MoleculeMut
+        MoleculeMut::default()
     }
 
     /// Collaboration-related functionality group

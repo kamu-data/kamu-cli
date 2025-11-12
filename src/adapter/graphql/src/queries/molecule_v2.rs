@@ -59,6 +59,28 @@ impl MoleculeV2 {
         let _ = per_page;
         todo!()
     }
+
+    /// Performs a semantic search
+    /// Using `filters` parameters, a search can be narrowed down to:
+    /// - a specific set of projects
+    /// - specific categories and tags
+    /// - only returning files or announcements
+    #[tracing::instrument(level = "info", name = MoleculeV2_search, skip_all)]
+    async fn search(
+        &self,
+        _ctx: &Context<'_>,
+        // TODO: update types
+        prompt: String,
+        filters: String,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<FoundSearchEntry> {
+        let _ = prompt;
+        let _ = filters;
+        let _ = page;
+        let _ = per_page;
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,5 +150,18 @@ impl MoleculeProjectV2 {
         todo!()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct FoundSearchEntry {
+    pub dummy: String,
+}
+
+page_based_connection!(
+    FoundSearchEntry,
+    FoundSearchEntryConnection,
+    FoundSearchEntryEdge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
