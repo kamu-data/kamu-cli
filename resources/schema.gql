@@ -2773,6 +2773,26 @@ type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 	message: String!
 }
 
+type FullTextSearchHighlight {
+	field: String!
+	bestFragment: String!
+}
+
+type FullTextSearchHit {
+	id: String!
+	schemaName: String!
+	score: Float
+	source: JSON!
+	highlights: [FullTextSearchHighlight!]
+}
+
+type FullTextSearchResponse {
+	tookMs: Int!
+	timeout: Boolean!
+	totalHits: Int!
+	hits: [FullTextSearchHit!]!
+}
+
 interface GetFlowResult {
 	message: String!
 }
@@ -2786,6 +2806,11 @@ input InitiatorFilterInput @oneOf {
 	system: Boolean
 	accounts: [AccountID!]
 }
+
+"""
+A scalar that can represent any JSON value.
+"""
+scalar JSON
 
 type JdbcDesc {
 	url: String!
@@ -3637,6 +3662,11 @@ type Search {
 	versatile interface to the user consisting of just one input field.
 	"""
 	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
+	"""
+	Searches for datasets and other objects managed by the
+	current node using a full text prompt in natural language
+	"""
+	queryFullText(prompt: String!, page: Int, perPage: Int): FullTextSearchResponse!
 	"""
 	Searches for datasets and other objects managed by the
 	current node using a prompt in natural language

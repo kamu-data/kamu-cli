@@ -79,6 +79,7 @@ members = [
     ## Search
     "src/infra/search/openai",
     "src/infra/search/qdrant",
+    "src/infra/search/elasticsearch",
     ## Task System
     "src/infra/task-system/repo-tests",
     "src/infra/task-system/inmem",
@@ -220,6 +221,7 @@ kamu-datasets-repo-tests = { version = "0.253.1", path = "src/infra/datasets/rep
 ## Search
 kamu-search-openai = { version = "0.253.1", path = "src/infra/search/openai", default-features = false }
 kamu-search-qdrant = { version = "0.253.1", path = "src/infra/search/qdrant", default-features = false }
+kamu-search-elasticsearch = { version = "0.253.1", path = "src/infra/search/elasticsearch", default-features = false }
 ## Task System
 kamu-task-system-inmem = { version = "0.253.1", path = "src/infra/task-system/inmem", default-features = false }
 kamu-task-system-postgres = { version = "0.253.1", path = "src/infra/task-system/postgres", default-features = false }

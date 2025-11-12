@@ -119,6 +119,7 @@ kamu-search = { workspace = true }
 kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-qdrant = { workspace = true }
+kamu-search-elasticsearch = { workspace = true }
 
 kamu-auth-web3-inmem = { workspace = true }
 kamu-auth-web3-postgres = { workspace = true }

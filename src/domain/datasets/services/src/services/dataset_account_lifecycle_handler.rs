@@ -13,7 +13,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountLifecycleMessage,
     AccountLifecycleMessageDeleted,
-    AccountLifecycleMessageRenamed,
+    AccountLifecycleMessageUpdated,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
 use kamu_core::DatasetRegistry;
@@ -42,17 +42,20 @@ pub struct DatasetAccountLifecycleHandler {
 }
 
 impl DatasetAccountLifecycleHandler {
-    async fn handle_account_lifecycle_renamed_message(
+    async fn handle_account_lifecycle_updated_message(
         &self,
-        message: &AccountLifecycleMessageRenamed,
+        message: &AccountLifecycleMessageUpdated,
     ) -> Result<(), InternalError> {
-        self.dataset_entry_writer
-            .update_owner_entries_after_rename(
-                &message.account_id,
-                &message.old_account_name,
-                &message.new_account_name,
-            )
-            .await?;
+        // Only react to account renames
+        if message.old_account_name != message.new_account_name {
+            self.dataset_entry_writer
+                .update_owner_entries_after_rename(
+                    &message.account_id,
+                    &message.old_account_name,
+                    &message.new_account_name,
+                )
+                .await?;
+        }
 
         Ok(())
     }
@@ -71,7 +74,7 @@ impl DatasetAccountLifecycleHandler {
         while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
             match self
                 .delete_dataset_use_case
-                .execute_via_handle(&dataset_handle)
+                .execute_via_handle_preauthorized(&dataset_handle)
                 .await
             {
                 Ok(_) | Err(DeleteDatasetError::NotFound(_)) => { /* idempotent deletion */ }
@@ -104,8 +107,8 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetAccountLifecycleHandle
         tracing::debug!(received_message = ?message, "Received account lifecycle message");
 
         match message {
-            AccountLifecycleMessage::Renamed(message) => {
-                self.handle_account_lifecycle_renamed_message(message).await
+            AccountLifecycleMessage::Updated(message) => {
+                self.handle_account_lifecycle_updated_message(message).await
             }
 
             AccountLifecycleMessage::Deleted(message) => {

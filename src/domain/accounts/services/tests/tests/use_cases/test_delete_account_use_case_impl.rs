@@ -193,7 +193,7 @@ impl DeleteAccountUseCaseImplHarness {
                             .unwrap();
                     matches!(message_res, AccountLifecycleMessage::Deleted(_))
                 }),
-                eq(1),
+                eq(2),
             )
             .returning(|_, _, _| Ok(()));
     }
