@@ -65,6 +65,14 @@ impl TotalStatistic {
             self.object_links_size,
         )
     }
+
+    pub fn add_dataset_statistic(&mut self, dataset_statistic: &DatasetStatistics) {
+        self.num_records += dataset_statistic.num_records;
+        self.data_size += dataset_statistic.data_size;
+        self.checkpoints_size += dataset_statistic.checkpoints_size;
+        self.num_object_links += dataset_statistic.num_object_links;
+        self.object_links_size += dataset_statistic.object_links_size;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
