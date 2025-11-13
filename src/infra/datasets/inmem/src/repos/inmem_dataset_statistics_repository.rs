@@ -25,6 +25,8 @@ use kamu_datasets::{
     TotalStatistic,
 };
 
+use crate::InMemoryDatasetEntryRepository;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
@@ -36,7 +38,7 @@ struct State {
 
 pub struct InMemoryDatasetStatisticsRepository {
     state: Arc<Mutex<State>>,
-    dataset_entry_repository: dill::Lazy<Arc<dyn DatasetEntryRepository>>,
+    dataset_entry_repository: dill::Lazy<Arc<InMemoryDatasetEntryRepository>>,
 }
 
 #[component(pub)]
@@ -44,7 +46,7 @@ pub struct InMemoryDatasetStatisticsRepository {
 #[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
 impl InMemoryDatasetStatisticsRepository {
-    pub fn new(dataset_entry_repository: dill::Lazy<Arc<dyn DatasetEntryRepository>>) -> Self {
+    pub fn new(dataset_entry_repository: dill::Lazy<Arc<InMemoryDatasetEntryRepository>>) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
             dataset_entry_repository,
