@@ -9,8 +9,7 @@
 
 use kamu_accounts::*;
 
-use super::AccountFlowsMut;
-use crate::mutations::AccountAccessTokensMut;
+use crate::mutations::{AccountAccessTokensMut, AccountFlowsMut, AccountQuotasMut};
 use crate::prelude::*;
 use crate::utils;
 
@@ -181,6 +180,12 @@ impl AccountMut {
     #[expect(clippy::unused_async)]
     async fn access_tokens(&self) -> Result<AccountAccessTokensMut<'_>> {
         Ok(AccountAccessTokensMut::new(&self.account))
+    }
+
+    /// Access to the mutable quotas of this account
+    #[expect(clippy::unused_async)]
+    async fn quotas(&self) -> Result<AccountQuotasMut<'_>> {
+        Ok(AccountQuotasMut::new(&self.account))
     }
 }
 

@@ -2794,6 +2794,10 @@ type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 	message: String!
 }
 
+type FoundSearchEntry {
+	dummy: String!
+}
+
 interface GetFlowResult {
 	message: String!
 }
@@ -3065,26 +3069,76 @@ type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 
 type Molecule {
 	"""
-	Looks up the project
+	Looks up the project.
+	
+	Shortcut for `v1 { project }`.
 	"""
-	project(ipnftUid: String!): MoleculeProject
+	project(ipnftUid: String!): MoleculeProject @deprecated(reason: "Use `v2 { project }` instead.")
 	"""
-	List the registered projects
+	List the registered projects.
+	
+	Shortcut for `v1 { projects }`.
 	"""
-	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	projects(page: Int, perPage: Int): MoleculeProjectConnection! @deprecated(reason: "Use `v2 { projects }` instead.")
 	"""
 	Latest activity events across all projects in reverse chronological
-	order
+	order.
+	
+	Shortcut for `v1 { activity }`.
 	"""
-	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection! @deprecated(reason: "Use `v2 { activity }` instead.")
+	"""
+	1-st Molecule API version (query).
+	"""
+	v1: MoleculeV1! @deprecated(reason: "Use `v2` instead")
+	"""
+	2-nd Molecule API version (query).
+	"""
+	v2: MoleculeV2!
 }
 
 type MoleculeMut {
+	"""
+	Shortcut for `v1 { create_project() }`.
+	"""
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult! @deprecated(reason: "Use `v2 { create_project() }` instead.")
+	"""
+	Looks up the project
+	
+	Shortcut for `v1 { project() }`.
+	"""
+	project(ipnftUid: String!): MoleculeProjectMut @deprecated(reason: "Use `v2 { project }` instead.")
+	"""
+	1-st Molecule API version (mutation).
+	"""
+	v1: MoleculeMutV1! @deprecated(reason: "Use `v2` instead")
+	"""
+	2-nd Molecule API version (mutation).
+	"""
+	v2: MoleculeMutV2!
+}
+
+type MoleculeMutV1 {
 	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
 	"""
 	Looks up the project
 	"""
 	project(ipnftUid: String!): MoleculeProjectMut
+}
+
+type MoleculeMutV2 {
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
+	"""
+	Retracts a project from the `projects` dataset.
+	History of this project existing will be preserved,
+	its symbol will remain reserved, data will remain intact,
+	but the project will no longer appear in the listing.
+	"""
+	removeProject(ipnftUid: String!): String!
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectMutV2
 }
 
 type MoleculeProject {
@@ -3245,6 +3299,101 @@ type MoleculeProjectMut {
 		"""
 		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
 	): CreateAnnouncementResult!
+}
+
+type MoleculeProjectMutV2 {
+	"""
+	Creates an announcement record for the project
+	"""
+	createAnnouncement(		headline: String!,		body: String!,
+		"""
+		List of dataset DIDs to link
+		"""
+		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
+	): CreateAnnouncementResult!
+}
+
+type MoleculeProjectV2 {
+	"""
+	System time when this version was created/updated
+	"""
+	systemTime: DateTime!
+	"""
+	Event time when this version was created/updated
+	"""
+	eventTime: DateTime!
+	"""
+	Symbolic name of the project
+	"""
+	ipnftSymbol: String!
+	"""
+	Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+	"""
+	ipnftUid: String!
+	"""
+	Address of the IPNFT contract
+	"""
+	ipnftAddress: String!
+	"""
+	Token ID withing the IPNFT contract
+	"""
+	ipnftTokenId: BigInt!
+	"""
+	Project's organizational account
+	"""
+	account: Account!
+	"""
+	Project's data room dataset
+	"""
+	dataRoom: Dataset!
+	"""
+	Project's announcements dataset
+	"""
+	announcements: Dataset!
+	"""
+	Project's activity events in reverse chronological order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+}
+
+type MoleculeV1 {
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProject
+	"""
+	List the registered projects
+	"""
+	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	"""
+	Latest activity events across all projects in reverse chronological
+	order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+}
+
+type MoleculeV2 {
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectV2
+	"""
+	List the registered projects
+	"""
+	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	"""
+	Latest activity events across all projects in reverse chronological
+	order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+	"""
+	Performs a semantic search
+	Using `filters` parameters, a search can be narrowed down to:
+	- a specific set of projects
+	- specific categories and tags
+	- only returning files or announcements
+	"""
+	search(prompt: String!, filters: String!, page: Int, perPage: Int): FoundSearchEntry!
 }
 
 """
@@ -4817,6 +4966,10 @@ type Webhooks {
 	eventTypes: [String!]!
 }
 
+"""
+Marks an element of a GraphQL schema as no longer supported.
+"""
+directive @deprecated(reason: String = "No longer supported") on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
 """
 Directs the executor to include this field or fragment only when the `if` argument is true.
 """
