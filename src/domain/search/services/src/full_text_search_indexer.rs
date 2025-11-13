@@ -30,9 +30,10 @@ pub struct FullTextSearchIndexer {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl InitOnStartup for FullTextSearchIndexer {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = FullTextSearchIndexer_run_initialization, skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         // TODO: indexing logic
         Ok(())

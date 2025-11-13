@@ -11,7 +11,7 @@ use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
-use kamu_search::SearchLocalNatLangError;
+use kamu_search::SearchNatLangError;
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -145,8 +145,8 @@ impl Search {
             .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { limit })
             .await
             .map_err(|e| match e {
-                SearchLocalNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),
-                SearchLocalNatLangError::Internal(e) => GqlError::Internal(e),
+                SearchNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),
+                SearchNatLangError::Internal(e) => GqlError::Internal(e),
             })?;
 
         let total_count = res.datasets.len();

@@ -1067,7 +1067,15 @@ pub fn register_config_in_catalog(
         full_text,
     } = config.search.clone().unwrap();
 
+    // Note: this is specific to CLI:
+    // - we are not registering NaturalLanguageSearchIndexer startup job here to
+    //   avoid heavyweight load in CLI commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use
+    //   (could be quite a long startup time, indexing itself + container start, if
+    //   containers are used)
+    // - lazy init wrapper is unnecessary in server mode
     catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
     catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
         overfetch_factor: overfetch_factor.unwrap(),
         overfetch_amount: overfetch_amount.unwrap(),
@@ -1129,6 +1137,13 @@ pub fn register_config_in_catalog(
     }
     //
 
+    // Note: this is specific to CLI:
+    // - we are not registering FullTextSearchIndexer startup job here to avoid
+    //   heavyweight load in CLI commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use
+    //   (could be quite a long startup time, indexing itself + container start, if
+    //   containers are used)
+    // - lazy init wrapper is unnecessary in server mode
     catalog_builder.add::<kamu_search_services::FullTextSearchImplLazyInit>();
 
     match full_text.unwrap_or_default() {
