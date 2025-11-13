@@ -11,10 +11,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use cheap_clone::CheapClone;
+use database_common::PaginationOpts;
 use dill::*;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{
     DatasetEntryRemovalListener,
+    DatasetEntryRepository,
     DatasetStatistics,
     DatasetStatisticsNotFoundError,
     DatasetStatisticsRepository,
@@ -34,6 +36,7 @@ struct State {
 
 pub struct InMemoryDatasetStatisticsRepository {
     state: Arc<Mutex<State>>,
+    dataset_entry_repository: dill::Lazy<Arc<dyn DatasetEntryRepository>>,
 }
 
 #[component(pub)]
@@ -41,9 +44,10 @@ pub struct InMemoryDatasetStatisticsRepository {
 #[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
 impl InMemoryDatasetStatisticsRepository {
-    pub fn new() -> Self {
+    pub fn new(dataset_entry_repository: dill::Lazy<Arc<dyn DatasetEntryRepository>>) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
+            dataset_entry_repository,
         }
     }
 }
@@ -59,10 +63,35 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
 
     async fn get_total_statistic_by_account_id(
         &self,
-        _account_id: &odf::AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<TotalStatistic, InternalError> {
-        // Not implemented for test, such as required to store accounts list.
-        Ok(TotalStatistic::default())
+        let dataset_entry_repository = self.dataset_entry_repository.get().unwrap();
+        let owned_datasets_count = dataset_entry_repository
+            .dataset_entries_count_by_owner_id(account_id)
+            .await?;
+
+        let mut owned_datasets_stream = dataset_entry_repository
+            .get_dataset_entries_by_owner_id(
+                account_id,
+                PaginationOpts {
+                    offset: 0,
+                    limit: owned_datasets_count,
+                },
+            )
+            .await;
+        let mut result = TotalStatistic::default();
+
+        use futures::TryStreamExt;
+        while let Some(dataset_entry) = owned_datasets_stream.try_next().await.int_err()? {
+            if let Ok(dataset_statistic) = self
+                .get_dataset_statistics(&dataset_entry.id, &odf::BlockRef::Head)
+                .await
+            {
+                result.add_dataset_statistic(&dataset_statistic);
+            }
+        }
+
+        Ok(result)
     }
 
     async fn get_dataset_statistics(
