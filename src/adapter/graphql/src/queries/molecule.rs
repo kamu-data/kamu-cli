@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+// TODO: breakdown to smaller files after API freeze stage.
+// TODO: use dir tree structure e.g. molecule/{v1,v2}/molecule_project_v2.rs.
+
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 
 use super::{

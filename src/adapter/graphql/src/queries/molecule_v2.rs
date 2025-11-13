@@ -7,9 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
+// TODO: breakdown to smaller files after API freeze stage.
 
-use super::{MoleculeProjectConnection, MoleculeProjectEventConnection};
+use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
+use url::Url;
+
+use super::{FileVersion, MoleculeProjectConnection, MoleculeProjectEventConnection};
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
 
@@ -130,7 +135,7 @@ impl MoleculeProjectV2 {
 
     /// Project's data room dataset
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_data_room, skip_all)]
-    async fn data_room(&self, _ctx: &Context<'_>) -> Result<Dataset> {
+    async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomDataset> {
         todo!()
     }
 
@@ -154,6 +159,151 @@ impl MoleculeProjectV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct MoleculeDataRoomDataset;
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl MoleculeDataRoomDataset {
+    /// Access the underlying core Dataset
+    async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
+        todo!()
+    }
+
+    async fn entries(
+        &self,
+        _ctx: &Context<'_>,
+        path_prefix: Option<CollectionPath>,
+        max_depth: Option<usize>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<MoleculeDataRoomEntryConnection> {
+        let _ = path_prefix;
+        let _ = max_depth;
+        let _ = page;
+        let _ = per_page;
+
+        todo!()
+    }
+
+    async fn entry(
+        &self,
+        _ctx: &Context<'_>,
+        path: CollectionPath,
+    ) -> Result<MoleculeDataRoomEntry> {
+        let _ = path;
+        todo!()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct MoleculeDataRoomEntry;
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl MoleculeDataRoomEntry {
+    async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
+        todo!()
+    }
+
+    async fn system_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
+        todo!()
+    }
+
+    async fn event_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
+        todo!()
+    }
+
+    async fn path(&self, _ctx: &Context<'_>) -> Result<CollectionPath> {
+        todo!()
+    }
+
+    #[graphql(name = "ref")]
+    async fn reference(&self, _ctx: &Context<'_>) -> Result<DatasetID<'static>> {
+        todo!()
+    }
+
+    /// Access the linked core Dataset
+    async fn as_dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
+        todo!()
+    }
+
+    /// Strongly typed [`MoleculeVersionedFile`] object
+    async fn as_versioned_file(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFile> {
+        todo!()
+    }
+}
+
+page_based_connection!(
+    MoleculeDataRoomEntry,
+    MoleculeDataRoomEntryConnection,
+    MoleculeDataRoomEntryEdge
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct MoleculeVersionedFile;
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl MoleculeVersionedFile {
+    async fn system_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
+        todo!()
+    }
+
+    async fn event_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
+        todo!()
+    }
+
+    async fn version(&self, _ctx: &Context<'_>) -> Result<FileVersion> {
+        todo!()
+    }
+
+    async fn content_hash(&self, _ctx: &Context<'_>) -> Result<Multihash<'static>> {
+        todo!()
+    }
+
+    async fn content_length(&self, _ctx: &Context<'_>) -> Result<usize> {
+        todo!()
+    }
+
+    // TODO: typing
+    async fn content_type(&self, _ctx: &Context<'_>) -> Result<String> {
+        todo!()
+    }
+
+    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
+        todo!()
+    }
+
+    // TODO: typing
+    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+        todo!()
+    }
+
+    // TODO: typing
+    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+        todo!()
+    }
+
+    async fn content_url(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFileContentUrl> {
+        todo!()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct MoleculeVersionedFileContentUrl {
+    pub url: Url,
+    pub headers: HashMap<String, String>,
+    // TODO: typing
+    pub method: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject)]
 pub struct FoundSearchEntry {
     pub dummy: String,
@@ -164,5 +314,18 @@ page_based_connection!(
     FoundSearchEntryConnection,
     FoundSearchEntryEdge
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: use enum instead of string?
+// #[derive(Enum)]
+// pub enum MoleculeAccessLevel {
+//     Public,
+//     Admin,
+//     Admin2,
+//     Holder,
+// }
+
+pub type MoleculeAccessLevel = String;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
