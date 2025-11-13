@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::{Component, TypedBuilder};
-use init_on_startup::InitOnStartup;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_search::*;
 
@@ -29,6 +29,13 @@ pub struct FullTextSearchImplLazyInit {
 
 #[dill::component(pub)]
 #[dill::interface(dyn FullTextSearchService)]
+#[dill::scope(dill::Singleton)]
+#[dill::interface(dyn InitOnStartup)]
+#[dill::meta(InitOnStartupMeta {
+    job_name: "dev.kamu.search.FullTextSearchImplLazyInit",
+    depends_on: &[],
+    requires_transaction: false,
+})]
 impl FullTextSearchImplLazyInit {
     pub fn new(catalog: dill::Catalog) -> Self {
         Self {
@@ -105,6 +112,19 @@ impl FullTextSearchService for FullTextSearchImplLazyInit {
     ) -> Result<FullTextSearchResponse, InternalError> {
         let inner = self.inner().await?;
         inner.search(ctx, req).await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl InitOnStartup for FullTextSearchImplLazyInit {
+    #[tracing::instrument(level = "debug", name = FullTextSearchImplLazyInit_run_initialization, skip_all)]
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        // Note: we only neeed this to capture the correct system catalog,
+        //  and not the one that may be passed in the context of the first search call.
+        Ok(())
     }
 }
 

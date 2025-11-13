@@ -131,9 +131,10 @@ impl NaturalLanguageSearchIndexer {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl InitOnStartup for NaturalLanguageSearchIndexer {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = NaturalLanguageSearchIndexer_run_initialization, skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         if self.config.clear_on_start {
             self.vector_repo.clear().await?;

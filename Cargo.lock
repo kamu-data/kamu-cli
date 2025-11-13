@@ -8398,6 +8398,7 @@ name = "kamu-search-services"
 version = "0.252.4"
 dependencies = [
  "async-trait",
+ "common-macros",
  "dill",
  "futures",
  "init-on-startup",

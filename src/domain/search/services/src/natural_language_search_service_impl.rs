@@ -68,7 +68,7 @@ impl NaturalLanguageSearchService for NaturalLanguageSearchServiceImpl {
         &self,
         prompt: &str,
         options: SearchNatLangOpts,
-    ) -> Result<SearchLocalNatLangResult, SearchLocalNatLangError> {
+    ) -> Result<SearchNatLangResult, SearchNatLangError> {
         let (Some(embeddings_encoder), Some(vector_repo)) = (
             self.embeddings_encoder.as_deref(),
             self.vector_repo.as_deref(),
@@ -77,7 +77,7 @@ impl NaturalLanguageSearchService for NaturalLanguageSearchServiceImpl {
         };
 
         if prompt.trim().is_empty() {
-            return Ok(SearchLocalNatLangResult {
+            return Ok(SearchNatLangResult {
                 datasets: Vec::new(),
             });
         }
@@ -193,7 +193,7 @@ impl NaturalLanguageSearchService for NaturalLanguageSearchServiceImpl {
             }
         }
 
-        Ok(SearchLocalNatLangResult { datasets })
+        Ok(SearchNatLangResult { datasets })
     }
 }
 

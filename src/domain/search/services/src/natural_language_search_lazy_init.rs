@@ -59,7 +59,7 @@ impl NaturalLanguageSearchService for NaturalLanguageSearchImplLazyInit {
         &self,
         prompt: &str,
         options: SearchNatLangOpts,
-    ) -> Result<SearchLocalNatLangResult, SearchLocalNatLangError> {
+    ) -> Result<SearchNatLangResult, SearchNatLangError> {
         self.maybe_init().await?;
 
         let inner = NaturalLanguageSearchServiceImpl::builder()
