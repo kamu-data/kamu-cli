@@ -20,6 +20,7 @@ pub struct TotalDatasetsStatistic {
     pub checkpoints_size: u64,
     pub num_object_links: u64,
     pub object_links_size: u64,
+    pub total_size: Option<u64>,
 }
 
 impl From<TotalStatistic> for TotalDatasetsStatistic {
@@ -30,6 +31,7 @@ impl From<TotalStatistic> for TotalDatasetsStatistic {
             checkpoints_size: value.checkpoints_size,
             num_object_links: value.num_object_links,
             object_links_size: value.object_links_size,
+            total_size: value.get_size_summary(),
         }
     }
 }
