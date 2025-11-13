@@ -9,21 +9,13 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct ElasticSearchFullTextSearchConfig {
-    pub url: url::Url,
-    pub password: Option<String>,
-    pub index_prefix: String,
-    pub timeout_secs: u64,
-    pub enable_compression: bool,
-}
+use crate::FullTextSearchEntitySchema;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[async_trait::async_trait]
+pub trait FullTextSearchEntitySchemaProvider: Send + Sync {
+    fn provider_name(&self) -> &'static str;
 
-#[derive(Debug, Clone)]
-pub struct ElasticSearchFullTextSearchContainerConfig {
-    pub image: String,
-    pub start_timeout: std::time::Duration,
+    fn provide_schemas(&self) -> &[FullTextSearchEntitySchema];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

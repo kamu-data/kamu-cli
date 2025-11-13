@@ -91,6 +91,7 @@ impl ElasticSearchFullTextRepoContainer {
             password: Some(DUMMY_PASSWORD.to_string()),
             timeout_secs: 5,
             enable_compression: false,
+            index_prefix: String::new(),
         }));
 
         Ok(State { container, inner })
@@ -103,6 +104,25 @@ impl ElasticSearchFullTextRepoContainer {
 impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
     async fn health(&self) -> Result<serde_json::Value, InternalError> {
         self.inner().await?.health().await
+    }
+
+    async fn has_entity_index(&self, kind: &str) -> Result<bool, InternalError> {
+        self.inner().await?.has_entity_index(kind).await
+    }
+
+    async fn create_entity_index(
+        &self,
+        entity_schema: &FullTextSearchEntitySchema,
+    ) -> Result<(), InternalError> {
+        self.inner().await?.create_entity_index(entity_schema).await
+    }
+
+    async fn total_documents(&self) -> Result<u64, InternalError> {
+        self.inner().await?.total_documents().await
+    }
+
+    async fn documents_in_index(&self, kind: &str) -> Result<u64, InternalError> {
+        self.inner().await?.documents_in_index(kind).await
     }
 }
 

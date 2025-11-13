@@ -13,10 +13,12 @@
 pub use kamu_accounts as domain;
 
 mod dependencies;
+mod search;
 mod services;
 mod use_cases;
 pub mod utils;
 
 pub use dependencies::*;
+pub use search::*;
 pub use services::*;
 pub use use_cases::*;

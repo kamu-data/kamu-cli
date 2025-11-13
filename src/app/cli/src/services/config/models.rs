@@ -1107,6 +1107,7 @@ impl SearchConfig {
                 FullTextSearchConfigElasticSearch {
                     url: "http://localhost:9200".to_string(),
                     password: Some("root".to_string()),
+                    index_prefix: Some(String::new()),
                     timeout_secs: Some(30),
                     enable_compression: Some(false),
                 },
@@ -1326,6 +1327,7 @@ pub struct FullTextSearchConfigElasticSearch {
     #[merge(skip)]
     pub url: String,
     pub password: Option<String>,
+    pub index_prefix: Option<String>,
     pub timeout_secs: Option<u64>,
     pub enable_compression: Option<bool>,
 }
@@ -1335,6 +1337,7 @@ impl Default for FullTextSearchConfigElasticSearch {
         Self {
             url: "http://localhost:9200".to_string(),
             password: None,
+            index_prefix: Some(String::new()),
             timeout_secs: Some(30),
             enable_compression: Some(false),
         }

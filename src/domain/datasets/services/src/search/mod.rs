@@ -7,21 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+mod dataset_full_text_search_entity_schema_provider;
 
-// Re-exports
-pub use kamu_datasets as domain;
-
-mod dependencies;
-mod search;
-mod services;
-mod use_cases;
-pub mod utils;
-
-#[cfg(feature = "testing")]
-pub mod testing;
-
-pub use dependencies::*;
-pub use search::*;
-pub use services::*;
-pub use use_cases::*;
+pub use dataset_full_text_search_entity_schema_provider::*;

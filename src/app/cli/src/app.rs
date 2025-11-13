@@ -1155,6 +1155,7 @@ pub fn register_config_in_catalog(
                 kamu_search_elasticsearch::ElasticSearchFullTextSearchConfig {
                     url: url::Url::parse(&cfg.url).int_err()?,
                     password: cfg.password,
+                    index_prefix: cfg.index_prefix.unwrap(),
                     timeout_secs: cfg.timeout_secs.unwrap(),
                     enable_compression: cfg.enable_compression.unwrap(),
                 },
