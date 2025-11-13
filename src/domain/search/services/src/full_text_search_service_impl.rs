@@ -28,13 +28,6 @@ impl FullTextSearchService for FullTextSearchServiceImpl {
         self.full_text_repo.health().await
     }
 
-    async fn register_entity_schema(
-        &self,
-        _entity: FullTextSearchEntitySchema,
-    ) -> Result<(), InternalError> {
-        unimplemented!()
-    }
-
     async fn index_bulk(
         &self,
         _kind: FullTextEntityKind,

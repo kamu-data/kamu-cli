@@ -79,14 +79,6 @@ impl FullTextSearchService for FullTextSearchImplLazyInit {
         inner.health().await
     }
 
-    async fn register_entity_schema(
-        &self,
-        entity: FullTextSearchEntitySchema,
-    ) -> Result<(), InternalError> {
-        let inner = self.inner().await?;
-        inner.register_entity_schema(entity).await
-    }
-
     async fn index_bulk(
         &self,
         kind: FullTextEntityKind,

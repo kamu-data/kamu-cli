@@ -12,7 +12,7 @@ use std::sync::Arc;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_datasets::JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER;
-use kamu_search::FullTextSearchRepository;
+use kamu_search::{FullTextSearchEntitySchemaProvider, FullTextSearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,8 +24,50 @@ use kamu_search::FullTextSearchRepository;
     requires_transaction: true,
 })]
 pub struct FullTextSearchIndexer {
-    #[allow(dead_code)]
     full_text_repo: Arc<dyn FullTextSearchRepository>,
+    entity_schema_providers: Vec<Arc<dyn FullTextSearchEntitySchemaProvider>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+impl FullTextSearchIndexer {
+    #[tracing::instrument(level = "info", name = FullTextSearchIndexer_ensure_indexes_exist, skip_all)]
+    async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
+        // Request schemas from all providers and ensure indexes exist
+        for provider in &self.entity_schema_providers {
+            let schemas = provider.provide_schemas();
+            tracing::info!(
+                "Registering {} full-text search entity schemas from provider '{}'",
+                schemas.len(),
+                provider.provider_name()
+            );
+
+            // Ensure indexes exist for each schema
+            for schema in schemas {
+                // TODO: handle schema versioning/migrations
+
+                if !self
+                    .full_text_repo
+                    .has_entity_index(schema.entity_kind)
+                    .await?
+                {
+                    tracing::info!(
+                        "Creating full-text search index for entity kind '{}'",
+                        schema.entity_kind
+                    );
+                    self.full_text_repo.create_entity_index(schema).await?;
+                } else {
+                    tracing::info!(
+                        "Full-text search index for entity kind '{}' already exists",
+                        schema.entity_kind
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +77,10 @@ pub struct FullTextSearchIndexer {
 impl InitOnStartup for FullTextSearchIndexer {
     #[tracing::instrument(level = "info", name = FullTextSearchIndexer_run_initialization, skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        // TODO: indexing logic
+        self.ensure_indexes_exist().await?;
+
+        // TODO: documents indexing logic
+
         Ok(())
     }
 }

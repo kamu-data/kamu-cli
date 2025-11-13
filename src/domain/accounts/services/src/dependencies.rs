@@ -14,6 +14,8 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool, production: bool) {
+    b.add::<AccountFullTextSearchSchemaProvider>();
+
     b.add::<AccessTokenServiceImpl>();
     b.add::<AccountServiceImpl>();
     b.add::<AuthenticationServiceImpl>();

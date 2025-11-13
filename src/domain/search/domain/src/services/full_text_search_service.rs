@@ -11,16 +11,13 @@ use std::collections::BTreeMap;
 
 use internal_error::InternalError;
 
+use crate::{FullTestSearchFieldPath, FullTextEntityKind};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FullTextSearchService: Send + Sync {
     async fn health(&self) -> Result<serde_json::Value, InternalError>;
-
-    async fn register_entity_schema(
-        &self,
-        entity: FullTextSearchEntitySchema,
-    ) -> Result<(), InternalError>;
 
     async fn index_bulk(
         &self,
@@ -39,33 +36,6 @@ pub trait FullTextSearchService: Send + Sync {
         ctx: &FullTextSearchContext,
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Entity schema model
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct FullTextSearchEntitySchema {
-    pub kind: FullTextEntityKind,
-    pub fields: Vec<FullTextSchemaField>,
-}
-
-pub type FullTextEntityKind = &'static str;
-
-pub struct FullTextSchemaField {
-    pub path: FullTestSearchFieldPath,
-    pub kind: FullTextSchemaFieldKind,
-    pub searchable: bool,
-    pub sortable: bool,
-    pub filterable: bool,
-}
-
-pub type FullTestSearchFieldPath = &'static str;
-
-pub enum FullTextSchemaFieldKind {
-    Text,
-    Keyword,
-    // TODO: Add more field kinds as needed, e.g., Numeric, Date, Boolean,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

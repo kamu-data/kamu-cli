@@ -6896,6 +6896,7 @@ dependencies = [
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
  "kamu-datasets",
+ "kamu-search",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
@@ -8000,6 +8001,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-search",
  "messaging-outbox",
  "mockall",
  "nutype",
@@ -8350,6 +8352,7 @@ name = "kamu-search-elasticsearch"
 version = "0.252.4"
 dependencies = [
  "async-trait",
+ "common-macros",
  "container-runtime",
  "dill",
  "elasticsearch",
@@ -8357,6 +8360,7 @@ dependencies = [
  "internal-error",
  "kamu-datasets",
  "kamu-search",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",
