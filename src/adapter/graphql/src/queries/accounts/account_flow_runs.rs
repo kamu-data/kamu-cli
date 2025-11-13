@@ -111,7 +111,9 @@ impl<'a> AccountFlowRuns<'a> {
         let dataset_flow_filters = filters
             .map(|filters| kamu_flow_system::FlowFilters {
                 by_flow_types: prepare_flows_filter_by_types(filters.by_process_type.as_ref()),
-                by_flow_status: filters.by_status.map(Into::into),
+                by_flow_statuses: filters
+                    .by_status
+                    .map(|statuses| statuses.into_iter().map(Into::into).collect()),
                 by_initiator: prepare_flows_filter_by_initiator(filters.by_initiator),
             })
             .unwrap_or_default();
@@ -170,7 +172,7 @@ impl<'a> AccountFlowRuns<'a> {
 
 #[derive(InputObject, Debug)]
 pub struct AccountFlowFilters {
-    by_status: Option<FlowStatus>,
+    by_status: Option<Vec<FlowStatus>>,
     by_initiator: Option<InitiatorFilterInput>,
     by_dataset_ids: Vec<DatasetID<'static>>,
     by_process_type: Option<FlowProcessTypeFilterInput>,
