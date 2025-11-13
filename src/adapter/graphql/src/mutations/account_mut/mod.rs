@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod account_mut;
+mod account_quotas_mut;
 
 pub(crate) use account_mut::*;
+pub(crate) use account_quotas_mut::*;

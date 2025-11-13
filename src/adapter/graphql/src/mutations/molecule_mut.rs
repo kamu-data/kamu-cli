@@ -62,7 +62,7 @@ impl MoleculeMut {
 
     /// 2-nd Molecule API version (mutation).
     async fn v2(&self) -> MoleculeMutV2 {
-        MoleculeMutV2
+        MoleculeMutV2::default()
     }
 }
 

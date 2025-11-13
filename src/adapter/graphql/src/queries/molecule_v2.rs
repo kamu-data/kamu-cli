@@ -74,7 +74,7 @@ impl MoleculeV2 {
         filters: String,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<FoundSearchEntry> {
+    ) -> Result<FoundSearchEntryConnection> {
         let _ = prompt;
         let _ = filters;
         let _ = page;
@@ -85,6 +85,7 @@ impl MoleculeV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: revisit after IPNFT-less projects changes.
 #[derive(SimpleObject, Clone)]
 #[graphql(complex)]
 pub struct MoleculeProjectV2 {

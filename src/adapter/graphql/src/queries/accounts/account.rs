@@ -19,7 +19,7 @@ use tokio::sync::OnceCell;
 
 use super::AccountFlows;
 use crate::prelude::*;
-use crate::queries::{AccountAccessTokens, Dataset, DatasetConnection};
+use crate::queries::{AccountAccessTokens, AccountQuotas, Dataset, DatasetConnection};
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,10 +70,7 @@ impl Account {
         if let Some(account) = maybe_account {
             Ok(Self::from_account(account))
         } else {
-            Err(AccountNotFoundByIdError {
-                account_id: account_id.clone(),
-            }
-            .int_err())
+            Err(AccountNotFoundByIdError { account_id }.int_err())
         }
     }
 
@@ -275,6 +272,12 @@ impl Account {
             .collect();
 
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
+    }
+
+    /// Returns datasets belonging to this account
+    #[tracing::instrument(level = "info", name = Account_quotas, skip_all)]
+    async fn quotas(&self, _ctx: &Context<'_>) -> Result<AccountQuotas<'_>> {
+        todo!()
     }
 }
 

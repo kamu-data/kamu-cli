@@ -7,12 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::mutations::{CreateAnnouncementResult, CreateProjectResult};
+use crate::mutations::{CreateAnnouncementResult, CreateProjectResult, MoleculeMutV1};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct MoleculeMutV2;
+#[derive(Default)]
+pub(crate) struct MoleculeMutV2 {
+    v1: MoleculeMutV1,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,17 +26,15 @@ impl MoleculeMutV2 {
     #[tracing::instrument(level = "info", name = MoleculeMutV2_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
     async fn create_project(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         ipnft_symbol: String,
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: U256,
     ) -> Result<CreateProjectResult> {
-        let _ = ipnft_symbol;
-        let _ = ipnft_uid;
-        let _ = ipnft_address;
-        let _ = ipnft_token_id;
-        todo!()
+        self.v1
+            .create_project(ctx, ipnft_symbol, ipnft_uid, ipnft_address, ipnft_token_id)
+            .await
     }
 
     /// Retracts a project from the `projects` dataset.
@@ -64,7 +65,6 @@ impl MoleculeMutV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[expect(dead_code)]
 pub struct MoleculeProjectMutV2;
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
