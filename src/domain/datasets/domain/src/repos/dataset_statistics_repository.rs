@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::DatasetStatistics;
+use crate::{DatasetStatistics, TotalStatistic};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +23,11 @@ pub trait DatasetStatisticsRepository: Send + Sync {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<DatasetStatistics, GetDatasetStatisticsError>;
+
+    async fn get_total_statistic_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<TotalStatistic, InternalError>;
 
     async fn set_dataset_statistics(
         &self,

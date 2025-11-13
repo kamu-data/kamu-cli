@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    COALESCE(SUM(num_records), 0) AS num_records,\n                    COALESCE(SUM(data_size), 0) AS data_size,\n                    COALESCE(SUM(checkpoints_size), 0) AS checkpoints_size,\n                    COALESCE(SUM(num_object_links), 0) AS num_object_links,\n                    COALESCE(SUM(object_links_size), 0) AS object_links_size\n                FROM dataset_statistics ds\n                    LEFT JOIN dataset_entries de on ds.dataset_id = de.dataset_id\n                WHERE de.owner_id = $1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "num_records",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "data_size",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "checkpoints_size",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "num_object_links",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "object_links_size",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "17059a433930c7a3319b35c167798c2dc7efd1a1091af1b4620d3e01b8f8bb89"
+}

@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Dataset statistics now stores information about object links
+### Added
+- GQL: new method `owned_dataset_statistic` for account which return full combined statistic for all datasets
+
 ## [0.252.4] - 2025-11-10
 ### Changed
 - Refactor: QueryService was split on 3 parts (queries, schema, and session context builder)

@@ -43,6 +43,28 @@ impl<'a> DatasetData<'a> {
         Ok(dataset_statistics.data_size)
     }
 
+    /// Total number of object links in this dataset
+    #[tracing::instrument(level = "info", name = DatasetData_num_object_links, skip_all)]
+    async fn num_object_links(&self, ctx: &Context<'_>) -> Result<u64> {
+        let dataset_statistics = self.readable_state.dataset_statistics(ctx).await?;
+        Ok(dataset_statistics.num_object_links)
+    }
+
+    /// An estimated size of object links
+    #[tracing::instrument(level = "info", name = DatasetData_estimated_content_links_size, skip_all)]
+    async fn estimated_content_links_size(&self, ctx: &Context<'_>) -> Result<u64> {
+        let dataset_statistics = self.readable_state.dataset_statistics(ctx).await?;
+        Ok(dataset_statistics.object_links_size)
+    }
+
+    /// An estimated size of all objects in dataset
+    #[tracing::instrument(level = "info", name = DatasetData_total_size, skip_all)]
+    async fn total_size(&self, ctx: &Context<'_>) -> Result<Option<u64>> {
+        let dataset_statistics = self.readable_state.dataset_statistics(ctx).await?;
+
+        Ok(dataset_statistics.get_size_summary())
+    }
+
     /// Returns the specified number of the latest records in the dataset
     /// This is equivalent to SQL query like:
     ///
