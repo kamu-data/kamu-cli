@@ -1174,7 +1174,7 @@ type DatasetData {
 	"""
 	An estimated size of all objects in dataset
 	"""
-	totalSize: Int!
+	totalSize: Int
 	"""
 	Returns the specified number of the latest records in the dataset
 	This is equivalent to SQL query like:
