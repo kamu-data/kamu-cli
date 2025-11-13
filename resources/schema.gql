@@ -1166,11 +1166,15 @@ type DatasetData {
 	"""
 	Total number of object links in this dataset
 	"""
-	numObjectLinksTotal: Int!
+	numObjectLinks: Int!
 	"""
 	An estimated size of object links
 	"""
-	estimatedObjectLinksSize: Int!
+	estimatedContentLinksSize: Int!
+	"""
+	An estimated size of all objects in dataset
+	"""
+	totalSize: Int!
 	"""
 	Returns the specified number of the latest records in the dataset
 	This is equivalent to SQL query like:
@@ -4102,6 +4106,7 @@ type TotalDatasetsStatistic {
 	checkpointsSize: Int!
 	numObjectLinks: Int!
 	objectLinksSize: Int!
+	totalSize: Int
 }
 
 """
