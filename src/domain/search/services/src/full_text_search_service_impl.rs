@@ -24,20 +24,16 @@ pub struct FullTextSearchServiceImpl {
 
 #[async_trait::async_trait]
 impl FullTextSearchService for FullTextSearchServiceImpl {
-    async fn health(&self) -> Result<serde_json::Value, InternalError> {
-        self.full_text_repo.health().await
-    }
-
-    async fn index_bulk(
+    async fn health(
         &self,
-        _kind: FullTextEntityKind,
-        _docs: Vec<(String, serde_json::Value)>,
-    ) -> Result<(), InternalError> {
-        unimplemented!()
+        _ctx: FullTextSearchContext<'_>,
+    ) -> Result<serde_json::Value, InternalError> {
+        self.full_text_repo.health().await
     }
 
     async fn delete_bulk(
         &self,
+        _ctx: FullTextSearchContext<'_>,
         _kind: FullTextEntityKind,
         _ids: Vec<String>,
     ) -> Result<(), InternalError> {
@@ -46,7 +42,7 @@ impl FullTextSearchService for FullTextSearchServiceImpl {
 
     async fn search(
         &self,
-        _ctx: &FullTextSearchContext,
+        _ctx: FullTextSearchContext<'_>,
         _req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError> {
         unimplemented!()

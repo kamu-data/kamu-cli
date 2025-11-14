@@ -120,6 +120,14 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
     async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError> {
         self.inner().await?.documents_of_kind(kind).await
     }
+
+    async fn index_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        docs: Vec<(String, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        self.inner().await?.index_bulk(kind, docs).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8340,6 +8340,7 @@ name = "kamu-search"
 version = "0.252.4"
 dependencies = [
  "async-trait",
+ "dill",
  "futures",
  "internal-error",
  "opendatafabric",

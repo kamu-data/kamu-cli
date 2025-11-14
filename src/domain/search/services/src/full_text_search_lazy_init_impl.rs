@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use dill::{Component, TypedBuilder};
-use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_search::*;
 
@@ -21,7 +20,6 @@ use crate::*;
 /// This is a temporary solution that initializes the search index upon the
 /// first call.
 pub struct FullTextSearchImplLazyInit {
-    catalog: dill::Catalog,
     is_initialized: tokio::sync::OnceCell<()>,
 }
 
@@ -30,40 +28,35 @@ pub struct FullTextSearchImplLazyInit {
 #[dill::component(pub)]
 #[dill::interface(dyn FullTextSearchService)]
 #[dill::scope(dill::Singleton)]
-#[dill::interface(dyn InitOnStartup)]
-#[dill::meta(InitOnStartupMeta {
-    job_name: "dev.kamu.search.FullTextSearchImplLazyInit",
-    depends_on: &[],
-    requires_transaction: false,
-})]
 impl FullTextSearchImplLazyInit {
-    pub fn new(catalog: dill::Catalog) -> Self {
+    pub fn new() -> Self {
         Self {
-            catalog,
             is_initialized: tokio::sync::OnceCell::new(),
         }
     }
 
-    async fn maybe_init(&self) -> Result<(), InternalError> {
+    async fn maybe_init(&self, catalog: &dill::Catalog) -> Result<(), InternalError> {
         self.is_initialized
-            .get_or_try_init(async || self.init().await)
+            .get_or_try_init(async || self.init(catalog).await)
             .await?;
         Ok(())
     }
 
-    async fn init(&self) -> Result<(), InternalError> {
-        let indexer = FullTextSearchIndexer::builder()
-            .get(&self.catalog)
-            .int_err()?;
+    async fn init(&self, catalog: &dill::Catalog) -> Result<(), InternalError> {
+        let indexer = FullTextSearchIndexer::builder().get(catalog).int_err()?;
 
+        use init_on_startup::InitOnStartup;
         indexer.run_initialization().await
     }
 
-    async fn inner(&self) -> Result<Arc<dyn FullTextSearchService>, InternalError> {
-        self.maybe_init().await?;
+    async fn inner(
+        &self,
+        catalog: &dill::Catalog,
+    ) -> Result<Arc<dyn FullTextSearchService>, InternalError> {
+        self.maybe_init(catalog).await?;
 
         let inner = FullTextSearchServiceImpl::builder()
-            .get(&self.catalog)
+            .get(catalog)
             .int_err()?;
 
         Ok(inner)
@@ -74,49 +67,31 @@ impl FullTextSearchImplLazyInit {
 
 #[async_trait::async_trait]
 impl FullTextSearchService for FullTextSearchImplLazyInit {
-    async fn health(&self) -> Result<serde_json::Value, InternalError> {
-        let inner = self.inner().await?;
-        inner.health().await
-    }
-
-    async fn index_bulk(
+    async fn health(
         &self,
-        kind: FullTextEntityKind,
-        docs: Vec<(String, serde_json::Value)>,
-    ) -> Result<(), InternalError> {
-        let inner = self.inner().await?;
-        inner.index_bulk(kind, docs).await
+        ctx: FullTextSearchContext<'_>,
+    ) -> Result<serde_json::Value, InternalError> {
+        let inner = self.inner(ctx.catalog).await?;
+        inner.health(ctx).await
     }
 
     async fn delete_bulk(
         &self,
+        ctx: FullTextSearchContext<'_>,
         kind: FullTextEntityKind,
         ids: Vec<String>,
     ) -> Result<(), InternalError> {
-        let inner = self.inner().await?;
-        inner.delete_bulk(kind, ids).await
+        let inner = self.inner(ctx.catalog).await?;
+        inner.delete_bulk(ctx, kind, ids).await
     }
 
     async fn search(
         &self,
-        ctx: &FullTextSearchContext,
+        ctx: FullTextSearchContext<'_>,
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError> {
-        let inner = self.inner().await?;
+        let inner = self.inner(ctx.catalog).await?;
         inner.search(ctx, req).await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl InitOnStartup for FullTextSearchImplLazyInit {
-    #[tracing::instrument(level = "debug", name = FullTextSearchImplLazyInit_run_initialization, skip_all)]
-    async fn run_initialization(&self) -> Result<(), InternalError> {
-        // Note: we only neeed this to capture the correct system catalog,
-        //  and not the one that may be passed in the context of the first search call.
-        Ok(())
     }
 }
 

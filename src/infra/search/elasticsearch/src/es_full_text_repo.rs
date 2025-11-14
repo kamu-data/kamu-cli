@@ -56,6 +56,27 @@ impl ElasticSearchFullTextRepo {
             .int_err()?;
         Ok(client)
     }
+
+    fn resolve_index_name(
+        &self,
+        client: &ElasticSearchClient,
+        kind: FullTextEntityKind,
+    ) -> Result<String, InternalError> {
+        let state = self.state.read().unwrap();
+        let Some(schema) = state.registered_schemas.get(&kind) else {
+            return Err(InternalError::new(format!(
+                "Entity kind '{kind}' is not registered in full-text search repository",
+            )));
+        };
+
+        let entity_index = ElasticSearchVersionedEntityIndex::new(
+            client,
+            &self.config,
+            schema.entity_kind,
+            schema.version,
+        );
+        Ok(entity_index.index_name())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,25 +185,19 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
     #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_documents_of_kind, skip_all, fields(kind))]
     async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError> {
         let client = self.es_client().await?;
-
-        let index_name = {
-            let state = self.state.read().unwrap();
-            let Some(schema) = state.registered_schemas.get(&kind) else {
-                return Err(InternalError::new(format!(
-                    "Entity kind '{kind}' is not registered in full-text search repository",
-                )));
-            };
-
-            let entity_index = ElasticSearchVersionedEntityIndex::new(
-                client,
-                &self.config,
-                schema.entity_kind,
-                schema.version,
-            );
-            entity_index.index_name()
-        };
-
+        let index_name = self.resolve_index_name(client, kind)?;
         client.documents_in_index(&index_name).await.int_err()
+    }
+
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_index_bulk, skip_all, fields(kind, num_docs = docs.len()))]
+    async fn index_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        docs: Vec<(String, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        let client = self.es_client().await?;
+        let index_name = self.resolve_index_name(client, kind)?;
+        client.bulk_index(&index_name, docs).await.int_err()
     }
 }
 

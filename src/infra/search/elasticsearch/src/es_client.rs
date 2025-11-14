@@ -315,6 +315,75 @@ impl ElasticSearchClient {
         // Success
         Ok(())
     }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = ElasticSearchClient_bulk_index,
+        skip_all,
+        fields(index_name, num_docs = docs.len())
+    )]
+    pub async fn bulk_index(
+        &self,
+        index_name: &str,
+        docs: Vec<(String, serde_json::Value)>,
+    ) -> Result<(), ElasticSearchClientError> {
+        use elasticsearch::BulkParts;
+
+        if docs.is_empty() {
+            return Ok(());
+        }
+
+        let mut body: Vec<elasticsearch::BulkOperation<_>> = Vec::with_capacity(docs.len() * 2);
+
+        for (doc_id, doc_value) in docs {
+            body.push(
+                elasticsearch::BulkOperation::index(doc_value)
+                    .id(doc_id)
+                    .into(),
+            );
+        }
+
+        tracing::debug!(
+            index_name,
+            num_operations = body.len(),
+            "Executing bulk index operation"
+        );
+
+        let response = self
+            .client
+            .bulk(BulkParts::Index(index_name))
+            .body(body)
+            .send()
+            .await?;
+
+        let response = ensure_client_response(response).await?;
+
+        #[derive(serde::Deserialize)]
+        struct BulkResponse {
+            errors: bool,
+            items: Vec<serde_json::Value>,
+        }
+
+        let bulk_result: BulkResponse = response.json().await?;
+
+        if bulk_result.errors {
+            tracing::error!(
+                index_name,
+                items = ?bulk_result.items,
+                "Bulk indexing completed with errors"
+            );
+            return Err(ElasticSearchClientError::BadResponse {
+                status: elasticsearch::http::StatusCode::from_u16(500).unwrap(),
+                error_type: "bulk_index_errors".to_string(),
+                reason: "Some documents failed to index".to_string(),
+                body: serde_json::json!({ "items": bulk_result.items }),
+            });
+        }
+
+        tracing::debug!(index_name, "Bulk index operation completed successfully");
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

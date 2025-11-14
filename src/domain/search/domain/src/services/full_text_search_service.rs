@@ -17,23 +17,21 @@ use crate::{FullTestSearchFieldPath, FullTextEntityKind};
 
 #[async_trait::async_trait]
 pub trait FullTextSearchService: Send + Sync {
-    async fn health(&self) -> Result<serde_json::Value, InternalError>;
-
-    async fn index_bulk(
+    async fn health(
         &self,
-        kind: FullTextEntityKind,
-        docs: Vec<(String, serde_json::Value)>,
-    ) -> Result<(), InternalError>;
+        ctx: FullTextSearchContext<'_>,
+    ) -> Result<serde_json::Value, InternalError>;
 
     async fn delete_bulk(
         &self,
+        ctx: FullTextSearchContext<'_>,
         kind: FullTextEntityKind,
         ids: Vec<String>,
     ) -> Result<(), InternalError>;
 
     async fn search(
         &self,
-        ctx: &FullTextSearchContext,
+        ctx: FullTextSearchContext<'_>,
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError>;
 }
@@ -42,7 +40,8 @@ pub trait FullTextSearchService: Send + Sync {
 // Search request model
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FullTextSearchContext {
+pub struct FullTextSearchContext<'a> {
+    pub catalog: &'a dill::Catalog,
     pub actor_account_id: Option<odf::AccountID>,
 }
 
