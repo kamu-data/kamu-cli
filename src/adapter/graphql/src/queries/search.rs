@@ -119,7 +119,7 @@ impl Search {
         // TODO: support real queries
         let catalog = ctx.data::<dill::Catalog>().unwrap();
         let context = kamu_search::FullTextSearchContext {
-            catalog: &catalog,
+            catalog,
             actor_account_id: None,
         };
 

@@ -6886,6 +6886,7 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "futures",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",
