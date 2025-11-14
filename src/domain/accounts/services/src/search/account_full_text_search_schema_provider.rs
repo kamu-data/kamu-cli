@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,6 +16,7 @@ use kamu_search::*;
 #[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
 pub struct AccountFullTextSearchSchemaProvider {}
 
+#[async_trait::async_trait]
 impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSchemaProvider {
     fn provider_name(&self) -> &'static str {
         "dev.kamu.domain.accounts.AccountFullTextSearchSchemaProvider"
@@ -22,6 +24,15 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
 
     fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
         &[ACCOUNT_FULL_TEXT_SEARCH_ENTITY_SCHEMA]
+    }
+
+    async fn run_schema_initial_indexing(
+        &self,
+        _repo: &dyn FullTextSearchRepository,
+        _schema: &FullTextSearchEntitySchema,
+    ) -> Result<usize, InternalError> {
+        // TODO
+        Ok(0)
     }
 }
 

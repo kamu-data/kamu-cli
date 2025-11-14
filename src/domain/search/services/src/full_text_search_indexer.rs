@@ -69,6 +69,54 @@ impl FullTextSearchIndexer {
 
         Ok(())
     }
+
+    #[tracing::instrument(level = "info", name = FullTextSearchIndexer_run_indexing, skip_all)]
+    async fn run_indexing(&self) -> Result<(), InternalError> {
+        for provider in &self.entity_schema_providers {
+            let schemas = provider.provide_schemas();
+            for schema in schemas {
+                let num_existing_documents = self
+                    .full_text_repo
+                    .documents_of_kind(schema.entity_kind)
+                    .await?;
+                if num_existing_documents == 0 {
+                    tracing::info!(
+                        entity_kind = %schema.entity_kind,
+                        "No existing documents found, running full reindexing",
+                    );
+                    match provider
+                        .run_schema_initial_indexing(self.full_text_repo.as_ref(), schema)
+                        .await
+                    {
+                        Ok(num_indexed) => {
+                            tracing::info!(
+                                entity_kind = %schema.entity_kind,
+                                num_indexed,
+                                "Completed full reindexing of full-text search index for entity",
+                            );
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                entity_kind = %schema.entity_kind,
+                                error = ?e,
+                                error_msg = %e,
+                                "Failed to run full reindexing of full-text search index for entity",
+                            );
+                            return Err(e);
+                        }
+                    }
+                } else {
+                    tracing::info!(
+                        entity_kind = %schema.entity_kind,
+                        num_existing_documents,
+                        "Existing documents found, skipping full reindexing",
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,9 +127,7 @@ impl InitOnStartup for FullTextSearchIndexer {
     #[tracing::instrument(level = "info", name = FullTextSearchIndexer_run_initialization, skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         self.ensure_indexes_exist().await?;
-
-        // TODO: documents indexing logic
-
+        self.run_indexing().await?;
         Ok(())
     }
 }

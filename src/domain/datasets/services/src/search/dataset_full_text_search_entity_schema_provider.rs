@@ -7,14 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
+use internal_error::InternalError;
+use kamu_core::DatasetRegistry;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
-pub struct DatasetFullTextSearchSchemaProvider {}
+pub struct DatasetFullTextSearchSchemaProvider {
+    dataset_registry: Arc<dyn DatasetRegistry>,
+}
 
+#[async_trait::async_trait]
 impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSchemaProvider {
     fn provider_name(&self) -> &'static str {
         "dev.kamu.domain.datasets.DatasetFullTextSearchSchemaProvider"
@@ -22,6 +29,52 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
 
     fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
         &[DATASET_FULL_TEXT_SEARCH_ENTITY_SCHEMA]
+    }
+
+    async fn run_schema_initial_indexing(
+        &self,
+        repo: &dyn FullTextSearchRepository,
+        schema: &FullTextSearchEntitySchema,
+    ) -> Result<usize, InternalError> {
+        assert!(schema.entity_kind == FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET);
+
+        const CHUNK_SIZE: usize = 500;
+
+        let mut datasets_stream = self.dataset_registry.all_dataset_handles();
+
+        let mut dataset_documents = Vec::new();
+        let mut total_indexed = 0;
+
+        use futures::TryStreamExt;
+        while let Some(handle) = datasets_stream.try_next().await? {
+            let dataset_document = serde_json::json!({
+                FIELD_DATASET_NAME: handle.alias.dataset_name.to_string(),
+                FIELD_ALIAS: handle.alias.to_string(),
+                FIELD_KIND: match handle.kind {
+                    odf::DatasetKind::Root => "root",
+                    odf::DatasetKind::Derivative => "derivative",
+                },
+            });
+            dataset_documents.push((handle.id.to_string(), dataset_document));
+
+            // Index in chunks to avoid memory overwhelming
+            if dataset_documents.len() >= CHUNK_SIZE {
+                repo.index_bulk(FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET, dataset_documents)
+                    .await?;
+                total_indexed += CHUNK_SIZE;
+                dataset_documents = Vec::new();
+            }
+        }
+
+        // Index remaining documents
+        if !dataset_documents.is_empty() {
+            let remaining_count = dataset_documents.len();
+            repo.index_bulk(FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET, dataset_documents)
+                .await?;
+            total_indexed += remaining_count;
+        }
+
+        Ok(total_indexed)
     }
 }
 
@@ -32,23 +85,29 @@ const FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const FIELD_DATASET_NAME: &str = "dataset_name";
+const FIELD_ALIAS: &str = "alias";
+const FIELD_KIND: &str = "kind";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const DATASET_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
-        path: "dataset_name",
+        path: FIELD_DATASET_NAME,
         kind: FullTextSchemaFieldKind::Text,
         searchable: true,
         sortable: true,
         filterable: false,
     },
     FullTextSchemaField {
-        path: "alias",
+        path: FIELD_ALIAS,
         kind: FullTextSchemaFieldKind::Text,
         searchable: true,
         sortable: true,
         filterable: false,
     },
     FullTextSchemaField {
-        path: "kind",
+        path: FIELD_KIND,
         kind: FullTextSchemaFieldKind::Keyword,
         searchable: false,
         sortable: false,

@@ -117,7 +117,13 @@ impl Search {
         let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
 
         // TODO: support real queries
-        let health = full_text_search_service.health().await.int_err()?;
+        let catalog = ctx.data::<dill::Catalog>().unwrap();
+        let context = kamu_search::FullTextSearchContext {
+            catalog: &catalog,
+            actor_account_id: None,
+        };
+
+        let health = full_text_search_service.health(context).await.int_err()?;
         let health_as_string = serde_json::to_string_pretty(&health).int_err()?;
         Ok(health_as_string)
     }

@@ -23,6 +23,12 @@ pub trait FullTextSearchRepository: Send + Sync {
     async fn total_documents(&self) -> Result<u64, InternalError>;
 
     async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError>;
+
+    async fn index_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        docs: Vec<(String, serde_json::Value)>,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
