@@ -61,6 +61,7 @@ const DATASET_FULL_TEXT_SEARCH_ENTITY_SCHEMA: FullTextSearchEntitySchema =
         entity_kind: FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
         version: FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET_VERSION,
         fields: DATASET_FIELDS,
+        upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
     };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -15,28 +15,29 @@ use internal_error::InternalError;
 pub trait FullTextSearchRepository: Send + Sync {
     async fn health(&self) -> Result<serde_json::Value, InternalError>;
 
-    async fn has_entity_index(&self, kind: &str) -> Result<bool, InternalError>;
-
-    async fn create_entity_index(
+    async fn ensure_entity_index(
         &self,
         entity_schema: &FullTextSearchEntitySchema,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), FullTextSearchEnsureEntityIndexError>;
 
     async fn total_documents(&self) -> Result<u64, InternalError>;
 
-    async fn documents_in_index(&self, kind: &str) -> Result<u64, InternalError>;
+    async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
 pub struct FullTextSearchEntitySchema {
     pub entity_kind: FullTextEntityKind,
     pub version: u32,
     pub fields: &'static [FullTextSchemaField],
+    pub upgrade_mode: FullTextSearchEntitySchemaUpgradeMode,
 }
 
 pub type FullTextEntityKind = &'static str;
 
+#[derive(Debug)]
 pub struct FullTextSchemaField {
     pub path: FullTestSearchFieldPath,
     pub kind: FullTextSchemaFieldKind,
@@ -47,10 +48,53 @@ pub struct FullTextSchemaField {
 
 pub type FullTestSearchFieldPath = &'static str;
 
+#[derive(Debug, Clone, Copy)]
 pub enum FullTextSchemaFieldKind {
     Text,
     Keyword,
     // TODO: Add more field kinds as needed, e.g., Numeric, Date, Boolean,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FullTextSearchEntitySchemaUpgradeMode {
+    /// Try to preserve existing data via reindexing into new schema
+    Reindex,
+
+    /// Existing data won't be preserved, new empty index will be created
+    BreakingRecreate,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub enum FullTextSearchEnsureEntityIndexError {
+    #[error(
+        "Entity index schema drift detected for entity '{entity_kind}', version {version}: \
+         expected mapping hash '{expected_hash}', actual mapping hash '{actual_hash}'"
+    )]
+    SchemaDriftDetected {
+        entity_kind: FullTextEntityKind,
+        version: u32,
+        alias: String,
+        index: String,
+        expected_hash: String,
+        actual_hash: String,
+    },
+
+    #[error(
+        "Attempted to downgrade entity index for entity '{entity_kind}' from version \
+         {existing_version} to {attempted_version}"
+    )]
+    DowngradeAttempted {
+        entity_kind: FullTextEntityKind,
+        existing_version: u32,
+        alias: String,
+        index: String,
+        attempted_version: u32,
+    },
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
