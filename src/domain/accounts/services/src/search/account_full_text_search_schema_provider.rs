@@ -54,6 +54,7 @@ const ACCOUNT_FULL_TEXT_SEARCH_ENTITY_SCHEMA: FullTextSearchEntitySchema =
         entity_kind: FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT,
         version: FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT_VERSION,
         fields: ACCOUNT_FIELDS,
+        upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
     };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

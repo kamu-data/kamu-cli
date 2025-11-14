@@ -106,23 +106,19 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
         self.inner().await?.health().await
     }
 
-    async fn has_entity_index(&self, kind: &str) -> Result<bool, InternalError> {
-        self.inner().await?.has_entity_index(kind).await
-    }
-
-    async fn create_entity_index(
+    async fn ensure_entity_index(
         &self,
         entity_schema: &FullTextSearchEntitySchema,
-    ) -> Result<(), InternalError> {
-        self.inner().await?.create_entity_index(entity_schema).await
+    ) -> Result<(), FullTextSearchEnsureEntityIndexError> {
+        self.inner().await?.ensure_entity_index(entity_schema).await
     }
 
     async fn total_documents(&self) -> Result<u64, InternalError> {
         self.inner().await?.total_documents().await
     }
 
-    async fn documents_in_index(&self, kind: &str) -> Result<u64, InternalError> {
-        self.inner().await?.documents_in_index(kind).await
+    async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError> {
+        self.inner().await?.documents_of_kind(kind).await
     }
 }
 

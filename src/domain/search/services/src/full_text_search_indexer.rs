@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER;
 use kamu_search::{FullTextSearchEntitySchemaProvider, FullTextSearchRepository};
 
@@ -38,30 +38,31 @@ impl FullTextSearchIndexer {
         for provider in &self.entity_schema_providers {
             let schemas = provider.provide_schemas();
             tracing::info!(
-                "Registering {} full-text search entity schemas from provider '{}'",
-                schemas.len(),
-                provider.provider_name()
+                schemas_count = schemas.len(),
+                provider_name = provider.provider_name(),
+                "Registering full-text search entity schemas from provider",
             );
 
             // Ensure indexes exist for each schema
             for schema in schemas {
-                // TODO: handle schema versioning/migrations
-
-                if !self
-                    .full_text_repo
-                    .has_entity_index(schema.entity_kind)
-                    .await?
-                {
-                    tracing::info!(
-                        "Creating full-text search index for entity kind '{}'",
-                        schema.entity_kind
-                    );
-                    self.full_text_repo.create_entity_index(schema).await?;
-                } else {
-                    tracing::info!(
-                        "Full-text search index for entity kind '{}' already exists",
-                        schema.entity_kind
-                    );
+                match self.full_text_repo.ensure_entity_index(schema).await {
+                    Ok(outcome) => {
+                        tracing::info!(
+                            entity_kind = %schema.entity_kind,
+                            version = schema.version,
+                            outcome = ?outcome,
+                            "Ensured up-to-date full-text search index for entity",
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            entity_kind = %schema.entity_kind,
+                            error = ?e,
+                            error_msg = %e,
+                            "Failed to ensure full-text search index for entity",
+                        );
+                        return Err(e.int_err());
+                    }
                 }
             }
         }

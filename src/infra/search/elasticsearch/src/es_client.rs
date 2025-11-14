@@ -1,0 +1,420 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use crate::ElasticSearchFullTextSearchConfig;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const DEFAULT_ELASTICSEARCH_USER: &str = "elastic";
+const DEFAULT_ELASTICSEARCH_PASSWORD: &str = "root";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) struct ElasticSearchClient {
+    client: elasticsearch::Elasticsearch,
+    _config: ElasticSearchFullTextSearchConfig,
+}
+
+#[common_macros::method_names_consts]
+impl ElasticSearchClient {
+    #[tracing::instrument(level = "info", name = ElasticSearchClient_init, skip_all)]
+    pub fn init(
+        config: ElasticSearchFullTextSearchConfig,
+    ) -> Result<Self, ElasticSearchClientBuildError> {
+        use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
+
+        let pool = SingleNodeConnectionPool::new(config.url.clone());
+
+        let builder = TransportBuilder::new(pool)
+            .disable_proxy() // often desirable in k8s
+            .timeout(std::time::Duration::from_secs(config.timeout_secs))
+            .request_body_compression(config.enable_compression)
+            .auth(elasticsearch::auth::Credentials::Basic(
+                DEFAULT_ELASTICSEARCH_USER.into(),
+                config
+                    .password
+                    .as_ref()
+                    .map(|p| p.as_str().to_string())
+                    .unwrap_or_else(|| DEFAULT_ELASTICSEARCH_PASSWORD.into()),
+            ));
+
+        let transport = builder.build()?;
+        let client = elasticsearch::Elasticsearch::new(transport);
+        Ok(Self {
+            client,
+            _config: config,
+        })
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_cluster_health, skip_all)]
+    pub async fn cluster_health(&self) -> Result<serde_json::Value, ElasticSearchClientError> {
+        let response = self
+            .client
+            .cluster()
+            .health(elasticsearch::cluster::ClusterHealthParts::None)
+            .send()
+            .await?;
+
+        let response = ensure_client_response(response).await?;
+        let body: serde_json::Value = response.json().await?;
+        Ok(body)
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_total_documents, skip_all)]
+    pub async fn total_documents(&self) -> Result<u64, ElasticSearchClientError> {
+        let response = self
+            .client
+            .count(elasticsearch::CountParts::None)
+            .send()
+            .await?;
+
+        let response = ensure_client_response(response).await?;
+
+        #[derive(serde::Deserialize)]
+        struct CountResponse {
+            count: u64,
+        }
+
+        let body: CountResponse = response.json().await?;
+        let count = body.count;
+        Ok(count)
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = ElasticSearchClient_documents_in_index,
+        skip_all,
+        fields(index_name)
+    )]
+    pub async fn documents_in_index(
+        &self,
+        index_name: &str,
+    ) -> Result<u64, ElasticSearchClientError> {
+        let response = self
+            .client
+            .count(elasticsearch::CountParts::Index(&[index_name]))
+            .send()
+            .await?;
+
+        let response = ensure_client_response(response).await?;
+
+        #[derive(serde::Deserialize)]
+        struct CountResponse {
+            count: u64,
+        }
+
+        let body: CountResponse = response.json().await?;
+        let count = body.count;
+        Ok(count)
+    }
+
+    #[tracing::instrument(level = "info", name = ElasticSearchClient_create_index, skip_all, fields(index_name))]
+    pub async fn create_index(
+        &self,
+        index_name: &str,
+        body: serde_json::Value,
+    ) -> Result<(), ElasticSearchClientError> {
+        tracing::debug!(index_name, body = ?body, "Creating ElasticSearch index");
+
+        let response = self
+            .client
+            .indices()
+            .create(elasticsearch::indices::IndicesCreateParts::Index(
+                index_name,
+            ))
+            .body(body)
+            .send()
+            .await?;
+
+        let _ = ensure_client_response(response).await?;
+        Ok(())
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_read_index_meta, skip_all, fields(index_name))]
+    pub async fn read_index_meta(
+        &self,
+        index_name: &str,
+    ) -> Result<serde_json::Value, ElasticSearchClientError> {
+        let response = self
+            .client
+            .indices()
+            .get_mapping(elasticsearch::indices::IndicesGetMappingParts::Index(&[
+                index_name,
+            ]))
+            .send()
+            .await?;
+        let response = ensure_client_response(response).await?;
+
+        // Body structure: {
+        //    "<index_name>": {
+        //        "mappings": {
+        //            "_meta": {
+        //                ... interested metadata ...
+        //            },
+        //            "properties": {
+        //                ... field mappings ...
+        //            }
+        //        }
+        //    }
+        // }
+
+        let body: serde_json::Value = response.json().await?;
+        let index_settings = &body[index_name]["mappings"]["_meta"];
+        Ok(index_settings.clone())
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_move_alias, skip_all, fields(alias_name, to_index))]
+    pub async fn move_alias(
+        &self,
+        alias_name: &str,
+        to_index: &str,
+    ) -> Result<(), ElasticSearchClientError> {
+        let body = serde_json::json!({
+            "actions": [
+                { "remove": { "index": "*", "alias": alias_name } },
+                { "add": { "index": to_index, "alias": alias_name, "is_write_index": true } }
+            ]
+        });
+
+        tracing::debug!(
+            alias_name,
+            to_index,
+            body = ?body,
+            "Moving ElasticSearch alias to new index"
+        );
+
+        let response = self
+            .client
+            .indices()
+            .update_aliases()
+            .body(body)
+            .send()
+            .await?;
+
+        let _ = ensure_client_response(response).await?;
+
+        Ok(())
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_resolve_alias_indices, skip_all, fields(alias_name))]
+    pub async fn resolve_alias_indices(
+        &self,
+        alias_name: &str,
+    ) -> Result<Vec<String>, ElasticSearchClientError> {
+        use elasticsearch::indices::IndicesGetAliasParts;
+
+        let response = self
+            .client
+            .indices()
+            .get_alias(IndicesGetAliasParts::Name(&[alias_name]))
+            .send()
+            .await?;
+
+        // 404 means alias does not exist
+        if response.status_code().as_u16() == 404 {
+            return Ok(vec![]);
+        }
+
+        // shape:
+        // {
+        //   "index1": { "aliases": { "<alias>": { ... } } },
+        //   "index2": {...},  ...
+        // }
+        let response = ensure_client_response(response).await?;
+        let body: serde_json::Value = response.json().await?;
+
+        let mut indices = Vec::new();
+        if let Some(obj) = body.as_object() {
+            for (idx_name, v) in obj {
+                if v["aliases"].get(alias_name).is_some() {
+                    indices.push(idx_name.clone());
+                }
+            }
+        }
+
+        Ok(indices)
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_reindex_data, skip_all, fields(from_index, to_index))]
+    pub async fn reindex_data(
+        &self,
+        from_index: &str,
+        to_index: &str,
+    ) -> Result<(), ElasticSearchReindexError> {
+        // Copy everything from source to dest
+        let body = serde_json::json!({
+            "source": {
+                "index": from_index,
+            },
+            "dest": {
+                "index": to_index,
+            }
+        });
+
+        tracing::debug!(
+            from_index,
+            to_index,
+            body = ?body,
+            "Reindexing data from one ElasticSearch index to another"
+        );
+
+        let response = self
+            .client
+            .reindex()
+            .body(body)
+            .wait_for_completion(true) // block until done for now
+            .refresh(true) // refresh dest so new alias sees all docs
+            .send()
+            .await
+            .map_err(|e| ElasticSearchReindexError::Client(e.into()))?;
+
+        let response = ensure_client_response(response)
+            .await
+            .map_err(ElasticSearchReindexError::Client)?;
+
+        let value: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| ElasticSearchReindexError::Client(e.into()))?;
+
+        tracing::info!(
+            "Reindex from '{}' to '{}' completed with response: {}",
+            from_index,
+            to_index,
+            value
+        );
+
+        #[derive(serde::Deserialize)]
+        struct ReindexSummary {
+            updated: u64,
+            deleted: u64,
+            failures: Vec<serde_json::Value>,
+        }
+
+        let summary = serde_json::from_value::<ReindexSummary>(value).unwrap();
+
+        // Check for failures
+        if !summary.failures.is_empty() {
+            return Err(ElasticSearchReindexError::ReindexFailures(summary.failures));
+        }
+
+        // We only expect new documents to be created, no updates or deletions
+        if summary.deleted > 0 || summary.updated > 0 {
+            return Err(ElasticSearchReindexError::UnexpectedDocumentChanges {
+                updated: summary.updated,
+                deleted: summary.deleted,
+            });
+        }
+
+        // Success
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ElasticSearchReindexError {
+    #[error("ElasticSearch client error: {0}")]
+    Client(#[from] ElasticSearchClientError),
+
+    #[error("Detected unexpected document updates or deletions during reindexing")]
+    UnexpectedDocumentChanges { updated: u64, deleted: u64 },
+
+    #[error("Reindexing failed with failures: {0:?}")]
+    ReindexFailures(Vec<serde_json::Value>),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ElasticSearchClientBuildError {
+    #[error("transport error building ElasticSearch client: {0}")]
+    Build(#[from] elasticsearch::http::transport::BuildError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ElasticSearchClientError {
+    #[error("transport error communicating to ElasticSearch: {0}")]
+    Transport(#[from] elasticsearch::Error),
+
+    #[error("ElasticSearch error {status} ({error_type}): {reason}")]
+    BadResponse {
+        status: elasticsearch::http::StatusCode,
+        error_type: String,
+        reason: String,
+        body: serde_json::Value,
+    },
+
+    #[error("ElasticSearch index not found: {index}")]
+    IndexNotFound { index: String },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn ensure_client_response(
+    resp: elasticsearch::http::response::Response,
+) -> Result<elasticsearch::http::response::Response, ElasticSearchClientError> {
+    let status = resp.status_code();
+    if status.is_success() {
+        return Ok(resp);
+    }
+
+    let body_text = resp.text().await.unwrap_or_default();
+
+    #[derive(serde::Deserialize)]
+    struct EsErrorRoot {
+        error: EsErrorDetail,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct EsErrorDetail {
+        #[serde(rename = "type")]
+        type_: String,
+        reason: String,
+    }
+
+    // Try JSON first
+    if let Ok(parsed) = serde_json::from_str::<EsErrorRoot>(&body_text) {
+        let error_type = parsed.error.type_;
+        let reason = parsed.error.reason;
+        let body_json = serde_json::from_str::<serde_json::Value>(&body_text)
+            .unwrap_or(serde_json::Value::Null);
+
+        // Special case: index_not_found
+        const INDEX_NOT_FOUND_ERROR_TYPE: &str = "index_not_found_exception";
+        if error_type == INDEX_NOT_FOUND_ERROR_TYPE {
+            let index = body_json["error"]["index"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+
+            return Err(ElasticSearchClientError::IndexNotFound { index });
+        }
+
+        return Err(ElasticSearchClientError::BadResponse {
+            status,
+            error_type,
+            reason,
+            body: body_json,
+        });
+    }
+
+    // If it wasn’t JSON, still return a structured error
+    Err(ElasticSearchClientError::BadResponse {
+        status,
+        error_type: "non_json_error".to_string(),
+        reason: body_text.clone(),
+        body: serde_json::Value::String(body_text),
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
