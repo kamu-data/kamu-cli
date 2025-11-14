@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_core::DatasetRegistry;
+use kamu_datasets::DatasetEntryService;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@ use kamu_search::*;
 #[dill::component]
 #[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
 pub struct DatasetFullTextSearchSchemaProvider {
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 #[async_trait::async_trait]
@@ -40,22 +40,23 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
 
         const CHUNK_SIZE: usize = 500;
 
-        let mut datasets_stream = self.dataset_registry.all_dataset_handles();
+        let mut entries_stream = self.dataset_entry_service.all_entries();
 
         let mut dataset_documents = Vec::new();
         let mut total_indexed = 0;
 
         use futures::TryStreamExt;
-        while let Some(handle) = datasets_stream.try_next().await? {
+        while let Some(entry) = entries_stream.try_next().await? {
             let dataset_document = serde_json::json!({
-                FIELD_DATASET_NAME: handle.alias.dataset_name.to_string(),
-                FIELD_ALIAS: handle.alias.to_string(),
-                FIELD_KIND: match handle.kind {
+                FIELD_DATASET_NAME: entry.name.to_string(),
+                FIELD_ALIAS: entry.alias().to_string(),
+                FIELD_KIND: match entry.kind {
                     odf::DatasetKind::Root => "root",
                     odf::DatasetKind::Derivative => "derivative",
                 },
+                FIELD_OWNER_ID: entry.owner_id.to_string(),
             });
-            dataset_documents.push((handle.id.to_string(), dataset_document));
+            dataset_documents.push((entry.id.to_string(), dataset_document));
 
             // Index in chunks to avoid memory overwhelming
             if dataset_documents.len() >= CHUNK_SIZE {
@@ -88,6 +89,7 @@ const FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET_VERSION: u32 = 1;
 const FIELD_DATASET_NAME: &str = "dataset_name";
 const FIELD_ALIAS: &str = "alias";
 const FIELD_KIND: &str = "kind";
+const FIELD_OWNER_ID: &str = "owner_id";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,6 +110,13 @@ const DATASET_FIELDS: &[FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_KIND,
+        kind: FullTextSchemaFieldKind::Keyword,
+        searchable: false,
+        sortable: false,
+        filterable: true,
+    },
+    FullTextSchemaField {
+        path: FIELD_OWNER_ID,
         kind: FullTextSchemaFieldKind::Keyword,
         searchable: false,
         sortable: false,
