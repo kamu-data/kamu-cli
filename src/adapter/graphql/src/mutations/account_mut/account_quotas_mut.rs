@@ -25,6 +25,7 @@ impl<'a> AccountQuotasMut<'a> {
         Self { account }
     }
 
+    /// Setting quotas at the user level.
     #[tracing::instrument(level = "info", name = AccountQuotasMut_set_user_level_quotas, skip_all)]
     pub async fn set_user_level_quotas(
         &self,
