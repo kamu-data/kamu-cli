@@ -263,7 +263,10 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
         let body = serde_json::json!({
             "settings": {
-                "analysis": ElasticSearchIndexMappings::build_analysis_settings_json()
+                "analysis": ElasticSearchIndexMappings::build_analysis_settings_json(),
+                "index": {
+                    "max_ngram_diff": 3
+                }
             },
             "mappings": mappings_json,
         });

@@ -215,21 +215,24 @@ const DATASET_FIELDS: &[FullTextSchemaField] = &[
         path: FIELD_DATASET_NAME,
         role: FullTextSchemaFieldRole::Identifier {
             hierarchical: true,
-            enable_ngrams: true,
+            enable_edge_ngrams: true,
+            enable_inner_ngrams: true,
         },
     },
     FullTextSchemaField {
         path: FIELD_ALIAS,
         role: FullTextSchemaFieldRole::Identifier {
             hierarchical: true,
-            enable_ngrams: true,
+            enable_edge_ngrams: false,
+            enable_inner_ngrams: false,
         },
     },
     FullTextSchemaField {
         path: FIELD_OWNER_NAME,
         role: FullTextSchemaFieldRole::Identifier {
             hierarchical: true,
-            enable_ngrams: true,
+            enable_edge_ngrams: true,
+            enable_inner_ngrams: true,
         },
     },
     FullTextSchemaField {
@@ -248,7 +251,8 @@ const DATASET_FIELDS: &[FullTextSchemaField] = &[
         path: FIELD_SCHEMA_FIELDS,
         role: FullTextSchemaFieldRole::Identifier {
             hierarchical: false,
-            enable_ngrams: true,
+            enable_edge_ngrams: true,
+            enable_inner_ngrams: true,
         },
     },
     FullTextSchemaField {

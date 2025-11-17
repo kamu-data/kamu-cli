@@ -53,12 +53,14 @@ pub type FullTestSearchFieldPath = &'static str;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FullTextSchemaFieldRole {
-    Prose {
-        enable_positions: bool,
-    },
     Identifier {
         hierarchical: bool,
-        enable_ngrams: bool,
+        enable_edge_ngrams: bool,
+        enable_inner_ngrams: bool,
+    },
+    Title,
+    Prose {
+        enable_positions: bool,
     },
     Keyword,
     DateTime,

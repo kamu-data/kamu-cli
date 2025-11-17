@@ -95,15 +95,13 @@ const ACCOUNT_FIELDS: &[FullTextSchemaField] = &[
         path: FIELD_ACCOUNT_NAME,
         role: FullTextSchemaFieldRole::Identifier {
             hierarchical: true,
-            enable_ngrams: true,
+            enable_edge_ngrams: true,
+            enable_inner_ngrams: true,
         },
     },
     FullTextSchemaField {
         path: FIELD_DISPLAY_NAME,
-        role: FullTextSchemaFieldRole::Prose {
-            // TODO: tune this, not really prose
-            enable_positions: false,
-        },
+        role: FullTextSchemaFieldRole::Title,
     },
     FullTextSchemaField {
         path: FIELD_CREATED_AT,

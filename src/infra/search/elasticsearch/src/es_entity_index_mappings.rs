@@ -25,7 +25,12 @@ impl ElasticSearchIndexMappings {
                 "kamu_edge_ngram": {
                     "type": "edge_ngram",
                     "min_gram": 2,
-                    "max_gram": 6,
+                    "max_gram": 10,
+                },
+                "kamu_inner_ngram": {
+                    "type": "ngram",
+                    "min_gram": 3,
+                    "max_gram": 6
                 },
                 "english_possessive_stemmer": {
                     "type": "stemmer",
@@ -65,7 +70,7 @@ impl ElasticSearchIndexMappings {
                         "asciifolding",
                     ],
                 },
-                "kamu_ident_ngram": {
+                "kamu_ident_edge_ngram": {
                     "type": "custom",
                     "tokenizer": "kamu_ident_pattern",
                     "filter": [
@@ -73,6 +78,23 @@ impl ElasticSearchIndexMappings {
                         "asciifolding",
                         "kamu_edge_ngram",
                     ],
+                },
+                "kamu_ident_inner_ngram": {
+                    "type": "custom",
+                    "tokenizer": "kamu_ident_pattern",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding",
+                        "kamu_inner_ngram"
+                    ]
+                },
+                "kamu_title": {
+                    "type": "custom",
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding"
+                    ]
                 },
                 "kamu_english_html": {
                     "type": "custom",
@@ -98,8 +120,15 @@ impl ElasticSearchIndexMappings {
             let field_mapping = match field.role {
                 FullTextSchemaFieldRole::Identifier {
                     hierarchical,
-                    enable_ngrams,
-                } => Self::map_identifier_field(hierarchical, enable_ngrams),
+                    enable_edge_ngrams,
+                    enable_inner_ngrams,
+                } => Self::map_identifier_field(
+                    hierarchical,
+                    enable_edge_ngrams,
+                    enable_inner_ngrams,
+                ),
+
+                FullTextSchemaFieldRole::Title => Self::map_title_field(),
 
                 FullTextSchemaFieldRole::Prose { enable_positions } => {
                     Self::map_prose_field(enable_positions)
@@ -123,7 +152,11 @@ impl ElasticSearchIndexMappings {
         }
     }
 
-    fn map_identifier_field(hierarchical: bool, enable_ngrams: bool) -> serde_json::Value {
+    fn map_identifier_field(
+        hierarchical: bool,
+        edge_ngrams: bool,
+        inner_ngrams: bool,
+    ) -> serde_json::Value {
         let mut base_mapping = serde_json::json!({
             "type": "keyword",
             "normalizer": "kamu_keyword_norm",
@@ -143,12 +176,23 @@ impl ElasticSearchIndexMappings {
             );
         }
 
-        if enable_ngrams {
+        if edge_ngrams {
             fields.insert(
                 "ngram".to_string(),
                 serde_json::json!({
                     "type": "text",
-                    "analyzer": "kamu_ident_ngram",
+                    "analyzer": "kamu_ident_edge_ngram",
+                    "search_analyzer": "kamu_ident_parts"
+                }),
+            );
+        }
+
+        if inner_ngrams {
+            fields.insert(
+                "substr".to_string(),
+                serde_json::json!({
+                    "type": "text",
+                    "analyzer": "kamu_ident_inner_ngram",
                     "search_analyzer": "kamu_ident_parts"
                 }),
             );
@@ -175,9 +219,30 @@ impl ElasticSearchIndexMappings {
         mapping
     }
 
+    fn map_title_field() -> serde_json::Value {
+        serde_json::json!({
+            "type": "text",
+            "analyzer": "kamu_title",
+            "search_analyzer": "kamu_title",
+            "fields": {
+                "keyword": {
+                    "type": "keyword",
+                    "normalizer": "kamu_keyword_norm",
+                    "ignore_above": 1024
+                },
+                "ngram": {
+                    "type": "text",
+                    "analyzer": "kamu_ident_edge_ngram",
+                    "search_analyzer": "kamu_title"
+                }
+            }
+        })
+    }
+
     fn map_keyword_field() -> serde_json::Value {
         serde_json::json!({
             "type": "keyword",
+            "normalizer": "kamu_keyword_norm",
             "ignore_above": 256
         })
     }
