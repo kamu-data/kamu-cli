@@ -93,24 +93,21 @@ const FIELD_CREATED_AT: &str = "created_at";
 const ACCOUNT_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
         path: FIELD_ACCOUNT_NAME,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: true,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Identifier {
+            hierarchical: true,
+            enable_ngrams: true,
+        },
     },
     FullTextSchemaField {
         path: FIELD_DISPLAY_NAME,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: true,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Prose {
+            // TODO: tune this, not really prose
+            enable_positions: false,
+        },
     },
     FullTextSchemaField {
         path: FIELD_CREATED_AT,
-        kind: FullTextSchemaFieldKind::DateTime,
-        searchable: false,
-        sortable: true,
-        filterable: true,
+        role: FullTextSchemaFieldRole::DateTime,
     },
 ];
 

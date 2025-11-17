@@ -46,20 +46,23 @@ pub type FullTextEntityKind = &'static str;
 #[derive(Debug)]
 pub struct FullTextSchemaField {
     pub path: FullTestSearchFieldPath,
-    pub kind: FullTextSchemaFieldKind,
-    pub searchable: bool,
-    pub sortable: bool,
-    pub filterable: bool,
+    pub role: FullTextSchemaFieldRole,
 }
 
 pub type FullTestSearchFieldPath = &'static str;
 
 #[derive(Debug, Clone, Copy)]
-pub enum FullTextSchemaFieldKind {
-    Text,
+pub enum FullTextSchemaFieldRole {
+    Prose {
+        enable_positions: bool,
+    },
+    Identifier {
+        hierarchical: bool,
+        enable_ngrams: bool,
+    },
     Keyword,
     DateTime,
-    // TODO: Add more field kinds as needed, e.g., Numeric, Boolean,
+    // TODO: Add more field roles as needed, e.g., Numeric, Boolean,
 }
 
 #[derive(Debug, Clone, Copy)]

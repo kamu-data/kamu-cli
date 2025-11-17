@@ -88,13 +88,14 @@ impl DatasetFullTextSearchSchemaProvider {
             .unwrap_or(None);
 
         Ok(DatasetSearchDocument {
-            name: entry.name.to_string(),
+            dataset_name: entry.name.to_string(),
             alias: entry.alias().to_string(),
+            owner_name: entry.owner_name.to_string(),
+            owner_id: entry.owner_id.to_string(),
             kind: match entry.kind {
                 odf::DatasetKind::Root => "root".to_string(),
                 odf::DatasetKind::Derivative => "derivative".to_string(),
             },
-            owner_id: entry.owner_id.to_string(),
             created_at: entry.created_at.to_rfc3339(), // probably should be Seed event time?
             schema_fields,
             description,
@@ -174,10 +175,11 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
 /// Represents a dataset document for full-text search indexing.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct DatasetSearchDocument {
-    name: String,
+    dataset_name: String,
     alias: String,
-    kind: String,
+    owner_name: String,
     owner_id: String,
+    kind: String,
     created_at: String,
     schema_fields: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -197,8 +199,9 @@ const FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET_VERSION: u32 = 1;
 
 const FIELD_DATASET_NAME: &str = "dataset_name";
 const FIELD_ALIAS: &str = "alias";
-const FIELD_KIND: &str = "kind";
+const FIELD_OWNER_NAME: &str = "owner_name";
 const FIELD_OWNER_ID: &str = "owner_id";
+const FIELD_KIND: &str = "kind";
 const FIELD_CREATED_AT: &str = "created_at";
 const FIELD_SCHEMA_FIELDS: &str = "schema_fields";
 const FIELD_DESCRIPTION: &str = "description";
@@ -210,66 +213,59 @@ const FIELD_ATTACHMENTS: &str = "attachments";
 const DATASET_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
         path: FIELD_DATASET_NAME,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: true,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Identifier {
+            hierarchical: true,
+            enable_ngrams: true,
+        },
     },
     FullTextSchemaField {
         path: FIELD_ALIAS,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: true,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Identifier {
+            hierarchical: true,
+            enable_ngrams: true,
+        },
     },
     FullTextSchemaField {
-        path: FIELD_KIND,
-        kind: FullTextSchemaFieldKind::Keyword,
-        searchable: false,
-        sortable: false,
-        filterable: true,
+        path: FIELD_OWNER_NAME,
+        role: FullTextSchemaFieldRole::Identifier {
+            hierarchical: true,
+            enable_ngrams: true,
+        },
     },
     FullTextSchemaField {
         path: FIELD_OWNER_ID,
-        kind: FullTextSchemaFieldKind::Keyword,
-        searchable: false,
-        sortable: false,
-        filterable: true,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_KIND,
+        role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
         path: FIELD_CREATED_AT,
-        kind: FullTextSchemaFieldKind::DateTime,
-        searchable: false,
-        sortable: true,
-        filterable: true,
+        role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {
         path: FIELD_SCHEMA_FIELDS,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: false,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Identifier {
+            hierarchical: false,
+            enable_ngrams: true,
+        },
     },
     FullTextSchemaField {
         path: FIELD_DESCRIPTION,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: false,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Prose {
+            enable_positions: false, // short prose
+        },
     },
     FullTextSchemaField {
         path: FIELD_KEYWORDS,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: false,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
         path: FIELD_ATTACHMENTS,
-        kind: FullTextSchemaFieldKind::Text,
-        searchable: true,
-        sortable: false,
-        filterable: false,
+        role: FullTextSchemaFieldRole::Prose {
+            enable_positions: true, // long prose
+        },
     },
 ];
 

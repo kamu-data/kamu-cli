@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{FullTextSchemaFieldKind, FullTextSearchEntitySchema};
+use kamu_search::{FullTextSchemaFieldRole, FullTextSearchEntitySchema};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,13 +19,97 @@ pub(crate) struct ElasticSearchIndexMappings {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ElasticSearchIndexMappings {
+    pub(crate) fn build_analysis_settings_json() -> serde_json::Value {
+        serde_json::json!({
+            "filter": {
+                "kamu_edge_ngram": {
+                    "type": "edge_ngram",
+                    "min_gram": 2,
+                    "max_gram": 6,
+                },
+                "english_possessive_stemmer": {
+                    "type": "stemmer",
+                    "language": "possessive_english",
+                },
+                "english_stemmer": {
+                    "type": "stemmer",
+                    "language": "english",
+                },
+                "english_stop": {
+                    "type": "stop",
+                    "language": "english",
+                }
+            },
+            "normalizer": {
+                "kamu_keyword_norm": {
+                    "type": "custom",
+                    "char_filter": [],
+                    "filter": [
+                        "lowercase",
+                        "asciifolding",
+                    ]
+                }
+            },
+            "tokenizer": {
+                "kamu_ident_pattern": {
+                    "type": "pattern",
+                    "pattern": "[^A-Za-z0-9]+",
+                }
+            },
+            "analyzer": {
+                "kamu_ident_parts": {
+                    "type": "custom",
+                    "tokenizer": "kamu_ident_pattern",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding",
+                    ],
+                },
+                "kamu_ident_ngram": {
+                    "type": "custom",
+                    "tokenizer": "kamu_ident_pattern",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding",
+                        "kamu_edge_ngram",
+                    ],
+                },
+                "kamu_english_html": {
+                    "type": "custom",
+                    "char_filter": [
+                        "html_strip",
+                    ],
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding",
+                        "english_possessive_stemmer",
+                        "english_stemmer",
+                        "english_stop",
+                    ],
+                },
+            }
+        })
+    }
+
     pub(crate) fn from_entity_schema(entity_schema: &FullTextSearchEntitySchema) -> Self {
         let mut mappings = serde_json::Map::new();
         for field in entity_schema.fields {
-            let field_mapping = match field.kind {
-                FullTextSchemaFieldKind::Text => serde_json::json!({"type": "text"}),
-                FullTextSchemaFieldKind::Keyword => serde_json::json!({"type": "keyword"}),
-                FullTextSchemaFieldKind::DateTime => serde_json::json!({"type": "date"}),
+            let field_mapping = match field.role {
+                FullTextSchemaFieldRole::Identifier {
+                    hierarchical,
+                    enable_ngrams,
+                } => Self::map_identifier_field(hierarchical, enable_ngrams),
+
+                FullTextSchemaFieldRole::Prose { enable_positions } => {
+                    Self::map_prose_field(enable_positions)
+                }
+
+                FullTextSchemaFieldRole::Keyword => Self::map_keyword_field(),
+
+                FullTextSchemaFieldRole::DateTime => serde_json::json!({
+                    "type": "date"
+                }),
             };
             mappings.insert(field.path.to_string(), field_mapping);
         }
@@ -37,6 +121,65 @@ impl ElasticSearchIndexMappings {
             mappings_json,
             mappings_hash,
         }
+    }
+
+    fn map_identifier_field(hierarchical: bool, enable_ngrams: bool) -> serde_json::Value {
+        let mut base_mapping = serde_json::json!({
+            "type": "keyword",
+            "normalizer": "kamu_keyword_norm",
+            "ignore_above": 1024,
+        });
+
+        let mut fields = serde_json::Map::new();
+
+        if hierarchical {
+            fields.insert(
+                "tokens".to_string(),
+                serde_json::json!({
+                    "type": "text",
+                    "analyzer": "kamu_ident_parts",
+                    "search_analyzer": "kamu_ident_parts"
+                }),
+            );
+        }
+
+        if enable_ngrams {
+            fields.insert(
+                "ngram".to_string(),
+                serde_json::json!({
+                    "type": "text",
+                    "analyzer": "kamu_ident_ngram",
+                    "search_analyzer": "kamu_ident_parts"
+                }),
+            );
+        }
+
+        if !fields.is_empty() {
+            base_mapping["fields"] = serde_json::Value::Object(fields);
+        }
+
+        base_mapping
+    }
+
+    fn map_prose_field(enable_positions: bool) -> serde_json::Value {
+        let mut mapping = serde_json::json!({
+            "type": "text",
+            "analyzer": "kamu_english_html",
+        });
+
+        if enable_positions {
+            mapping["term_vector"] =
+                serde_json::Value::String("with_positions_offsets".to_string());
+        }
+
+        mapping
+    }
+
+    fn map_keyword_field() -> serde_json::Value {
+        serde_json::json!({
+            "type": "keyword",
+            "ignore_above": 256
+        })
     }
 
     fn hash_json_normalized(value: &serde_json::Value) -> String {

@@ -262,6 +262,9 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
         }
 
         let body = serde_json::json!({
+            "settings": {
+                "analysis": ElasticSearchIndexMappings::build_analysis_settings_json()
+            },
             "mappings": mappings_json,
         });
 
