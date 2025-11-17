@@ -11,6 +11,8 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type FullTextEntityId = String;
+
 #[async_trait::async_trait]
 pub trait FullTextSearchRepository: Send + Sync {
     async fn health(&self) -> Result<serde_json::Value, InternalError>;
@@ -27,7 +29,19 @@ pub trait FullTextSearchRepository: Send + Sync {
     async fn index_bulk(
         &self,
         kind: FullTextEntityKind,
-        docs: Vec<(String, serde_json::Value)>,
+        docs: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError>;
+
+    async fn update_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        updates: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError>;
+
+    async fn delete_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        ids: Vec<FullTextEntityId>,
     ) -> Result<(), InternalError>;
 }
 

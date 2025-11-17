@@ -26,26 +26,44 @@ pub struct FullTextSearchServiceImpl {
 impl FullTextSearchService for FullTextSearchServiceImpl {
     async fn health(
         &self,
-        _ctx: FullTextSearchContext<'_>,
+        _: FullTextSearchContext<'_>,
     ) -> Result<serde_json::Value, InternalError> {
         self.full_text_repo.health().await
     }
 
-    async fn delete_bulk(
-        &self,
-        _ctx: FullTextSearchContext<'_>,
-        _kind: FullTextEntityKind,
-        _ids: Vec<String>,
-    ) -> Result<(), InternalError> {
-        unimplemented!()
-    }
-
     async fn search(
         &self,
-        _ctx: FullTextSearchContext<'_>,
+        _: FullTextSearchContext<'_>,
         _req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError> {
         unimplemented!()
+    }
+
+    async fn index_bulk(
+        &self,
+        _: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        docs: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        self.full_text_repo.index_bulk(kind, docs).await
+    }
+
+    async fn update_bulk(
+        &self,
+        _: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        updates: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        self.full_text_repo.update_bulk(kind, updates).await
+    }
+
+    async fn delete_bulk(
+        &self,
+        _: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        ids: Vec<FullTextEntityId>,
+    ) -> Result<(), InternalError> {
+        self.full_text_repo.delete_bulk(kind, ids).await
     }
 }
 

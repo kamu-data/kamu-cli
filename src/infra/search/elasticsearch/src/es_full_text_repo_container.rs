@@ -124,9 +124,25 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
     async fn index_bulk(
         &self,
         kind: FullTextEntityKind,
-        docs: Vec<(String, serde_json::Value)>,
+        docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
         self.inner().await?.index_bulk(kind, docs).await
+    }
+
+    async fn update_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        updates: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        self.inner().await?.update_bulk(kind, updates).await
+    }
+
+    async fn delete_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        ids: Vec<FullTextEntityId>,
+    ) -> Result<(), InternalError> {
+        self.inner().await?.delete_bulk(kind, ids).await
     }
 }
 

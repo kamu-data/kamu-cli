@@ -12,6 +12,8 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use kamu_search::*;
 
+use super::account_full_text_search_schema as account_schema;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -29,7 +31,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
     }
 
     fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
-        &[ACCOUNT_FULL_TEXT_SEARCH_ENTITY_SCHEMA]
+        &[account_schema::ACCOUNT_FULL_TEXT_SEARCH_ENTITY_SCHEMA]
     }
 
     async fn run_schema_initial_indexing(
@@ -37,7 +39,9 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
         repo: &dyn FullTextSearchRepository,
         schema: &FullTextSearchEntitySchema,
     ) -> Result<usize, InternalError> {
-        assert!(schema.entity_kind == FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT);
+        assert!(schema.entity_kind == account_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT);
+
+        // Index accounts in chunks
 
         const CHUNK_SIZE: usize = 500;
 
@@ -49,17 +53,17 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
 
         use futures::TryStreamExt;
         while let Some(account) = accounts_stream.try_next().await? {
-            let account_document = serde_json::json!({
-                FIELD_ACCOUNT_NAME: account.account_name.to_string(),
-                FIELD_DISPLAY_NAME: account.display_name,
-                FIELD_CREATED_AT: account.registered_at.to_rfc3339(),
-            });
+            // Prepare document
+            let account_document = account_schema::index_from_account(&account);
             account_documents.push((account.id.to_string(), account_document));
 
             // Index in chunks to avoid memory overwhelming
             if account_documents.len() >= CHUNK_SIZE {
-                repo.index_bulk(FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT, account_documents)
-                    .await?;
+                repo.index_bulk(
+                    account_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT,
+                    account_documents,
+                )
+                .await?;
                 total_indexed += CHUNK_SIZE;
                 account_documents = Vec::new();
             }
@@ -68,53 +72,16 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
         // Index remaining documents
         if !account_documents.is_empty() {
             let remaining_count = account_documents.len();
-            repo.index_bulk(FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT, account_documents)
-                .await?;
+            repo.index_bulk(
+                account_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT,
+                account_documents,
+            )
+            .await?;
             total_indexed += remaining_count;
         }
 
         Ok(total_indexed)
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT: &str = "kamu-accounts";
-const FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT_VERSION: u32 = 1;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const FIELD_ACCOUNT_NAME: &str = "account_name";
-const FIELD_DISPLAY_NAME: &str = "display_name";
-const FIELD_CREATED_AT: &str = "created_at";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const ACCOUNT_FIELDS: &[FullTextSchemaField] = &[
-    FullTextSchemaField {
-        path: FIELD_ACCOUNT_NAME,
-        role: FullTextSchemaFieldRole::Identifier {
-            hierarchical: true,
-            enable_edge_ngrams: true,
-            enable_inner_ngrams: true,
-        },
-    },
-    FullTextSchemaField {
-        path: FIELD_DISPLAY_NAME,
-        role: FullTextSchemaFieldRole::Title,
-    },
-    FullTextSchemaField {
-        path: FIELD_CREATED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
-    },
-];
-
-const ACCOUNT_FULL_TEXT_SEARCH_ENTITY_SCHEMA: FullTextSearchEntitySchema =
-    FullTextSearchEntitySchema {
-        entity_kind: FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT,
-        version: FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT_VERSION,
-        fields: ACCOUNT_FIELDS,
-        upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
-    };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -356,33 +356,93 @@ impl ElasticSearchClient {
             .send()
             .await?;
 
-        let response = ensure_client_response(response).await?;
+        handle_bulk_response(response, index_name, "index").await
+    }
 
-        #[derive(serde::Deserialize)]
-        struct BulkResponse {
-            errors: bool,
-            items: Vec<serde_json::Value>,
+    #[tracing::instrument(
+        level = "debug",
+        name = ElasticSearchClient_bulk_update,
+        skip_all,
+        fields(index_name, num_updates = updates.len())
+    )]
+    pub async fn bulk_update(
+        &self,
+        index_name: &str,
+        updates: Vec<(String, serde_json::Value)>,
+    ) -> Result<(), ElasticSearchClientError> {
+        use elasticsearch::BulkParts;
+
+        if updates.is_empty() {
+            return Ok(());
         }
 
-        let bulk_result: BulkResponse = response.json().await?;
+        let mut body: Vec<elasticsearch::BulkOperation<serde_json::Value>> =
+            Vec::with_capacity(updates.len());
 
-        if bulk_result.errors {
-            tracing::error!(
-                index_name,
-                items = ?bulk_result.items,
-                "Bulk indexing completed with errors"
+        for (doc_id, partial_doc) in updates {
+            body.push(
+                elasticsearch::BulkOperation::update(
+                    doc_id,
+                    serde_json::json!({"doc": partial_doc}),
+                )
+                .into(),
             );
-            return Err(ElasticSearchClientError::BadResponse {
-                status: elasticsearch::http::StatusCode::from_u16(500).unwrap(),
-                error_type: "bulk_index_errors".to_string(),
-                reason: "Some documents failed to index".to_string(),
-                body: serde_json::json!({ "items": bulk_result.items }),
-            });
         }
 
-        tracing::debug!(index_name, "Bulk index operation completed successfully");
+        tracing::debug!(
+            index_name,
+            num_operations = body.len(),
+            "Executing bulk update operation"
+        );
 
-        Ok(())
+        let response = self
+            .client
+            .bulk(BulkParts::Index(index_name))
+            .body(body)
+            .send()
+            .await?;
+
+        handle_bulk_response(response, index_name, "update").await
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = ElasticSearchClient_bulk_delete,
+        skip_all,
+        fields(index_name, num_ids = ids.len())
+    )]
+    pub async fn bulk_delete(
+        &self,
+        index_name: &str,
+        ids: Vec<String>,
+    ) -> Result<(), ElasticSearchClientError> {
+        use elasticsearch::BulkParts;
+
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut body: Vec<elasticsearch::BulkOperation<serde_json::Value>> =
+            Vec::with_capacity(ids.len());
+
+        for doc_id in ids {
+            body.push(elasticsearch::BulkOperation::delete(doc_id).into());
+        }
+
+        tracing::debug!(
+            index_name,
+            num_operations = body.len(),
+            "Executing bulk delete operation"
+        );
+
+        let response = self
+            .client
+            .bulk(BulkParts::Index(index_name))
+            .body(body)
+            .send()
+            .await?;
+
+        handle_bulk_response(response, index_name, "delete").await
     }
 }
 
@@ -425,6 +485,43 @@ pub(crate) enum ElasticSearchClientError {
 
     #[error("ElasticSearch index not found: {index}")]
     IndexNotFound { index: String },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(serde::Deserialize)]
+struct BulkResponse {
+    errors: bool,
+    items: Vec<serde_json::Value>,
+}
+
+async fn handle_bulk_response(
+    response: elasticsearch::http::response::Response,
+    index_name: &str,
+    operation_name: &str,
+) -> Result<(), ElasticSearchClientError> {
+    let response = ensure_client_response(response).await?;
+    let bulk_result: BulkResponse = response.json().await?;
+
+    if bulk_result.errors {
+        tracing::error!(
+            index_name,
+            items = ?bulk_result.items,
+            "Bulk {operation_name} completed with errors"
+        );
+        return Err(ElasticSearchClientError::BadResponse {
+            status: elasticsearch::http::StatusCode::from_u16(500).unwrap(),
+            error_type: format!("bulk_{operation_name}_errors"),
+            reason: format!("Some documents failed to {operation_name}"),
+            body: serde_json::json!({ "items": bulk_result.items }),
+        });
+    }
+
+    tracing::debug!(
+        index_name,
+        "Bulk {operation_name} operation completed successfully"
+    );
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

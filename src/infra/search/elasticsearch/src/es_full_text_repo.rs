@@ -193,11 +193,33 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
     async fn index_bulk(
         &self,
         kind: FullTextEntityKind,
-        docs: Vec<(String, serde_json::Value)>,
+        docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
         let index_name = self.resolve_index_name(client, kind)?;
         client.bulk_index(&index_name, docs).await.int_err()
+    }
+
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_update_bulk, skip_all, fields(kind, num_updates = updates.len()))]
+    async fn update_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        updates: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        let client = self.es_client().await?;
+        let index_name = self.resolve_index_name(client, kind)?;
+        client.bulk_update(&index_name, updates).await.int_err()
+    }
+
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_delete_bulk, skip_all, fields(kind, num_ids = ids.len()))]
+    async fn delete_bulk(
+        &self,
+        kind: FullTextEntityKind,
+        ids: Vec<FullTextEntityId>,
+    ) -> Result<(), InternalError> {
+        let client = self.es_client().await?;
+        let index_name = self.resolve_index_name(client, kind)?;
+        client.bulk_delete(&index_name, ids).await.int_err()
     }
 }
 

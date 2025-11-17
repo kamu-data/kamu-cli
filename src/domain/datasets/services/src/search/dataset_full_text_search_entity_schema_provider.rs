@@ -203,6 +203,7 @@ const FIELD_OWNER_NAME: &str = "owner_name";
 const FIELD_OWNER_ID: &str = "owner_id";
 const FIELD_KIND: &str = "kind";
 const FIELD_CREATED_AT: &str = "created_at";
+const FIELD_UPDATED_AT: &str = "updated_at";
 const FIELD_SCHEMA_FIELDS: &str = "schema_fields";
 const FIELD_DESCRIPTION: &str = "description";
 const FIELD_KEYWORDS: &str = "keywords";
@@ -245,6 +246,10 @@ const DATASET_FIELDS: &[FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_CREATED_AT,
+        role: FullTextSchemaFieldRole::DateTime,
+    },
+    FullTextSchemaField {
+        path: FIELD_UPDATED_AT,
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {

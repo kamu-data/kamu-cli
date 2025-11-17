@@ -75,16 +75,6 @@ impl FullTextSearchService for FullTextSearchImplLazyInit {
         inner.health(ctx).await
     }
 
-    async fn delete_bulk(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
-        ids: Vec<String>,
-    ) -> Result<(), InternalError> {
-        let inner = self.inner(ctx.catalog).await?;
-        inner.delete_bulk(ctx, kind, ids).await
-    }
-
     async fn search(
         &self,
         ctx: FullTextSearchContext<'_>,
@@ -92,6 +82,36 @@ impl FullTextSearchService for FullTextSearchImplLazyInit {
     ) -> Result<FullTextSearchResponse, InternalError> {
         let inner = self.inner(ctx.catalog).await?;
         inner.search(ctx, req).await
+    }
+
+    async fn index_bulk(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        docs: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        let inner = self.inner(ctx.catalog).await?;
+        inner.index_bulk(ctx, kind, docs).await
+    }
+
+    async fn update_bulk(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        updates: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        let inner = self.inner(ctx.catalog).await?;
+        inner.update_bulk(ctx, kind, updates).await
+    }
+
+    async fn delete_bulk(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        ids: Vec<FullTextEntityId>,
+    ) -> Result<(), InternalError> {
+        let inner = self.inner(ctx.catalog).await?;
+        inner.delete_bulk(ctx, kind, ids).await
     }
 }
 

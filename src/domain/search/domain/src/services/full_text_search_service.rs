@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use internal_error::InternalError;
 
-use crate::{FullTestSearchFieldPath, FullTextEntityKind};
+use crate::{FullTestSearchFieldPath, FullTextEntityId, FullTextEntityKind};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,18 +22,32 @@ pub trait FullTextSearchService: Send + Sync {
         ctx: FullTextSearchContext<'_>,
     ) -> Result<serde_json::Value, InternalError>;
 
-    async fn delete_bulk(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
-        ids: Vec<String>,
-    ) -> Result<(), InternalError>;
-
     async fn search(
         &self,
         ctx: FullTextSearchContext<'_>,
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError>;
+
+    async fn index_bulk(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        docs: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError>;
+
+    async fn update_bulk(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        updates: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError>;
+
+    async fn delete_bulk(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        kind: FullTextEntityKind,
+        ids: Vec<FullTextEntityId>,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
