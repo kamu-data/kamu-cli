@@ -58,7 +58,8 @@ pub type FullTestSearchFieldPath = &'static str;
 pub enum FullTextSchemaFieldKind {
     Text,
     Keyword,
-    // TODO: Add more field kinds as needed, e.g., Numeric, Date, Boolean,
+    DateTime,
+    // TODO: Add more field kinds as needed, e.g., Numeric, Boolean,
 }
 
 #[derive(Debug, Clone, Copy)]

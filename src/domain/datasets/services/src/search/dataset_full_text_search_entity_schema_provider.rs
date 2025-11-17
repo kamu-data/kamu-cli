@@ -55,6 +55,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
                     odf::DatasetKind::Derivative => "derivative",
                 },
                 FIELD_OWNER_ID: entry.owner_id.to_string(),
+                FIELD_CREATED_AT: entry.created_at.to_rfc3339(),
             });
             dataset_documents.push((entry.id.to_string(), dataset_document));
 
@@ -90,6 +91,7 @@ const FIELD_DATASET_NAME: &str = "dataset_name";
 const FIELD_ALIAS: &str = "alias";
 const FIELD_KIND: &str = "kind";
 const FIELD_OWNER_ID: &str = "owner_id";
+const FIELD_CREATED_AT: &str = "created_at";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -120,6 +122,13 @@ const DATASET_FIELDS: &[FullTextSchemaField] = &[
         kind: FullTextSchemaFieldKind::Keyword,
         searchable: false,
         sortable: false,
+        filterable: true,
+    },
+    FullTextSchemaField {
+        path: FIELD_CREATED_AT,
+        kind: FullTextSchemaFieldKind::DateTime,
+        searchable: false,
+        sortable: true,
         filterable: true,
     },
 ];

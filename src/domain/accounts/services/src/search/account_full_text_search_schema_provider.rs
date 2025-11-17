@@ -52,6 +52,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
             let account_document = serde_json::json!({
                 FIELD_ACCOUNT_NAME: account.account_name.to_string(),
                 FIELD_DISPLAY_NAME: account.display_name,
+                FIELD_CREATED_AT: account.registered_at.to_rfc3339(),
             });
             account_documents.push((account.id.to_string(), account_document));
 
@@ -85,6 +86,7 @@ const FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT_VERSION: u32 = 1;
 
 const FIELD_ACCOUNT_NAME: &str = "account_name";
 const FIELD_DISPLAY_NAME: &str = "display_name";
+const FIELD_CREATED_AT: &str = "created_at";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +104,13 @@ const ACCOUNT_FIELDS: &[FullTextSchemaField] = &[
         searchable: true,
         sortable: true,
         filterable: false,
+    },
+    FullTextSchemaField {
+        path: FIELD_CREATED_AT,
+        kind: FullTextSchemaFieldKind::DateTime,
+        searchable: false,
+        sortable: true,
+        filterable: true,
     },
 ];
 

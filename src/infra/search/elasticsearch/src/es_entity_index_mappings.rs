@@ -23,8 +23,9 @@ impl ElasticSearchIndexMappings {
         let mut mappings = serde_json::Map::new();
         for field in entity_schema.fields {
             let field_mapping = match field.kind {
-                FullTextSchemaFieldKind::Text => serde_json::json!({"type":"text"}),
-                FullTextSchemaFieldKind::Keyword => serde_json::json!({"type":"keyword"}),
+                FullTextSchemaFieldKind::Text => serde_json::json!({"type": "text"}),
+                FullTextSchemaFieldKind::Keyword => serde_json::json!({"type": "keyword"}),
+                FullTextSchemaFieldKind::DateTime => serde_json::json!({"type": "date"}),
             };
             mappings.insert(field.path.to_string(), field_mapping);
         }
