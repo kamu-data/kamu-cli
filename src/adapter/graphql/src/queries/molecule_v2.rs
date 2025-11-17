@@ -14,7 +14,13 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use url::Url;
 
-use super::{FileVersion, MoleculeProjectConnection, MoleculeProjectEventConnection};
+use super::{
+    FileVersion,
+    FlowProcessTypeFilterInput,
+    InitiatorFilterInput,
+    MoleculeProjectConnection,
+    MoleculeProjectEventConnection,
+};
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
 
@@ -152,6 +158,7 @@ impl MoleculeProjectV2 {
         _ctx: &Context<'_>,
         _page: Option<usize>,
         _per_page: Option<usize>,
+        _filters: Option<MoleculeActivityFiltersV2>,
     ) -> Result<MoleculeProjectEventConnection> {
         todo!()
     }
@@ -391,7 +398,7 @@ page_based_connection!(
 
 // TODO: use enum instead of string?
 // #[derive(Enum)]
-// pub enum MoleculeAccessLevel {
+// pub enum MoleculeAccessLevelV2 {
 //     Public,
 //     Admin,
 //     Admin2,
@@ -402,7 +409,52 @@ pub type MoleculeAccessLevel = String;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: scalar
+// TODO: scalar?
 pub type MoleculeAnnouncementID = String;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject)]
+pub struct MoleculeActivityFiltersV2 {
+    // TODO: replace w/ real filters.
+    /// This filter is provided as an example.
+    by_ipnft_uids: Vec<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union)]
+pub enum MoleculeActivityEventV2 {
+    ActivityFileAdded(MoleculeActivityFileAddedV2),
+    ActivityFileRemoved(MoleculeActivityFileRemovedV2),
+    ActivityFileUpdated(MoleculeActivityFileUpdatedV2),
+    ActivityAnnouncement(MoleculeActivityAnnouncementV2),
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeActivityFileAddedV2 {
+    pub entry: MoleculeDataRoomEntryV2,
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeActivityFileRemovedV2 {
+    pub entry: MoleculeDataRoomEntryV2,
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeActivityFileUpdatedV2 {
+    pub entry: MoleculeDataRoomEntryV2,
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeActivityAnnouncementV2 {
+    pub announcement: MoleculeAnnouncementEntryV2,
+}
+
+page_based_stream_connection!(
+    MoleculeActivityEventV2,
+    MoleculeActivityEventV2Connection,
+    MoleculeActivityEventV2Edge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
