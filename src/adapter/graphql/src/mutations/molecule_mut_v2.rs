@@ -9,7 +9,13 @@
 
 use crate::mutations::{CreateAnnouncementResult, CreateProjectResult, MoleculeMutV1};
 use crate::prelude::*;
-use crate::queries::MoleculeAccessLevel;
+use crate::queries::{
+    Dataset,
+    MoleculeAccessLevel,
+    MoleculeAnnouncementEntryV2,
+    MoleculeAnnouncementEntryV2Connection,
+    MoleculeAnnouncementID,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,38 +77,24 @@ pub struct MoleculeProjectMutV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeProjectMutV2 {
-    /// Methods allowing to modify the associated data room.
-    async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomMut> {
+    /// Strongly typed data room mutator
+    async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomMutV2> {
         todo!()
     }
 
-    /// Creates an announcement record for the project.
-    #[tracing::instrument(level = "info", name = MoleculeProjectMutV2_create_announcement, skip_all)]
-    async fn create_announcement(
-        &self,
-        _ctx: &Context<'_>,
-        headline: String,
-        body: String,
-        #[graphql(desc = "List of dataset DIDs to link")] attachments: Option<Vec<String>>,
-        molecule_access_level: MoleculeAccessLevel,
-        molecule_change_by: String,
-    ) -> Result<CreateAnnouncementResult> {
-        let _ = headline;
-        let _ = body;
-        let _ = attachments;
-        let _ = molecule_access_level;
-        let _ = molecule_change_by;
+    /// Strongly typed announcements mutator
+    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetMutV2> {
         todo!()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDataRoomMut;
+pub struct MoleculeDataRoomMutV2;
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeDataRoomMut {
+impl MoleculeDataRoomMutV2 {
     /// Starts the process of uploading a file to the data room.
     async fn start_upload_file(
         &self,
@@ -187,6 +179,42 @@ impl MoleculeDataRoomMut {
         let _ = tags;
         let _ = content_text;
         let _ = expected_head;
+        todo!()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct MoleculeAnnouncementsDatasetMutV2;
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl MoleculeAnnouncementsDatasetMutV2 {
+    /// Access the underlying core Dataset
+    async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
+        todo!()
+    }
+
+    /// Creates an announcement record for the project.
+    #[tracing::instrument(level = "info", name = MoleculeAnnouncementsDatasetMutV2_create, skip_all)]
+    async fn create(
+        &self,
+        _ctx: &Context<'_>,
+        headline: String,
+        body: String,
+        #[graphql(desc = "List of dataset DIDs to link")] attachments: Option<Vec<String>>,
+        molecule_access_level: MoleculeAccessLevel,
+        molecule_change_by: String,
+        categories: Vec<String>,
+        tags: Vec<String>,
+    ) -> Result<CreateAnnouncementResult> {
+        let _ = headline;
+        let _ = body;
+        let _ = attachments;
+        let _ = molecule_access_level;
+        let _ = molecule_change_by;
+        let _ = categories;
+        let _ = tags;
         todo!()
     }
 }
