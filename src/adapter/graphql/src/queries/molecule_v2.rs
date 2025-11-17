@@ -133,15 +133,15 @@ impl MoleculeProjectV2 {
         todo!()
     }
 
-    /// Project's data room dataset
+    /// Strongly typed data room accessor
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_data_room, skip_all)]
-    async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomDataset> {
+    async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomDatasetV2> {
         todo!()
     }
 
-    /// Project's announcements dataset
+    /// Strongly typed announcements accessor
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_announcements, skip_all)]
-    async fn announcements(&self, _ctx: &Context<'_>) -> Result<Dataset> {
+    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetV2> {
         todo!()
     }
 
@@ -159,11 +159,11 @@ impl MoleculeProjectV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDataRoomDataset;
+pub struct MoleculeDataRoomDatasetV2;
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeDataRoomDataset {
+impl MoleculeDataRoomDatasetV2 {
     /// Access the underlying core Dataset
     async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
         todo!()
@@ -176,7 +176,7 @@ impl MoleculeDataRoomDataset {
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeDataRoomEntryConnection> {
+    ) -> Result<MoleculeDataRoomEntryV2Connection> {
         let _ = path_prefix;
         let _ = max_depth;
         let _ = page;
@@ -189,7 +189,7 @@ impl MoleculeDataRoomDataset {
         &self,
         _ctx: &Context<'_>,
         path: CollectionPath,
-    ) -> Result<MoleculeDataRoomEntry> {
+    ) -> Result<MoleculeDataRoomEntryV2> {
         let _ = path;
         todo!()
     }
@@ -197,11 +197,11 @@ impl MoleculeDataRoomDataset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDataRoomEntry;
+pub struct MoleculeDataRoomEntryV2;
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeDataRoomEntry {
+impl MoleculeDataRoomEntryV2 {
     async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
         todo!()
     }
@@ -228,25 +228,25 @@ impl MoleculeDataRoomEntry {
         todo!()
     }
 
-    /// Strongly typed [`MoleculeVersionedFile`] object
-    async fn as_versioned_file(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFile> {
+    /// Strongly typed [`MoleculeVersionedFileV2`] object
+    async fn as_versioned_file(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFileV2> {
         todo!()
     }
 }
 
 page_based_connection!(
-    MoleculeDataRoomEntry,
-    MoleculeDataRoomEntryConnection,
-    MoleculeDataRoomEntryEdge
+    MoleculeDataRoomEntryV2,
+    MoleculeDataRoomEntryV2Connection,
+    MoleculeDataRoomEntryV2Edge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeVersionedFile;
+pub struct MoleculeVersionedFileV2;
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeVersionedFile {
+impl MoleculeVersionedFileV2 {
     async fn system_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         todo!()
     }
@@ -286,15 +286,87 @@ impl MoleculeVersionedFile {
         todo!()
     }
 
-    async fn content_url(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFileContentUrl> {
+    async fn content_url(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFileContentUrlV2> {
         todo!()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct MoleculeAnnouncementsDatasetV2;
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl MoleculeAnnouncementsDatasetV2 {
+    /// Access the underlying core Dataset
+    async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
+        todo!()
+    }
+
+    async fn by_id(
+        &self,
+        _ctx: &Context<'_>,
+        id: MoleculeAnnouncementID,
+    ) -> Result<MoleculeAnnouncementEntryV2> {
+        let _ = id;
+        todo!()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct MoleculeAnnouncementEntryV2;
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl MoleculeAnnouncementEntryV2 {
+    async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
+        todo!()
+    }
+
+    async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementID> {
+        todo!()
+    }
+
+    async fn headline(&self, _ctx: &Context<'_>) -> Result<String> {
+        todo!()
+    }
+
+    async fn body(&self, _ctx: &Context<'_>) -> Result<String> {
+        todo!()
+    }
+
+    async fn attachments(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+        todo!()
+    }
+
+    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
+        todo!()
+    }
+
+    async fn change_by(&self, _ctx: &Context<'_>) -> Result<AccountID<'static>> {
+        todo!()
+    }
+
+    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+        todo!()
+    }
+
+    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+        todo!()
+    }
+}
+
+page_based_connection!(
+    MoleculeAnnouncementEntryV2,
+    MoleculeAnnouncementEntryV2Connection,
+    MoleculeAnnouncementEntryV2Edge
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject)]
-pub struct MoleculeVersionedFileContentUrl {
+pub struct MoleculeVersionedFileContentUrlV2 {
     pub url: Url,
     pub headers: HashMap<String, String>,
     // TODO: typing
@@ -327,5 +399,10 @@ page_based_connection!(
 // }
 
 pub type MoleculeAccessLevel = String;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: scalar
+pub type MoleculeAnnouncementID = String;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
