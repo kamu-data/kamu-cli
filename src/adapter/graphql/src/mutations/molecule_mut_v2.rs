@@ -9,13 +9,7 @@
 
 use crate::mutations::{CreateAnnouncementResult, CreateProjectResult, MoleculeMutV1};
 use crate::prelude::*;
-use crate::queries::{
-    Dataset,
-    MoleculeAccessLevel,
-    MoleculeAnnouncementEntryV2,
-    MoleculeAnnouncementEntryV2Connection,
-    MoleculeAnnouncementID,
-};
+use crate::queries::MoleculeAccessLevel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -190,11 +184,6 @@ pub struct MoleculeAnnouncementsDatasetMutV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncementsDatasetMutV2 {
-    /// Access the underlying core Dataset
-    async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
-        todo!()
-    }
-
     /// Creates an announcement record for the project.
     #[tracing::instrument(level = "info", name = MoleculeAnnouncementsDatasetMutV2_create, skip_all)]
     async fn create(

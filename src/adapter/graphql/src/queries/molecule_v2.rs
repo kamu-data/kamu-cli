@@ -14,13 +14,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use url::Url;
 
-use super::{
-    FileVersion,
-    FlowProcessTypeFilterInput,
-    InitiatorFilterInput,
-    MoleculeProjectConnection,
-    MoleculeProjectEventConnection,
-};
+use super::{FileVersion, MoleculeProjectConnection, MoleculeProjectEventConnection};
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
 
@@ -82,10 +76,10 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         // TODO: update types
         prompt: String,
-        filters: String,
+        filters: Option<MoleculeSemanticSearchFiltersV2>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<FoundSearchEntryConnection> {
+    ) -> Result<MoleculeSemanticSearchFoundItemV2Connection> {
         let _ = prompt;
         let _ = filters;
         let _ = page;
@@ -383,15 +377,35 @@ pub struct MoleculeVersionedFileContentUrlV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(InputObject)]
+pub struct MoleculeSemanticSearchFiltersV2 {
+    // TODO: replace w/ real filters.
+    // These filters are provided as an example.
+    by_ipnft_uids: Option<Vec<String>>,
+    by_tags: Option<Vec<String>>,
+    by_categories: Option<Vec<String>>,
+}
+
+#[derive(Union)]
+pub enum MoleculeSemanticSearchFoundItemV2 {
+    File(MoleculeSemanticSearchFoundFileV2),
+    Announcement(MoleculeSemanticSearchFoundAnnouncementV2),
+}
+
 #[derive(SimpleObject)]
-pub struct FoundSearchEntry {
-    pub dummy: String,
+pub struct MoleculeSemanticSearchFoundFileV2 {
+    pub entry: MoleculeVersionedFileV2,
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeSemanticSearchFoundAnnouncementV2 {
+    pub entry: MoleculeAnnouncementEntryV2,
 }
 
 page_based_connection!(
-    FoundSearchEntry,
-    FoundSearchEntryConnection,
-    FoundSearchEntryEdge
+    MoleculeSemanticSearchFoundItemV2,
+    MoleculeSemanticSearchFoundItemV2Connection,
+    MoleculeSemanticSearchFoundItemV2Edge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -418,7 +432,7 @@ pub type MoleculeAnnouncementID = String;
 pub struct MoleculeActivityFiltersV2 {
     // TODO: replace w/ real filters.
     /// This filter is provided as an example.
-    by_ipnft_uids: Vec<String>,
+    by_ipnft_uids: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

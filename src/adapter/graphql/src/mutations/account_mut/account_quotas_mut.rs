@@ -21,7 +21,6 @@ pub struct AccountQuotasMut<'a> {
 #[Object]
 impl<'a> AccountQuotasMut<'a> {
     #[graphql(skip)]
-    #[expect(unused)]
     pub fn new(account: &'a Account) -> Self {
         Self { account }
     }
