@@ -13,14 +13,16 @@ use chrono::{DateTime, Utc};
 use url::Url;
 
 use crate::prelude::*;
-use crate::queries::molecule::v2::{MoleculeProjectV2, MoleculeProjectV2Connection};
+use crate::queries::molecule::v2::{
+    MoleculeActivityEventV2Connection,
+    MoleculeProjectV2,
+    MoleculeProjectV2Connection,
+};
 use crate::queries::{Dataset, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeV2;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
@@ -414,41 +416,5 @@ pub struct MoleculeActivityFiltersV2 {
     /// This filter is provided as an example.
     by_ipnft_uids: Option<Vec<String>>,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union)]
-pub enum MoleculeActivityEventV2 {
-    FileAdded(MoleculeActivityFileAddedV2),
-    FileRemoved(MoleculeActivityFileRemovedV2),
-    FileUpdated(MoleculeActivityFileUpdatedV2),
-    Announcement(MoleculeActivityAnnouncementV2),
-}
-
-#[derive(SimpleObject)]
-pub struct MoleculeActivityFileAddedV2 {
-    pub entry: MoleculeDataRoomEntryV2,
-}
-
-#[derive(SimpleObject)]
-pub struct MoleculeActivityFileRemovedV2 {
-    pub entry: MoleculeDataRoomEntryV2,
-}
-
-#[derive(SimpleObject)]
-pub struct MoleculeActivityFileUpdatedV2 {
-    pub entry: MoleculeDataRoomEntryV2,
-}
-
-#[derive(SimpleObject)]
-pub struct MoleculeActivityAnnouncementV2 {
-    pub announcement: MoleculeAnnouncementEntryV2,
-}
-
-page_based_stream_connection!(
-    MoleculeActivityEventV2,
-    MoleculeActivityEventV2Connection,
-    MoleculeActivityEventV2Edge
-);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
