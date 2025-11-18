@@ -13,7 +13,6 @@ use crate::prelude::*;
 use crate::queries::Account;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2Connection,
-    MoleculeActivityFiltersV2,
     MoleculeAnnouncementsDatasetV2,
     MoleculeDataRoomDatasetV2,
 };
@@ -85,7 +84,7 @@ impl MoleculeProjectV2 {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filters: Option<MoleculeActivityFiltersV2>,
+        filters: Option<MoleculeProjectActivityFiltersV2>,
     ) -> Result<MoleculeActivityEventV2Connection> {
         let _ = ctx;
         let _ = page;
@@ -101,5 +100,14 @@ page_based_connection!(
     MoleculeProjectV2Connection,
     MoleculeProjectV2Edge
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject)]
+pub struct MoleculeProjectActivityFiltersV2 {
+    // TODO: replace w/ real filters.
+    /// This filter is provided as an example.
+    by_ipnft_uids: Option<Vec<String>>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
