@@ -7,10 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod common;
-mod molecule;
-pub mod v1;
-pub mod v2;
+mod molecule_v1;
 
-pub use common::*;
-pub use molecule::*;
+pub use molecule_v1::*;
