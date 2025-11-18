@@ -3221,8 +3221,14 @@ type MoleculeAnnouncementsDatasetV2 {
 	Access the underlying core Dataset
 	"""
 	dataset: Dataset!
-	tail(page: Int, perPage: Int): MoleculeAnnouncementEntryV2Connection!
+	tail(page: Int, perPage: Int, filters: MoleculeAnnouncementsFiltersV2): MoleculeAnnouncementEntryV2Connection!
 	byId(id: String!): MoleculeAnnouncementEntryV2!
+}
+
+input MoleculeAnnouncementsFiltersV2 {
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
 }
 
 type MoleculeDataRoomDatasetV2 {
@@ -3604,8 +3610,8 @@ type MoleculeRemoveProjectResultV2 {
 
 input MoleculeSemanticSearchFiltersV2 {
 	byIpnftUids: [String!]
-	byTags: [String!]
 	byCategories: [String!]
+	byTags: [String!]
 }
 
 type MoleculeSemanticSearchFoundAnnouncementV2 {
