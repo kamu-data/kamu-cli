@@ -71,11 +71,13 @@ pub struct MoleculeProjectMutV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeProjectMutV2 {
+    #[expect(clippy::unused_async)]
     /// Strongly typed data room mutator
     async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomMutV2> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Strongly typed announcements mutator
     async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetMutV2> {
         todo!()
@@ -89,6 +91,7 @@ pub struct MoleculeDataRoomMutV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomMutV2 {
+    #[expect(clippy::unused_async)]
     /// Starts the process of uploading a file to the data room.
     async fn start_upload_file(
         &self,
@@ -99,6 +102,7 @@ impl MoleculeDataRoomMutV2 {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Finishes the process of uploading a file to the data room.
     async fn finish_upload_file(
         &self,
@@ -125,6 +129,7 @@ impl MoleculeDataRoomMutV2 {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Moves an entry in the data room.
     async fn move_entry(
         &self,
@@ -139,6 +144,7 @@ impl MoleculeDataRoomMutV2 {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Removes an entry from the data room.
     async fn remove_entry(
         &self,
@@ -151,6 +157,7 @@ impl MoleculeDataRoomMutV2 {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Updates the metadata of a file in the data room.
     async fn update_file_metadata(
         &self,

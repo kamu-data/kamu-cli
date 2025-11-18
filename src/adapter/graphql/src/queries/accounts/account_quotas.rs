@@ -64,11 +64,13 @@ impl<'a> AccountQuotasUserStorage<'a> {
         Self { account }
     }
 
+    #[expect(clippy::unused_async)]
     /// Total bytes used by this account.
     pub async fn utilized_total_bytes(&self) -> Result<u64> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Total bytes limit for this account.
     pub async fn limit_total_bytes(&self) -> Result<u64> {
         todo!()

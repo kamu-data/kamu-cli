@@ -84,7 +84,13 @@ impl MoleculeV2 {
         let _ = filters;
         let _ = page;
         let _ = per_page;
-        todo!()
+        // TODO: implement
+        Ok(MoleculeSemanticSearchFoundItemV2Connection::new(
+            vec![],
+            0,
+            0,
+            0,
+        ))
     }
 }
 
@@ -94,8 +100,17 @@ impl MoleculeV2 {
 #[derive(SimpleObject, Clone)]
 #[graphql(complex)]
 pub struct MoleculeProjectV2 {
+    #[expect(dead_code)]
     #[graphql(skip)]
     pub account_id: odf::AccountID,
+
+    #[expect(dead_code)]
+    #[graphql(skip)]
+    pub data_room_dataset_id: odf::DatasetID,
+
+    #[expect(dead_code)]
+    #[graphql(skip)]
+    pub announcements_dataset_id: odf::DatasetID,
 
     /// System time when this version was created/updated
     pub system_time: DateTime<Utc>,
@@ -116,12 +131,6 @@ pub struct MoleculeProjectV2 {
     //       we continue using BigInt type, which is wider than needed U256.
     /// Token ID withing the IPNFT contract
     pub ipnft_token_id: BigInt,
-
-    #[graphql(skip)]
-    pub data_room_dataset_id: odf::DatasetID,
-
-    #[graphql(skip)]
-    pub announcements_dataset_id: odf::DatasetID,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -149,12 +158,17 @@ impl MoleculeProjectV2 {
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_activity, skip_all)]
     async fn activity(
         &self,
-        _ctx: &Context<'_>,
-        _page: Option<usize>,
-        _per_page: Option<usize>,
-        _filters: Option<MoleculeActivityFiltersV2>,
-    ) -> Result<MoleculeProjectEventConnection> {
-        todo!()
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+        filters: Option<MoleculeActivityFiltersV2>,
+    ) -> Result<MoleculeActivityEventV2Connection> {
+        let _ = ctx;
+        let _ = page;
+        let _ = per_page;
+        let _ = filters;
+        // TODO: implement
+        Ok(MoleculeActivityEventV2Connection::new(vec![], 0, 0))
     }
 }
 
@@ -165,11 +179,13 @@ pub struct MoleculeDataRoomDatasetV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomDatasetV2 {
+    #[expect(clippy::unused_async)]
     /// Access the underlying core Dataset
     async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn entries(
         &self,
         _ctx: &Context<'_>,
@@ -183,9 +199,11 @@ impl MoleculeDataRoomDatasetV2 {
         let _ = page;
         let _ = per_page;
 
-        todo!()
+        // TODO: implement
+        Ok(MoleculeDataRoomEntryV2Connection::new(vec![], 0, 0, 0))
     }
 
+    #[expect(clippy::unused_async)]
     async fn entry(
         &self,
         _ctx: &Context<'_>,
@@ -203,32 +221,39 @@ pub struct MoleculeDataRoomEntryV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomEntryV2 {
+    #[expect(clippy::unused_async)]
     async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn system_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn event_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn path(&self, _ctx: &Context<'_>) -> Result<CollectionPath> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     #[graphql(name = "ref")]
     async fn reference(&self, _ctx: &Context<'_>) -> Result<DatasetID<'static>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Access the linked core Dataset
     async fn as_dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     /// Strongly typed [`MoleculeVersionedFileV2`] object
     async fn as_versioned_file(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFileV2> {
         todo!()
@@ -248,45 +273,55 @@ pub struct MoleculeVersionedFileV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeVersionedFileV2 {
+    #[expect(clippy::unused_async)]
     async fn system_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn event_time(&self, _ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn version(&self, _ctx: &Context<'_>) -> Result<FileVersion> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn content_hash(&self, _ctx: &Context<'_>) -> Result<Multihash<'static>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn content_length(&self, _ctx: &Context<'_>) -> Result<usize> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     // TODO: typing
     async fn content_type(&self, _ctx: &Context<'_>) -> Result<String> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     // TODO: typing
     async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     // TODO: typing
     async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn content_url(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFileContentUrlV2> {
         todo!()
     }
@@ -299,11 +334,25 @@ pub struct MoleculeAnnouncementsDatasetV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncementsDatasetV2 {
+    #[expect(clippy::unused_async)]
     /// Access the underlying core Dataset
     async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
+    async fn tail(
+        &self,
+        _ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<MoleculeAnnouncementEntryV2Connection> {
+        let _ = page;
+        let _ = per_page;
+        Ok(MoleculeAnnouncementEntryV2Connection::new(vec![], 0, 0, 0))
+    }
+
+    #[expect(clippy::unused_async)]
     async fn by_id(
         &self,
         _ctx: &Context<'_>,
@@ -321,38 +370,47 @@ pub struct MoleculeAnnouncementEntryV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncementEntryV2 {
+    #[expect(clippy::unused_async)]
     async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementID> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn headline(&self, _ctx: &Context<'_>) -> Result<String> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn body(&self, _ctx: &Context<'_>) -> Result<String> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn attachments(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn change_by(&self, _ctx: &Context<'_>) -> Result<AccountID<'static>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
         todo!()
     }
 
+    #[expect(clippy::unused_async)]
     async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
         todo!()
     }
@@ -439,10 +497,10 @@ pub struct MoleculeActivityFiltersV2 {
 
 #[derive(Union)]
 pub enum MoleculeActivityEventV2 {
-    ActivityFileAdded(MoleculeActivityFileAddedV2),
-    ActivityFileRemoved(MoleculeActivityFileRemovedV2),
-    ActivityFileUpdated(MoleculeActivityFileUpdatedV2),
-    ActivityAnnouncement(MoleculeActivityAnnouncementV2),
+    FileAdded(MoleculeActivityFileAddedV2),
+    FileRemoved(MoleculeActivityFileRemovedV2),
+    FileUpdated(MoleculeActivityFileUpdatedV2),
+    Announcement(MoleculeActivityAnnouncementV2),
 }
 
 #[derive(SimpleObject)]
