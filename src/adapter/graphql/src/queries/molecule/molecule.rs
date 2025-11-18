@@ -10,8 +10,6 @@
 // TODO: breakdown to smaller files after API freeze stage.
 // TODO: use dir tree structure e.g. molecule/{v1,v2}/molecule_project_v2.rs.
 
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
-
 use super::{v1, v2};
 use crate::prelude::*;
 
@@ -86,39 +84,6 @@ impl Molecule {
     async fn v2(&self) -> v2::MoleculeV2 {
         v2::MoleculeV2
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const MOLECULE_ORG_ACCOUNTS: [&str; 2] = ["molecule", "molecule.dev"];
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn molecule_subject(ctx: &Context<'_>) -> Result<LoggedAccount> {
-    // Check auth
-    let subject = from_catalog_n!(ctx, CurrentAccountSubject);
-    let subject_molecule = match subject.as_ref() {
-        CurrentAccountSubject::Logged(subj)
-            if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_name.as_str()) =>
-        {
-            subj
-        }
-        _ => {
-            return Err(GqlError::Access(odf::AccessError::Unauthorized(
-                format!(
-                    "Only accounts {} can provision projects",
-                    MOLECULE_ORG_ACCOUNTS
-                        .iter()
-                        .map(|account_name| format!("'{account_name}'"))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-                .as_str()
-                .into(),
-            )));
-        }
-    };
-    Ok(subject_molecule.clone())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
