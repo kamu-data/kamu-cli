@@ -12,26 +12,20 @@
 
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 
-use super::{
-    MoleculeProject,
-    MoleculeProjectConnection,
-    MoleculeProjectEventConnection,
-    MoleculeV1,
-    MoleculeV2,
-};
+use super::{v1, v2};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 pub struct Molecule {
-    v1: MoleculeV1,
+    v1: v1::MoleculeV1,
 }
 
 impl Molecule {
     // Public only for tests
     pub fn dataset_snapshot_projects_v1(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        MoleculeV1::dataset_snapshot_projects(alias)
+        v1::MoleculeV1::dataset_snapshot_projects(alias)
     }
 }
 
@@ -49,7 +43,7 @@ impl Molecule {
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<Option<MoleculeProject>> {
+    ) -> Result<Option<v1::MoleculeProject>> {
         self.v1.project(ctx, ipnft_uid).await
     }
 
@@ -63,7 +57,7 @@ impl Molecule {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeProjectConnection> {
+    ) -> Result<v1::MoleculeProjectConnection> {
         self.v1.projects(ctx, page, per_page).await
     }
 
@@ -78,19 +72,19 @@ impl Molecule {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeProjectEventConnection> {
+    ) -> Result<v1::MoleculeProjectEventConnection> {
         self.v1.activity(ctx, page, per_page).await
     }
 
     /// 1-st Molecule API version (query).
     #[graphql(deprecation = "Use `v2` instead")]
-    async fn v1(&self) -> MoleculeV1 {
-        MoleculeV1
+    async fn v1(&self) -> v1::MoleculeV1 {
+        v1::MoleculeV1
     }
 
     /// 2-nd Molecule API version (query).
-    async fn v2(&self) -> MoleculeV2 {
-        MoleculeV2
+    async fn v2(&self) -> v2::MoleculeV2 {
+        v2::MoleculeV2
     }
 }
 

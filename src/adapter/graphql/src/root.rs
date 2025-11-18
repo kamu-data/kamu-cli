@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::extensions::*;
+use crate::molecule::Molecule;
 use crate::mutations::*;
 use crate::prelude::*;
 use crate::queries::*;

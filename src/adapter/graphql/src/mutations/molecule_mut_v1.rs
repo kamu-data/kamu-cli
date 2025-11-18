@@ -12,8 +12,9 @@ use kamu_accounts::{AccountServiceExt as _, CreateAccountUseCaseOptions, Current
 use kamu_core::DatasetRegistryExt;
 use kamu_core::auth::DatasetAction;
 
+use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::{MoleculeProject, MoleculeV1, molecule_subject};
+use crate::queries::molecule::v1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +67,7 @@ impl MoleculeMutV1 {
 
         // Resolve projects dataset
         let (projects_dataset, df) =
-            MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Write, true).await?;
+            v1::MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Write, true).await?;
 
         // Check for conflicts
         if let Some(df) = df {
@@ -80,7 +81,7 @@ impl MoleculeMutV1 {
 
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
-                let project = MoleculeProject::from_json(record);
+                let project = v1::MoleculeProject::from_json(record);
                 return Ok(CreateProjectResult::Conflict(CreateProjectErrorConflict {
                     project,
                 }));
@@ -127,7 +128,7 @@ impl MoleculeMutV1 {
         };
 
         // Create `data-room` dataset
-        let snapshot = MoleculeV1::dataset_snapshot_data_room(odf::DatasetAlias::new(
+        let snapshot = v1::MoleculeV1::dataset_snapshot_data_room(odf::DatasetAlias::new(
             Some(project_account_name.clone()),
             odf::DatasetName::new_unchecked("data-room"),
         ));
@@ -142,7 +143,7 @@ impl MoleculeMutV1 {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = MoleculeV1::dataset_snapshot_announcements(odf::DatasetAlias::new(
+        let snapshot = v1::MoleculeV1::dataset_snapshot_announcements(odf::DatasetAlias::new(
             Some(project_account_name.clone()),
             odf::DatasetName::new_unchecked("announcements"),
         ));
@@ -177,7 +178,7 @@ impl MoleculeMutV1 {
 
         // Add project entry
         let now = chrono::Utc::now();
-        let project = MoleculeProject {
+        let project = v1::MoleculeProject {
             account_id: project_account.id,
             system_time: now,
             event_time: now,
@@ -221,7 +222,7 @@ impl MoleculeMutV1 {
     ) -> Result<Option<MoleculeProjectMut>> {
         use datafusion::logical_expr::{col, lit};
 
-        let Some(df) = MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
+        let Some(df) = v1::MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
             .await?
             .1
         else {
@@ -380,7 +381,7 @@ pub enum CreateProjectResult {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateProjectSuccess {
-    pub project: MoleculeProject,
+    pub project: v1::MoleculeProject,
 }
 #[ComplexObject]
 impl CreateProjectSuccess {
@@ -395,7 +396,7 @@ impl CreateProjectSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateProjectErrorConflict {
-    project: MoleculeProject,
+    project: v1::MoleculeProject,
 }
 #[ComplexObject]
 impl CreateProjectErrorConflict {

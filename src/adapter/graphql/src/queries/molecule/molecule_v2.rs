@@ -14,9 +14,8 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use url::Url;
 
-use super::{FileVersion, MoleculeProjectConnection, MoleculeProjectEventConnection};
 use crate::prelude::*;
-use crate::queries::{Account, Dataset};
+use crate::queries::{Account, Dataset, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,10 +44,11 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeProjectConnection> {
+    ) -> Result<MoleculeProjectV2Connection> {
         let _ = page;
         let _ = per_page;
-        todo!()
+        // TODO: implement
+        Ok(MoleculeProjectV2Connection::new(Vec::new(), 0, 0, 0))
     }
 
     /// Latest activity events across all projects in reverse chronological
@@ -59,10 +59,11 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeProjectEventConnection> {
+    ) -> Result<MoleculeActivityEventV2Connection> {
         let _ = page;
         let _ = per_page;
-        todo!()
+        // TODO: implement
+        Ok(MoleculeActivityEventV2Connection::new(Vec::new(), 0, 0))
     }
 
     /// Performs a semantic search
@@ -171,6 +172,12 @@ impl MoleculeProjectV2 {
         Ok(MoleculeActivityEventV2Connection::new(vec![], 0, 0))
     }
 }
+
+page_based_connection!(
+    MoleculeProjectV2,
+    MoleculeProjectV2Connection,
+    MoleculeProjectV2Edge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -305,7 +312,7 @@ impl MoleculeVersionedFileV2 {
     }
 
     #[expect(clippy::unused_async)]
-    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
+    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevelV2> {
         todo!()
     }
 
@@ -396,7 +403,7 @@ impl MoleculeAnnouncementEntryV2 {
     }
 
     #[expect(clippy::unused_async)]
-    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
+    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevelV2> {
         todo!()
     }
 
@@ -477,7 +484,7 @@ page_based_connection!(
 //     Holder,
 // }
 
-pub type MoleculeAccessLevel = String;
+pub type MoleculeAccessLevelV2 = String;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

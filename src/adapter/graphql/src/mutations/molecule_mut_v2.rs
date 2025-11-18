@@ -9,7 +9,7 @@
 
 use crate::mutations::{CreateAnnouncementResult, CreateProjectResult, MoleculeMutV1};
 use crate::prelude::*;
-use crate::queries::MoleculeAccessLevel;
+use crate::queries::molecule::v2::MoleculeAccessLevelV2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -110,7 +110,7 @@ impl MoleculeDataRoomMutV2 {
         upload_token: String,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
         path: CollectionPath,
-        access_level: MoleculeAccessLevel,
+        access_level: MoleculeAccessLevelV2,
         change_by: AccountID<'static>,
         description: String,
         categories: Vec<String>,
@@ -164,7 +164,7 @@ impl MoleculeDataRoomMutV2 {
         _ctx: &Context<'_>,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
         // TODO: use update object w/ optional fields instead
-        access_level: MoleculeAccessLevel,
+        access_level: MoleculeAccessLevelV2,
         change_by: AccountID<'static>,
         description: String,
         categories: Vec<String>,
@@ -199,7 +199,7 @@ impl MoleculeAnnouncementsDatasetMutV2 {
         headline: String,
         body: String,
         #[graphql(desc = "List of dataset DIDs to link")] attachments: Option<Vec<String>>,
-        molecule_access_level: MoleculeAccessLevel,
+        molecule_access_level: MoleculeAccessLevelV2,
         molecule_change_by: String,
         categories: Vec<String>,
         tags: Vec<String>,

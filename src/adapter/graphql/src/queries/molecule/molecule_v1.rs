@@ -16,10 +16,9 @@ use kamu_core::ResolvedDataset;
 use kamu_core::auth::DatasetAction;
 use odf::utils::data::DataFrameExt;
 
-use super::{CollectionEntry, VersionedFileEntry};
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::{Account, Dataset};
+use crate::queries::{Account, Collection, CollectionEntry, Dataset, VersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -101,7 +100,7 @@ impl MoleculeV1 {
     }
 
     pub fn dataset_snapshot_data_room(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        super::Collection::dataset_snapshot(
+        Collection::dataset_snapshot(
             alias,
             vec![ColumnInput {
                 name: "molecule_change_by".into(),
