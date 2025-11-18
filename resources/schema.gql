@@ -72,6 +72,10 @@ type Account {
 	Returns datasets belonging to this account
 	"""
 	ownedDatasets(page: Int, perPage: Int): DatasetConnection!
+	"""
+	Returns datasets belonging to this account
+	"""
+	quotas: AccountQuotas!
 }
 
 type AccountAccessTokens {
@@ -229,6 +233,10 @@ type AccountMut {
 	Access to the mutable flow configurations of this account
 	"""
 	accessTokens: AccountAccessTokensMut!
+	"""
+	Access to the mutable quotas of this account
+	"""
+	quotas: AccountQuotasMut!
 }
 
 scalar AccountName
@@ -239,6 +247,35 @@ enum AccountProvider {
 	PASSWORD
 	OAUTH_GITHUB
 	WEB3_WALLET
+}
+
+type AccountQuotas {
+	"""
+	User-level quotas
+	"""
+	user: AccountQuotasUser!
+}
+
+type AccountQuotasMut {
+	setUserLevelQuotas(quotas: SetUserLevelQuotasInput!): SetUserLevelQuotasResult!
+}
+
+type AccountQuotasUser {
+	"""
+	User-level quotas
+	"""
+	storage: AccountQuotasUserStorage!
+}
+
+type AccountQuotasUserStorage {
+	"""
+	Total bytes used by this account.
+	"""
+	utilizedTotalBytes: Int!
+	"""
+	Total bytes limit for this account.
+	"""
+	limitTotalBytes: Int!
 }
 
 enum AccountType {
@@ -2813,6 +2850,11 @@ A scalar that can represent any JSON value.
 """
 scalar JSON
 
+"""
+A scalar that can represent any JSON Object value.
+"""
+scalar JSONObject
+
 type JdbcDesc {
 	url: String!
 }
@@ -3065,26 +3107,203 @@ type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 
 type Molecule {
 	"""
-	Looks up the project
+	Looks up the project.
+	
+	Shortcut for `v1 { project }`.
 	"""
-	project(ipnftUid: String!): MoleculeProject
+	project(ipnftUid: String!): MoleculeProject @deprecated(reason: "Use `v2 { project }` instead.")
 	"""
-	List the registered projects
+	List the registered projects.
+	
+	Shortcut for `v1 { projects }`.
 	"""
-	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	projects(page: Int, perPage: Int): MoleculeProjectConnection! @deprecated(reason: "Use `v2 { projects }` instead.")
 	"""
 	Latest activity events across all projects in reverse chronological
-	order
+	order.
+	
+	Shortcut for `v1 { activity }`.
 	"""
-	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection! @deprecated(reason: "Use `v2 { activity }` instead.")
+	"""
+	1-st Molecule API version (query).
+	"""
+	v1: MoleculeV1! @deprecated(reason: "Use `v2` instead")
+	"""
+	2-nd Molecule API version (query).
+	"""
+	v2: MoleculeV2!
+}
+
+input MoleculeActivityFiltersV2 {
+	"""
+	This filter is provided as an example.
+	"""
+	byIpnftUids: [String!]
+}
+
+type MoleculeAnnouncementEntryV2 {
+	project: MoleculeProjectV2!
+	id: String!
+	headline: String!
+	body: String!
+	attachments: [String!]!
+	accessLevel: String!
+	changeBy: AccountID!
+	categories: [String!]!
+	tags: [String!]!
+}
+
+type MoleculeAnnouncementsDatasetMutV2 {
+	"""
+	Creates an announcement record for the project.
+	"""
+	create(		headline: String!,		body: String!,
+		"""
+		List of dataset DIDs to link
+		"""
+		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!,		categories: [String!]!,		tags: [String!]!
+	): CreateAnnouncementResult!
+}
+
+type MoleculeAnnouncementsDatasetV2 {
+	"""
+	Access the underlying core Dataset
+	"""
+	dataset: Dataset!
+	byId(id: String!): MoleculeAnnouncementEntryV2!
+}
+
+type MoleculeDataRoomDatasetV2 {
+	"""
+	Access the underlying core Dataset
+	"""
+	dataset: Dataset!
+	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int): MoleculeDataRoomEntryV2Connection!
+	entry(path: CollectionPath!): MoleculeDataRoomEntryV2!
+}
+
+type MoleculeDataRoomEntryV2 {
+	project: MoleculeProjectV2!
+	systemTime: DateTime!
+	eventTime: DateTime!
+	path: CollectionPath!
+	ref: DatasetID!
+	"""
+	Access the linked core Dataset
+	"""
+	asDataset: Dataset!
+	"""
+	Strongly typed [`MoleculeVersionedFileV2`] object
+	"""
+	asVersionedFile: MoleculeVersionedFileV2!
+}
+
+type MoleculeDataRoomEntryV2Connection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeDataRoomEntryV2!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeDataRoomEntryV2Edge!]!
+}
+
+type MoleculeDataRoomEntryV2Edge {
+	node: MoleculeDataRoomEntryV2!
+}
+
+type MoleculeDataRoomFinishUploadFileResult {
+	dummy: String!
+}
+
+type MoleculeDataRoomMoveEntryResult {
+	dummy: String!
+}
+
+type MoleculeDataRoomMutV2 {
+	"""
+	Starts the process of uploading a file to the data room.
+	"""
+	startUploadFile(contentSize: Int!): MoleculeDataRoomUploadFileResult!
+	"""
+	Finishes the process of uploading a file to the data room.
+	"""
+	finishUploadFile(uploadToken: String!, ref: DatasetID!, path: CollectionPath!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!): MoleculeDataRoomFinishUploadFileResult!
+	"""
+	Moves an entry in the data room.
+	"""
+	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomMoveEntryResult!
+	"""
+	Removes an entry from the data room.
+	"""
+	removeEntry(path: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomRemoveEntryResult!
+	"""
+	Updates the metadata of a file in the data room.
+	"""
+	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!, expectedHead: Multihash!): MoleculeDataRoomUpdateFileMetadataResult!
+}
+
+type MoleculeDataRoomRemoveEntryResult {
+	dummy: String!
+}
+
+type MoleculeDataRoomUpdateFileMetadataResult {
+	dummy: String!
+}
+
+type MoleculeDataRoomUploadFileResult {
+	dummy: String!
 }
 
 type MoleculeMut {
+	"""
+	Shortcut for `v1 { create_project() }`.
+	"""
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult! @deprecated(reason: "Use `v2 { create_project() }` instead.")
+	"""
+	Looks up the project
+	
+	Shortcut for `v1 { project() }`.
+	"""
+	project(ipnftUid: String!): MoleculeProjectMut @deprecated(reason: "Use `v2 { project }` instead.")
+	"""
+	1-st Molecule API version (mutation).
+	"""
+	v1: MoleculeMutV1! @deprecated(reason: "Use `v2` instead")
+	"""
+	2-nd Molecule API version (mutation).
+	"""
+	v2: MoleculeMutV2!
+}
+
+type MoleculeMutV1 {
 	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
 	"""
 	Looks up the project
 	"""
 	project(ipnftUid: String!): MoleculeProjectMut
+}
+
+type MoleculeMutV2 {
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
+	"""
+	Retracts a project from the `projects` dataset.
+	History of this project existing will be preserved,
+	its symbol will remain reserved, data will remain intact,
+	but the project will no longer appear in the listing.
+	"""
+	removeProject(ipnftUid: String!): MoleculeRemoveProjectResult!
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectMutV2
 }
 
 type MoleculeProject {
@@ -3245,6 +3464,160 @@ type MoleculeProjectMut {
 		"""
 		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
 	): CreateAnnouncementResult!
+}
+
+type MoleculeProjectMutV2 {
+	"""
+	Strongly typed data room mutator
+	"""
+	dataRoom: MoleculeDataRoomMutV2!
+	"""
+	Strongly typed announcements mutator
+	"""
+	announcements: MoleculeAnnouncementsDatasetMutV2!
+}
+
+type MoleculeProjectV2 {
+	"""
+	System time when this version was created/updated
+	"""
+	systemTime: DateTime!
+	"""
+	Event time when this version was created/updated
+	"""
+	eventTime: DateTime!
+	"""
+	Symbolic name of the project
+	"""
+	ipnftSymbol: String!
+	"""
+	Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+	"""
+	ipnftUid: String!
+	"""
+	Address of the IPNFT contract
+	"""
+	ipnftAddress: String!
+	"""
+	Token ID withing the IPNFT contract
+	"""
+	ipnftTokenId: BigInt!
+	"""
+	Project's organizational account
+	"""
+	account: Account!
+	"""
+	Strongly typed data room accessor
+	"""
+	dataRoom: MoleculeDataRoomDatasetV2!
+	"""
+	Strongly typed announcements accessor
+	"""
+	announcements: MoleculeAnnouncementsDatasetV2!
+	"""
+	Project's activity events in reverse chronological order
+	"""
+	activity(page: Int, perPage: Int, filters: MoleculeActivityFiltersV2): MoleculeProjectEventConnection!
+}
+
+type MoleculeRemoveProjectResult {
+	dummy: String!
+}
+
+input MoleculeSemanticSearchFiltersV2 {
+	byIpnftUids: [String!]
+	byTags: [String!]
+	byCategories: [String!]
+}
+
+type MoleculeSemanticSearchFoundAnnouncementV2 {
+	entry: MoleculeAnnouncementEntryV2!
+}
+
+type MoleculeSemanticSearchFoundFileV2 {
+	entry: MoleculeVersionedFileV2!
+}
+
+union MoleculeSemanticSearchFoundItemV2 = MoleculeSemanticSearchFoundFileV2 | MoleculeSemanticSearchFoundAnnouncementV2
+
+type MoleculeSemanticSearchFoundItemV2Connection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeSemanticSearchFoundItemV2!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeSemanticSearchFoundItemV2Edge!]!
+}
+
+type MoleculeSemanticSearchFoundItemV2Edge {
+	node: MoleculeSemanticSearchFoundItemV2!
+}
+
+type MoleculeV1 {
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProject
+	"""
+	List the registered projects
+	"""
+	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	"""
+	Latest activity events across all projects in reverse chronological
+	order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+}
+
+type MoleculeV2 {
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectV2
+	"""
+	List the registered projects
+	"""
+	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	"""
+	Latest activity events across all projects in reverse chronological
+	order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+	"""
+	Performs a semantic search
+	Using `filters` parameters, a search can be narrowed down to:
+	- a specific set of projects
+	- specific categories and tags
+	- only returning files or announcements
+	"""
+	search(prompt: String!, filters: MoleculeSemanticSearchFiltersV2, page: Int, perPage: Int): MoleculeSemanticSearchFoundItemV2Connection!
+}
+
+type MoleculeVersionedFileContentUrlV2 {
+	url: Url!
+	headers: JSONObject!
+	method: String!
+	expiresAt: DateTime!
+}
+
+type MoleculeVersionedFileV2 {
+	systemTime: DateTime!
+	eventTime: DateTime!
+	version: Int!
+	contentHash: Multihash!
+	contentLength: Int!
+	contentType: String!
+	accessLevel: String!
+	categories: [String!]!
+	tags: [String!]!
+	contentUrl: MoleculeVersionedFileContentUrlV2!
 }
 
 """
@@ -4073,6 +4446,18 @@ type SetTransform {
 	transform: Transform!
 }
 
+input SetUserLevelQuotasInput {
+	storage: SetUserLevelQuotasStorageInput
+}
+
+type SetUserLevelQuotasResult {
+	dummy: Boolean!
+}
+
+input SetUserLevelQuotasStorageInput {
+	limitTotalBytes: Int
+}
+
 """
 Lets you manipulate names of the system columns to avoid conflicts.
 
@@ -4817,6 +5202,10 @@ type Webhooks {
 	eventTypes: [String!]!
 }
 
+"""
+Marks an element of a GraphQL schema as no longer supported.
+"""
+directive @deprecated(reason: String = "No longer supported") on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
 """
 Directs the executor to include this field or fragment only when the `if` argument is true.
 """
