@@ -31,7 +31,7 @@ use time_source::SystemTimeSource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetEntryIndexer {
-    dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+    dataset_entry_repo: dill::Lazy<Arc<dyn DatasetEntryRepository>>,
     time_source: Arc<dyn SystemTimeSource>,
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>, /* Note: potentially we will have
                                                              * multiple */
@@ -50,7 +50,7 @@ pub struct DatasetEntryIndexer {
 })]
 impl DatasetEntryIndexer {
     pub fn new(
-        dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+        dataset_entry_repo: dill::Lazy<Arc<dyn DatasetEntryRepository>>,
         time_source: Arc<dyn SystemTimeSource>,
         dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
         account_service: Arc<dyn AccountService>,
@@ -66,6 +66,8 @@ impl DatasetEntryIndexer {
     async fn has_datasets_indexed(&self) -> Result<bool, InternalError> {
         let stored_dataset_entries_count = self
             .dataset_entry_repo
+            .get()
+            .unwrap()
             .dataset_entries_count()
             .await
             .int_err()?;
@@ -164,6 +166,8 @@ impl DatasetEntryIndexer {
 
             use tracing::Instrument;
             self.dataset_entry_repo
+                .get()
+                .unwrap()
                 .save_dataset_entry(&dataset_entry)
                 .instrument(tracing::debug_span!(
                     "Saving indexed dataset entry",
