@@ -1131,9 +1131,7 @@ impl Default for SearchConfig {
             )),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
-            full_text: Some(FullTextSearchConfig::ElasticSearchContainer(
-                FullTextSearchConfigElasticSearchContainer::default(),
-            )),
+            full_text: Some(FullTextSearchConfig::default()),
         }
     }
 }
@@ -1303,20 +1301,15 @@ impl Default for VectorRepoConfigQdrantContainer {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum FullTextSearchConfig {
+    #[default]
     Dummy,
     ElasticSearch(FullTextSearchConfigElasticSearch),
     ElasticSearchContainer(FullTextSearchConfigElasticSearchContainer),
-}
-
-impl Default for FullTextSearchConfig {
-    fn default() -> Self {
-        Self::ElasticSearchContainer(FullTextSearchConfigElasticSearchContainer::default())
-    }
 }
 
 #[skip_serializing_none]

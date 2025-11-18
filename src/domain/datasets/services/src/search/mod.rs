@@ -9,5 +9,7 @@
 
 mod dataset_full_text_search_schema;
 mod dataset_full_text_search_schema_provider;
+mod dataset_full_text_search_updater;
 
 pub use dataset_full_text_search_schema_provider::*;
+pub use dataset_full_text_search_updater::*;

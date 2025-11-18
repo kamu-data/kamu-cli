@@ -84,10 +84,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetAliasUpdateHandler {
 
                 odf::dataset::write_dataset_alias(
                     target.as_ref(),
-                    &odf::DatasetAlias::new(
-                        target.get_alias().account_name.clone(),
-                        renamed_message.new_dataset_name.clone(),
-                    ),
+                    &renamed_message.new_dataset_alias,
                 )
                 .await
             }

@@ -74,7 +74,7 @@ impl DatasetAccountLifecycleHandler {
         while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
             match self
                 .delete_dataset_use_case
-                .execute_via_handle(&dataset_handle)
+                .execute_via_handle_preauthorized(&dataset_handle)
                 .await
             {
                 Ok(_) | Err(DeleteDatasetError::NotFound(_)) => { /* idempotent deletion */ }

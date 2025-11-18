@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
+use chrono::{DateTime, Utc};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_core::ResolvedDataset;
-use kamu_datasets::DatasetEntry;
 use kamu_search::{
     FullTextSchemaField,
     FullTextSchemaFieldRole,
@@ -19,34 +20,162 @@ use kamu_search::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn index_dataset(
+pub(crate) async fn index_dataset_from_scratch(
     dataset: ResolvedDataset,
-    entry: &DatasetEntry,
-) -> Result<DatasetSearchDocument, InternalError> {
-    // Extract key blocks that contribute to full-text search
+    owner_id: &odf::AccountID,
+) -> Result<serde_json::Value, InternalError> {
+    // Find key blocks that contribute to full-text search
     let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
     let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
     let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
+
+    // Also need the seed event for created_at
     let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
 
-    let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>;
-        4] = [
+    use odf::dataset::*;
+    let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 4] = [
         &mut attachments_visitor,
         &mut info_visitor,
         &mut schema_visitor,
         &mut seed_visitor,
     ];
 
-    use odf::dataset::MetadataChainExt as _;
+    // Visit entire metadata chain
     dataset
         .as_metadata_chain()
         .accept(&mut visitors)
         .await
         .int_err()?;
 
-    // Schema: field names
-    // Note: should we omit system columns (system_time, event_time, op, offset)?
-    let schema_fields = schema_visitor
+    // Extract interested parts from visitors
+    let schema_fields = extract_schema_field_names(schema_visitor);
+    let (description, keywords) = extract_description_and_keywords(info_visitor);
+    let attachments = extract_attachment_contents(attachments_visitor);
+
+    // Seed event: created_at
+    let seed_event_time = seed_visitor.into_block().unwrap().system_time;
+
+    // Head event: updated_at
+    let head_event_time = dataset
+        .as_metadata_chain()
+        .get_block_by_ref(&odf::BlockRef::Head)
+        .await
+        .int_err()?
+        .system_time;
+
+    // Prepare full text search document
+    let alias = dataset.get_alias();
+    Ok(serde_json::json!({
+        FIELD_DATASET_NAME: alias.dataset_name.to_string(),
+        FIELD_ALIAS: alias.to_string(),
+        FIELD_OWNER_NAME: alias
+            .account_name
+            .as_ref()
+            .map(std::string::ToString::to_string)
+            .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
+        FIELD_OWNER_ID: owner_id.to_string(),
+        FIELD_KIND: match dataset.get_kind() {
+            odf::DatasetKind::Root => "root".to_string(),
+            odf::DatasetKind::Derivative => "derivative".to_string(),
+        },
+        FIELD_CREATED_AT: seed_event_time.to_rfc3339(),
+        FIELD_UPDATED_AT: head_event_time.to_rfc3339(),
+        FIELD_SCHEMA_FIELDS: schema_fields,
+        FIELD_DESCRIPTION: description,
+        FIELD_KEYWORDS: keywords,
+        FIELD_ATTACHMENTS: attachments,
+    }))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn partial_update_for_new_interval(
+    dataset: ResolvedDataset,
+    owner_id: &odf::AccountID,
+    new_head: &odf::Multihash,
+    maybe_prev_head: Option<&odf::Multihash>,
+) -> Result<serde_json::Value, InternalError> {
+    // Extract key blocks that contribute to full-text search
+    let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
+    let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
+    let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
+
+    use odf::dataset::*;
+    let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 3] = [
+        &mut attachments_visitor,
+        &mut info_visitor,
+        &mut schema_visitor,
+    ];
+
+    // Only need to visit blocks between maybe_prev_head and new_head
+    let result = dataset
+        .as_metadata_chain()
+        .accept_by_interval_ext(
+            &mut visitors,
+            Some(new_head),
+            maybe_prev_head,
+            AcceptByIntervalOptions {
+                ignore_missing_tail: false, // Detect divergence errors
+                ..Default::default()
+            },
+        )
+        .await;
+
+    // In case divergence is detected, fall back to full indexing
+    match result {
+        Ok(_) => {}
+        Err(AcceptVisitorError::Traversal(IterBlocksError::InvalidInterval(_))) => {
+            return index_dataset_from_scratch(dataset, owner_id).await;
+        }
+        Err(e) => return Err(e.int_err()),
+    }
+
+    // Extract interested parts from visitors
+    let schema_fields = extract_schema_field_names(schema_visitor);
+    let (description, keywords) = extract_description_and_keywords(info_visitor);
+    let attachments = extract_attachment_contents(attachments_visitor);
+
+    // New head event: updated_at
+    // Note: ES should receive an update, even if other parts were not touched,
+    //  otherwise ordering of datasets by updated_at would be broken
+    let new_head_event_time = dataset
+        .as_metadata_chain()
+        .get_block(new_head)
+        .await
+        .int_err()?
+        .system_time;
+
+    // Prepare partial update to full text search document
+    Ok(serde_json::json!({
+        FIELD_SCHEMA_FIELDS: schema_fields,
+        FIELD_DESCRIPTION: description,
+        FIELD_KEYWORDS: keywords,
+        FIELD_ATTACHMENTS: attachments,
+        FIELD_UPDATED_AT: new_head_event_time.to_rfc3339(),
+    }))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn partial_update_for_rename(
+    new_alias: &odf::DatasetAlias,
+    updated_at: DateTime<Utc>,
+) -> serde_json::Value {
+    serde_json::json!({
+        FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
+            .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
+        FIELD_DATASET_NAME: new_alias.dataset_name.to_string(),
+        FIELD_ALIAS: new_alias.to_string(),
+        FIELD_UPDATED_AT: updated_at.to_rfc3339(),
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn extract_schema_field_names(
+    schema_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetDataSchema>,
+) -> Vec<String> {
+    schema_visitor
         .into_event()
         .map(|e| {
             e.upgrade()
@@ -56,62 +185,34 @@ pub(crate) async fn index_dataset(
                 .map(|f| f.name.clone())
                 .collect()
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
 
-    // Info: description, keywords
-    let (description, keywords) = info_visitor
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn extract_description_and_keywords(
+    info_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetInfo>,
+) -> (Option<String>, Option<Vec<String>>) {
+    info_visitor
         .into_event()
         .map(|e| (e.description, e.keywords))
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
 
-    // Attachments: contents
-    let attachments = attachments_visitor
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn extract_attachment_contents(
+    attachments_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetAttachments>,
+) -> Option<Vec<String>> {
+    attachments_visitor
         .into_event()
-        .map(|a| match a.attachments {
+        .map(|e| match e.attachments {
             odf::metadata::Attachments::Embedded(a) => {
                 let items: Vec<String> = a.items.into_iter().map(|a| a.content).collect();
                 if items.is_empty() { None } else { Some(items) }
             }
         })
-        .unwrap_or(None);
-
-    Ok(DatasetSearchDocument {
-        dataset_name: entry.name.to_string(),
-        alias: entry.alias().to_string(),
-        owner_name: entry.owner_name.to_string(),
-        owner_id: entry.owner_id.to_string(),
-        kind: match entry.kind {
-            odf::DatasetKind::Root => "root".to_string(),
-            odf::DatasetKind::Derivative => "derivative".to_string(),
-        },
-        created_at: entry.created_at.to_rfc3339(), // probably should be Seed event time?
-        updated_at: entry.created_at.to_rfc3339(), // take time of Head
-        schema_fields,
-        description,
-        keywords,
-        attachments,
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents a dataset document for full-text search indexing.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub(crate) struct DatasetSearchDocument {
-    dataset_name: String,
-    alias: String,
-    owner_name: String,
-    owner_id: String,
-    kind: String,
-    created_at: String,
-    updated_at: String,
-    schema_fields: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    keywords: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    attachments: Option<Vec<String>>,
+        .unwrap_or(None)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

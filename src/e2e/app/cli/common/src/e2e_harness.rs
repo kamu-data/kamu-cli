@@ -142,9 +142,6 @@ impl KamuCliApiServerHarness {
                             userName: {user}
                             rawPassword: {password}
                     databaseName: {database}
-                search:
-                    fullText:
-                        kind: dummy
             "#,
             host = db.get_host(),
             user = db.get_username(),
@@ -171,9 +168,6 @@ impl KamuCliApiServerHarness {
                             userName: {user}
                             rawPassword: {password}
                     databaseName: {database}
-                search:
-                    fullText:
-                        kind: dummy
                 "#,
             host = db.get_host(),
             user = db.get_username(),
@@ -187,18 +181,7 @@ impl KamuCliApiServerHarness {
     pub fn sqlite(options: KamuCliApiServerHarnessOptions) -> Self {
         // We don't need to specify sqlite database in config,
         // because kamu-cli will create the database on its own
-        let kamu_config = indoc::formatdoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-                search:
-                    fullText:
-                        kind: dummy
-                "#,
-        );
-
-        Self::new(options, Some(kamu_config))
+        Self::new(options, None)
     }
 
     fn new(

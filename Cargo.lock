@@ -6942,6 +6942,7 @@ name = "kamu-adapter-auth-oso-rebac"
 version = "0.252.4"
 dependencies = [
  "async-trait",
+ "chrono",
  "database-common",
  "dill",
  "futures",
@@ -7415,6 +7416,7 @@ name = "kamu-auth-rebac-services"
 version = "0.252.4"
 dependencies = [
  "async-trait",
+ "chrono",
  "dill",
  "futures",
  "indoc 2.0.7",

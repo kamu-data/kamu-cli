@@ -63,7 +63,8 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
                 .int_err()?;
 
             // Index dataset
-            let dataset_document = dataset_schema::index_dataset(dataset, &entry).await?;
+            let dataset_document =
+                dataset_schema::index_dataset_from_scratch(dataset, &entry.owner_id).await?;
             let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
 
             tracing::debug!(

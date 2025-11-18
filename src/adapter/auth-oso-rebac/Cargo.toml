@@ -51,6 +51,7 @@ kamu-datasets-services = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
 
+chrono = "0.4"
 indoc = { version = "2" }
 pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
