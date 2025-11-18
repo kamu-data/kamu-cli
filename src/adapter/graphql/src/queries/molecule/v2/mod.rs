@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod molecule_activity_event_v2;
+mod molecule_data_room_dataset_v2;
 mod molecule_project_v2;
 mod molecule_v2;
 
 pub use molecule_activity_event_v2::*;
+pub use molecule_data_room_dataset_v2::*;
 pub use molecule_project_v2::*;
 pub use molecule_v2::*;
