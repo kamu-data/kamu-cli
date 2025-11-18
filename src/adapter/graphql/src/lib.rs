@@ -30,5 +30,6 @@ pub use guards::*;
 pub use root::*;
 
 pub mod molecule {
+    pub use crate::mutations::molecule_mut::MoleculeMut;
     pub use crate::queries::molecule::{Molecule, molecule_subject};
 }

@@ -7,31 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// TODO: breakdown to smaller files after API freeze stage.
-// TODO: use dir tree structure e.g. molecule/{v1,v2}/molecule_project_v2.rs.
-
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
-
-use super::{
-    MoleculeProject,
-    MoleculeProjectConnection,
-    MoleculeProjectEventConnection,
-    MoleculeV1,
-    MoleculeV2,
-};
+use super::{v1, v2};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 pub struct Molecule {
-    v1: MoleculeV1,
+    v1: v1::MoleculeV1,
 }
 
 impl Molecule {
     // Public only for tests
-    pub fn dataset_snapshot_projects(alias: odf::DatasetAlias) -> odf::metadata::DatasetSnapshot {
-        MoleculeV1::dataset_snapshot_projects(alias)
+    pub fn dataset_snapshot_projects_v1(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+        v1::MoleculeV1::dataset_snapshot_projects(alias)
     }
 }
 
@@ -49,7 +38,7 @@ impl Molecule {
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<Option<MoleculeProject>> {
+    ) -> Result<Option<v1::MoleculeProject>> {
         self.v1.project(ctx, ipnft_uid).await
     }
 
@@ -63,7 +52,7 @@ impl Molecule {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeProjectConnection> {
+    ) -> Result<v1::MoleculeProjectConnection> {
         self.v1.projects(ctx, page, per_page).await
     }
 
@@ -78,53 +67,20 @@ impl Molecule {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeProjectEventConnection> {
+    ) -> Result<v1::MoleculeProjectEventConnection> {
         self.v1.activity(ctx, page, per_page).await
     }
 
     /// 1-st Molecule API version (query).
     #[graphql(deprecation = "Use `v2` instead")]
-    async fn v1(&self) -> MoleculeV1 {
-        MoleculeV1
+    async fn v1(&self) -> v1::MoleculeV1 {
+        v1::MoleculeV1
     }
 
     /// 2-nd Molecule API version (query).
-    async fn v2(&self) -> MoleculeV2 {
-        MoleculeV2
+    async fn v2(&self) -> v2::MoleculeV2 {
+        v2::MoleculeV2
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const MOLECULE_ORG_ACCOUNTS: [&str; 2] = ["molecule", "molecule.dev"];
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn molecule_subject(ctx: &Context<'_>) -> Result<LoggedAccount> {
-    // Check auth
-    let subject = from_catalog_n!(ctx, CurrentAccountSubject);
-    let subject_molecule = match subject.as_ref() {
-        CurrentAccountSubject::Logged(subj)
-            if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_name.as_str()) =>
-        {
-            subj
-        }
-        _ => {
-            return Err(GqlError::Access(odf::AccessError::Unauthorized(
-                format!(
-                    "Only accounts {} can provision projects",
-                    MOLECULE_ORG_ACCOUNTS
-                        .iter()
-                        .map(|account_name| format!("'{account_name}'"))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-                .as_str()
-                .into(),
-            )));
-        }
-    };
-    Ok(subject_molecule.clone())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

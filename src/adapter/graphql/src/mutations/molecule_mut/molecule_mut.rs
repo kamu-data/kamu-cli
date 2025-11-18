@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::mutations::{CreateProjectResult, MoleculeMutV1, MoleculeMutV2, MoleculeProjectMut};
+use crate::mutations::molecule_mut::{v1, v2};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub(crate) struct MoleculeMut {
-    molecule_mut_v1: MoleculeMutV1,
+pub struct MoleculeMut {
+    molecule_mut_v1: v1::MoleculeMutV1,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +35,7 @@ impl MoleculeMut {
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: U256,
-    ) -> Result<CreateProjectResult> {
+    ) -> Result<v1::CreateProjectResult> {
         self.molecule_mut_v1
             .create_project(ctx, ipnft_symbol, ipnft_uid, ipnft_address, ipnft_token_id)
             .await
@@ -50,19 +50,19 @@ impl MoleculeMut {
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectMut>> {
+    ) -> Result<Option<v1::MoleculeProjectMut>> {
         self.molecule_mut_v1.project(ctx, ipnft_uid).await
     }
 
     /// 1-st Molecule API version (mutation).
     #[graphql(deprecation = "Use `v2` instead")]
-    async fn v1(&self) -> MoleculeMutV1 {
-        MoleculeMutV1
+    async fn v1(&self) -> v1::MoleculeMutV1 {
+        v1::MoleculeMutV1
     }
 
     /// 2-nd Molecule API version (mutation).
-    async fn v2(&self) -> MoleculeMutV2 {
-        MoleculeMutV2::default()
+    async fn v2(&self) -> v2::MoleculeMutV2 {
+        v2::MoleculeMutV2::default()
     }
 }
 
