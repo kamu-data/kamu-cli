@@ -22,7 +22,7 @@ pub struct DatasetStatistics {
 }
 
 impl DatasetStatistics {
-    pub fn get_size_summary(&self) -> Option<u64> {
+    pub fn get_size_summary(&self) -> u64 {
         calculate_total_size(
             self.data_size,
             self.checkpoints_size,
@@ -58,7 +58,7 @@ pub struct TotalStatistic {
 }
 
 impl TotalStatistic {
-    pub fn get_size_summary(&self) -> Option<u64> {
+    pub fn get_size_summary(&self) -> u64 {
         calculate_total_size(
             self.data_size,
             self.checkpoints_size,
@@ -77,12 +77,8 @@ impl TotalStatistic {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn calculate_total_size(
-    data_size: u64,
-    checkpoints_size: u64,
-    object_links_size: u64,
-) -> Option<u64> {
+pub fn calculate_total_size(data_size: u64, checkpoints_size: u64, object_links_size: u64) -> u64 {
     data_size
-        .checked_add(checkpoints_size)?
-        .checked_add(object_links_size)
+        .wrapping_add(checkpoints_size)
+        .wrapping_add(object_links_size)
 }

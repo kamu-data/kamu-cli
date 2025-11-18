@@ -15,12 +15,11 @@ use kamu_accounts::{
 };
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
-use kamu_datasets::DatasetStatisticsService;
 use tokio::sync::OnceCell;
 
 use super::AccountFlows;
 use crate::prelude::*;
-use crate::queries::{AccountAccessTokens, Dataset, DatasetConnection};
+use crate::queries::{AccountAccessTokens, AccountUsage, Dataset, DatasetConnection};
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,10 +230,16 @@ impl Account {
         Ok(AccountFlows::new(full_account_info))
     }
 
-    /// Access to the flow configurations of this account
+    /// Access to the access token management
     #[expect(clippy::unused_async)]
     async fn access_tokens(&self) -> Result<AccountAccessTokens<'_>> {
         Ok(AccountAccessTokens::new(&self.account_id))
+    }
+
+    /// Access to account usage statistic
+    #[expect(clippy::unused_async)]
+    async fn usage(&self) -> Result<AccountUsage<'_>> {
+        Ok(AccountUsage::new(&self.account_id))
     }
 
     /// Returns datasets belonging to this account
@@ -276,16 +281,6 @@ impl Account {
             .collect();
 
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
-    }
-
-    async fn owned_dataset_statistic(&self, ctx: &Context<'_>) -> Result<TotalDatasetsStatistic> {
-        let dataset_statistic_service = from_catalog_n!(ctx, dyn DatasetStatisticsService);
-
-        let total_statistic = dataset_statistic_service
-            .get_total_statistic_by_account_id(&self.account_id)
-            .await?;
-
-        Ok(total_statistic.into())
     }
 }
 

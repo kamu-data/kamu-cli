@@ -15,22 +15,22 @@ use crate::prelude::*;
 
 #[derive(SimpleObject, Debug)]
 pub struct TotalDatasetsStatistic {
-    pub num_records: u64,
-    pub data_size: u64,
-    pub checkpoints_size: u64,
-    pub num_object_links: u64,
-    pub object_links_size: u64,
-    pub total_size: Option<u64>,
+    pub total_records: u64,
+    pub total_data_size: u64,
+    pub total_checkpoints_size: u64,
+    pub total_num_linked_objects: u64,
+    pub total_linked_objects_size: u64,
+    pub total_size: u64,
 }
 
 impl From<TotalStatistic> for TotalDatasetsStatistic {
     fn from(value: TotalStatistic) -> Self {
         Self {
-            num_records: value.num_records,
-            data_size: value.data_size,
-            checkpoints_size: value.checkpoints_size,
-            num_object_links: value.num_object_links,
-            object_links_size: value.object_links_size,
+            total_records: value.num_records,
+            total_data_size: value.data_size,
+            total_checkpoints_size: value.checkpoints_size,
+            total_num_linked_objects: value.num_object_links,
+            total_linked_objects_size: value.object_links_size,
             total_size: value.get_size_summary(),
         }
     }
