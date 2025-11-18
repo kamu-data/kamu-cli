@@ -9,6 +9,7 @@
 
 use crate::extensions::*;
 use crate::molecule::Molecule;
+use crate::mutations::molecule_mut::MoleculeMut;
 use crate::mutations::*;
 use crate::prelude::*;
 use crate::queries::*;

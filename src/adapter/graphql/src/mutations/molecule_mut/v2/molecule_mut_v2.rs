@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::mutations::{CreateAnnouncementResult, CreateProjectResult, MoleculeMutV1};
+use crate::mutations::molecule_mut::v1;
 use crate::prelude::*;
 use crate::queries::molecule::v2::MoleculeAccessLevelV2;
 
@@ -15,7 +15,7 @@ use crate::queries::molecule::v2::MoleculeAccessLevelV2;
 
 #[derive(Default)]
 pub(crate) struct MoleculeMutV2 {
-    v1: MoleculeMutV1,
+    v1: v1::MoleculeMutV1,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +32,7 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: U256,
-    ) -> Result<CreateProjectResult> {
+    ) -> Result<v1::CreateProjectResult> {
         self.v1
             .create_project(ctx, ipnft_symbol, ipnft_uid, ipnft_address, ipnft_token_id)
             .await
@@ -203,7 +203,7 @@ impl MoleculeAnnouncementsDatasetMutV2 {
         molecule_change_by: String,
         categories: Vec<String>,
         tags: Vec<String>,
-    ) -> Result<CreateAnnouncementResult> {
+    ) -> Result<v1::CreateAnnouncementResult> {
         let _ = headline;
         let _ = body;
         let _ = attachments;
