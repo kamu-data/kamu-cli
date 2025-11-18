@@ -11,6 +11,7 @@ use crate::prelude::*;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncementEntryV2,
+    MoleculeProjectActivityFiltersV2,
     MoleculeProjectV2,
     MoleculeProjectV2Connection,
     MoleculeVersionedFileV2,
@@ -56,10 +57,11 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        // TODO: filters?
+        filters: Option<MoleculeProjectActivityFiltersV2>,
     ) -> Result<MoleculeActivityEventV2Connection> {
         let _ = page;
         let _ = per_page;
+        let _ = filters;
         // TODO: implement
         Ok(MoleculeActivityEventV2Connection::new(Vec::new(), 0, 0))
     }
