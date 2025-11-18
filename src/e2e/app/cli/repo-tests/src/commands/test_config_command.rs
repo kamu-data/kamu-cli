@@ -29,7 +29,10 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
             r#"
             engine:
               runtime: podman
-
+            search:
+              fullText:
+                kind: dummy
+            
             "#
         )),
         None::<Vec<&str>>,
@@ -62,7 +65,10 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
             engine:
               runtime: podman
               networkNs: host
-
+            search:
+              fullText:
+                kind: dummy
+            
             "#
         )),
         None::<Vec<&str>>,
@@ -96,6 +102,9 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
             engine:
               runtime: podman
               networkNs: host
+            search:
+              fullText:
+                kind: dummy
             uploads:
               maxFileSizeInMb: 42
 

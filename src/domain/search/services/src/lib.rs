@@ -9,6 +9,7 @@
 
 #![feature(error_generic_member_access)]
 
+mod dummy_full_text_search_service;
 mod embeddings_chunker_simple;
 mod full_text_search_indexer;
 mod full_text_search_lazy_init_impl;
@@ -17,6 +18,7 @@ mod natural_language_search_indexer;
 mod natural_language_search_lazy_init;
 mod natural_language_search_service_impl;
 
+pub use dummy_full_text_search_service::*;
 pub use embeddings_chunker_simple::*;
 pub use full_text_search_indexer::*;
 pub use full_text_search_lazy_init_impl::*;

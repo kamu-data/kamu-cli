@@ -1144,12 +1144,17 @@ pub fn register_config_in_catalog(
     //   (could be quite a long startup time, indexing itself + container start, if
     //   containers are used)
     // - lazy init wrapper is unnecessary in server mode
-    catalog_builder.add::<kamu_search_services::FullTextSearchImplLazyInit>();
 
     match full_text.unwrap_or_default() {
+        config::FullTextSearchConfig::Dummy => {
+            // no lazy init needed for dummy impl
+            catalog_builder.add::<kamu_search_services::DummyFullTextSearchService>();
+        }
+
         config::FullTextSearchConfig::ElasticSearch(mut cfg) => {
             cfg.merge(config::FullTextSearchConfigElasticSearch::default());
 
+            catalog_builder.add::<kamu_search_services::FullTextSearchImplLazyInit>();
             catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchFullTextRepo>();
             catalog_builder.add_value(
                 kamu_search_elasticsearch::ElasticSearchFullTextSearchConfig {
@@ -1162,6 +1167,7 @@ pub fn register_config_in_catalog(
             );
         }
         config::FullTextSearchConfig::ElasticSearchContainer(cfg) => {
+            catalog_builder.add::<kamu_search_services::FullTextSearchImplLazyInit>();
             catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchFullTextRepoContainer>();
             catalog_builder.add_value(
                 kamu_search_elasticsearch::ElasticSearchFullTextSearchContainerConfig {

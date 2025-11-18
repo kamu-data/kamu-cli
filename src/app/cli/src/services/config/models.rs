@@ -1308,6 +1308,7 @@ impl Default for VectorRepoConfigQdrantContainer {
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum FullTextSearchConfig {
+    Dummy,
     ElasticSearch(FullTextSearchConfigElasticSearch),
     ElasticSearchContainer(FullTextSearchConfigElasticSearchContainer),
 }

@@ -115,7 +115,7 @@ pub struct FullTextPageSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FullTextSearchResponse {
-    pub total_hits: Option<u64>,
+    pub total_hits: u64,
     pub hits: Vec<FullTextSearchHit>,
     pub next_cursor: Option<String>,
     pub took_ms: Option<u64>,
