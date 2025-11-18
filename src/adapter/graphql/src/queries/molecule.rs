@@ -30,7 +30,7 @@ pub struct Molecule {
 
 impl Molecule {
     // Public only for tests
-    pub fn dataset_snapshot_projects(alias: odf::DatasetAlias) -> odf::metadata::DatasetSnapshot {
+    pub fn dataset_snapshot_projects_v1(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
         MoleculeV1::dataset_snapshot_projects(alias)
     }
 }
