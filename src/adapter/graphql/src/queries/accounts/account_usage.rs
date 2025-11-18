@@ -28,7 +28,7 @@ impl<'a> AccountUsage<'a> {
         let dataset_statistic_service = from_catalog_n!(ctx, dyn DatasetStatisticsService);
 
         let total_statistic = dataset_statistic_service
-            .get_total_statistic_by_account_id(&self.account_id)
+            .get_total_statistic_by_account_id(self.account_id)
             .await?;
 
         Ok(total_statistic.into())
