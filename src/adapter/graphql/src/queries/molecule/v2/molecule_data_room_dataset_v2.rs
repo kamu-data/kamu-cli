@@ -13,7 +13,12 @@ use chrono::{DateTime, Utc};
 use url::Url;
 
 use crate::prelude::*;
-use crate::queries::molecule::v2::{MoleculeAccessLevelV2, MoleculeProjectV2};
+use crate::queries::molecule::v2::{
+    MoleculeAccessLevelV2,
+    MoleculeCategoryV2,
+    MoleculeProjectV2,
+    MoleculeTagV2,
+};
 use crate::queries::{Dataset, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,14 +159,12 @@ impl MoleculeVersionedFileV2 {
     }
 
     #[expect(clippy::unused_async)]
-    // TODO: typing
-    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeCategoryV2>> {
         todo!()
     }
 
     #[expect(clippy::unused_async)]
-    // TODO: typing
-    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeTagV2>> {
         todo!()
     }
 

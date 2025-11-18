@@ -11,8 +11,10 @@ use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
     MoleculeAccessLevelV2,
-    MoleculeAnnouncementID,
+    MoleculeAnnouncementIdV2,
+    MoleculeCategoryV2,
     MoleculeProjectV2,
+    MoleculeTagV2,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,9 +36,11 @@ impl MoleculeAnnouncementsDatasetV2 {
         _ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
+        filters: Option<MoleculeAnnouncementsFiltersV2>,
     ) -> Result<MoleculeAnnouncementEntryV2Connection> {
         let _ = page;
         let _ = per_page;
+        let _ = filters;
         Ok(MoleculeAnnouncementEntryV2Connection::new(vec![], 0, 0, 0))
     }
 
@@ -44,7 +48,7 @@ impl MoleculeAnnouncementsDatasetV2 {
     async fn by_id(
         &self,
         _ctx: &Context<'_>,
-        id: MoleculeAnnouncementID,
+        id: MoleculeAnnouncementIdV2,
     ) -> Result<MoleculeAnnouncementEntryV2> {
         let _ = id;
         todo!()
@@ -64,7 +68,7 @@ impl MoleculeAnnouncementEntryV2 {
     }
 
     #[expect(clippy::unused_async)]
-    async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementID> {
+    async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementIdV2> {
         todo!()
     }
 
@@ -94,12 +98,12 @@ impl MoleculeAnnouncementEntryV2 {
     }
 
     #[expect(clippy::unused_async)]
-    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeCategoryV2>> {
         todo!()
     }
 
     #[expect(clippy::unused_async)]
-    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
+    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeTagV2>> {
         todo!()
     }
 }
@@ -109,5 +113,14 @@ page_based_connection!(
     MoleculeAnnouncementEntryV2Connection,
     MoleculeAnnouncementEntryV2Edge
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject)]
+pub struct MoleculeAnnouncementsFiltersV2 {
+    by_tags: Option<Vec<MoleculeTagV2>>,
+    by_categories: Option<Vec<MoleculeCategoryV2>>,
+    by_access_levels: Option<Vec<MoleculeAccessLevelV2>>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

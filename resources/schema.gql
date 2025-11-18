@@ -257,6 +257,9 @@ type AccountQuotas {
 }
 
 type AccountQuotasMut {
+	"""
+	Setting quotas at the user level.
+	"""
 	setUserLevelQuotas(quotas: SetUserLevelQuotasInput!): SetUserLevelQuotasResult!
 }
 
@@ -3135,11 +3138,38 @@ type Molecule {
 	v2: MoleculeV2!
 }
 
-input MoleculeActivityFiltersV2 {
+type MoleculeActivityAnnouncementV2 {
+	announcement: MoleculeAnnouncementEntryV2!
+}
+
+union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityAnnouncementV2
+
+type MoleculeActivityEventV2Connection {
 	"""
-	This filter is provided as an example.
+	A shorthand for `edges { node { ... } }`
 	"""
-	byIpnftUids: [String!]
+	nodes: [MoleculeActivityEventV2!]!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeActivityEventV2Edge!]!
+}
+
+type MoleculeActivityEventV2Edge {
+	node: MoleculeActivityEventV2!
+}
+
+type MoleculeActivityFileAddedV2 {
+	entry: MoleculeDataRoomEntryV2!
+}
+
+type MoleculeActivityFileRemovedV2 {
+	entry: MoleculeDataRoomEntryV2!
+}
+
+type MoleculeActivityFileUpdatedV2 {
+	entry: MoleculeDataRoomEntryV2!
 }
 
 type MoleculeAnnouncementEntryV2 {
@@ -3152,6 +3182,26 @@ type MoleculeAnnouncementEntryV2 {
 	changeBy: AccountID!
 	categories: [String!]!
 	tags: [String!]!
+}
+
+type MoleculeAnnouncementEntryV2Connection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeAnnouncementEntryV2!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeAnnouncementEntryV2Edge!]!
+}
+
+type MoleculeAnnouncementEntryV2Edge {
+	node: MoleculeAnnouncementEntryV2!
 }
 
 type MoleculeAnnouncementsDatasetMutV2 {
@@ -3171,6 +3221,7 @@ type MoleculeAnnouncementsDatasetV2 {
 	Access the underlying core Dataset
 	"""
 	dataset: Dataset!
+	tail(page: Int, perPage: Int): MoleculeAnnouncementEntryV2Connection!
 	byId(id: String!): MoleculeAnnouncementEntryV2!
 }
 
@@ -3219,11 +3270,11 @@ type MoleculeDataRoomEntryV2Edge {
 	node: MoleculeDataRoomEntryV2!
 }
 
-type MoleculeDataRoomFinishUploadFileResult {
+type MoleculeDataRoomFinishUploadFileResultV2 {
 	dummy: String!
 }
 
-type MoleculeDataRoomMoveEntryResult {
+type MoleculeDataRoomMoveEntryResultV2 {
 	dummy: String!
 }
 
@@ -3231,34 +3282,34 @@ type MoleculeDataRoomMutV2 {
 	"""
 	Starts the process of uploading a file to the data room.
 	"""
-	startUploadFile(contentSize: Int!): MoleculeDataRoomUploadFileResult!
+	startUploadFile(contentSize: Int!): MoleculeDataRoomUploadFileResultV2!
 	"""
 	Finishes the process of uploading a file to the data room.
 	"""
-	finishUploadFile(uploadToken: String!, ref: DatasetID!, path: CollectionPath!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!): MoleculeDataRoomFinishUploadFileResult!
+	finishUploadFile(uploadToken: String!, ref: DatasetID!, path: CollectionPath!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!): MoleculeDataRoomFinishUploadFileResultV2!
 	"""
 	Moves an entry in the data room.
 	"""
-	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomMoveEntryResult!
+	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomMoveEntryResultV2!
 	"""
 	Removes an entry from the data room.
 	"""
-	removeEntry(path: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomRemoveEntryResult!
+	removeEntry(path: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomRemoveEntryResultV2!
 	"""
 	Updates the metadata of a file in the data room.
 	"""
-	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!, expectedHead: Multihash!): MoleculeDataRoomUpdateFileMetadataResult!
+	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!, expectedHead: Multihash!): MoleculeDataRoomUpdateFileMetadataResultV2!
 }
 
-type MoleculeDataRoomRemoveEntryResult {
+type MoleculeDataRoomRemoveEntryResultV2 {
 	dummy: String!
 }
 
-type MoleculeDataRoomUpdateFileMetadataResult {
+type MoleculeDataRoomUpdateFileMetadataResultV2 {
 	dummy: String!
 }
 
-type MoleculeDataRoomUploadFileResult {
+type MoleculeDataRoomUploadFileResultV2 {
 	dummy: String!
 }
 
@@ -3299,7 +3350,7 @@ type MoleculeMutV2 {
 	its symbol will remain reserved, data will remain intact,
 	but the project will no longer appear in the listing.
 	"""
-	removeProject(ipnftUid: String!): MoleculeRemoveProjectResult!
+	removeProject(ipnftUid: String!): MoleculeRemoveProjectResultV2!
 	"""
 	Looks up the project
 	"""
@@ -3347,6 +3398,13 @@ type MoleculeProject {
 	Project's activity events in reverse chronological order
 	"""
 	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+}
+
+input MoleculeProjectActivityFiltersV2 {
+	"""
+	This filter is provided as an example.
+	"""
+	byIpnftUids: [String!]
 }
 
 type MoleculeProjectConnection {
@@ -3517,10 +3575,30 @@ type MoleculeProjectV2 {
 	"""
 	Project's activity events in reverse chronological order
 	"""
-	activity(page: Int, perPage: Int, filters: MoleculeActivityFiltersV2): MoleculeProjectEventConnection!
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFiltersV2): MoleculeActivityEventV2Connection!
 }
 
-type MoleculeRemoveProjectResult {
+type MoleculeProjectV2Connection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeProjectV2!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeProjectV2Edge!]!
+}
+
+type MoleculeProjectV2Edge {
+	node: MoleculeProjectV2!
+}
+
+type MoleculeRemoveProjectResultV2 {
 	dummy: String!
 }
 
@@ -3584,12 +3662,12 @@ type MoleculeV2 {
 	"""
 	List the registered projects
 	"""
-	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	projects(page: Int, perPage: Int): MoleculeProjectV2Connection!
 	"""
 	Latest activity events across all projects in reverse chronological
 	order
 	"""
-	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFiltersV2): MoleculeActivityEventV2Connection!
 	"""
 	Performs a semantic search
 	Using `filters` parameters, a search can be narrowed down to:

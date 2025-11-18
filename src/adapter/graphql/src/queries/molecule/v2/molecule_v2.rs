@@ -11,9 +11,11 @@ use crate::prelude::*;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncementEntryV2,
+    MoleculeCategoryV2,
     MoleculeProjectActivityFiltersV2,
     MoleculeProjectV2,
     MoleculeProjectV2Connection,
+    MoleculeTagV2,
     MoleculeVersionedFileV2,
 };
 
@@ -102,8 +104,8 @@ pub struct MoleculeSemanticSearchFiltersV2 {
     // TODO: replace w/ real filters.
     // These filters are provided as an example.
     by_ipnft_uids: Option<Vec<String>>,
-    by_tags: Option<Vec<String>>,
-    by_categories: Option<Vec<String>>,
+    by_categories: Option<Vec<MoleculeCategoryV2>>,
+    by_tags: Option<Vec<MoleculeTagV2>>,
 }
 
 #[derive(Union)]

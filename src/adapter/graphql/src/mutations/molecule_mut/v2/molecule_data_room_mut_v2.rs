@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::molecule::v2::MoleculeAccessLevelV2;
+use crate::queries::molecule::v2::{MoleculeAccessLevelV2, MoleculeCategoryV2, MoleculeTagV2};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,8 +39,8 @@ impl MoleculeDataRoomMutV2 {
         access_level: MoleculeAccessLevelV2,
         change_by: AccountID<'static>,
         description: String,
-        categories: Vec<String>,
-        tags: Vec<String>,
+        categories: Vec<MoleculeCategoryV2>,
+        tags: Vec<MoleculeTagV2>,
         content_text: String,
     ) -> Result<MoleculeDataRoomFinishUploadFileResultV2> {
         let _ = upload_token;
