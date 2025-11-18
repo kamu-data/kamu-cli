@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use crate::mutations::molecule_mut::v1;
+use crate::mutations::molecule_mut::v2::MoleculeProjectMutV2;
 use crate::prelude::*;
-use crate::queries::molecule::v2::MoleculeAccessLevelV2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub(crate) struct MoleculeMutV2 {
+pub struct MoleculeMutV2 {
     v1: v1::MoleculeMutV1,
 }
 
@@ -47,7 +47,7 @@ impl MoleculeMutV2 {
         &self,
         _ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeRemoveProjectResult> {
+    ) -> Result<MoleculeRemoveProjectResultV2> {
         let _ = ipnft_uid;
         todo!()
     }
@@ -66,194 +66,8 @@ impl MoleculeMutV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeProjectMutV2;
-
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
-impl MoleculeProjectMutV2 {
-    #[expect(clippy::unused_async)]
-    /// Strongly typed data room mutator
-    async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomMutV2> {
-        todo!()
-    }
-
-    #[expect(clippy::unused_async)]
-    /// Strongly typed announcements mutator
-    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetMutV2> {
-        todo!()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct MoleculeDataRoomMutV2;
-
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
-impl MoleculeDataRoomMutV2 {
-    #[expect(clippy::unused_async)]
-    /// Starts the process of uploading a file to the data room.
-    async fn start_upload_file(
-        &self,
-        _ctx: &Context<'_>,
-        content_size: usize,
-    ) -> Result<MoleculeDataRoomUploadFileResult> {
-        let _ = content_size;
-        todo!()
-    }
-
-    #[expect(clippy::unused_async)]
-    /// Finishes the process of uploading a file to the data room.
-    async fn finish_upload_file(
-        &self,
-        _ctx: &Context<'_>,
-        upload_token: String,
-        #[graphql(name = "ref")] reference: DatasetID<'static>,
-        path: CollectionPath,
-        access_level: MoleculeAccessLevelV2,
-        change_by: AccountID<'static>,
-        description: String,
-        categories: Vec<String>,
-        tags: Vec<String>,
-        content_text: String,
-    ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
-        let _ = upload_token;
-        let _ = reference;
-        let _ = path;
-        let _ = access_level;
-        let _ = change_by;
-        let _ = description;
-        let _ = categories;
-        let _ = tags;
-        let _ = content_text;
-        todo!()
-    }
-
-    #[expect(clippy::unused_async)]
-    /// Moves an entry in the data room.
-    async fn move_entry(
-        &self,
-        _ctx: &Context<'_>,
-        from_path: CollectionPath,
-        to_path: CollectionPath,
-        expected_head: Multihash<'static>,
-    ) -> Result<MoleculeDataRoomMoveEntryResult> {
-        let _ = from_path;
-        let _ = to_path;
-        let _ = expected_head;
-        todo!()
-    }
-
-    #[expect(clippy::unused_async)]
-    /// Removes an entry from the data room.
-    async fn remove_entry(
-        &self,
-        _ctx: &Context<'_>,
-        path: CollectionPath,
-        expected_head: Multihash<'static>,
-    ) -> Result<MoleculeDataRoomRemoveEntryResult> {
-        let _ = path;
-        let _ = expected_head;
-        todo!()
-    }
-
-    #[expect(clippy::unused_async)]
-    /// Updates the metadata of a file in the data room.
-    async fn update_file_metadata(
-        &self,
-        _ctx: &Context<'_>,
-        #[graphql(name = "ref")] reference: DatasetID<'static>,
-        // TODO: use update object w/ optional fields instead
-        access_level: MoleculeAccessLevelV2,
-        change_by: AccountID<'static>,
-        description: String,
-        categories: Vec<String>,
-        tags: Vec<String>,
-        content_text: String,
-        expected_head: Multihash<'static>,
-    ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
-        let _ = reference;
-        let _ = access_level;
-        let _ = change_by;
-        let _ = description;
-        let _ = categories;
-        let _ = tags;
-        let _ = content_text;
-        let _ = expected_head;
-        todo!()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct MoleculeAnnouncementsDatasetMutV2;
-
-#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[Object]
-impl MoleculeAnnouncementsDatasetMutV2 {
-    /// Creates an announcement record for the project.
-    #[tracing::instrument(level = "info", name = MoleculeAnnouncementsDatasetMutV2_create, skip_all)]
-    async fn create(
-        &self,
-        _ctx: &Context<'_>,
-        headline: String,
-        body: String,
-        #[graphql(desc = "List of dataset DIDs to link")] attachments: Option<Vec<String>>,
-        molecule_access_level: MoleculeAccessLevelV2,
-        molecule_change_by: String,
-        categories: Vec<String>,
-        tags: Vec<String>,
-    ) -> Result<v1::CreateAnnouncementResult> {
-        let _ = headline;
-        let _ = body;
-        let _ = attachments;
-        let _ = molecule_access_level;
-        let _ = molecule_change_by;
-        let _ = categories;
-        let _ = tags;
-        todo!()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject)]
-pub struct MoleculeRemoveProjectResult {
-    pub dummy: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomUploadFileResult {
-    pub dummy: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomFinishUploadFileResult {
-    pub dummy: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomMoveEntryResult {
-    pub dummy: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomRemoveEntryResult {
-    pub dummy: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomUpdateFileMetadataResult {
+pub struct MoleculeRemoveProjectResultV2 {
     pub dummy: String,
 }
 

@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod molecule_announcements_dataset_mut_v2;
+mod molecule_data_room_mut_v2;
 mod molecule_mut_v2;
+mod molecule_project_mut_v2;
 
+pub use molecule_announcements_dataset_mut_v2::*;
+pub use molecule_data_room_mut_v2::*;
 pub use molecule_mut_v2::*;
+pub use molecule_project_mut_v2::*;
