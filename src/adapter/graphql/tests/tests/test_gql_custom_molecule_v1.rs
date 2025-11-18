@@ -76,7 +76,7 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_provision_project() {
-    let harness = GraphQLMoleculeHarness::builder()
+    let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -295,7 +295,7 @@ async fn test_molecule_provision_project() {
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_data_room_operations() {
-    let harness = GraphQLMoleculeHarness::builder()
+    let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -475,7 +475,7 @@ async fn test_molecule_data_room_operations() {
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_announcements_operations() {
-    let harness = GraphQLMoleculeHarness::builder()
+    let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -784,7 +784,7 @@ async fn test_molecule_announcements_operations() {
 
 #[test_log::test(tokio::test)]
 async fn test_molecule_activity() {
-    let harness = GraphQLMoleculeHarness::builder()
+    let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -1414,14 +1414,14 @@ async fn test_molecule_activity() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-struct GraphQLMoleculeHarness {
+struct GraphQLMoleculeV1Harness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
     molecule_account_id: odf::AccountID,
 }
 
 #[bon]
-impl GraphQLMoleculeHarness {
+impl GraphQLMoleculeV1Harness {
     #[builder]
     pub async fn new(
         tenancy_config: TenancyConfig,
@@ -1474,7 +1474,7 @@ impl GraphQLMoleculeHarness {
     }
 
     pub async fn create_projects_dataset(&self) -> CreateDatasetResult {
-        let snapshot = kamu_adapter_graphql::molecule::Molecule::dataset_snapshot_projects(
+        let snapshot = kamu_adapter_graphql::molecule::Molecule::dataset_snapshot_projects_v1(
             "molecule/projects".parse().unwrap(),
         );
 

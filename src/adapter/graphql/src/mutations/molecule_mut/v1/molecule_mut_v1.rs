@@ -12,21 +12,23 @@ use kamu_accounts::{AccountServiceExt as _, CreateAccountUseCaseOptions, Current
 use kamu_core::DatasetRegistryExt;
 use kamu_core::auth::DatasetAction;
 
+use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::{Molecule, MoleculeProject, molecule_subject};
+use crate::queries::molecule::v1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct MoleculeMut;
+#[derive(Default)]
+pub(crate) struct MoleculeMutV1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeMut {
+impl MoleculeMutV1 {
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeMut_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
-    async fn create_project(
+    #[tracing::instrument(level = "info", name = MoleculeMutV1_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
+    pub async fn create_project(
         &self,
         ctx: &Context<'_>,
         mut ipnft_symbol: String,
@@ -65,7 +67,7 @@ impl MoleculeMut {
 
         // Resolve projects dataset
         let (projects_dataset, df) =
-            Molecule::get_projects_snapshot(ctx, DatasetAction::Write, true).await?;
+            v1::MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Write, true).await?;
 
         // Check for conflicts
         if let Some(df) = df {
@@ -79,7 +81,7 @@ impl MoleculeMut {
 
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
-                let project = MoleculeProject::from_json(record);
+                let project = v1::MoleculeProject::from_json(record);
                 return Ok(CreateProjectResult::Conflict(CreateProjectErrorConflict {
                     project,
                 }));
@@ -126,7 +128,7 @@ impl MoleculeMut {
         };
 
         // Create `data-room` dataset
-        let snapshot = Molecule::dataset_snapshot_data_room(odf::DatasetAlias::new(
+        let snapshot = v1::MoleculeV1::dataset_snapshot_data_room(odf::DatasetAlias::new(
             Some(project_account_name.clone()),
             odf::DatasetName::new_unchecked("data-room"),
         ));
@@ -141,7 +143,7 @@ impl MoleculeMut {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = Molecule::dataset_snapshot_announcements(odf::DatasetAlias::new(
+        let snapshot = v1::MoleculeV1::dataset_snapshot_announcements(odf::DatasetAlias::new(
             Some(project_account_name.clone()),
             odf::DatasetName::new_unchecked("announcements"),
         ));
@@ -176,7 +178,7 @@ impl MoleculeMut {
 
         // Add project entry
         let now = chrono::Utc::now();
-        let project = MoleculeProject {
+        let project = v1::MoleculeProject {
             account_id: project_account.id,
             system_time: now,
             event_time: now,
@@ -212,15 +214,15 @@ impl MoleculeMut {
     }
 
     /// Looks up the project
-    #[tracing::instrument(level = "info", name = MoleculeMut_project, skip_all, fields(?ipnft_uid))]
-    async fn project(
+    #[tracing::instrument(level = "info", name = MoleculeMutV1_project, skip_all, fields(?ipnft_uid))]
+    pub async fn project(
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProjectMut>> {
         use datafusion::logical_expr::{col, lit};
 
-        let Some(df) = Molecule::get_projects_snapshot(ctx, DatasetAction::Read, false)
+        let Some(df) = v1::MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
             .await?
             .1
         else {
@@ -379,7 +381,7 @@ pub enum CreateProjectResult {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateProjectSuccess {
-    pub project: MoleculeProject,
+    pub project: v1::MoleculeProject,
 }
 #[ComplexObject]
 impl CreateProjectSuccess {
@@ -394,7 +396,7 @@ impl CreateProjectSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateProjectErrorConflict {
-    project: MoleculeProject,
+    project: v1::MoleculeProject,
 }
 #[ComplexObject]
 impl CreateProjectErrorConflict {

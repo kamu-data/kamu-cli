@@ -11,23 +11,23 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use kamu::domain;
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::ResolvedDataset;
 use kamu_core::auth::DatasetAction;
 use odf::utils::data::DataFrameExt;
 
-use super::{CollectionEntry, VersionedFileEntry};
+use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::{Account, Dataset};
+use crate::queries::{Account, Collection, CollectionEntry, Dataset, VersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Molecule;
+#[derive(Default)]
+pub struct MoleculeV1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Molecule {
+impl MoleculeV1 {
     pub fn dataset_snapshot_projects(alias: odf::DatasetAlias) -> odf::metadata::DatasetSnapshot {
         odf::DatasetSnapshot {
             name: alias,
@@ -100,7 +100,7 @@ impl Molecule {
     }
 
     pub fn dataset_snapshot_data_room(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        super::Collection::dataset_snapshot(
+        Collection::dataset_snapshot(
             alias,
             vec![ColumnInput {
                 name: "molecule_change_by".into(),
@@ -277,13 +277,13 @@ impl Molecule {
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl Molecule {
+impl MoleculeV1 {
     const DEFAULT_PROJECTS_PER_PAGE: usize = 15;
     const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
 
     /// Looks up the project
-    #[tracing::instrument(level = "info", name = Molecule_project, skip_all, fields(?ipnft_uid))]
-    async fn project(
+    #[tracing::instrument(level = "info", name = MoleculeV1_project, skip_all, fields(?ipnft_uid))]
+    pub async fn project(
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
@@ -311,8 +311,8 @@ impl Molecule {
     }
 
     /// List the registered projects
-    #[tracing::instrument(level = "info", name = Molecule_projects, skip_all)]
-    async fn projects(
+    #[tracing::instrument(level = "info", name = MoleculeV1_projects, skip_all)]
+    pub async fn projects(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
@@ -354,8 +354,8 @@ impl Molecule {
 
     /// Latest activity events across all projects in reverse chronological
     /// order
-    #[tracing::instrument(level = "info", name = Molecule_activity, skip_all)]
-    async fn activity(
+    #[tracing::instrument(level = "info", name = MoleculeV1_activity, skip_all)]
+    pub async fn activity(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
@@ -1004,38 +1004,5 @@ page_based_stream_connection!(
     MoleculeProjectEventConnection,
     MoleculeProjectEventEdge
 );
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const MOLECULE_ORG_ACCOUNTS: [&str; 2] = ["molecule", "molecule.dev"];
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn molecule_subject(ctx: &Context<'_>) -> Result<LoggedAccount> {
-    // Check auth
-    let subject = from_catalog_n!(ctx, CurrentAccountSubject);
-    let subject_molecule = match subject.as_ref() {
-        CurrentAccountSubject::Logged(subj)
-            if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_name.as_str()) =>
-        {
-            subj
-        }
-        _ => {
-            return Err(GqlError::Access(odf::AccessError::Unauthorized(
-                format!(
-                    "Only accounts {} can provision projects",
-                    MOLECULE_ORG_ACCOUNTS
-                        .iter()
-                        .map(|account_name| format!("'{account_name}'"))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-                .as_str()
-                .into(),
-            )));
-        }
-    };
-    Ok(subject_molecule.clone())
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
