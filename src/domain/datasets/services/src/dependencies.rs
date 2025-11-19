@@ -31,6 +31,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
     b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
+    b.add::<UpdateCollectionEntriesUseCaseImpl>();
     b.add::<UpdateVersionFileUseCaseImpl>();
 
     b.add::<CreateDatasetUseCaseHelper>();

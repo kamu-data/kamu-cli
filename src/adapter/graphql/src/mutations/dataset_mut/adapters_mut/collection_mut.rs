@@ -7,12 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use file_utils::MediaType;
-use kamu::domain;
-use odf::metadata::OperationType as Op;
+use kamu_datasets::{
+    CollectionEntryMove,
+    CollectionEntryRemove,
+    CollectionEntryUpdate,
+    CollectionUpdateOperation,
+    UpdateCollectionEntriesResult,
+    UpdateCollectionEntriesUseCase,
+    UpdateCollectionEntriesUseCaseError,
+};
 
 use crate::prelude::*;
-use crate::queries::{CollectionEntry, DatasetRequestState};
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,218 +34,62 @@ impl<'a> CollectionMut<'a> {
         Self { writable_state }
     }
 
-    // Push ingest the new record
-    // TODO: Compare and swap current head
-    // TODO: Handle errors on invalid extra data columns
-    async fn write_records(
-        &self,
-        ctx: &Context<'_>,
-        entries: Vec<(Op, CollectionEntry)>,
-        expected_head: Option<odf::Multihash>,
-    ) -> Result<CollectionUpdateResult> {
-        use std::io::Write;
-
-        let target = self.writable_state.resolved_dataset(ctx).await?;
-
-        let push_ingest_use_case = from_catalog_n!(ctx, dyn domain::PushIngestDataUseCase);
-
-        let mut ndjson = Vec::<u8>::new();
-        for (op, entry) in entries {
-            let mut record = entry.into_record_data();
-            record["op"] = u8::from(op).into();
-            writeln!(&mut ndjson, "{record}").int_err()?;
-        }
-
-        let ingest_result = match push_ingest_use_case
-            .execute(
-                target.clone(),
-                kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(ndjson)),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(MediaType::NDJSON.to_owned()),
-                    expected_head,
-                },
-                None,
-            )
-            .await
-        {
-            Ok(res) => res,
-            Err(domain::PushIngestDataError::Planning(
-                domain::PushIngestPlanningError::HeadNotFound(e),
-            )) => {
-                return Ok(CollectionUpdateResult::CasFailed(
-                    CollectionUpdateErrorCasFailed {
-                        expected_head: e.hash.into(),
-                        actual_head: None,
-                    },
-                ));
-            }
-            Err(domain::PushIngestDataError::Execution(domain::PushIngestError::CommitError(
-                odf::dataset::CommitError::MetadataAppendError(
-                    odf::dataset::AppendError::RefCASFailed(e),
-                ),
-            ))) => {
-                return Ok(CollectionUpdateResult::CasFailed(
-                    CollectionUpdateErrorCasFailed {
-                        expected_head: e.expected.unwrap().into(),
-                        actual_head: Some(e.actual.unwrap().into()),
-                    },
-                ));
-            }
-            Err(err) => {
-                return Err(err.int_err().into());
-            }
-        };
-
-        match ingest_result {
-            kamu_core::PushIngestResult::Updated {
-                old_head,
-                new_head,
-                num_blocks: _,
-            } => Ok(CollectionUpdateResult::Success(CollectionUpdateSuccess {
-                old_head: old_head.into(),
-                new_head: new_head.into(),
-            })),
-            kamu_core::PushIngestResult::UpToDate => unreachable!(),
-        }
-    }
-
     pub async fn update_entries_impl(
         &self,
         ctx: &Context<'_>,
         operations: Vec<CollectionUpdateInput>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<CollectionUpdateResult> {
-        if operations.is_empty() {
-            return Ok(CollectionUpdateResult::UpToDate(CollectionUpdateUpToDate));
-        }
+        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let writable_dataset = self.writable_state.resolved_dataset(ctx).await?;
-
-        // Load current state
-        // TODO: PERF: Filter paths that are relevant to operations
-        let query_res = query_svc
-            .get_data(
-                writable_dataset.clone(), // Writable means readable too
-                domain::GetDataOptions::default(),
-            )
-            .await
-            .int_err()?;
-
-        let expected_head = expected_head.unwrap_or(query_res.block_hash);
-
-        let mut current_entries: std::collections::BTreeMap<_, _> = match query_res.df {
-            None => Default::default(),
-            Some(df) => {
-                // Project changelog into state
-                let df = odf::utils::data::changelog::project(
-                    df,
-                    &["path".to_string()],
-                    &odf::metadata::DatasetVocabulary::default(),
-                )
-                .int_err()?;
-
-                df.collect_json_aos()
-                    .await
-                    .int_err()?
-                    .into_iter()
-                    .map(|record| {
-                        CollectionEntry::from_json(record).map(|entry| (entry.path.clone(), entry))
-                    })
-                    .collect::<Result<_, _>>()?
-            }
-        };
-
-        let mut diff = Vec::new();
-
+        let mut mapped_ops = Vec::with_capacity(operations.len());
         for op in operations {
             if let Some(add) = op.add {
-                let new_entry = CollectionEntry::from_input(add.entry);
-
-                if let Some(existing) = current_entries.remove(&new_entry.path) {
-                    if existing.is_equivalent_record(&new_entry) {
-                        // Undo and ignore the operation if new entry is identical to the existing
-                        current_entries.insert(new_entry.path, existing);
-                        continue;
-                    }
-
-                    diff.push((Op::Retract, existing));
-                }
-
-                current_entries.insert(new_entry.path.clone(), new_entry.clone());
-                diff.push((Op::Append, new_entry));
+                mapped_ops.push(CollectionUpdateOperation::Add(add.entry.into()));
             } else if let Some(remove) = op.remove {
-                if let Some(existing) = current_entries.remove(&remove.path) {
-                    diff.push((Op::Retract, existing));
-                }
+                mapped_ops.push(CollectionUpdateOperation::Remove(CollectionEntryRemove {
+                    path: remove.path.into(),
+                }));
             } else if let Some(mov) = op.r#move {
-                let Some(old_entry) = current_entries.remove(&mov.path_from) else {
-                    return Ok(CollectionUpdateResult::NotFound(
-                        CollectionUpdateErrorNotFound {
-                            path: mov.path_from,
-                        },
-                    ));
-                };
-
-                let mut new_entry = old_entry.clone();
-                new_entry.path = mov.path_to;
-                if let Some(extra_data) = mov.extra_data {
-                    new_entry.extra_data = extra_data;
-                }
-
-                if old_entry.is_equivalent_record(&new_entry) {
-                    // Undo and ignore the operation if new entry is identical to the existing
-                    current_entries.insert(new_entry.path, old_entry);
-                    continue;
-                }
-
-                if new_entry.path != old_entry.path {
-                    // Path is a PK, so when it changes we treat it as retraction + append
-                    if let Some(collision) = current_entries.remove(&new_entry.path) {
-                        diff.push((Op::Retract, collision));
-                    }
-
-                    diff.push((Op::Retract, old_entry));
-                    diff.push((Op::Append, new_entry.clone()));
-                } else {
-                    // When path stays the same - we treat it as a correction
-                    diff.push((Op::CorrectFrom, old_entry));
-                    diff.push((Op::CorrectTo, new_entry.clone()));
-                }
-
-                current_entries.insert(new_entry.path.clone(), new_entry);
+                mapped_ops.push(CollectionUpdateOperation::Move(CollectionEntryMove {
+                    path_from: mov.path_from.into(),
+                    path_to: mov.path_to.into(),
+                    extra_data: mov.extra_data.map(Into::into),
+                }));
             }
         }
 
-        if diff.is_empty() {
-            return Ok(CollectionUpdateResult::UpToDate(CollectionUpdateUpToDate));
-        }
-
-        let mut expected_head: odf::Multihash = expected_head;
-        let mut res = None;
-
-        // TODO: PERF: FIXME: Writing each operation in a different block to work around
-        // changelog sorting issue.
-        // See: https://github.com/kamu-data/kamu-cli/issues/1228
-        for op in diff {
-            match self
-                .write_records(ctx, vec![op], Some(expected_head.clone()))
-                .await?
-            {
-                CollectionUpdateResult::Success(r) => {
-                    expected_head = r.new_head.clone().into();
-                    res = Some(CollectionUpdateResult::Success(r));
-                }
-                r => {
-                    return Ok(r);
-                }
+        match update_entries_use_case
+            .execute(
+                self.writable_state.dataset_handle(),
+                mapped_ops,
+                expected_head,
+            )
+            .await
+        {
+            Ok(UpdateCollectionEntriesResult::Success(res)) => {
+                Ok(CollectionUpdateResult::Success(CollectionUpdateSuccess {
+                    old_head: res.old_head.into(),
+                    new_head: res.new_head.into(),
+                }))
             }
+            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+                Ok(CollectionUpdateResult::UpToDate(CollectionUpdateUpToDate))
+            }
+            Ok(UpdateCollectionEntriesResult::NotFound(not_found)) => {
+                Ok(CollectionUpdateResult::NotFound(CollectionUpdateErrorNotFound {
+                    path: not_found.path.into(),
+                }))
+            }
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)) => {
+                Ok(CollectionUpdateResult::CasFailed(CollectionUpdateErrorCasFailed {
+                    expected_head: err.expected.unwrap().into(),
+                    actual_head: err.actual.map(Into::into),
+                }))
+            }
+            Err(UpdateCollectionEntriesUseCaseError::Access(err)) => Err(err.int_err().into()),
+            Err(UpdateCollectionEntriesUseCaseError::Internal(err)) => Err(err.into()),
         }
-
-        Ok(res.unwrap())
     }
 }
 
@@ -337,6 +187,16 @@ pub struct CollectionEntryInput {
 
     /// Json object containing extra column values
     pub extra_data: Option<ExtraData>,
+}
+
+impl From<CollectionEntryInput> for CollectionEntryUpdate {
+    fn from(value: CollectionEntryInput) -> Self {
+        Self {
+            path: value.path.into(),
+            reference: value.reference.into(),
+            extra_data: value.extra_data.unwrap_or_default().into(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
