@@ -7,16 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_core::ResolvedDataset;
-use kamu_search::{
-    FullTextSchemaField,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
-};
+use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,13 +49,32 @@ pub(crate) async fn index_dataset_from_scratch(
     // Seed event: created_at
     let seed_event_time = seed_visitor.into_block().unwrap().system_time;
 
-    // Head event: updated_at
+    // Head event: ref_changed_at
     let head_event_time = dataset
         .as_metadata_chain()
         .get_block_by_ref(&odf::BlockRef::Head)
         .await
         .int_err()?
         .system_time;
+
+    // Convert FieldUpdate to Option for JSON serialization
+    // For full indexing, Absent means the chain has no such event (use null)
+    let schema_fields_value = match schema_fields {
+        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
+        FullTextSearchFieldUpdate::Present(v) => Some(v),
+    };
+    let description_value = match description {
+        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
+        FullTextSearchFieldUpdate::Present(v) => Some(v),
+    };
+    let keywords_value = match keywords {
+        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
+        FullTextSearchFieldUpdate::Present(v) => Some(v),
+    };
+    let attachments_value = match attachments {
+        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
+        FullTextSearchFieldUpdate::Present(v) => Some(v),
+    };
 
     // Prepare full text search document
     let alias = dataset.get_alias();
@@ -79,11 +92,11 @@ pub(crate) async fn index_dataset_from_scratch(
             odf::DatasetKind::Derivative => "derivative".to_string(),
         },
         FIELD_CREATED_AT: seed_event_time.to_rfc3339(),
-        FIELD_UPDATED_AT: head_event_time.to_rfc3339(),
-        FIELD_SCHEMA_FIELDS: schema_fields,
-        FIELD_DESCRIPTION: description,
-        FIELD_KEYWORDS: keywords,
-        FIELD_ATTACHMENTS: attachments,
+        FIELD_REF_CHANGED_AT: head_event_time.to_rfc3339(),
+        FIELD_SCHEMA_FIELDS: schema_fields_value,
+        FIELD_DESCRIPTION: description_value,
+        FIELD_KEYWORDS: keywords_value,
+        FIELD_ATTACHMENTS: attachments_value,
     }))
 }
 
@@ -135,9 +148,9 @@ pub(crate) async fn partial_update_for_new_interval(
     let (description, keywords) = extract_description_and_keywords(info_visitor);
     let attachments = extract_attachment_contents(attachments_visitor);
 
-    // New head event: updated_at
+    // New head event: ref_changed_at
     // Note: ES should receive an update, even if other parts were not touched,
-    //  otherwise ordering of datasets by updated_at would be broken
+    //  otherwise ordering of datasets by ref_changed_at would be broken
     let new_head_event_time = dataset
         .as_metadata_chain()
         .get_block(new_head)
@@ -146,27 +159,28 @@ pub(crate) async fn partial_update_for_new_interval(
         .system_time;
 
     // Prepare partial update to full text search document
-    Ok(serde_json::json!({
-        FIELD_SCHEMA_FIELDS: schema_fields,
-        FIELD_DESCRIPTION: description,
-        FIELD_KEYWORDS: keywords,
-        FIELD_ATTACHMENTS: attachments,
-        FIELD_UPDATED_AT: new_head_event_time.to_rfc3339(),
-    }))
+    // Only include fields that were actually touched in the interval
+    let mut update = serde_json::Map::from_iter([(
+        FIELD_REF_CHANGED_AT.to_string(),
+        serde_json::json!(new_head_event_time.to_rfc3339()),
+    )]);
+
+    insert_full_text_incremental_update_field(&mut update, FIELD_SCHEMA_FIELDS, schema_fields);
+    insert_full_text_incremental_update_field(&mut update, FIELD_DESCRIPTION, description);
+    insert_full_text_incremental_update_field(&mut update, FIELD_KEYWORDS, keywords);
+    insert_full_text_incremental_update_field(&mut update, FIELD_ATTACHMENTS, attachments);
+
+    Ok(serde_json::Value::Object(update))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn partial_update_for_rename(
-    new_alias: &odf::DatasetAlias,
-    updated_at: DateTime<Utc>,
-) -> serde_json::Value {
+pub(crate) fn partial_update_for_rename(new_alias: &odf::DatasetAlias) -> serde_json::Value {
     serde_json::json!({
         FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
         FIELD_DATASET_NAME: new_alias.dataset_name.to_string(),
         FIELD_ALIAS: new_alias.to_string(),
-        FIELD_UPDATED_AT: updated_at.to_rfc3339(),
     })
 }
 
@@ -174,45 +188,73 @@ pub(crate) fn partial_update_for_rename(
 
 fn extract_schema_field_names(
     schema_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetDataSchema>,
-) -> Vec<String> {
+) -> FullTextSearchFieldUpdate<Vec<String>> {
     schema_visitor
         .into_event()
         .map(|e| {
-            e.upgrade()
+            let schema_field_names: Vec<String> = e
+                .upgrade()
                 .schema
                 .fields
                 .iter()
                 .map(|f| f.name.clone())
-                .collect()
+                .collect();
+            if schema_field_names.is_empty() {
+                FullTextSearchFieldUpdate::Empty
+            } else {
+                FullTextSearchFieldUpdate::Present(schema_field_names)
+            }
         })
-        .unwrap_or_default()
+        .unwrap_or(FullTextSearchFieldUpdate::Absent)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn extract_description_and_keywords(
     info_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetInfo>,
-) -> (Option<String>, Option<Vec<String>>) {
+) -> (
+    FullTextSearchFieldUpdate<String>,
+    FullTextSearchFieldUpdate<Vec<String>>,
+) {
     info_visitor
         .into_event()
-        .map(|e| (e.description, e.keywords))
-        .unwrap_or_default()
+        .map(|e| {
+            let description_update = match e.description {
+                None => FullTextSearchFieldUpdate::Empty,
+                Some(s) if s.is_empty() => FullTextSearchFieldUpdate::Empty,
+                Some(s) => FullTextSearchFieldUpdate::Present(s),
+            };
+            let keywords_update = match e.keywords {
+                None => FullTextSearchFieldUpdate::Empty,
+                Some(v) if v.is_empty() => FullTextSearchFieldUpdate::Empty,
+                Some(v) => FullTextSearchFieldUpdate::Present(v),
+            };
+            (description_update, keywords_update)
+        })
+        .unwrap_or((
+            FullTextSearchFieldUpdate::Absent,
+            FullTextSearchFieldUpdate::Absent,
+        ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn extract_attachment_contents(
     attachments_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetAttachments>,
-) -> Option<Vec<String>> {
+) -> FullTextSearchFieldUpdate<Vec<String>> {
     attachments_visitor
         .into_event()
         .map(|e| match e.attachments {
             odf::metadata::Attachments::Embedded(a) => {
                 let items: Vec<String> = a.items.into_iter().map(|a| a.content).collect();
-                if items.is_empty() { None } else { Some(items) }
+                if items.is_empty() {
+                    FullTextSearchFieldUpdate::Empty
+                } else {
+                    FullTextSearchFieldUpdate::Present(items)
+                }
             }
         })
-        .unwrap_or(None)
+        .unwrap_or(FullTextSearchFieldUpdate::Absent)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,7 +270,7 @@ const FIELD_OWNER_NAME: &str = "owner_name";
 const FIELD_OWNER_ID: &str = "owner_id";
 const FIELD_KIND: &str = "kind";
 const FIELD_CREATED_AT: &str = "created_at";
-const FIELD_UPDATED_AT: &str = "updated_at";
+const FIELD_REF_CHANGED_AT: &str = "ref_changed_at";
 const FIELD_SCHEMA_FIELDS: &str = "schema_fields";
 const FIELD_DESCRIPTION: &str = "description";
 const FIELD_KEYWORDS: &str = "keywords";
@@ -274,7 +316,7 @@ const DATASET_FIELDS: &[FullTextSchemaField] = &[
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {
-        path: FIELD_UPDATED_AT,
+        path: FIELD_REF_CHANGED_AT,
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {

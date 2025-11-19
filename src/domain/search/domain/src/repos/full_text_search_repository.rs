@@ -124,3 +124,34 @@ pub enum FullTextSearchEnsureEntityIndexError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the state of a field extraction in incremental indexing
+pub enum FullTextSearchFieldUpdate<T> {
+    /// Field was not present in the interval (no corresponding event)
+    Absent,
+    /// Field was present but empty (event exists, but data cleared)
+    Empty,
+    /// Field was present with data
+    Present(T),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Helper to conditionally insert field based on update state
+pub fn insert_full_text_incremental_update_field<T: serde::Serialize>(
+    incremental_update: &mut serde_json::Map<String, serde_json::Value>,
+    field_path: FullTestSearchFieldPath,
+    field_update: FullTextSearchFieldUpdate<T>,
+) {
+    match field_update {
+        FullTextSearchFieldUpdate::Absent => {}
+        FullTextSearchFieldUpdate::Empty => {
+            incremental_update.insert(field_path.to_string(), serde_json::json!(null));
+        }
+        FullTextSearchFieldUpdate::Present(v) => {
+            incremental_update.insert(field_path.to_string(), serde_json::json!(v));
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

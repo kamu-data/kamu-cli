@@ -119,10 +119,8 @@ impl DatasetFullTextSearchUpdater {
         renamed_message: &DatasetLifecycleMessageRenamed,
     ) -> Result<(), InternalError> {
         // Prepare partial update to dataset search document
-        let partial_update = dataset_schema::partial_update_for_rename(
-            &renamed_message.new_dataset_alias,
-            renamed_message.event_time,
-        );
+        let partial_update =
+            dataset_schema::partial_update_for_rename(&renamed_message.new_dataset_alias);
 
         // Send it to the full text search service for updating
         self.full_text_search_service
@@ -169,10 +167,7 @@ impl DatasetFullTextSearchUpdater {
                 Some(updated_account_message.new_account_name.clone()),
                 entry.name.clone(),
             );
-            let partial_update = dataset_schema::partial_update_for_rename(
-                &new_alias,
-                updated_account_message.event_time,
-            );
+            let partial_update = dataset_schema::partial_update_for_rename(&new_alias);
             updates.push((entry.id.to_string(), partial_update));
         }
 
