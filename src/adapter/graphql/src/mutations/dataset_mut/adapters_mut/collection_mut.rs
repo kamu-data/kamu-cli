@@ -76,17 +76,17 @@ impl<'a> CollectionMut<'a> {
             Ok(UpdateCollectionEntriesResult::UpToDate) => {
                 Ok(CollectionUpdateResult::UpToDate(CollectionUpdateUpToDate))
             }
-            Ok(UpdateCollectionEntriesResult::NotFound(not_found)) => {
-                Ok(CollectionUpdateResult::NotFound(CollectionUpdateErrorNotFound {
+            Ok(UpdateCollectionEntriesResult::NotFound(not_found)) => Ok(
+                CollectionUpdateResult::NotFound(CollectionUpdateErrorNotFound {
                     path: not_found.path.into(),
-                }))
-            }
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)) => {
-                Ok(CollectionUpdateResult::CasFailed(CollectionUpdateErrorCasFailed {
+                }),
+            ),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)) => Ok(
+                CollectionUpdateResult::CasFailed(CollectionUpdateErrorCasFailed {
                     expected_head: err.expected.unwrap().into(),
                     actual_head: err.actual.map(Into::into),
-                }))
-            }
+                }),
+            ),
             Err(UpdateCollectionEntriesUseCaseError::Access(err)) => Err(err.int_err().into()),
             Err(UpdateCollectionEntriesUseCaseError::Internal(err)) => Err(err.into()),
         }

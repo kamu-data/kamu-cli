@@ -196,6 +196,12 @@ impl UpdateCollectionEntriesUseCaseImpl {
                     ),
                 ))) => {
                     if should_retry_on_cas_failed && retry_count < MAX_RETRIES {
+                        tracing::warn!(
+                            "RefCASFailed encountered during collection entries update. \
+                             Retrying... (attempt #{}), dataset: {}",
+                            retry_count + 1,
+                            target.get_alias(),
+                        );
                         retry_count += 1;
                         expected_head = target
                             .as_metadata_chain()
