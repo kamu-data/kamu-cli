@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use bon::bon;
+use futures::future;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::*;
@@ -737,6 +738,70 @@ async fn test_add_entry_errors() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_multiple_parallel_add_entry_collection() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let foo = harness.create_root_dataset("foo").await.dataset_handle.id;
+    let bar = harness.create_root_dataset("bar").await.dataset_handle.id;
+    let baz = harness.create_root_dataset("baz").await.dataset_handle.id;
+
+    let collection = harness.create_collection("collection", None).await;
+
+    let entries = [
+        json!({
+            "path": "/foo",
+            "ref": foo,
+        }),
+        json!({
+            "path": "/bar",
+            "ref": bar,
+        }),
+        json!({
+            "path": "/baz",
+            "ref": baz,
+        }),
+    ];
+
+    let results = future::join_all(entries.iter().map(|entry| {
+        harness.execute_authorized_query(harness.add_entry_request(&collection, entry, None))
+    }))
+    .await;
+
+    for res in results {
+        assert!(res.is_ok(), "{res:#?}");
+        let json = res.data.into_json().unwrap();
+        let add_entry = &json["datasets"]["byId"]["asCollection"]["addEntry"];
+        assert_eq!(add_entry["isSuccess"], true);
+    }
+
+    assert_eq!(
+        harness.list_entries(&collection).await,
+        json!([
+            {
+                "path": "/bar",
+                "ref": bar,
+                "extraData": {},
+            },
+            {
+                "path": "/baz",
+                "ref": baz,
+                "extraData": {},
+            },
+            {
+                "path": "/foo",
+                "ref": foo,
+                "extraData": {},
+            },
+        ])
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -775,6 +840,7 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<UpdateCollectionEntriesUseCaseImpl>()
             .build();
 
         let (_catalog_anonymous, catalog_authorized) =

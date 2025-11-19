@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::mutations::CollectionEntryInput;
 use crate::prelude::*;
 use crate::queries::Dataset;
 
@@ -40,18 +39,6 @@ pub struct CollectionEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CollectionEntry {
-    pub fn from_input(input: CollectionEntryInput) -> Self {
-        let now = Utc::now();
-
-        Self {
-            system_time: now,
-            event_time: now,
-            path: input.path,
-            reference: input.reference,
-            extra_data: input.extra_data.unwrap_or_default(),
-        }
-    }
-
     pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let mut event: CollectionEntryEvent = serde_json::from_value(record).int_err()?;
 
@@ -66,21 +53,6 @@ impl CollectionEntry {
             reference: event.record.reference.into(),
             extra_data: ExtraData::new(event.record.extra_data),
         })
-    }
-
-    pub fn into_record_data(self) -> serde_json::Value {
-        serde_json::to_value(CollectionEntryRecord {
-            path: self.path.into(),
-            reference: self.reference.into(),
-            extra_data: self.extra_data.into(),
-        })
-        .unwrap()
-    }
-
-    pub fn is_equivalent_record(&self, other: &Self) -> bool {
-        self.path == other.path
-            && self.reference == other.reference
-            && self.extra_data == other.extra_data
     }
 }
 
