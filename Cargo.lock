@@ -7987,6 +7987,7 @@ dependencies = [
  "s3-utils",
  "secrecy",
  "serde_json",
+ "sha3",
  "tempfile",
  "test-log",
  "thiserror 2.0.17",

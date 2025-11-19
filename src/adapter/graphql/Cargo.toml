@@ -43,6 +43,7 @@ kamu-auth-rebac = { workspace = true }
 kamu-auth-web3 = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-search = { workspace = true }

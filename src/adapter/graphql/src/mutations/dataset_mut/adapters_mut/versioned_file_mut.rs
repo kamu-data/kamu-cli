@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::io::Cursor;
-
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
-use tokio::io::BufReader;
+use kamu_datasets::{UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
+use kamu_datasets_services::utils::{
+    ContentSource,
+    GetContentArgsError,
+    UpdateVersionFileUseCaseHelper,
+};
 
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, FileVersion};
@@ -23,77 +25,6 @@ use crate::queries::{DatasetRequestState, FileVersion};
 #[derive(Debug)]
 pub struct VersionedFileMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
-}
-
-impl<'a> VersionedFileMut<'a> {
-    async fn get_content_args(
-        &'a self,
-        ctx: &Context<'_>,
-        content_source: ContentSource<'a>,
-        content_type: Option<MediaType>,
-    ) -> Result<ContentArgs> {
-        use sha3::Digest;
-        use tokio::io::AsyncReadExt;
-
-        match content_source {
-            ContentSource::Bytes(bytes) => {
-                let reader = BufReader::new(Cursor::new(bytes.to_owned()));
-
-                Ok(ContentArgs {
-                    content_length: bytes.len(),
-                    content_stream: Some(Box::new(reader)),
-                    content_hash: odf::Multihash::from_digest_sha3_256(bytes),
-                    content_type,
-                })
-            }
-            ContentSource::Token(token) => {
-                let upload_token: domain::UploadTokenBase64Json =
-                    token
-                        .parse()
-                        .map_err(|e: domain::UploadTokenBase64JsonDecodeError| {
-                            async_graphql::Error::new(e.message)
-                        })?;
-
-                let upload_service = from_catalog_n!(ctx, dyn domain::UploadService);
-
-                let mut stream = upload_service
-                    .upload_token_into_stream(&upload_token.0)
-                    .await
-                    .int_err()?;
-
-                let mut digest = sha3::Sha3_256::new();
-                let mut buf = [0u8; 2048];
-
-                loop {
-                    let read = stream.read(&mut buf).await.int_err()?;
-                    if read == 0 {
-                        break;
-                    }
-                    digest.update(&buf[..read]);
-                }
-
-                let content_hash =
-                    odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest.finalize())
-                        .unwrap();
-
-                // Get the stream again and copy data from uploads to storage using computed
-                // hash
-                // TODO: PERF: Should we create file in the final storage directly to avoid
-                // copying?
-                let content_stream = upload_service
-                    .upload_token_into_stream(&upload_token.0)
-                    .await
-                    .int_err()?;
-
-                Ok(ContentArgs {
-                    content_length: upload_token.0.content_length,
-                    content_hash,
-                    content_stream: Some(content_stream),
-                    content_type: upload_token.0.content_type,
-                })
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,15 +56,16 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
+        let (update_version_file_use_case_helper, update_version_file_use_case) = from_catalog_n!(
+            ctx,
+            UpdateVersionFileUseCaseHelper,
+            dyn UpdateVersionFileUseCase
+        );
 
-        let content_args = self
-            .get_content_args(
-                ctx,
-                ContentSource::Bytes(&content),
-                content_type.map(Into::into),
-            )
-            .await?;
+        let content_args = update_version_file_use_case_helper
+            .get_content_args(ContentSource::Bytes(&content), content_type.map(Into::into))
+            .await
+            .map_err(map_get_content_args_error)?;
 
         match update_version_file_use_case
             .execute(
@@ -150,17 +82,13 @@ impl<'a> VersionedFileMut<'a> {
                 new_head: res.new_head.into(),
                 content_hash: res.content_hash.into(),
             })),
-            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
-                return Ok(UpdateVersionResult::CasFailed(
-                    UpdateVersionErrorCasFailed {
-                        expected_head: err.expected.unwrap().into(),
-                        actual_head: err.actual.unwrap().into(),
-                    },
-                ));
-            }
-            Err(err) => {
-                return Err(err.int_err().into());
-            }
+            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
+                UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
+                    expected_head: err.expected.unwrap().into(),
+                    actual_head: err.actual.unwrap().into(),
+                }),
+            ),
+            Err(e) => Err(e.int_err().into()),
         }
     }
 
@@ -225,11 +153,16 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
+        let (update_version_file_use_case_helper, update_version_file_use_case) = from_catalog_n!(
+            ctx,
+            UpdateVersionFileUseCaseHelper,
+            dyn UpdateVersionFileUseCase
+        );
 
-        let content_args = self
-            .get_content_args(ctx, ContentSource::Token(upload_token), None)
-            .await?;
+        let content_args = update_version_file_use_case_helper
+            .get_content_args(ContentSource::Token(upload_token), None)
+            .await
+            .map_err(map_get_content_args_error)?;
 
         match update_version_file_use_case
             .execute(
@@ -246,17 +179,13 @@ impl<'a> VersionedFileMut<'a> {
                 new_head: res.new_head.into(),
                 content_hash: res.content_hash.into(),
             })),
-            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
-                return Ok(UpdateVersionResult::CasFailed(
-                    UpdateVersionErrorCasFailed {
-                        expected_head: err.expected.unwrap().into(),
-                        actual_head: err.actual.unwrap().into(),
-                    },
-                ));
-            }
-            Err(err) => {
-                return Err(err.int_err().into());
-            }
+            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
+                UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
+                    expected_head: err.expected.unwrap().into(),
+                    actual_head: err.actual.unwrap().into(),
+                }),
+            ),
+            Err(e) => Err(e.int_err().into()),
         }
     }
 
@@ -288,17 +217,13 @@ impl<'a> VersionedFileMut<'a> {
                 new_head: res.new_head.into(),
                 content_hash: res.content_hash.into(),
             })),
-            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
-                return Ok(UpdateVersionResult::CasFailed(
-                    UpdateVersionErrorCasFailed {
-                        expected_head: err.expected.unwrap().into(),
-                        actual_head: err.actual.unwrap().into(),
-                    },
-                ));
-            }
-            Err(err) => {
-                return Err(err.int_err().into());
-            }
+            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
+                UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
+                    expected_head: err.expected.unwrap().into(),
+                    actual_head: err.actual.unwrap().into(),
+                }),
+            ),
+            Err(e) => Err(e.int_err().into()),
         }
     }
 }
@@ -378,7 +303,7 @@ pub enum StartUploadVersionResult {
 #[graphql(complex)]
 pub struct StartUploadVersionSuccess {
     #[graphql(flatten)]
-    upload_context: UploadContext,
+    pub upload_context: UploadContext,
 }
 #[ComplexObject]
 impl StartUploadVersionSuccess {
@@ -393,8 +318,8 @@ impl StartUploadVersionSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct StartUploadVersionErrorTooLarge {
-    upload_size: usize,
-    upload_limit: usize,
+    pub upload_size: usize,
+    pub upload_limit: usize,
 }
 #[ComplexObject]
 impl StartUploadVersionErrorTooLarge {
@@ -440,10 +365,14 @@ impl From<domain::UploadContext> for UploadContext {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum ContentSource<'a> {
-    Bytes(&'a [u8]),
-    Token(String),
+pub fn map_get_content_args_error(e: GetContentArgsError) -> GqlError {
+    match e {
+        GetContentArgsError::TokenDecode(e) => GqlError::gql(e.message),
+        e @ GetContentArgsError::Internal(_) => e.int_err().into(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
