@@ -34,9 +34,9 @@ impl FullTextSearchService for FullTextSearchServiceImpl {
     async fn search(
         &self,
         _: FullTextSearchContext<'_>,
-        _req: FullTextSearchRequest,
+        req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError> {
-        unimplemented!()
+        self.full_text_repo.search(req).await
     }
 
     async fn index_bulk(

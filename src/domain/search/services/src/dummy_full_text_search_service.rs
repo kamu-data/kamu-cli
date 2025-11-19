@@ -36,11 +36,10 @@ impl FullTextSearchService for DummyFullTextSearchService {
         _req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError> {
         Ok(FullTextSearchResponse {
+            took_ms: 0,
+            timeout: false,
             total_hits: 0,
             hits: vec![],
-            next_cursor: None,
-            debug_payload: None,
-            took_ms: None,
         })
     }
 

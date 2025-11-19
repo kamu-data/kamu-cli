@@ -7,11 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
-
 use internal_error::InternalError;
 
-use crate::{FullTestSearchFieldPath, FullTextEntityId, FullTextEntityKind};
+use crate::{
+    FullTestSearchFieldPath,
+    FullTextEntityId,
+    FullTextEntityKind,
+    FullTextSearchRequest,
+    FullTextSearchResponse,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,83 +55,41 @@ pub trait FullTextSearchService: Send + Sync {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Search request model
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FullTextSearchContext<'a> {
     pub catalog: &'a dill::Catalog,
     pub actor_account_id: Option<odf::AccountID>,
 }
 
-pub struct FullTextSearchRequest {
-    /// Free-text query
-    pub query: Option<String>,
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// Allowed entity types (empty means all)
-    pub kinds: Vec<FullTextEntityKind>,
-
-    /// Structured filter
-    pub filter: Option<FullTextSearchFilterExpr>,
-
-    /// Sorting specification
-    pub sort: Vec<FullTextSortSpec>,
-
-    /// Pagination specification
-    pub page: FullTextPageSpec,
-
-    /// Debug payload enabled
-    pub debug: bool,
-}
-
-pub enum FullTextSearchFilterExpr {
-    Field {
-        field: FullTestSearchFieldPath,
-        op: FullTextSearchFilterOp,
-    },
-    And(Vec<FullTextSearchFilterExpr>),
-    Or(Vec<FullTextSearchFilterExpr>),
-    Not(Box<FullTextSearchFilterExpr>),
-}
-
-pub enum FullTextSearchFilterOp {
-    Eq(serde_json::Value),
-    // TODO: Add more operators as needed
-}
-
-pub struct FullTextSortSpec {
-    pub field: FullTestSearchFieldPath,
-    pub direction: FullTextSortDirection,
-    pub nulls_first: bool,
-}
-
-pub enum FullTextSortDirection {
-    Asc,
-    Desc,
-}
-
-pub struct FullTextPageSpec {
-    pub limit: u32,
-    pub cursor: Option<String>,
+/// Represents the state of a field extraction in incremental indexing
+pub enum FullTextSearchFieldUpdate<T> {
+    /// Field was not present in the interval (no corresponding event)
+    Absent,
+    /// Field was present but empty (event exists, but data cleared)
+    Empty,
+    /// Field was present with data
+    Present(T),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Search response model
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FullTextSearchResponse {
-    pub total_hits: u64,
-    pub hits: Vec<FullTextSearchHit>,
-    pub next_cursor: Option<String>,
-    pub took_ms: Option<u64>,
-    pub debug_payload: Option<serde_json::Value>,
-}
-
-pub struct FullTextSearchHit {
-    pub id: String,
-    pub kind: FullTextEntityKind,
-    pub score: Option<f32>,
-    pub highlights: BTreeMap<String, Vec<String>>,
-    pub source: serde_json::Value,
+// Helper to conditionally insert field based on update state
+pub fn insert_full_text_incremental_update_field<T: serde::Serialize>(
+    incremental_update: &mut serde_json::Map<String, serde_json::Value>,
+    field_path: FullTestSearchFieldPath,
+    field_update: FullTextSearchFieldUpdate<T>,
+) {
+    match field_update {
+        FullTextSearchFieldUpdate::Absent => {}
+        FullTextSearchFieldUpdate::Empty => {
+            incremental_update.insert(field_path.to_string(), serde_json::json!(null));
+        }
+        FullTextSearchFieldUpdate::Present(v) => {
+            incremental_update.insert(field_path.to_string(), serde_json::json!(v));
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

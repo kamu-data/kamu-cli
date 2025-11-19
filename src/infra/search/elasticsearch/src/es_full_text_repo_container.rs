@@ -106,6 +106,13 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
         self.inner().await?.health().await
     }
 
+    async fn search(
+        &self,
+        req: FullTextSearchRequest,
+    ) -> Result<FullTextSearchResponse, InternalError> {
+        self.inner().await?.search(req).await
+    }
+
     async fn ensure_entity_index(
         &self,
         entity_schema: &FullTextSearchEntitySchema,

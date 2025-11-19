@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::*;
 use crate::ElasticSearchFullTextSearchConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,7 +17,7 @@ const DEFAULT_ELASTICSEARCH_PASSWORD: &str = "root";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct ElasticSearchClient {
+pub struct ElasticSearchClient {
     client: elasticsearch::Elasticsearch,
     _config: ElasticSearchFullTextSearchConfig,
 }
@@ -75,13 +76,7 @@ impl ElasticSearchClient {
             .await?;
 
         let response = ensure_client_response(response).await?;
-
-        #[derive(serde::Deserialize)]
-        struct CountResponse {
-            count: u64,
-        }
-
-        let body: CountResponse = response.json().await?;
+        let body: es_client::CountResponse = response.json().await?;
         let count = body.count;
         Ok(count)
     }
@@ -104,14 +99,35 @@ impl ElasticSearchClient {
 
         let response = ensure_client_response(response).await?;
 
-        #[derive(serde::Deserialize)]
-        struct CountResponse {
-            count: u64,
-        }
-
         let body: CountResponse = response.json().await?;
         let count = body.count;
         Ok(count)
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_search, skip_all)]
+    pub async fn search(
+        &self,
+        req_body: serde_json::Value,
+        index_names: &[&str],
+    ) -> Result<es_client::SearchResponse, ElasticSearchClientError> {
+        // Send request to ElasticSearch
+        let response = self
+            .client
+            .search(elasticsearch::SearchParts::Index(index_names))
+            .body(req_body)
+            .send()
+            .await?;
+
+        // Obtain and log a raw response
+        let response = ensure_client_response(response).await?;
+        let body: serde_json::Value = response.json().await?;
+        tracing::debug!(body=?body, "Raw ElasticSearch response");
+
+        // Try interpreting the response
+
+        let search_response: SearchResponse = serde_json::from_value(body).unwrap();
+        tracing::debug!(search_response=?search_response, "Parsed search response");
+        Ok(search_response)
     }
 
     #[tracing::instrument(level = "info", name = ElasticSearchClient_create_index, skip_all, fields(index_name))]
@@ -449,7 +465,7 @@ impl ElasticSearchClient {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum ElasticSearchReindexError {
+pub enum ElasticSearchReindexError {
     #[error("ElasticSearch client error: {0}")]
     Client(#[from] ElasticSearchClientError),
 
@@ -463,7 +479,7 @@ pub(crate) enum ElasticSearchReindexError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum ElasticSearchClientBuildError {
+pub enum ElasticSearchClientBuildError {
     #[error("transport error building ElasticSearch client: {0}")]
     Build(#[from] elasticsearch::http::transport::BuildError),
 }
@@ -471,7 +487,7 @@ pub(crate) enum ElasticSearchClientBuildError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum ElasticSearchClientError {
+pub enum ElasticSearchClientError {
     #[error("transport error communicating to ElasticSearch: {0}")]
     Transport(#[from] elasticsearch::Error),
 

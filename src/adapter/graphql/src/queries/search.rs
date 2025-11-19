@@ -113,19 +113,60 @@ impl Search {
     /// Searches for datasets and other objects managed by the
     /// current node using a full text prompt in natural language
     #[tracing::instrument(level = "info", name = Search_query_full_text, skip_all)]
-    async fn query_full_text(&self, ctx: &Context<'_>) -> Result<String> {
+    async fn query_full_text(
+        &self,
+        ctx: &Context<'_>,
+        prompt: String,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<FullTextSearchResponse> {
         let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
 
-        // TODO: support real queries
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+
         let catalog = ctx.data::<dill::Catalog>().unwrap();
         let context = kamu_search::FullTextSearchContext {
             catalog,
-            actor_account_id: None,
+            actor_account_id: None, // TODO: support access control
         };
 
-        let health = full_text_search_service.health(context).await.int_err()?;
-        let health_as_string = serde_json::to_string_pretty(&health).int_err()?;
-        Ok(health_as_string)
+        let search_results = full_text_search_service
+            .search(
+                context,
+                kamu_search::FullTextSearchRequest {
+                    query: if prompt.is_empty() {
+                        None
+                    } else {
+                        Some(prompt)
+                    },
+                    kinds: vec![], // TODO: pass entity kinds
+                    filter: None,  // TODO: pass filters
+                    sort: vec![],  // TODO: pass ordering criteria
+                    page: kamu_search::FullTextPageSpec {
+                        limit: per_page,
+                        offset: page * per_page,
+                    },
+                    debug: false,
+                },
+            )
+            .await?;
+
+        Ok(FullTextSearchResponse {
+            took_ms: search_results.took_ms,
+            timeout: search_results.timeout,
+            total_hits: search_results.total_hits,
+            hits: search_results
+                .hits
+                .into_iter()
+                .map(|hit| FullTextSearchHit {
+                    id: hit.id,
+                    kind: hit.kind.to_string(),
+                    score: hit.score,
+                    source: hit.source,
+                })
+                .collect(),
+        })
     }
 
     /// Searches for datasets and other objects managed by the
@@ -239,6 +280,24 @@ impl Search {
             page_nodes, page, per_page, total,
         ))
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug)]
+pub struct FullTextSearchResponse {
+    pub took_ms: u64,
+    pub timeout: bool,
+    pub total_hits: u64,
+    pub hits: Vec<FullTextSearchHit>,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct FullTextSearchHit {
+    pub id: String,
+    pub kind: String,
+    pub score: Option<f64>,
+    pub source: serde_json::Value,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

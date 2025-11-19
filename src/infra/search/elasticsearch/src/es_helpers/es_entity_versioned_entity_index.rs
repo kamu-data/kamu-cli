@@ -12,11 +12,13 @@ use std::borrow::Cow;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_search::{FullTextEntityKind, FullTextSearchEntitySchemaUpgradeMode};
 
-use crate::{ElasticSearchClient, ElasticSearchFullTextSearchConfig, ElasticSearchIndexMappings};
+use super::ElasticSearchIndexMappings;
+use crate::ElasticSearchFullTextSearchConfig;
+use crate::es_client::ElasticSearchClient;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct ElasticSearchVersionedEntityIndex<'a> {
+pub struct ElasticSearchVersionedEntityIndex<'a> {
     client: &'a ElasticSearchClient,
     config: &'a ElasticSearchFullTextSearchConfig,
     entity_kind: FullTextEntityKind,
@@ -278,7 +280,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub(crate) struct IndexVersionMetadata<'a> {
+pub struct IndexVersionMetadata<'a> {
     pub schema_version: u32,
     pub mapping_hash: Cow<'a, str>,
 }
@@ -287,7 +289,7 @@ pub(crate) struct IndexVersionMetadata<'a> {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub(crate) enum EntityIndexEnsureOutcome {
+pub enum EntityIndexEnsureOutcome {
     CreatedNew {
         alias: String,
         index: String,

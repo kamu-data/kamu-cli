@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub(crate) mod es_client;
-pub(crate) mod es_helpers;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod es_full_text_repo;
-mod es_full_text_repo_container;
-mod es_full_text_search_config;
+#[derive(serde::Deserialize)]
+pub struct CountResponse {
+    pub count: u64,
+}
 
-pub use es_full_text_repo::*;
-pub use es_full_text_repo_container::*;
-pub use es_full_text_search_config::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

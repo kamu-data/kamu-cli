@@ -11,7 +11,7 @@ use kamu_search::{FullTextSchemaFieldRole, FullTextSearchEntitySchema};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct ElasticSearchIndexMappings {
+pub struct ElasticSearchIndexMappings {
     pub mappings_json: serde_json::Value,
     pub mappings_hash: String,
 }
@@ -19,7 +19,7 @@ pub(crate) struct ElasticSearchIndexMappings {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ElasticSearchIndexMappings {
-    pub(crate) fn build_analysis_settings_json() -> serde_json::Value {
+    pub fn build_analysis_settings_json() -> serde_json::Value {
         serde_json::json!({
             "filter": {
                 "kamu_edge_ngram": {
@@ -114,7 +114,7 @@ impl ElasticSearchIndexMappings {
         })
     }
 
-    pub(crate) fn from_entity_schema(entity_schema: &FullTextSearchEntitySchema) -> Self {
+    pub fn from_entity_schema(entity_schema: &FullTextSearchEntitySchema) -> Self {
         let mut mappings = serde_json::Map::new();
         for field in entity_schema.fields {
             let field_mapping = match field.role {
