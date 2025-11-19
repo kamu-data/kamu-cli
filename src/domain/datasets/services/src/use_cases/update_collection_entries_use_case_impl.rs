@@ -209,7 +209,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
                     return Ok(Err(e));
                 }
                 Err(err) => {
-                    return Err(err.int_err().into());
+                    return Err(err.int_err());
                 }
             }
         }
@@ -295,7 +295,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
         let mut current_head = chain_head;
         let mut last_result = None;
 
-        for (operation, state) in diff.into_iter() {
+        for (operation, state) in diff {
             tracing::debug!(
                 ?operation,
                 path = %state.path,

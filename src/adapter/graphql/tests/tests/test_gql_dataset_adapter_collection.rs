@@ -752,7 +752,7 @@ async fn test_multiple_parallel_add_entry_collection() {
 
     let collection = harness.create_collection("collection", None).await;
 
-    let entries = vec![
+    let entries = [
         json!({
             "path": "/foo",
             "ref": foo,
