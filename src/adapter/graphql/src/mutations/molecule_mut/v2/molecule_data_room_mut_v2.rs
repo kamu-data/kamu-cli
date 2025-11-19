@@ -7,6 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use file_utils::MediaType;
+use kamu::domain;
+use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets::{UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
+use kamu_datasets_services::utils::{ContentSource, UpdateVersionFileUseCaseHelper};
+
+use crate::mutations::{
+    StartUploadVersionErrorTooLarge,
+    StartUploadVersionResult,
+    StartUploadVersionSuccess,
+    UpdateVersionErrorCasFailed,
+    UpdateVersionResult,
+    UpdateVersionSuccess,
+    map_get_content_args_error,
+};
 use crate::prelude::*;
 use crate::queries::molecule::v2::{MoleculeAccessLevelV2, MoleculeCategoryV2, MoleculeTagV2};
 
@@ -17,15 +32,50 @@ pub struct MoleculeDataRoomMutV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomMutV2 {
-    #[expect(clippy::unused_async)]
     /// Starts the process of uploading a file to the data room.
+    #[graphql(guard = "LoggedInGuard")]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_start_upload_file, skip_all)]
     async fn start_upload_file(
         &self,
-        _ctx: &Context<'_>,
-        content_size: usize,
-    ) -> Result<MoleculeDataRoomUploadFileResultV2> {
-        let _ = content_size;
-        todo!()
+        ctx: &Context<'_>,
+        #[graphql(desc = "Size of the file being uploaded")] content_length: usize,
+        #[graphql(desc = "Media type of content (e.g. application/pdf)")] content_type: Option<
+            String,
+        >,
+    ) -> Result<StartUploadVersionResult> {
+        let (subject, upload_svc, limits) = from_catalog_n!(
+            ctx,
+            CurrentAccountSubject,
+            dyn domain::UploadService,
+            domain::FileUploadLimitConfig
+        );
+
+        let upload_context = match upload_svc
+            .make_upload_context(
+                subject.account_id(),
+                uuid::Uuid::new_v4().to_string(),
+                content_type.map(MediaType),
+                content_length,
+            )
+            .await
+        {
+            Ok(ctx) => ctx,
+            Err(domain::MakeUploadContextError::TooLarge(_)) => {
+                return Ok(StartUploadVersionResult::TooLarge(
+                    StartUploadVersionErrorTooLarge {
+                        upload_size: content_length,
+                        upload_limit: limits.max_file_size_in_bytes(),
+                    },
+                ));
+            }
+            Err(e) => return Err(e.int_err().into()),
+        };
+
+        Ok(StartUploadVersionResult::Success(
+            StartUploadVersionSuccess {
+                upload_context: upload_context.into(),
+            },
+        ))
     }
 
     #[expect(clippy::unused_async)]
