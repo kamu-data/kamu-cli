@@ -585,7 +585,7 @@ impl QueryService for QueryServiceImpl {
     async fn get_changelog_projection(
         &self,
         source: ResolvedDataset,
-        options: GetDataOptions,
+        options: GetChangelogProjectionOptions,
     ) -> Result<GetDataResponse, QueryError> {
         let (head, maybe_df) = self
             .single_dataset(&source, None, options.block_hash)
@@ -600,6 +600,15 @@ impl QueryService for QueryServiceImpl {
             });
         };
 
+        enum PrimaryKeyValue {
+            Preresolved(Vec<String>),
+            NeedToScan,
+        }
+        enum DatasetVocabularyValue {
+            Preresolved(odf::metadata::DatasetVocabulary),
+            NeedToScan,
+        }
+
         let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
         // TODO: Remove these visitors once schema contains primary keys -->
         let mut active_polling_source_visitor =
@@ -608,11 +617,22 @@ impl QueryService for QueryServiceImpl {
             odf::dataset::SearchActivePushSourcesVisitor::new(source.get_kind());
         // <--
 
-        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = _>; _] = [
-            &mut set_vocab_visitor,
-            &mut active_polling_source_visitor,
-            &mut active_push_sources_visitor,
-        ];
+        let mut visitors =
+            Vec::<&mut dyn odf::dataset::MetadataChainVisitor<Error = _>>::with_capacity(3);
+
+        let primary_key_value = if let Some(value) = options.hints.primary_key {
+            PrimaryKeyValue::Preresolved(value)
+        } else {
+            visitors.push(&mut active_polling_source_visitor);
+            visitors.push(&mut active_push_sources_visitor);
+            PrimaryKeyValue::NeedToScan
+        };
+        let dataset_vocabulary_value = if let Some(value) = options.hints.dataset_vocabulary {
+            DatasetVocabularyValue::Preresolved(value)
+        } else {
+            visitors.push(&mut set_vocab_visitor);
+            DatasetVocabularyValue::NeedToScan
+        };
 
         use odf::dataset::MetadataChainExt;
 
@@ -622,28 +642,42 @@ impl QueryService for QueryServiceImpl {
             .await
             .int_err()?;
 
-        // TODO: Revisit once schema contains primary keys
-        let merge_strategy = if let Some(event) = active_polling_source_visitor.into_event() {
-            // Use the active polling source if any.
-            Some(event.merge)
-        } else if let Some(event) = active_push_sources_visitor.into_events().pop() {
-            // Use the (!) last active push source, if any.
-            // It's OK until the schema starts containing primary keys.
-            Some(event.merge)
-        } else {
-            None
-        };
+        let primary_key = match primary_key_value {
+            PrimaryKeyValue::Preresolved(value) => value,
+            PrimaryKeyValue::NeedToScan => {
+                // TODO: Revisit once schema contains primary keys
+                let merge_strategy = if let Some(event) = active_polling_source_visitor.into_event()
+                {
+                    // Use the active polling source if any.
+                    Some(event.merge)
+                } else if let Some(event) = active_push_sources_visitor.into_events().pop() {
+                    // Use the (!) last active push source, if any.
+                    // It's OK until the schema starts containing primary keys.
+                    Some(event.merge)
+                } else {
+                    None
+                };
 
-        let Some(primary_key) = merge_strategy.and_then(odf::metadata::MergeStrategy::primary_key)
-        else {
-            return Err(DatasetHasNoPrimaryKeysError {
-                dataset_handle: source.take_handle(),
+                let Some(primary_key) =
+                    merge_strategy.and_then(odf::metadata::MergeStrategy::primary_key)
+                else {
+                    return Err(DatasetHasNoPrimaryKeysError {
+                        dataset_handle: source.take_handle(),
+                    }
+                    .int_err()
+                    .into());
+                };
+
+                primary_key
             }
-            .int_err()
-            .into());
+        };
+        let dataset_vocabulary = match dataset_vocabulary_value {
+            DatasetVocabularyValue::Preresolved(value) => value,
+            DatasetVocabularyValue::NeedToScan => {
+                set_vocab_visitor.into_event().unwrap_or_default().into()
+            }
         };
 
-        let dataset_vocabulary = set_vocab_visitor.into_event().unwrap_or_default().into();
         let projection_df =
             odf::utils::data::changelog::project(df, &primary_key, &dataset_vocabulary)?;
 

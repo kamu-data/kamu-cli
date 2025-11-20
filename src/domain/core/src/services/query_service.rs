@@ -86,7 +86,7 @@ pub trait QueryService: Send + Sync {
     async fn get_changelog_projection(
         &self,
         source: ResolvedDataset,
-        options: GetDataOptions,
+        options: GetChangelogProjectionOptions,
     ) -> Result<GetDataResponse, QueryError>;
 }
 
@@ -123,7 +123,7 @@ pub struct QueryOptionsDataset {
     pub block_hash: Option<odf::Multihash>,
     /// Hints that can help the system to minimize metadata scanning. Be extra
     /// careful that your hints don't influence the actual result of the
-    /// query, as they are not inlcuded in the [`QueryState`] and thus can
+    /// query, as they are not included in the [`QueryState`] and thus can
     /// ruin reproducibility if misused.
     pub hints: DatasetQueryHints,
 }
@@ -172,6 +172,27 @@ pub struct QueryStateDataset {
     /// Last block hash that was considered during the
     /// query planning
     pub block_hash: odf::Multihash,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GetChangelogProjectionOptions {
+    /// Last block hash of an input dataset that should be used for query
+    /// execution. This is used to achieve full reproducibility of queries
+    /// as no matter what updates happen in the datasets - the query will
+    /// only consider a specific subset of the data ledger.
+    pub block_hash: Option<odf::Multihash>,
+
+    /// Hints that can help the system to minimize metadata scanning.
+    pub hints: ChangelogProjectionHints,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ChangelogProjectionHints {
+    /// Optional pre-resolved primary key.
+    pub primary_key: Option<Vec<String>>,
+
+    /// Optional pre-resolved dataset vocabulary.
+    pub dataset_vocabulary: Option<odf::metadata::DatasetVocabulary>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
