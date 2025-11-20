@@ -80,6 +80,14 @@ pub trait QueryService: Send + Sync {
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
+
+    /// Projects the CDC ledger into a state snapshot.
+    /// Uses [`odf::utils::data::changelog::project`] function internally.
+    async fn get_changelog_projection(
+        &self,
+        source: ResolvedDataset,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,7 +179,7 @@ pub struct QueryStateDataset {
 #[derive(Debug, Clone)]
 pub struct GetDataResponse {
     /// A [`DataFrameExt`] that can be used to read schema and access the data.
-    /// `None` when dataset schema was not yet defined. Note that the data
+    /// `None` when the dataset schema was not yet defined. Note that the data
     /// frames are "lazy". They are a representation of a logical query
     /// plan. The actual query is executed only when you pull the resulting
     /// data from it.
@@ -220,6 +228,7 @@ pub enum CreateSessionError {
         #[backtrace]
         odf::metadata::AccessError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -457,6 +466,14 @@ impl From<DatasetActionUnauthorizedError> for QueryError {
             DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("'{dataset_handle}' has no primary keys")]
+pub struct DatasetHasNoPrimaryKeysError {
+    pub dataset_handle: odf::DatasetHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
