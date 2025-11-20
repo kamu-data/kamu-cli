@@ -142,6 +142,9 @@ pub struct FullTextSearchRequest {
     /// Allowed entity types (empty means all)
     pub kinds: Vec<FullTextEntityKind>,
 
+    /// Requested source fields. If empty, only IDs will be returned.
+    pub source_fields: FullTextSearchRequestSourceFields,
+
     /// Structured filter
     pub filter: Option<FullTextSearchFilterExpr>,
 
@@ -153,6 +156,17 @@ pub struct FullTextSearchRequest {
 
     /// Debug payload enabled
     pub debug: bool,
+}
+
+#[derive(Debug)]
+pub enum FullTextSearchRequestSourceFields {
+    None,
+    All,
+    Particular(Vec<FullTestSearchFieldPath>),
+    Complex {
+        include_patterns: Vec<String>,
+        exclude_patterns: Vec<String>,
+    },
 }
 
 #[derive(Debug)]

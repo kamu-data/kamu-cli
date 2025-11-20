@@ -225,8 +225,10 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
 
         // Build ElasticSearch request body
         let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(&req);
-        // println!("\nES Search request: {req_body:?}, indexes:
-        // {involved_index_names:?}\n",);
+        /*println!(
+            "\nES Search request: {}, indexes: {involved_index_names:?}\n",
+            serde_json::to_string_pretty(&req_body).unwrap()
+        );*/
 
         // Execute request
         let es_response: es_client::SearchResponse = client

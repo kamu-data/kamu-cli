@@ -122,6 +122,10 @@ impl ElasticSearchClient {
         let response = ensure_client_response(response).await?;
         let body: serde_json::Value = response.json().await?;
         tracing::debug!(body=?body, "Raw ElasticSearch response");
+        /*println!(
+            "\nRaw ES Search response: {}\n",
+            serde_json::to_string_pretty(&body).unwrap()
+        );*/
 
         // Try interpreting the response
 

@@ -122,6 +122,7 @@ impl Search {
     ) -> Result<FullTextSearchResponse> {
         let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
 
+        // TODO: max limit is 10,000 in ES, otherwise we need cursors
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
@@ -140,6 +141,7 @@ impl Search {
                     } else {
                         Some(prompt)
                     },
+                    source_fields: kamu_search::FullTextSearchRequestSourceFields::All,
                     kinds: vec![], // TODO: pass entity kinds
                     filter: None,  // TODO: pass filters
                     sort: vec![],  // TODO: pass ordering criteria
