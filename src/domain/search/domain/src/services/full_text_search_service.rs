@@ -10,9 +10,9 @@
 use internal_error::InternalError;
 
 use crate::{
-    FullTestSearchFieldPath,
     FullTextEntityId,
-    FullTextEntityKind,
+    FullTextEntitySchemaName,
+    FullTextSearchFieldPath,
     FullTextSearchRequest,
     FullTextSearchResponse,
 };
@@ -35,21 +35,21 @@ pub trait FullTextSearchService: Send + Sync {
     async fn index_bulk(
         &self,
         ctx: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError>;
 
     async fn update_bulk(
         &self,
         ctx: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         updates: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError>;
 
     async fn delete_bulk(
         &self,
         ctx: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         ids: Vec<FullTextEntityId>,
     ) -> Result<(), InternalError>;
 }
@@ -78,7 +78,7 @@ pub enum FullTextSearchFieldUpdate<T> {
 // Helper to conditionally insert field based on update state
 pub fn insert_full_text_incremental_update_field<T: serde::Serialize>(
     incremental_update: &mut serde_json::Map<String, serde_json::Value>,
-    field_path: FullTestSearchFieldPath,
+    field_path: FullTextSearchFieldPath,
     field_update: FullTextSearchFieldUpdate<T>,
 ) {
     match field_update {

@@ -10,6 +10,7 @@
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_core::ResolvedDataset;
+use kamu_datasets::dataset_full_text_search_schema as dataset_schema;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,24 +80,24 @@ pub(crate) async fn index_dataset_from_scratch(
     // Prepare full text search document
     let alias = dataset.get_alias();
     Ok(serde_json::json!({
-        FIELD_DATASET_NAME: alias.dataset_name.to_string(),
-        FIELD_ALIAS: alias.to_string(),
-        FIELD_OWNER_NAME: alias
+        dataset_schema::FIELD_DATASET_NAME: alias.dataset_name.to_string(),
+        dataset_schema::FIELD_ALIAS: alias.to_string(),
+        dataset_schema::FIELD_OWNER_NAME: alias
             .account_name
             .as_ref()
             .map(std::string::ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-        FIELD_OWNER_ID: owner_id.to_string(),
-        FIELD_KIND: match dataset.get_kind() {
+        dataset_schema::FIELD_OWNER_ID: owner_id.to_string(),
+        dataset_schema::FIELD_KIND: match dataset.get_kind() {
             odf::DatasetKind::Root => "root".to_string(),
             odf::DatasetKind::Derivative => "derivative".to_string(),
         },
-        FIELD_CREATED_AT: seed_event_time.to_rfc3339(),
-        FIELD_REF_CHANGED_AT: head_event_time.to_rfc3339(),
-        FIELD_SCHEMA_FIELDS: schema_fields_value,
-        FIELD_DESCRIPTION: description_value,
-        FIELD_KEYWORDS: keywords_value,
-        FIELD_ATTACHMENTS: attachments_value,
+        dataset_schema::FIELD_CREATED_AT: seed_event_time.to_rfc3339(),
+        dataset_schema::FIELD_REF_CHANGED_AT: head_event_time.to_rfc3339(),
+        dataset_schema::FIELD_SCHEMA_FIELDS: schema_fields_value,
+        dataset_schema::FIELD_DESCRIPTION: description_value,
+        dataset_schema::FIELD_KEYWORDS: keywords_value,
+        dataset_schema::FIELD_ATTACHMENTS: attachments_value,
     }))
 }
 
@@ -161,14 +162,30 @@ pub(crate) async fn partial_update_for_new_interval(
     // Prepare partial update to full text search document
     // Only include fields that were actually touched in the interval
     let mut update = serde_json::Map::from_iter([(
-        FIELD_REF_CHANGED_AT.to_string(),
+        dataset_schema::FIELD_REF_CHANGED_AT.to_string(),
         serde_json::json!(new_head_event_time.to_rfc3339()),
     )]);
 
-    insert_full_text_incremental_update_field(&mut update, FIELD_SCHEMA_FIELDS, schema_fields);
-    insert_full_text_incremental_update_field(&mut update, FIELD_DESCRIPTION, description);
-    insert_full_text_incremental_update_field(&mut update, FIELD_KEYWORDS, keywords);
-    insert_full_text_incremental_update_field(&mut update, FIELD_ATTACHMENTS, attachments);
+    insert_full_text_incremental_update_field(
+        &mut update,
+        dataset_schema::FIELD_SCHEMA_FIELDS,
+        schema_fields,
+    );
+    insert_full_text_incremental_update_field(
+        &mut update,
+        dataset_schema::FIELD_DESCRIPTION,
+        description,
+    );
+    insert_full_text_incremental_update_field(
+        &mut update,
+        dataset_schema::FIELD_KEYWORDS,
+        keywords,
+    );
+    insert_full_text_incremental_update_field(
+        &mut update,
+        dataset_schema::FIELD_ATTACHMENTS,
+        attachments,
+    );
 
     Ok(serde_json::Value::Object(update))
 }
@@ -177,10 +194,10 @@ pub(crate) async fn partial_update_for_new_interval(
 
 pub(crate) fn partial_update_for_rename(new_alias: &odf::DatasetAlias) -> serde_json::Value {
     serde_json::json!({
-        FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
+        dataset_schema::FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-        FIELD_DATASET_NAME: new_alias.dataset_name.to_string(),
-        FIELD_ALIAS: new_alias.to_string(),
+        dataset_schema::FIELD_DATASET_NAME: new_alias.dataset_name.to_string(),
+        dataset_schema::FIELD_ALIAS: new_alias.to_string(),
     })
 }
 
@@ -256,101 +273,5 @@ fn extract_attachment_contents(
         })
         .unwrap_or(FullTextSearchFieldUpdate::Absent)
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET: &str = "kamu-datasets";
-pub(crate) const FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET_VERSION: u32 = 1;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const FIELD_DATASET_NAME: &str = "dataset_name";
-const FIELD_ALIAS: &str = "alias";
-const FIELD_OWNER_NAME: &str = "owner_name";
-const FIELD_OWNER_ID: &str = "owner_id";
-const FIELD_KIND: &str = "kind";
-const FIELD_CREATED_AT: &str = "created_at";
-const FIELD_REF_CHANGED_AT: &str = "ref_changed_at";
-const FIELD_SCHEMA_FIELDS: &str = "schema_fields";
-const FIELD_DESCRIPTION: &str = "description";
-const FIELD_KEYWORDS: &str = "keywords";
-const FIELD_ATTACHMENTS: &str = "attachments";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const DATASET_FIELDS: &[FullTextSchemaField] = &[
-    FullTextSchemaField {
-        path: FIELD_DATASET_NAME,
-        role: FullTextSchemaFieldRole::Identifier {
-            hierarchical: true,
-            enable_edge_ngrams: true,
-            enable_inner_ngrams: true,
-        },
-    },
-    FullTextSchemaField {
-        path: FIELD_ALIAS,
-        role: FullTextSchemaFieldRole::Identifier {
-            hierarchical: true,
-            enable_edge_ngrams: false,
-            enable_inner_ngrams: false,
-        },
-    },
-    FullTextSchemaField {
-        path: FIELD_OWNER_NAME,
-        role: FullTextSchemaFieldRole::Identifier {
-            hierarchical: true,
-            enable_edge_ngrams: true,
-            enable_inner_ngrams: true,
-        },
-    },
-    FullTextSchemaField {
-        path: FIELD_OWNER_ID,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_KIND,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_CREATED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
-    },
-    FullTextSchemaField {
-        path: FIELD_REF_CHANGED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
-    },
-    FullTextSchemaField {
-        path: FIELD_SCHEMA_FIELDS,
-        role: FullTextSchemaFieldRole::Identifier {
-            hierarchical: false,
-            enable_edge_ngrams: true,
-            enable_inner_ngrams: true,
-        },
-    },
-    FullTextSchemaField {
-        path: FIELD_DESCRIPTION,
-        role: FullTextSchemaFieldRole::Prose {
-            enable_positions: false, // short prose
-        },
-    },
-    FullTextSchemaField {
-        path: FIELD_KEYWORDS,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_ATTACHMENTS,
-        role: FullTextSchemaFieldRole::Prose {
-            enable_positions: true, // long prose
-        },
-    },
-];
-
-pub(crate) const DATASET_FULL_TEXT_SEARCH_ENTITY_SCHEMA: FullTextSearchEntitySchema =
-    FullTextSearchEntitySchema {
-        entity_kind: FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
-        version: FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET_VERSION,
-        fields: DATASET_FIELDS,
-        upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
-    };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

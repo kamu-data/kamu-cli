@@ -25,7 +25,7 @@ pub struct ElasticSearchFullTextRepo {
 
 #[derive(Default)]
 struct State {
-    registered_schemas: HashMap<FullTextEntityKind, FullTextSearchEntitySchema>,
+    registered_schemas: HashMap<FullTextEntitySchemaName, FullTextSearchEntitySchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,42 +54,42 @@ impl ElasticSearchFullTextRepo {
     fn resolve_index_name(
         &self,
         client: &es_client::ElasticSearchClient,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
     ) -> Result<String, InternalError> {
         let state = self.state.read().unwrap();
-        let Some(schema) = state.registered_schemas.get(&kind) else {
+        let Some(schema) = state.registered_schemas.get(&schema_name) else {
             return Err(InternalError::new(format!(
-                "Entity kind '{kind}' is not registered in full-text search repository",
+                "Entity schema '{schema_name}' is not registered in full-text search repository",
             )));
         };
 
         let entity_index = es_helpers::ElasticSearchVersionedEntityIndex::new(
             client,
             &self.config,
-            schema.entity_kind,
+            schema.schema_name,
             schema.version,
         );
         Ok(entity_index.index_name())
     }
 
-    fn resolve_entity_kinds_to_index_names(
+    fn resolve_entity_schemas_to_index_names(
         &self,
         client: &es_client::ElasticSearchClient,
-        kinds: &[FullTextEntityKind],
-    ) -> Result<HashMap<String, FullTextEntityKind>, InternalError> {
-        // If no kinds specified, use all registered schemas
-        let kinds_to_resolve: Vec<FullTextEntityKind> = if kinds.is_empty() {
+        schema_names: &[FullTextEntitySchemaName],
+    ) -> Result<HashMap<String, FullTextEntitySchemaName>, InternalError> {
+        // If no schema_names specified, use all registered schemas
+        let schema_names_to_resolve: Vec<FullTextEntitySchemaName> = if schema_names.is_empty() {
             let state = self.state.read().unwrap();
             state.registered_schemas.keys().copied().collect()
         } else {
-            kinds.to_vec()
+            schema_names.to_vec()
         };
 
-        kinds_to_resolve
+        schema_names_to_resolve
             .iter()
-            .map(|kind| {
-                let index_name = self.resolve_index_name(client, kind)?;
-                Ok((index_name, *kind))
+            .map(|schema_name| {
+                let index_name = self.resolve_index_name(client, schema_name)?;
+                Ok((index_name, *schema_name))
             })
             .collect::<Result<HashMap<_, _>, InternalError>>()
     }
@@ -110,24 +110,23 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         level = "debug",
         name=ElasticSearchFullTextRepo_ensure_entity_index,
         skip_all, fields(
-            entity_kind = %entity_schema.entity_kind,
-            version = entity_schema.version
+            entity_kind = %schema.schema_name,
+            version = schema.version
         )
     )]
     async fn ensure_entity_index(
         &self,
-        entity_schema: &FullTextSearchEntitySchema,
+        schema: &FullTextSearchEntitySchema,
     ) -> Result<(), FullTextSearchEnsureEntityIndexError> {
         {
             // Check if schema is already registered
             let state = self.state.read().unwrap();
-            if let Some(registered_schema) = state.registered_schemas.get(entity_schema.entity_kind)
-            {
+            if let Some(registered_schema) = state.registered_schemas.get(schema.schema_name) {
                 tracing::info!(
-                    entity_kind = %entity_schema.entity_kind,
+                    entity_kind = %schema.schema_name,
                     "Full-text search entity schema is already registered, skipping",
                 );
-                assert!(registered_schema.version == entity_schema.version);
+                assert!(registered_schema.version == schema.version);
                 return Ok(());
             }
         }
@@ -135,14 +134,14 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         let index = es_helpers::ElasticSearchVersionedEntityIndex::new(
             self.es_client().await?,
             &self.config,
-            entity_schema.entity_kind,
-            entity_schema.version,
+            schema.schema_name,
+            schema.version,
         );
 
-        let mappings = es_helpers::ElasticSearchIndexMappings::from_entity_schema(entity_schema);
+        let mappings = es_helpers::ElasticSearchIndexMappings::from_entity_schema(schema);
 
         let outcome = index
-            .ensure_version_existence(mappings, entity_schema.upgrade_mode)
+            .ensure_version_existence(mappings, schema.upgrade_mode)
             .await?;
 
         use es_helpers::EntityIndexEnsureOutcome;
@@ -158,7 +157,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 actual_hash,
             } => {
                 return Err(FullTextSearchEnsureEntityIndexError::SchemaDriftDetected {
-                    entity_kind: entity_schema.entity_kind,
+                    schema_name: schema.schema_name,
                     version: existing_version,
                     alias,
                     index,
@@ -173,7 +172,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 attempted_version,
             } => {
                 return Err(FullTextSearchEnsureEntityIndexError::DowngradeAttempted {
-                    entity_kind: entity_schema.entity_kind,
+                    schema_name: schema.schema_name,
                     existing_version,
                     attempted_version,
                     alias,
@@ -187,7 +186,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
             let mut state = self.state.write().unwrap();
             state
                 .registered_schemas
-                .insert(entity_schema.entity_kind, entity_schema.clone());
+                .insert(schema.schema_name, schema.clone());
         }
 
         Ok(())
@@ -199,10 +198,13 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         client.total_documents().await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_documents_of_kind, skip_all, fields(kind))]
-    async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError> {
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_documents_of_kind, skip_all, fields(schema_name))]
+    async fn documents_of_kind(
+        &self,
+        schema_name: FullTextEntitySchemaName,
+    ) -> Result<u64, InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, kind)?;
+        let index_name = self.resolve_index_name(client, schema_name)?;
         client.documents_in_index(&index_name).await.int_err()
     }
 
@@ -214,21 +216,17 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         let client = self.es_client().await?;
 
         // Resolve affected index names
-        let entity_kinds_by_index_names =
-            self.resolve_entity_kinds_to_index_names(client, &req.kinds)?;
+        let schema_names_by_index_names =
+            self.resolve_entity_schemas_to_index_names(client, &req.entity_schemas)?;
 
         // Involved indexes
-        let involved_index_names: Vec<&str> = entity_kinds_by_index_names
+        let involved_index_names: Vec<&str> = schema_names_by_index_names
             .keys()
             .map(std::string::String::as_str)
             .collect();
 
         // Build ElasticSearch request body
         let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(&req);
-        /*println!(
-            "\nES Search request: {}, indexes: {involved_index_names:?}\n",
-            serde_json::to_string_pretty(&req_body).unwrap()
-        );*/
 
         // Execute request
         let es_response: es_client::SearchResponse = client
@@ -247,7 +245,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 .into_iter()
                 .map(|hit| FullTextSearchHit {
                     id: hit.id.unwrap_or_default(),
-                    kind: entity_kinds_by_index_names
+                    schema_name: schema_names_by_index_names
                         .get(&hit.index)
                         .copied()
                         .unwrap_or("<unknown>"),
@@ -259,36 +257,36 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         })
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_index_bulk, skip_all, fields(kind, num_docs = docs.len()))]
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_index_bulk, skip_all, fields(schema_name, num_docs = docs.len()))]
     async fn index_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, kind)?;
+        let index_name = self.resolve_index_name(client, schema_name)?;
         client.bulk_index(&index_name, docs).await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_update_bulk, skip_all, fields(kind, num_updates = updates.len()))]
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_update_bulk, skip_all, fields(schema_name, num_updates = updates.len()))]
     async fn update_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         updates: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, kind)?;
+        let index_name = self.resolve_index_name(client, schema_name)?;
         client.bulk_update(&index_name, updates).await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_delete_bulk, skip_all, fields(kind, num_ids = ids.len()))]
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_delete_bulk, skip_all, fields(schema_name, num_ids = ids.len()))]
     async fn delete_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         ids: Vec<FullTextEntityId>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, kind)?;
+        let index_name = self.resolve_index_name(client, schema_name)?;
         client.bulk_delete(&index_name, ids).await.int_err()
     }
 }

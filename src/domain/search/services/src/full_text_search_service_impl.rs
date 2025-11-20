@@ -42,28 +42,28 @@ impl FullTextSearchService for FullTextSearchServiceImpl {
     async fn index_bulk(
         &self,
         _: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
-        self.full_text_repo.index_bulk(kind, docs).await
+        self.full_text_repo.index_bulk(schema_name, docs).await
     }
 
     async fn update_bulk(
         &self,
         _: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         updates: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
-        self.full_text_repo.update_bulk(kind, updates).await
+        self.full_text_repo.update_bulk(schema_name, updates).await
     }
 
     async fn delete_bulk(
         &self,
         _: FullTextSearchContext<'_>,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         ids: Vec<FullTextEntityId>,
     ) -> Result<(), InternalError> {
-        self.full_text_repo.delete_bulk(kind, ids).await
+        self.full_text_repo.delete_bulk(schema_name, ids).await
     }
 }
 

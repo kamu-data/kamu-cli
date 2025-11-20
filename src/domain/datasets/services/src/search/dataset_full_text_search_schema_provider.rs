@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::DatasetRegistryExt;
-use kamu_datasets::DatasetEntryService;
+use kamu_datasets::{DatasetEntryService, dataset_full_text_search_schema as dataset_schema};
 use kamu_search::*;
 
-use super::dataset_full_text_search_schema as dataset_schema;
+use super::dataset_full_text_search_schema_helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +34,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
     }
 
     fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
-        &[dataset_schema::DATASET_FULL_TEXT_SEARCH_ENTITY_SCHEMA]
+        &[dataset_schema::SCHEMA]
     }
 
     async fn run_schema_initial_indexing(
@@ -42,7 +42,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
         repo: &dyn FullTextSearchRepository,
         schema: &FullTextSearchEntitySchema,
     ) -> Result<usize, InternalError> {
-        assert!(schema.entity_kind == dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET);
+        assert!(schema.schema_name == dataset_schema::SCHEMA_NAME);
 
         // Process all datasets in chunks
 
@@ -63,8 +63,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
                 .int_err()?;
 
             // Index dataset
-            let dataset_document =
-                dataset_schema::index_dataset_from_scratch(dataset, &entry.owner_id).await?;
+            let dataset_document = index_dataset_from_scratch(dataset, &entry.owner_id).await?;
             let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
 
             tracing::debug!(
@@ -79,11 +78,8 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
 
             // Index in chunks to avoid memory overwhelming
             if dataset_documents.len() >= CHUNK_SIZE {
-                repo.index_bulk(
-                    dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
-                    dataset_documents,
-                )
-                .await?;
+                repo.index_bulk(dataset_schema::SCHEMA_NAME, dataset_documents)
+                    .await?;
                 total_indexed += CHUNK_SIZE;
                 dataset_documents = Vec::new();
             }
@@ -92,11 +88,8 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
         // Index remaining documents
         if !dataset_documents.is_empty() {
             let remaining_count = dataset_documents.len();
-            repo.index_bulk(
-                dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
-                dataset_documents,
-            )
-            .await?;
+            repo.index_bulk(dataset_schema::SCHEMA_NAME, dataset_documents)
+                .await?;
             total_indexed += remaining_count;
         }
 

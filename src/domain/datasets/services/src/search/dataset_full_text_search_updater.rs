@@ -16,11 +16,11 @@ use kamu_accounts::{
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
 use kamu_core::{DatasetRegistry, DatasetRegistryExt};
-use kamu_datasets::*;
+use kamu_datasets::{dataset_full_text_search_schema as dataset_schema, *};
 use kamu_search::*;
 use messaging_outbox::*;
 
-use super::dataset_full_text_search_schema as dataset_schema;
+use super::dataset_full_text_search_schema_helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,14 +62,13 @@ impl DatasetFullTextSearchUpdater {
 
         // Prepare dataset search document
         let dataset_document =
-            dataset_schema::index_dataset_from_scratch(dataset, &created_message.owner_account_id)
-                .await?;
+            index_dataset_from_scratch(dataset, &created_message.owner_account_id).await?;
 
         // Sent it to the full text search service for indexing
         self.full_text_search_service
             .index_bulk(
                 ctx,
-                dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
+                dataset_schema::SCHEMA_NAME,
                 vec![(created_message.dataset_id.to_string(), dataset_document)],
             )
             .await
@@ -95,7 +94,7 @@ impl DatasetFullTextSearchUpdater {
             .int_err()?;
 
         // Prepare partial update to dataset search document
-        let partial_update = dataset_schema::partial_update_for_new_interval(
+        let partial_update = partial_update_for_new_interval(
             dataset,
             &entry.owner_id,
             &updated_message.new_block_hash,
@@ -107,7 +106,7 @@ impl DatasetFullTextSearchUpdater {
         self.full_text_search_service
             .update_bulk(
                 ctx,
-                dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
+                dataset_schema::SCHEMA_NAME,
                 vec![(updated_message.dataset_id.to_string(), partial_update)],
             )
             .await
@@ -119,14 +118,13 @@ impl DatasetFullTextSearchUpdater {
         renamed_message: &DatasetLifecycleMessageRenamed,
     ) -> Result<(), InternalError> {
         // Prepare partial update to dataset search document
-        let partial_update =
-            dataset_schema::partial_update_for_rename(&renamed_message.new_dataset_alias);
+        let partial_update = partial_update_for_rename(&renamed_message.new_dataset_alias);
 
         // Send it to the full text search service for updating
         self.full_text_search_service
             .update_bulk(
                 ctx,
-                dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
+                dataset_schema::SCHEMA_NAME,
                 vec![(renamed_message.dataset_id.to_string(), partial_update)],
             )
             .await
@@ -140,7 +138,7 @@ impl DatasetFullTextSearchUpdater {
         self.full_text_search_service
             .delete_bulk(
                 ctx,
-                dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
+                dataset_schema::SCHEMA_NAME,
                 vec![dataset_id.to_string()],
             )
             .await
@@ -167,17 +165,13 @@ impl DatasetFullTextSearchUpdater {
                 Some(updated_account_message.new_account_name.clone()),
                 entry.name.clone(),
             );
-            let partial_update = dataset_schema::partial_update_for_rename(&new_alias);
+            let partial_update = partial_update_for_rename(&new_alias);
             updates.push((entry.id.to_string(), partial_update));
         }
 
         // Send them to the full text search service for updating
         self.full_text_search_service
-            .update_bulk(
-                ctx,
-                dataset_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_DATASET,
-                updates,
-            )
+            .update_bulk(ctx, dataset_schema::SCHEMA_NAME, updates)
             .await?;
 
         Ok(())

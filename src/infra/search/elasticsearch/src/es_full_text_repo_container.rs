@@ -115,41 +115,44 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
 
     async fn ensure_entity_index(
         &self,
-        entity_schema: &FullTextSearchEntitySchema,
+        schema: &FullTextSearchEntitySchema,
     ) -> Result<(), FullTextSearchEnsureEntityIndexError> {
-        self.inner().await?.ensure_entity_index(entity_schema).await
+        self.inner().await?.ensure_entity_index(schema).await
     }
 
     async fn total_documents(&self) -> Result<u64, InternalError> {
         self.inner().await?.total_documents().await
     }
 
-    async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError> {
-        self.inner().await?.documents_of_kind(kind).await
+    async fn documents_of_kind(
+        &self,
+        schema_name: FullTextEntitySchemaName,
+    ) -> Result<u64, InternalError> {
+        self.inner().await?.documents_of_kind(schema_name).await
     }
 
     async fn index_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
-        self.inner().await?.index_bulk(kind, docs).await
+        self.inner().await?.index_bulk(schema_name, docs).await
     }
 
     async fn update_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         updates: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
-        self.inner().await?.update_bulk(kind, updates).await
+        self.inner().await?.update_bulk(schema_name, updates).await
     }
 
     async fn delete_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         ids: Vec<FullTextEntityId>,
     ) -> Result<(), InternalError> {
-        self.inner().await?.delete_bulk(kind, ids).await
+        self.inner().await?.delete_bulk(schema_name, ids).await
     }
 }
 

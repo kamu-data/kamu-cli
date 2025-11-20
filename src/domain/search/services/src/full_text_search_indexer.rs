@@ -48,7 +48,7 @@ impl FullTextSearchIndexer {
                 match self.full_text_repo.ensure_entity_index(schema).await {
                     Ok(outcome) => {
                         tracing::info!(
-                            entity_kind = %schema.entity_kind,
+                            entity_kind = %schema.schema_name,
                             version = schema.version,
                             outcome = ?outcome,
                             "Ensured up-to-date full-text search index for entity",
@@ -56,7 +56,7 @@ impl FullTextSearchIndexer {
                     }
                     Err(e) => {
                         tracing::error!(
-                            entity_kind = %schema.entity_kind,
+                            entity_kind = %schema.schema_name,
                             error = ?e,
                             error_msg = %e,
                             "Failed to ensure full-text search index for entity",
@@ -77,11 +77,11 @@ impl FullTextSearchIndexer {
             for schema in schemas {
                 let num_existing_documents = self
                     .full_text_repo
-                    .documents_of_kind(schema.entity_kind)
+                    .documents_of_kind(schema.schema_name)
                     .await?;
                 if num_existing_documents == 0 {
                     tracing::info!(
-                        entity_kind = %schema.entity_kind,
+                        entity_kind = %schema.schema_name,
                         "No existing documents found, running full reindexing",
                     );
                     match provider
@@ -90,14 +90,14 @@ impl FullTextSearchIndexer {
                     {
                         Ok(num_indexed) => {
                             tracing::info!(
-                                entity_kind = %schema.entity_kind,
+                                entity_kind = %schema.schema_name,
                                 num_indexed,
                                 "Completed full reindexing of full-text search index for entity",
                             );
                         }
                         Err(e) => {
                             tracing::error!(
-                                entity_kind = %schema.entity_kind,
+                                entity_kind = %schema.schema_name,
                                 error = ?e,
                                 error_msg = %e,
                                 "Failed to run full reindexing of full-text search index for entity",
@@ -107,7 +107,7 @@ impl FullTextSearchIndexer {
                     }
                 } else {
                     tracing::info!(
-                        entity_kind = %schema.entity_kind,
+                        entity_kind = %schema.schema_name,
                         num_existing_documents,
                         "Existing documents found, skipping full reindexing",
                     );

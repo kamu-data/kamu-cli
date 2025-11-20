@@ -110,6 +110,12 @@ impl ElasticSearchClient {
         req_body: serde_json::Value,
         index_names: &[&str],
     ) -> Result<es_client::SearchResponse, ElasticSearchClientError> {
+        tracing::debug!(index_names = ?index_names, req_body = ?req_body, "Executing ElasticSearch search");
+        /*println!(
+            "\nES Search request: {}, indexes: {involved_index_names:?}\n",
+            serde_json::to_string_pretty(&req_body).unwrap()
+        );*/
+
         // Send request to ElasticSearch
         let response = self
             .client
@@ -121,7 +127,7 @@ impl ElasticSearchClient {
         // Obtain and log a raw response
         let response = ensure_client_response(response).await?;
         let body: serde_json::Value = response.json().await?;
-        tracing::debug!(body=?body, "Raw ElasticSearch response");
+        tracing::debug!(body = ?body, "Raw ElasticSearch response");
         /*println!(
             "\nRaw ES Search response: {}\n",
             serde_json::to_string_pretty(&body).unwrap()
@@ -555,6 +561,7 @@ async fn ensure_client_response(
     }
 
     let body_text = resp.text().await.unwrap_or_default();
+    // println!("ElasticSearch error response body: {body_text}" );
 
     #[derive(serde::Deserialize)]
     struct EsErrorRoot {

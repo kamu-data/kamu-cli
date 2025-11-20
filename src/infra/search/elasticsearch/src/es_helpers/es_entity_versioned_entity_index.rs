@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_search::{FullTextEntityKind, FullTextSearchEntitySchemaUpgradeMode};
+use kamu_search::{FullTextEntitySchemaName, FullTextSearchEntitySchemaUpgradeMode};
 
 use super::ElasticSearchIndexMappings;
 use crate::ElasticSearchFullTextSearchConfig;
@@ -21,7 +21,7 @@ use crate::es_client::ElasticSearchClient;
 pub struct ElasticSearchVersionedEntityIndex<'a> {
     client: &'a ElasticSearchClient,
     config: &'a ElasticSearchFullTextSearchConfig,
-    entity_kind: FullTextEntityKind,
+    schema_name: FullTextEntitySchemaName,
     version: u32,
 }
 
@@ -30,13 +30,13 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
     pub fn new(
         client: &'a ElasticSearchClient,
         config: &'a ElasticSearchFullTextSearchConfig,
-        entity_kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         version: u32,
     ) -> Self {
         Self {
             client,
             config,
-            entity_kind,
+            schema_name,
             version,
         }
     }
@@ -45,7 +45,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
         level = "info",
         name = ElasticSearchVersionedEntityIndex_ensure_version_existence,
         skip_all,
-        fields(entity_kind = self.entity_kind, version = self.version)
+        fields(schema_name = self.schema_name, version = self.version)
     )]
     pub async fn ensure_version_existence(
         &self,
@@ -207,24 +207,28 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
     pub fn alias_name(&self) -> String {
         if self.config.index_prefix.is_empty() {
-            self.entity_kind.to_string()
+            self.schema_name.to_string()
         } else {
             format!(
-                "{prefix}-{kind}",
+                "{prefix}-{schema_name}",
                 prefix = self.config.index_prefix,
-                kind = self.entity_kind
+                schema_name = self.schema_name
             )
         }
     }
 
     pub fn index_name(&self) -> String {
         if self.config.index_prefix.is_empty() {
-            format!("{kind}-v{ver}", kind = self.entity_kind, ver = self.version)
+            format!(
+                "{schema_name}-v{ver}",
+                schema_name = self.schema_name,
+                ver = self.version
+            )
         } else {
             format!(
-                "{prefix}-{kind}-{ver}",
+                "{prefix}-{schema_name}-{ver}",
                 prefix = self.config.index_prefix,
-                kind = self.entity_kind,
+                schema_name = self.schema_name,
                 ver = self.version
             )
         }

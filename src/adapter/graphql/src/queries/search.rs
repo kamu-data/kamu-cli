@@ -122,6 +122,9 @@ impl Search {
     ) -> Result<FullTextSearchResponse> {
         let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
 
+        use kamu_accounts::account_full_text_search_schema as account_schema;
+        use kamu_datasets::dataset_full_text_search_schema as dataset_schema;
+
         // TODO: max limit is 10,000 in ES, otherwise we need cursors
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
@@ -141,10 +144,14 @@ impl Search {
                     } else {
                         Some(prompt)
                     },
-                    source_fields: kamu_search::FullTextSearchRequestSourceFields::All,
-                    kinds: vec![], // TODO: pass entity kinds
-                    filter: None,  // TODO: pass filters
-                    sort: vec![],  // TODO: pass ordering criteria
+                    source: kamu_search::FullTextSearchRequestSourceSpec::All,
+                    entity_schemas: vec![account_schema::SCHEMA_NAME, dataset_schema::SCHEMA_NAME],
+                    filter: None, // TODO: pass filters
+                    sort: vec![kamu_search::FullTextSortSpec::ByField {
+                        field: kamu_search::FULL_TEXT_SEARCH_ALIAS_TITLE,
+                        direction: kamu_search::FullTextSortDirection::Ascending,
+                        nulls_first: false,
+                    }],
                     page: kamu_search::FullTextPageSpec {
                         limit: per_page,
                         offset: page * per_page,
@@ -163,7 +170,7 @@ impl Search {
                 .into_iter()
                 .map(|hit| FullTextSearchHit {
                     id: hit.id,
-                    kind: hit.kind.to_string(),
+                    schema_name: hit.schema_name.to_string(),
                     score: hit.score,
                     source: hit.source,
                 })
@@ -297,7 +304,7 @@ pub struct FullTextSearchResponse {
 #[derive(SimpleObject, Debug)]
 pub struct FullTextSearchHit {
     pub id: String,
-    pub kind: String,
+    pub schema_name: String,
     pub score: Option<f64>,
     pub source: serde_json::Value,
 }

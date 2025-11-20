@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{FullTextSchemaFieldRole, FullTextSearchEntitySchema};
+use kamu_search::{
+    FULL_TEXT_SEARCH_ALIAS_TITLE,
+    FullTextSchemaFieldRole,
+    FullTextSearchEntitySchema,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -88,7 +92,7 @@ impl ElasticSearchIndexMappings {
                         "kamu_inner_ngram"
                     ]
                 },
-                "kamu_title": {
+                "kamu_name": {
                     "type": "custom",
                     "tokenizer": "standard",
                     "filter": [
@@ -128,7 +132,7 @@ impl ElasticSearchIndexMappings {
                     enable_inner_ngrams,
                 ),
 
-                FullTextSchemaFieldRole::Title => Self::map_title_field(),
+                FullTextSchemaFieldRole::Name => Self::map_name_field(),
 
                 FullTextSchemaFieldRole::Prose { enable_positions } => {
                     Self::map_prose_field(enable_positions)
@@ -142,6 +146,14 @@ impl ElasticSearchIndexMappings {
             };
             mappings.insert(field.path.to_string(), field_mapping);
         }
+
+        mappings.insert(
+            FULL_TEXT_SEARCH_ALIAS_TITLE.to_string(),
+            serde_json::json!({
+                "type": "alias",
+                "path": entity_schema.title_field
+            }),
+        );
 
         let mappings_json = serde_json::json!({ "properties": mappings });
         let mappings_hash = Self::hash_json_normalized(&mappings_json);
@@ -219,11 +231,11 @@ impl ElasticSearchIndexMappings {
         mapping
     }
 
-    fn map_title_field() -> serde_json::Value {
+    fn map_name_field() -> serde_json::Value {
         serde_json::json!({
             "type": "text",
-            "analyzer": "kamu_title",
-            "search_analyzer": "kamu_title",
+            "analyzer": "kamu_name",
+            "search_analyzer": "kamu_name",
             "fields": {
                 "keyword": {
                     "type": "keyword",
@@ -233,7 +245,7 @@ impl ElasticSearchIndexMappings {
                 "ngram": {
                     "type": "text",
                     "analyzer": "kamu_ident_edge_ngram",
-                    "search_analyzer": "kamu_title"
+                    "search_analyzer": "kamu_name"
                 }
             }
         })

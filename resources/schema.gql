@@ -2775,7 +2775,7 @@ type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 
 type FullTextSearchHit {
 	id: String!
-	kind: String!
+	schemaName: String!
 	score: Float
 	source: JSON!
 }

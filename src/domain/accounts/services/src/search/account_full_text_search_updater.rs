@@ -10,11 +10,11 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_accounts::*;
+use kamu_accounts::{account_full_text_search_schema as account_schema, *};
 use kamu_search::*;
 use messaging_outbox::*;
 
-use super::account_full_text_search_schema as account_schema;
+use super::account_full_text_search_schema_helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,7 +41,7 @@ impl AccountFullTextSearchUpdater {
         ctx: FullTextSearchContext<'_>,
         new_account_message: &AccountLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        let doc = account_schema::index_from_parts(
+        let doc = index_from_parts(
             &new_account_message.account_name,
             &new_account_message.display_name,
             new_account_message.event_time,
@@ -50,7 +50,7 @@ impl AccountFullTextSearchUpdater {
         self.full_text_search_service
             .index_bulk(
                 ctx,
-                account_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT,
+                account_schema::SCHEMA_NAME,
                 vec![(new_account_message.account_id.to_string(), doc)],
             )
             .await
@@ -73,7 +73,7 @@ impl AccountFullTextSearchUpdater {
             return Ok(());
         }
 
-        let partial_update = account_schema::partial_update_for_account(
+        let partial_update = partial_update_for_account(
             &updated_account_message.new_account_name,
             &updated_account_message.new_display_name,
             updated_account_message.event_time,
@@ -82,7 +82,7 @@ impl AccountFullTextSearchUpdater {
         self.full_text_search_service
             .update_bulk(
                 ctx,
-                account_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT,
+                account_schema::SCHEMA_NAME,
                 vec![(
                     updated_account_message.account_id.to_string(),
                     partial_update,
@@ -99,7 +99,7 @@ impl AccountFullTextSearchUpdater {
         self.full_text_search_service
             .delete_bulk(
                 ctx,
-                account_schema::FULL_TEXT_SEARCH_ENTITY_KAMU_ACCOUNT,
+                account_schema::SCHEMA_NAME,
                 vec![account_id.to_string()],
             )
             .await

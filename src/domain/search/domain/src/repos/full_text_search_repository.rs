@@ -21,12 +21,15 @@ pub trait FullTextSearchRepository: Send + Sync {
 
     async fn ensure_entity_index(
         &self,
-        entity_schema: &FullTextSearchEntitySchema,
+        schema: &FullTextSearchEntitySchema,
     ) -> Result<(), FullTextSearchEnsureEntityIndexError>;
 
     async fn total_documents(&self) -> Result<u64, InternalError>;
 
-    async fn documents_of_kind(&self, kind: FullTextEntityKind) -> Result<u64, InternalError>;
+    async fn documents_of_kind(
+        &self,
+        schema_name: FullTextEntitySchemaName,
+    ) -> Result<u64, InternalError>;
 
     async fn search(
         &self,
@@ -35,19 +38,19 @@ pub trait FullTextSearchRepository: Send + Sync {
 
     async fn index_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError>;
 
     async fn update_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         updates: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError>;
 
     async fn delete_bulk(
         &self,
-        kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         ids: Vec<FullTextEntityId>,
     ) -> Result<(), InternalError>;
 }
@@ -56,21 +59,22 @@ pub trait FullTextSearchRepository: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct FullTextSearchEntitySchema {
-    pub entity_kind: FullTextEntityKind,
+    pub schema_name: FullTextEntitySchemaName,
     pub version: u32,
     pub fields: &'static [FullTextSchemaField],
+    pub title_field: FullTextSearchFieldPath,
     pub upgrade_mode: FullTextSearchEntitySchemaUpgradeMode,
 }
 
-pub type FullTextEntityKind = &'static str;
+pub type FullTextEntitySchemaName = &'static str;
 
 #[derive(Debug)]
 pub struct FullTextSchemaField {
-    pub path: FullTestSearchFieldPath,
+    pub path: FullTextSearchFieldPath,
     pub role: FullTextSchemaFieldRole,
 }
 
-pub type FullTestSearchFieldPath = &'static str;
+pub type FullTextSearchFieldPath = &'static str;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FullTextSchemaFieldRole {
@@ -79,7 +83,7 @@ pub enum FullTextSchemaFieldRole {
         enable_edge_ngrams: bool,
         enable_inner_ngrams: bool,
     },
-    Title,
+    Name,
     Prose {
         enable_positions: bool,
     },
@@ -97,16 +101,18 @@ pub enum FullTextSearchEntitySchemaUpgradeMode {
     BreakingRecreate,
 }
 
+pub const FULL_TEXT_SEARCH_ALIAS_TITLE: &str = "title";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
 pub enum FullTextSearchEnsureEntityIndexError {
     #[error(
-        "Entity index schema drift detected for entity '{entity_kind}', version {version}: \
+        "Entity index schema drift detected for entity '{schema_name}', version {version}: \
          expected mapping hash '{expected_hash}', actual mapping hash '{actual_hash}'"
     )]
     SchemaDriftDetected {
-        entity_kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         version: u32,
         alias: String,
         index: String,
@@ -115,11 +121,11 @@ pub enum FullTextSearchEnsureEntityIndexError {
     },
 
     #[error(
-        "Attempted to downgrade entity index for entity '{entity_kind}' from version \
+        "Attempted to downgrade entity index for entity '{schema_name}' from version \
          {existing_version} to {attempted_version}"
     )]
     DowngradeAttempted {
-        entity_kind: FullTextEntityKind,
+        schema_name: FullTextEntitySchemaName,
         existing_version: u32,
         alias: String,
         index: String,
@@ -134,21 +140,21 @@ pub enum FullTextSearchEnsureEntityIndexError {
 // Search request model
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FullTextSearchRequest {
     /// Free-text query
     pub query: Option<String>,
 
     /// Allowed entity types (empty means all)
-    pub kinds: Vec<FullTextEntityKind>,
+    pub entity_schemas: Vec<FullTextEntitySchemaName>,
 
     /// Requested source fields. If empty, only IDs will be returned.
-    pub source_fields: FullTextSearchRequestSourceFields,
+    pub source: FullTextSearchRequestSourceSpec,
 
     /// Structured filter
     pub filter: Option<FullTextSearchFilterExpr>,
 
-    /// Sorting specification
+    /// Sorting specification, Relevance by default
     pub sort: Vec<FullTextSortSpec>,
 
     /// Pagination specification
@@ -158,11 +164,12 @@ pub struct FullTextSearchRequest {
     pub debug: bool,
 }
 
-#[derive(Debug)]
-pub enum FullTextSearchRequestSourceFields {
+#[derive(Debug, Default)]
+pub enum FullTextSearchRequestSourceSpec {
     None,
+    #[default]
     All,
-    Particular(Vec<FullTestSearchFieldPath>),
+    Particular(Vec<FullTextSearchFieldPath>),
     Complex {
         include_patterns: Vec<String>,
         exclude_patterns: Vec<String>,
@@ -172,7 +179,7 @@ pub enum FullTextSearchRequestSourceFields {
 #[derive(Debug)]
 pub enum FullTextSearchFilterExpr {
     Field {
-        field: FullTestSearchFieldPath,
+        field: FullTextSearchFieldPath,
         op: FullTextSearchFilterOp,
     },
     And(Vec<FullTextSearchFilterExpr>),
@@ -186,23 +193,36 @@ pub enum FullTextSearchFilterOp {
     // TODO: Add more operators as needed
 }
 
-#[derive(Debug)]
-pub struct FullTextSortSpec {
-    pub field: FullTestSearchFieldPath,
-    pub direction: FullTextSortDirection,
-    pub nulls_first: bool,
+#[derive(Debug, Default)]
+pub enum FullTextSortSpec {
+    #[default]
+    Relevance,
+    ByField {
+        field: FullTextSearchFieldPath,
+        direction: FullTextSortDirection,
+        nulls_first: bool,
+    },
 }
 
 #[derive(Debug)]
 pub enum FullTextSortDirection {
-    Asc,
-    Desc,
+    Ascending,
+    Descending,
 }
 
 #[derive(Debug)]
 pub struct FullTextPageSpec {
     pub limit: usize,
     pub offset: usize,
+}
+
+impl Default for FullTextPageSpec {
+    fn default() -> Self {
+        Self {
+            limit: 10,
+            offset: 0,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -220,7 +240,7 @@ pub struct FullTextSearchResponse {
 #[derive(Debug)]
 pub struct FullTextSearchHit {
     pub id: String,
-    pub kind: FullTextEntityKind,
+    pub schema_name: FullTextEntitySchemaName,
     pub score: Option<f64>,
     pub highlights: BTreeMap<String, Vec<String>>,
     pub source: serde_json::Value,
