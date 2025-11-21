@@ -3237,7 +3237,7 @@ type MoleculeDataRoomDatasetV2 {
 	"""
 	dataset: Dataset!
 	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int): MoleculeDataRoomEntryV2Connection!
-	entry(path: CollectionPath!): MoleculeDataRoomEntryV2!
+	entry(path: CollectionPath!): MoleculeDataRoomEntryV2
 }
 
 type MoleculeDataRoomEntryV2 {
@@ -3276,47 +3276,63 @@ type MoleculeDataRoomEntryV2Edge {
 	node: MoleculeDataRoomEntryV2!
 }
 
-type MoleculeDataRoomFinishUploadFileResultV2 {
-	dummy: String!
+type MoleculeDataRoomFinishUploadFileResultSuccessV2 implements MoleculeDataRoomFinishUploadFileResultV2 {
+	message: String!
+	isSuccess: Boolean!
 }
 
-type MoleculeDataRoomMoveEntryResultV2 {
-	dummy: String!
+interface MoleculeDataRoomFinishUploadFileResultV2 {
+	isSuccess: Boolean!
+	message: String!
 }
 
 type MoleculeDataRoomMutV2 {
 	"""
 	Starts the process of uploading a file to the data room.
 	"""
-	startUploadFile(contentSize: Int!): MoleculeDataRoomUploadFileResultV2!
+	startUploadFile(
+		"""
+		Size of the file being uploaded
+		"""
+		contentLength: Int!,
+		"""
+		Media type of content (e.g. application/pdf)
+		"""
+		contentType: String
+	): StartUploadVersionResult!
 	"""
-	Finishes the process of uploading a file to the data room.
+	Allows creating a file, upload a new version, and link a file into the
+	data room via a single transaction.
 	"""
-	finishUploadFile(uploadToken: String!, ref: DatasetID!, path: CollectionPath!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!): MoleculeDataRoomFinishUploadFileResultV2!
+	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPath, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!, encryptionMetadata: JSON): MoleculeDataRoomFinishUploadFileResultV2!
 	"""
 	Moves an entry in the data room.
 	"""
-	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomMoveEntryResultV2!
+	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash): CollectionUpdateResult!
 	"""
 	Removes an entry from the data room.
 	"""
-	removeEntry(path: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomRemoveEntryResultV2!
+	removeEntry(path: CollectionPath!, expectedHead: Multihash): CollectionUpdateResult!
 	"""
 	Updates the metadata of a file in the data room.
 	"""
-	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!, expectedHead: Multihash!): MoleculeDataRoomUpdateFileMetadataResultV2!
+	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!, encryptionMetadata: JSON): MoleculeDataRoomUpdateFileMetadataResultV2!
 }
 
-type MoleculeDataRoomRemoveEntryResultV2 {
-	dummy: String!
+type MoleculeDataRoomUpdateFileMetadataResultEntryNotFoundV2 implements MoleculeDataRoomUpdateFileMetadataResultV2 {
+	ref: DatasetID!
+	isSuccess: Boolean!
+	message: String!
 }
 
-type MoleculeDataRoomUpdateFileMetadataResultV2 {
-	dummy: String!
+type MoleculeDataRoomUpdateFileMetadataResultSuccessV2 implements MoleculeDataRoomUpdateFileMetadataResultV2 {
+	message: String!
+	isSuccess: Boolean!
 }
 
-type MoleculeDataRoomUploadFileResultV2 {
-	dummy: String!
+interface MoleculeDataRoomUpdateFileMetadataResultV2 {
+	isSuccess: Boolean!
+	message: String!
 }
 
 type MoleculeMut {
@@ -4879,14 +4895,14 @@ interface UpdateReadmeResult {
 	message: String!
 }
 
-type UpdateVersionErrorCasFailed implements UpdateVersionResult {
+type UpdateVersionErrorCasFailed implements UpdateVersionResult & MoleculeDataRoomUpdateFileMetadataResultV2 {
 	expectedHead: Multihash!
 	actualHead: Multihash!
 	isSuccess: Boolean!
 	message: String!
 }
 
-type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
+type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult & MoleculeDataRoomUpdateFileMetadataResultV2 {
 	message: String!
 	isSuccess: Boolean!
 }
