@@ -248,10 +248,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
             .collect();
 
         // Build ElasticSearch request body
-        let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(
-            &req,
-            entity_schemas.as_slice(),
-        );
+        let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(&req);
 
         // Execute request
         let es_response: es_client::SearchResponse = client
@@ -281,6 +278,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                     } else {
                         None
                     },
+                    explanation: hit.explanation,
                 })
                 .collect(),
         })

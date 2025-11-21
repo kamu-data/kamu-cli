@@ -39,7 +39,7 @@ pub struct FullTextSearchRequest {
 
 #[derive(Debug, Default)]
 pub struct FullTextSearchOptions {
-    pub enable_debug_payload: bool,
+    pub enable_explain: bool,
     pub enable_highlighting: bool,
 }
 

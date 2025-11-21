@@ -26,6 +26,7 @@ pub struct FullTextSearchHit {
     pub score: Option<f64>,
     pub highlights: Option<Vec<FullTextSearchHighlight>>,
     pub source: serde_json::Value,
+    pub explanation: Option<serde_json::Value>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

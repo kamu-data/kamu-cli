@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,10 +14,7 @@ use kamu_search::*;
 pub struct ElasticSearchQueryBuilder {}
 
 impl ElasticSearchQueryBuilder {
-    pub fn build_search_query(
-        request: &FullTextSearchRequest,
-        _involved_entity_schemas: &[Arc<FullTextSearchEntitySchema>],
-    ) -> serde_json::Value {
+    pub fn build_search_query(request: &FullTextSearchRequest) -> serde_json::Value {
         let mut query_json = serde_json::json!({
             "query": Self::query_argument(request),
             "sort": Self::sort_argument(request),
@@ -30,6 +25,10 @@ impl ElasticSearchQueryBuilder {
 
         if let Some(highlight_json) = Self::highlight_argument(request) {
             query_json["highlight"] = highlight_json;
+        }
+
+        if request.options.enable_explain {
+            query_json["explain"] = serde_json::json!(true);
         }
 
         query_json

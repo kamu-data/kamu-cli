@@ -158,7 +158,7 @@ impl Search {
                             offset: page * per_page,
                         },
                         options: FullTextSearchOptions {
-                            enable_debug_payload: false,
+                            enable_explain: false,
                             enable_highlighting: true,
                         },
                     },

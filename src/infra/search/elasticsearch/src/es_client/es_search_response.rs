@@ -53,6 +53,9 @@ pub struct SearchHitResponse {
     pub source: Option<serde_json::Value>,
 
     pub highlight: Option<serde_json::Value>,
+
+    #[serde(rename = "_explanation")]
+    pub explanation: Option<serde_json::Value>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
