@@ -1437,6 +1437,7 @@ impl GraphQLMoleculeV1Harness {
 
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
             .add::<kamu_datasets_services::UpdateVersionFileUseCaseImpl>()
+            .add::<kamu_datasets_services::utils::UpdateVersionFileUseCaseHelper>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
             .add::<kamu::QueryDatasetDataUseCaseImpl>()
@@ -1449,6 +1450,10 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<kamu_adapter_http::platform::UploadServiceLocal>()
+            .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
+            .add_value(kamu_core::ServerUrlConfig::new_test(None))
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100500))
             .build();
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
