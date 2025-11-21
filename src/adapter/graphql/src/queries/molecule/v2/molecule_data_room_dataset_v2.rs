@@ -222,7 +222,7 @@ impl MoleculeVersionedFileV2 {
         categories: &Vec<MoleculeCategoryV2>,
         tags: &Vec<MoleculeTagV2>,
         content_text: &String,
-        encryption_metadata: &Option<Json<EncryptionMetadata>>,
+        encryption_metadata: Option<&Json<EncryptionMetadata>>,
     ) -> serde_json::Map<String, serde_json::Value> {
         let json_object = serde_json::json!({
             Self::COLUMN_NAME_ACCESS_LEVEL: access_level,

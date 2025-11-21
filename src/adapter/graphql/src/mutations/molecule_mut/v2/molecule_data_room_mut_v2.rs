@@ -104,7 +104,7 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
             &categories,
             &tags,
             &content_text,
-            &encryption_metadata,
+            encryption_metadata.as_ref(),
         );
 
         let content_type = content_args
@@ -205,7 +205,7 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
             &categories,
             &tags,
             &content_text,
-            &encryption_metadata,
+            encryption_metadata.as_ref(),
         );
 
         let content_type = content_args
@@ -471,7 +471,7 @@ impl MoleculeDataRoomMutV2<'_> {
                     content_text,
                     encryption_metadata,
                 )
-                .await?
+                .await?;
             }
             _ => return Err(GqlError::gql("Either `path` or `ref` must be specified")),
         }
@@ -568,7 +568,7 @@ impl MoleculeDataRoomMutV2<'_> {
             &categories,
             &tags,
             &content_text,
-            &encryption_metadata,
+            encryption_metadata.as_ref(),
         );
 
         // TODO: we need to do a retraction if any errors...
