@@ -9,8 +9,8 @@
 #   AND referenced_column_name = 'id';
 
 -- Delete the old constraint ...
-ALTER TABLE access_tokens
-    DROP FOREIGN KEY access_tokens_ibfk_1;
+-- ALTER TABLE access_tokens
+--    DROP FOREIGN KEY access_tokens_ibfk_1;
 
 -- ... and create a new one
 ALTER TABLE access_tokens
