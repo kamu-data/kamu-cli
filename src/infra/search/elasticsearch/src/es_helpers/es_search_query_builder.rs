@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{FullTextSearchRequest, FullTextSearchRequestSourceSpec, FullTextSortDirection};
+use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -15,14 +15,28 @@ pub struct ElasticSearchQueryBuilder {}
 
 impl ElasticSearchQueryBuilder {
     pub fn build_search_query(request: &FullTextSearchRequest) -> serde_json::Value {
-        let textual_query = Self::textual_query(request);
         serde_json::json!({
-            "query": textual_query,
+            "query": Self::query_argument(request),
             "sort": Self::sort_argument(request),
             "_source": Self::source_argument(request),
             "from": request.page.offset,
             "size": request.page.limit,
         })
+    }
+
+    fn query_argument(request: &FullTextSearchRequest) -> serde_json::Value {
+        let textual_query = Self::textual_query(request);
+        if let Some(filter_expr) = &request.filter {
+            let filter = Self::filter(filter_expr);
+            serde_json::json!({
+                "bool": {
+                    "must": textual_query,
+                    "filter": filter,
+                }
+            })
+        } else {
+            textual_query
+        }
     }
 
     fn textual_query(request: &FullTextSearchRequest) -> serde_json::Value {
@@ -38,6 +52,52 @@ impl ElasticSearchQueryBuilder {
             serde_json::json!({
                 "match_all": {}
             })
+        }
+    }
+
+    fn filter(filter_expr: &FullTextSearchFilterExpr) -> serde_json::Value {
+        match filter_expr {
+            FullTextSearchFilterExpr::Field { field, op } => match op {
+                FullTextSearchFilterOp::Eq(value) => {
+                    serde_json::json!({
+                        "term": {
+                            *field: value
+                        }
+                    })
+                }
+                FullTextSearchFilterOp::In(values) => {
+                    serde_json::json!({
+                        "terms": {
+                            *field: values
+                        }
+                    })
+                }
+            },
+            FullTextSearchFilterExpr::And(operands) => {
+                let parts = operands.iter().map(Self::filter).collect::<Vec<_>>();
+                serde_json::json!({
+                    "bool": {
+                        "must": parts
+                    },
+                })
+            }
+            FullTextSearchFilterExpr::Or(operands) => {
+                let parts = operands.iter().map(Self::filter).collect::<Vec<_>>();
+                serde_json::json!({
+                    "bool": {
+                        "should": parts,
+                        "minimum_should_match": 1,
+                    },
+                })
+            }
+            FullTextSearchFilterExpr::Not(operand) => {
+                let part = Self::filter(operand);
+                serde_json::json!({
+                    "bool": {
+                        "must_not": part,
+                    },
+                })
+            }
         }
     }
 

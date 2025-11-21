@@ -77,27 +77,29 @@ pub(crate) async fn index_dataset_from_scratch(
         FullTextSearchFieldUpdate::Present(v) => Some(v),
     };
 
+    use dataset_schema::*;
+
     // Prepare full text search document
     let alias = dataset.get_alias();
     Ok(serde_json::json!({
-        dataset_schema::FIELD_DATASET_NAME: alias.dataset_name.to_string(),
-        dataset_schema::FIELD_ALIAS: alias.to_string(),
-        dataset_schema::FIELD_OWNER_NAME: alias
+        FIELD_DATASET_NAME: alias.dataset_name.to_string(),
+        FIELD_ALIAS: alias.to_string(),
+        FIELD_OWNER_NAME: alias
             .account_name
             .as_ref()
             .map(std::string::ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-        dataset_schema::FIELD_OWNER_ID: owner_id.to_string(),
-        dataset_schema::FIELD_KIND: match dataset.get_kind() {
-            odf::DatasetKind::Root => "root".to_string(),
-            odf::DatasetKind::Derivative => "derivative".to_string(),
+        FIELD_OWNER_ID: owner_id.to_string(),
+        FIELD_KIND: match dataset.get_kind() {
+            odf::DatasetKind::Root => FIELD_VALUE_KIND_ROOT.to_string(),
+            odf::DatasetKind::Derivative => FIELD_VALUE_KIND_DERIVATIVE.to_string(),
         },
-        dataset_schema::FIELD_CREATED_AT: seed_event_time.to_rfc3339(),
-        dataset_schema::FIELD_REF_CHANGED_AT: head_event_time.to_rfc3339(),
-        dataset_schema::FIELD_SCHEMA_FIELDS: schema_fields_value,
-        dataset_schema::FIELD_DESCRIPTION: description_value,
-        dataset_schema::FIELD_KEYWORDS: keywords_value,
-        dataset_schema::FIELD_ATTACHMENTS: attachments_value,
+        FIELD_CREATED_AT: seed_event_time.to_rfc3339(),
+        FIELD_REF_CHANGED_AT: head_event_time.to_rfc3339(),
+        FIELD_SCHEMA_FIELDS: schema_fields_value,
+        FIELD_DESCRIPTION: description_value,
+        FIELD_KEYWORDS: keywords_value,
+        FIELD_ATTACHMENTS: attachments_value,
     }))
 }
 
@@ -159,33 +161,19 @@ pub(crate) async fn partial_update_for_new_interval(
         .int_err()?
         .system_time;
 
+    use dataset_schema::*;
+
     // Prepare partial update to full text search document
     // Only include fields that were actually touched in the interval
     let mut update = serde_json::Map::from_iter([(
-        dataset_schema::FIELD_REF_CHANGED_AT.to_string(),
+        FIELD_REF_CHANGED_AT.to_string(),
         serde_json::json!(new_head_event_time.to_rfc3339()),
     )]);
 
-    insert_full_text_incremental_update_field(
-        &mut update,
-        dataset_schema::FIELD_SCHEMA_FIELDS,
-        schema_fields,
-    );
-    insert_full_text_incremental_update_field(
-        &mut update,
-        dataset_schema::FIELD_DESCRIPTION,
-        description,
-    );
-    insert_full_text_incremental_update_field(
-        &mut update,
-        dataset_schema::FIELD_KEYWORDS,
-        keywords,
-    );
-    insert_full_text_incremental_update_field(
-        &mut update,
-        dataset_schema::FIELD_ATTACHMENTS,
-        attachments,
-    );
+    insert_full_text_incremental_update_field(&mut update, FIELD_SCHEMA_FIELDS, schema_fields);
+    insert_full_text_incremental_update_field(&mut update, FIELD_DESCRIPTION, description);
+    insert_full_text_incremental_update_field(&mut update, FIELD_KEYWORDS, keywords);
+    insert_full_text_incremental_update_field(&mut update, FIELD_ATTACHMENTS, attachments);
 
     Ok(serde_json::Value::Object(update))
 }
@@ -193,11 +181,12 @@ pub(crate) async fn partial_update_for_new_interval(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn partial_update_for_rename(new_alias: &odf::DatasetAlias) -> serde_json::Value {
+    use dataset_schema::*;
     serde_json::json!({
-        dataset_schema::FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
+        FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-        dataset_schema::FIELD_DATASET_NAME: new_alias.dataset_name.to_string(),
-        dataset_schema::FIELD_ALIAS: new_alias.to_string(),
+        FIELD_DATASET_NAME: new_alias.dataset_name.to_string(),
+        FIELD_ALIAS: new_alias.to_string(),
     })
 }
 

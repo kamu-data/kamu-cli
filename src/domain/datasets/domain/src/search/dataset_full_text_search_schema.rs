@@ -33,6 +33,9 @@ pub const FIELD_DESCRIPTION: &str = "description";
 pub const FIELD_KEYWORDS: &str = "keywords";
 pub const FIELD_ATTACHMENTS: &str = "attachments";
 
+pub const FIELD_VALUE_KIND_ROOT: &str = "root";
+pub const FIELD_VALUE_KIND_DERIVATIVE: &str = "derivative";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const SCHEMA_FIELDS: &[FullTextSchemaField] = &[

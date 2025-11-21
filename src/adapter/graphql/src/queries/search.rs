@@ -122,7 +122,7 @@ impl Search {
     ) -> Result<FullTextSearchResponse> {
         let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
 
-        use kamu_accounts::account_full_text_search_schema as account_schema;
+        // use kamu_accounts::account_full_text_search_schema as account_schema;
         use kamu_datasets::dataset_full_text_search_schema as dataset_schema;
 
         // TODO: max limit is 10,000 in ES, otherwise we need cursors
@@ -135,31 +135,31 @@ impl Search {
             actor_account_id: None, // TODO: support access control
         };
 
-        let search_results = full_text_search_service
-            .search(
-                context,
-                kamu_search::FullTextSearchRequest {
-                    query: if prompt.is_empty() {
-                        None
-                    } else {
-                        Some(prompt)
+        let search_results = {
+            use kamu_search::*;
+
+            full_text_search_service
+                .search(
+                    context,
+                    FullTextSearchRequest {
+                        query: if prompt.is_empty() {
+                            None
+                        } else {
+                            Some(prompt)
+                        },
+                        source: FullTextSearchRequestSourceSpec::All,
+                        entity_schemas: vec![dataset_schema::SCHEMA_NAME],
+                        filter: None,
+                        sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
+                        page: FullTextPageSpec {
+                            limit: per_page,
+                            offset: page * per_page,
+                        },
+                        debug: false,
                     },
-                    source: kamu_search::FullTextSearchRequestSourceSpec::All,
-                    entity_schemas: vec![account_schema::SCHEMA_NAME, dataset_schema::SCHEMA_NAME],
-                    filter: None, // TODO: pass filters
-                    sort: vec![kamu_search::FullTextSortSpec::ByField {
-                        field: kamu_search::FULL_TEXT_SEARCH_ALIAS_TITLE,
-                        direction: kamu_search::FullTextSortDirection::Ascending,
-                        nulls_first: false,
-                    }],
-                    page: kamu_search::FullTextPageSpec {
-                        limit: per_page,
-                        offset: page * per_page,
-                    },
-                    debug: false,
-                },
-            )
-            .await?;
+                )
+                .await
+        }?;
 
         Ok(FullTextSearchResponse {
             took_ms: search_results.took_ms,

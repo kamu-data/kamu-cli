@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+mod full_text_search_filter;
+mod full_text_search_request;
+mod full_text_search_response;
+mod full_text_search_schema;
+mod full_text_search_sorting;
 
-mod domain;
-mod repos;
-mod services;
-
-pub use domain::*;
-pub use repos::*;
-pub use services::*;
+pub use full_text_search_filter::*;
+pub use full_text_search_request::*;
+pub use full_text_search_response::*;
+pub use full_text_search_schema::*;
+pub use full_text_search_sorting::*;
