@@ -15,6 +15,13 @@ use kamu_search::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const FIELD_SUFFIX_KEYWORD: &str = "keyword";
+pub const FIELD_SUFFIX_NGRAM: &str = "ngram";
+pub const FIELD_SUFFIX_SUBSTR: &str = "substr";
+pub const FIELD_SUFFIX_TOKENS: &str = "tokens";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ElasticSearchIndexMappings {
     pub mappings_json: serde_json::Value,
     pub mappings_hash: String,
@@ -179,7 +186,7 @@ impl ElasticSearchIndexMappings {
 
         if hierarchical {
             fields.insert(
-                "tokens".to_string(),
+                FIELD_SUFFIX_TOKENS.to_string(),
                 serde_json::json!({
                     "type": "text",
                     "analyzer": "kamu_ident_parts",
@@ -190,7 +197,7 @@ impl ElasticSearchIndexMappings {
 
         if edge_ngrams {
             fields.insert(
-                "ngram".to_string(),
+                FIELD_SUFFIX_NGRAM.to_string(),
                 serde_json::json!({
                     "type": "text",
                     "analyzer": "kamu_ident_edge_ngram",
@@ -201,7 +208,7 @@ impl ElasticSearchIndexMappings {
 
         if inner_ngrams {
             fields.insert(
-                "substr".to_string(),
+                FIELD_SUFFIX_SUBSTR.to_string(),
                 serde_json::json!({
                     "type": "text",
                     "analyzer": "kamu_ident_inner_ngram",
@@ -237,12 +244,12 @@ impl ElasticSearchIndexMappings {
             "analyzer": "kamu_name",
             "search_analyzer": "kamu_name",
             "fields": {
-                "keyword": {
+                FIELD_SUFFIX_KEYWORD: {
                     "type": "keyword",
                     "normalizer": "kamu_keyword_norm",
                     "ignore_above": 1024
                 },
-                "ngram": {
+                FIELD_SUFFIX_NGRAM: {
                     "type": "text",
                     "analyzer": "kamu_ident_edge_ngram",
                     "search_analyzer": "kamu_name"

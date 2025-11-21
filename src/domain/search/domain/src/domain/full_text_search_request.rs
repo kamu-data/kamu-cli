@@ -31,8 +31,16 @@ pub struct FullTextSearchRequest {
     /// Pagination specification
     pub page: FullTextPageSpec,
 
-    /// Debug payload enabled
-    pub debug: bool,
+    /// Options
+    pub options: FullTextSearchOptions,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct FullTextSearchOptions {
+    pub enable_debug_payload: bool,
+    pub enable_highlighting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

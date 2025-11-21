@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -14,14 +16,23 @@ use kamu_search::*;
 pub struct ElasticSearchQueryBuilder {}
 
 impl ElasticSearchQueryBuilder {
-    pub fn build_search_query(request: &FullTextSearchRequest) -> serde_json::Value {
-        serde_json::json!({
+    pub fn build_search_query(
+        request: &FullTextSearchRequest,
+        _involved_entity_schemas: &[Arc<FullTextSearchEntitySchema>],
+    ) -> serde_json::Value {
+        let mut query_json = serde_json::json!({
             "query": Self::query_argument(request),
             "sort": Self::sort_argument(request),
             "_source": Self::source_argument(request),
             "from": request.page.offset,
             "size": request.page.limit,
-        })
+        });
+
+        if let Some(highlight_json) = Self::highlight_argument(request) {
+            query_json["highlight"] = highlight_json;
+        }
+
+        query_json
     }
 
     fn query_argument(request: &FullTextSearchRequest) -> serde_json::Value {
@@ -156,6 +167,20 @@ impl ElasticSearchQueryBuilder {
             relevance_sort()
         } else {
             serde_json::Value::Array(parts)
+        }
+    }
+
+    fn highlight_argument(request: &FullTextSearchRequest) -> Option<serde_json::Value> {
+        if request.options.enable_highlighting {
+            Some(serde_json::json!({
+                "pre_tags": ["<em>"],
+                "post_tags": ["</em>"],
+                "fields": {
+                    "*": { "fragment_size": 100, "number_of_fragments": 1 }
+                }
+            }))
+        } else {
+            None
         }
     }
 }

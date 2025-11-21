@@ -50,7 +50,7 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
         path: FIELD_ALIAS,
         role: FullTextSchemaFieldRole::Identifier {
-            hierarchical: true,
+            hierarchical: false,
             enable_edge_ngrams: false,
             enable_inner_ngrams: false,
         },

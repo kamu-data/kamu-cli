@@ -135,6 +135,7 @@ impl Search {
             actor_account_id: None, // TODO: support access control
         };
 
+        // Run actual search request
         let search_results = {
             use kamu_search::*;
 
@@ -150,17 +151,22 @@ impl Search {
                         source: FullTextSearchRequestSourceSpec::All,
                         entity_schemas: vec![dataset_schema::SCHEMA_NAME],
                         filter: None,
-                        sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
+                        // sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
+                        sort: vec![],
                         page: FullTextPageSpec {
                             limit: per_page,
                             offset: page * per_page,
                         },
-                        debug: false,
+                        options: FullTextSearchOptions {
+                            enable_debug_payload: false,
+                            enable_highlighting: true,
+                        },
                     },
                 )
                 .await
         }?;
 
+        // Convert into GQL response
         Ok(FullTextSearchResponse {
             took_ms: search_results.took_ms,
             timeout: search_results.timeout,
@@ -173,6 +179,15 @@ impl Search {
                     schema_name: hit.schema_name.to_string(),
                     score: hit.score,
                     source: hit.source,
+                    highlights: hit.highlights.map(|highlights| {
+                        highlights
+                            .into_iter()
+                            .map(|h| FullTextSearchHighlight {
+                                field: h.field,
+                                best_fragment: h.best_fragment,
+                            })
+                            .collect()
+                    }),
                 })
                 .collect(),
         })
@@ -307,6 +322,13 @@ pub struct FullTextSearchHit {
     pub schema_name: String,
     pub score: Option<f64>,
     pub source: serde_json::Value,
+    pub highlights: Option<Vec<FullTextSearchHighlight>>,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct FullTextSearchHighlight {
+    pub field: String,
+    pub best_fragment: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

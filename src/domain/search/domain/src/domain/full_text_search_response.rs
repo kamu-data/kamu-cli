@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
-
 use crate::FullTextEntitySchemaName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,8 +24,16 @@ pub struct FullTextSearchHit {
     pub id: String,
     pub schema_name: FullTextEntitySchemaName,
     pub score: Option<f64>,
-    pub highlights: BTreeMap<String, Vec<String>>,
+    pub highlights: Option<Vec<FullTextSearchHighlight>>,
     pub source: serde_json::Value,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct FullTextSearchHighlight {
+    pub field: String,
+    pub best_fragment: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

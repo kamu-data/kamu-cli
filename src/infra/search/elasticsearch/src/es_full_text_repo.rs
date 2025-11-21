@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_search::*;
 
+use crate::es_helpers::ElasticSearchHighlightExtractor;
 use crate::{ElasticSearchFullTextSearchConfig, es_client, es_helpers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +26,7 @@ pub struct ElasticSearchFullTextRepo {
 
 #[derive(Default)]
 struct State {
-    registered_schemas: HashMap<FullTextEntitySchemaName, FullTextSearchEntitySchema>,
+    registered_schemas: HashMap<FullTextEntitySchemaName, Arc<FullTextSearchEntitySchema>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,24 +73,43 @@ impl ElasticSearchFullTextRepo {
         Ok(entity_index.index_name())
     }
 
-    fn resolve_entity_schemas_to_index_names(
+    fn resolve_entity_schemas(
+        &self,
+        schema_names: &[FullTextEntitySchemaName],
+    ) -> Result<Vec<Arc<FullTextSearchEntitySchema>>, InternalError> {
+        let state = self.state.read().unwrap();
+        let mut schemas = Vec::new();
+        if schema_names.is_empty() {
+            // If no schema_names specified, use all registered schemas
+            for schema in state.registered_schemas.values() {
+                schemas.push(Arc::clone(schema));
+            }
+        } else {
+            for schema_name in schema_names {
+                let Some(schema) = state.registered_schemas.get(schema_name) else {
+                    return Err(InternalError::new(format!(
+                        "Entity schema '{schema_name}' is not registered in full-text search \
+                         repository",
+                    )));
+                };
+                schemas.push(Arc::clone(schema));
+            }
+        }
+        Ok(schemas)
+    }
+
+    fn resolve_index_names(
         &self,
         client: &es_client::ElasticSearchClient,
-        schema_names: &[FullTextEntitySchemaName],
+        entity_schemas: &[Arc<FullTextSearchEntitySchema>],
     ) -> Result<HashMap<String, FullTextEntitySchemaName>, InternalError> {
-        // If no schema_names specified, use all registered schemas
-        let schema_names_to_resolve: Vec<FullTextEntitySchemaName> = if schema_names.is_empty() {
-            let state = self.state.read().unwrap();
-            state.registered_schemas.keys().copied().collect()
-        } else {
-            schema_names.to_vec()
-        };
+        assert!(!entity_schemas.is_empty());
 
-        schema_names_to_resolve
+        entity_schemas
             .iter()
-            .map(|schema_name| {
-                let index_name = self.resolve_index_name(client, schema_name)?;
-                Ok((index_name, *schema_name))
+            .map(|schema| {
+                let index_name = self.resolve_index_name(client, schema.schema_name)?;
+                Ok((index_name, schema.schema_name))
             })
             .collect::<Result<HashMap<_, _>, InternalError>>()
     }
@@ -186,7 +206,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
             let mut state = self.state.write().unwrap();
             state
                 .registered_schemas
-                .insert(schema.schema_name, schema.clone());
+                .insert(schema.schema_name, Arc::new(schema.clone()));
         }
 
         Ok(())
@@ -215,9 +235,11 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
     ) -> Result<FullTextSearchResponse, InternalError> {
         let client = self.es_client().await?;
 
+        // Resolve entity schemas
+        let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
+
         // Resolve affected index names
-        let schema_names_by_index_names =
-            self.resolve_entity_schemas_to_index_names(client, &req.entity_schemas)?;
+        let schema_names_by_index_names = self.resolve_index_names(client, &entity_schemas)?;
 
         // Involved indexes
         let involved_index_names: Vec<&str> = schema_names_by_index_names
@@ -226,7 +248,10 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
             .collect();
 
         // Build ElasticSearch request body
-        let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(&req);
+        let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(
+            &req,
+            entity_schemas.as_slice(),
+        );
 
         // Execute request
         let es_response: es_client::SearchResponse = client
@@ -251,7 +276,11 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                         .unwrap_or("<unknown>"),
                     score: hit.score,
                     source: hit.source.unwrap_or_default(),
-                    highlights: BTreeMap::new(), // TODO: extract from highlight
+                    highlights: if let Some(highlight_json) = hit.highlight {
+                        ElasticSearchHighlightExtractor::extract_highlights(&highlight_json)
+                    } else {
+                        None
+                    },
                 })
                 .collect(),
         })

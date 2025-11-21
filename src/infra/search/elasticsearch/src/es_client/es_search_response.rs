@@ -42,12 +42,17 @@ pub enum SearchHitsTotalRelation {
 pub struct SearchHitResponse {
     #[serde(rename = "_index")]
     pub index: String,
+
     #[serde(rename = "_id")]
     pub id: Option<String>,
+
     #[serde(rename = "_score")]
     pub score: Option<f64>,
+
     #[serde(rename = "_source")]
     pub source: Option<serde_json::Value>,
+
+    pub highlight: Option<serde_json::Value>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

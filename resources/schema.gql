@@ -2773,11 +2773,17 @@ type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 	message: String!
 }
 
+type FullTextSearchHighlight {
+	field: String!
+	bestFragment: String!
+}
+
 type FullTextSearchHit {
 	id: String!
 	schemaName: String!
 	score: Float
 	source: JSON!
+	highlights: [FullTextSearchHighlight!]
 }
 
 type FullTextSearchResponse {

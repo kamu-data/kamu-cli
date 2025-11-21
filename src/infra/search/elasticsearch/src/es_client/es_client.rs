@@ -112,7 +112,7 @@ impl ElasticSearchClient {
     ) -> Result<es_client::SearchResponse, ElasticSearchClientError> {
         tracing::debug!(index_names = ?index_names, req_body = ?req_body, "Executing ElasticSearch search");
         /*println!(
-            "\nES Search request: {}, indexes: {involved_index_names:?}\n",
+            "\nES Search request: {}, indexes: {index_names:?}\n",
             serde_json::to_string_pretty(&req_body).unwrap()
         );*/
 
