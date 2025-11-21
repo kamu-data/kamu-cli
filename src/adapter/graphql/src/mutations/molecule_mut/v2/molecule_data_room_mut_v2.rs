@@ -377,6 +377,8 @@ impl MoleculeDataRoomMutV2<'_> {
             Arc<dyn kamu_core::DatasetRegistry>
         );
 
+        // 1. Update the versioned dataset.
+
         // NOTE: Access rights will be checked inside the use case.
         let entry_dataset_handle = {
             use odf::DatasetRefUnresolvedError as E;
@@ -384,17 +386,20 @@ impl MoleculeDataRoomMutV2<'_> {
                 .resolve_dataset_handle_by_ref(&reference.as_ref().as_local_ref())
                 .await
             {
+                // TODO: Check if the versioned dataset is in data room at all?
                 Ok(hdl) => hdl,
                 Err(E::NotFound(_)) => {
                     return Ok(MoleculeDataRoomUpdateFileMetadataResultV2::EntryNotFound(
-                        MoleculeDataRoomEntryNotFoundV2 { r#ref: reference },
+                        MoleculeDataRoomUpdateFileMetadataResultEntryNotFoundV2 {
+                            r#ref: reference,
+                        },
                     ));
                 }
                 Err(e @ E::Internal(_)) => return Err(e.int_err().into()),
             }
         };
 
-        let extra_data = MoleculeVersionedFileV2::build_extra_data_json_map(
+        let versioned_file_extra_data = MoleculeVersionedFileV2::build_extra_data_json_map(
             &access_level,
             &change_by,
             &description,
@@ -404,56 +409,91 @@ impl MoleculeDataRoomMutV2<'_> {
             &encryption_metadata,
         );
 
-        match update_version_file_use_case
+        // TODO: we need to do a retraction if any errors...
+        let _new_version = update_version_file_use_case
             .execute(
                 &entry_dataset_handle,
                 None,
-                expected_head.map(Into::into),
-                Some(ExtraDataFields::new(extra_data)),
+                None,
+                Some(ExtraDataFields::new(versioned_file_extra_data)),
             )
             .await
+            .int_err()?
+            .new_version;
+
+        Ok(MoleculeDataRoomUpdateFileMetadataResultSuccessV2::default().into())
+
+        // TODO: Can be unlocked by "!!! Read from the last entry..." step
+
+        /*// 2. Update the file state in the data room.
+
+        // TODO: Revisit after rebase (Roman's retry changes).
+        //       Temporary hacky path -- should use domain
+        //       instead of reusing the adapter.
+        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
+
+        // TODO: !!! Read from the last entry...
+        //       Return from UpdateVersionFileUseCase?
+        //       -->
+        let content_type = String::new();
+        let content_length = 0;
+        let path = String::new().into();
+        //       <--
+
+        let data_room_entry_extra_data = MoleculeDataRoomEntryV2::build_extra_data_json_map(
+            &access_level,
+            &change_by,
+            &content_type,
+            content_length,
+            &categories,
+            &tags,
+            new_version,
+        );
+        let new_data_room_entry_input = CollectionEntryInput {
+            path,
+            reference: entry_dataset_handle.id.into(),
+            extra_data: Some(ExtraData::new(data_room_entry_extra_data)),
+        };
+
+        match data_room_collection
+            .add_entry(ctx, new_data_room_entry_input, None)
+            .await
         {
-            Ok(res) => Ok(MoleculeDataRoomUpdateFileMetadataResultV2::Success(
-                UpdateVersionSuccess {
-                    new_version: res.new_version,
-                    old_head: res.old_head.into(),
-                    new_head: res.new_head.into(),
-                    content_hash: res.content_hash.into(),
-                },
-            )),
-            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
-                Ok(MoleculeDataRoomUpdateFileMetadataResultV2::CasFailed(
-                    UpdateVersionErrorCasFailed {
-                        expected_head: err.expected.unwrap().into(),
-                        actual_head: err.actual.unwrap().into(),
-                    },
-                ))
+            Ok(CollectionUpdateResult::Success(_)) => {
+                Ok(MoleculeDataRoomUpdateFileMetadataResultSuccessV2::default().into())
             }
-            Err(e) => Err(e.int_err().into()),
-        }
+            Ok(CollectionUpdateResult::CasFailed(_)) => {
+                // TODO: Propagate a nice error
+                Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Ok(CollectionUpdateResult::UpToDate(_) | CollectionUpdateResult::NotFound(_)) => {
+                unreachable!()
+            }
+            Err(e) => Err(e),
+        }*/
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: mix from UpdateVersionResult & CollectionUpdateResult?
+// TODO: Should be a mix from UpdateVersionResult & CollectionUpdateResult?
 #[derive(Interface)]
 #[graphql(
     field(name = "is_success", ty = "bool"),
     field(name = "message", ty = "String")
 )]
-pub enum MoleculeDataRoomFinishUploadFileV2 {
-    Success(MoleculeDataRoomFinishUploadFileSuccessV2),
+pub enum MoleculeDataRoomFinishUploadFileResultV2 {
+    Success(MoleculeDataRoomFinishUploadFileResultSuccessV2),
 }
 
 #[derive(SimpleObject, Default)]
 #[graphql(complex)]
-pub struct MoleculeDataRoomFinishUploadFileSuccessV2 {
+pub struct MoleculeDataRoomFinishUploadFileResultSuccessV2 {
     pub message: String,
 }
 
 #[ComplexObject]
-impl MoleculeDataRoomFinishUploadFileSuccessV2 {
+impl MoleculeDataRoomFinishUploadFileResultSuccessV2 {
     pub async fn is_success(&self) -> bool {
         false
     }
@@ -461,25 +501,39 @@ impl MoleculeDataRoomFinishUploadFileSuccessV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Should be a mix from UpdateVersionResult & CollectionUpdateResult?
 #[derive(Interface)]
 #[graphql(
     field(name = "is_success", ty = "bool"),
     field(name = "message", ty = "String")
 )]
 pub enum MoleculeDataRoomUpdateFileMetadataResultV2 {
-    Success(UpdateVersionSuccess),
-    EntryNotFound(MoleculeDataRoomEntryNotFoundV2),
+    Success(MoleculeDataRoomUpdateFileMetadataResultSuccessV2),
+    EntryNotFound(MoleculeDataRoomUpdateFileMetadataResultEntryNotFoundV2),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
 }
 
+#[derive(SimpleObject, Default)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomUpdateFileMetadataResultSuccessV2 {
+    pub message: String,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomUpdateFileMetadataResultSuccessV2 {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+}
+
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct MoleculeDataRoomEntryNotFoundV2 {
+pub struct MoleculeDataRoomUpdateFileMetadataResultEntryNotFoundV2 {
     pub r#ref: DatasetID<'static>,
 }
 #[ComplexObject]
-impl MoleculeDataRoomEntryNotFoundV2 {
+impl MoleculeDataRoomUpdateFileMetadataResultEntryNotFoundV2 {
     pub async fn is_success(&self) -> bool {
         false
     }
