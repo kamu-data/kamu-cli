@@ -83,10 +83,6 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
         content_text: String,
         encryption_metadata: Option<Json<EncryptionMetadata>>,
     ) -> Result<()> {
-        // IMPORTANT: If after file creation or version update an error occurs,
-        //            all DB will be cleared (transaction rollback). Dataset data
-        //            (e.g., on S3) will need later cleanup (garbage collection).
-
         let (create_dataset_from_snapshot_use_case, update_version_file_use_case) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
@@ -435,6 +431,31 @@ impl MoleculeDataRoomMutV2<'_> {
             }
             Err(e) => Err(e.int_err().into()),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: mix from UpdateVersionResult & CollectionUpdateResult?
+#[derive(Interface)]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
+pub enum MoleculeDataRoomFinishUploadFileV2 {
+    Success(MoleculeDataRoomFinishUploadFileSuccessV2),
+}
+
+#[derive(SimpleObject, Default)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomFinishUploadFileSuccessV2 {
+    pub message: String,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomFinishUploadFileSuccessV2 {
+    pub async fn is_success(&self) -> bool {
+        false
     }
 }
 
