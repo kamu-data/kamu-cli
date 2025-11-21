@@ -251,10 +251,10 @@ pub struct UpdateVersionSuccess {
 }
 #[ComplexObject]
 impl UpdateVersionSuccess {
-    async fn is_success(&self) -> bool {
+    pub async fn is_success(&self) -> bool {
         true
     }
-    async fn message(&self) -> String {
+    pub async fn message(&self) -> String {
         String::new()
     }
 }
@@ -262,15 +262,15 @@ impl UpdateVersionSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateVersionErrorCasFailed {
-    expected_head: Multihash<'static>,
-    actual_head: Multihash<'static>,
+    pub expected_head: Multihash<'static>,
+    pub actual_head: Multihash<'static>,
 }
 #[ComplexObject]
 impl UpdateVersionErrorCasFailed {
-    async fn is_success(&self) -> bool {
+    pub async fn is_success(&self) -> bool {
         false
     }
-    async fn message(&self) -> String {
+    pub async fn message(&self) -> String {
         "Expected head didn't match, dataset was likely updated concurrently".to_string()
     }
 }
@@ -278,11 +278,11 @@ impl UpdateVersionErrorCasFailed {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateVersionErrorInvalidExtraData {
-    message: String,
+    pub message: String,
 }
 #[ComplexObject]
 impl UpdateVersionErrorInvalidExtraData {
-    async fn is_success(&self) -> bool {
+    pub async fn is_success(&self) -> bool {
         false
     }
 }

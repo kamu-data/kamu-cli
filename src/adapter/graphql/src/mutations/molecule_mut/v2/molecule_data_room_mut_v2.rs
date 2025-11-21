@@ -7,31 +7,129 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
-use kamu_datasets_services::utils::{ContentSource, UpdateVersionFileUseCaseHelper};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotError,
+    CreateDatasetUseCaseOptions,
+    ExtraDataFields,
+    UpdateVersionFileUseCase,
+    UpdateVersionFileUseCaseError,
+};
+use odf::utils::data::DataFrameExt;
 
 use crate::mutations::{
+    CollectionEntryInput,
+    CollectionMut,
+    CollectionUpdateResult,
     StartUploadVersionErrorTooLarge,
     StartUploadVersionResult,
     StartUploadVersionSuccess,
     UpdateVersionErrorCasFailed,
-    UpdateVersionResult,
+    UpdateVersionErrorInvalidExtraData,
     UpdateVersionSuccess,
-    map_get_content_args_error,
 };
 use crate::prelude::*;
-use crate::queries::molecule::v2::{MoleculeAccessLevelV2, MoleculeCategoryV2, MoleculeTagV2};
+use crate::queries::molecule::v2::{
+    EncryptionMetadata,
+    MoleculeAccessLevelV2,
+    MoleculeCategoryV2,
+    MoleculeDataRoomEntryV2,
+    MoleculeTagV2,
+};
+use crate::queries::{Account, DatasetRequestState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDataRoomMutV2;
+pub struct MoleculeDataRoomMutV2<'a> {
+    project_account_id: &'a odf::AccountID,
+    data_room_writable_state: DatasetRequestState,
+}
+
+impl<'a> MoleculeDataRoomMutV2<'a> {
+    pub fn new(
+        project_account_id: &'a odf::AccountID,
+        data_room_writable_state: DatasetRequestState,
+    ) -> Self {
+        Self {
+            project_account_id,
+            data_room_writable_state,
+        }
+    }
+
+    async fn get_data_room_projection(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<(domain::ResolvedDataset, Option<DataFrameExt>)> {
+        let query_service = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        let resolved_dataset = self.data_room_writable_state.resolved_dataset(ctx).await?;
+
+        let res = query_service
+            .get_changelog_projection(
+                resolved_dataset.clone(),
+                domain::GetChangelogProjectionOptions {
+                    block_hash: None,
+                    // TODO: Maybe we don't need hints here. Added for performance reasons.
+                    hints: domain::ChangelogProjectionHints {
+                        // TODO: Extract "path" to constant
+                        primary_key: Some(vec!["path".to_string()]),
+                        dataset_vocabulary: Some(odf::metadata::DatasetVocabulary::default()),
+                    },
+                },
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use domain::QueryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    _ => e.int_err().into(),
+                }
+            })?;
+
+        Ok((res.source, res.df))
+    }
+
+    // TODO: Test with different paths
+    async fn build_new_file_dataset_alias(
+        &self,
+        ctx: &Context<'_>,
+        file_path: &CollectionPath,
+    ) -> odf::DatasetAlias {
+        // TODO: PERF: Add AccountRequestState similar to DatasetRequestState and reuse
+        //             possibly resolved account?
+        let project_account = Account::from_account_id(ctx, self.project_account_id.clone())
+            .await
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to load project account [{}]: {e}",
+                    self.project_account_id
+                )
+            });
+        let project_account_name = project_account.account_name_internal().clone();
+
+        let new_file_name = {
+            use std::borrow::Borrow;
+
+            // NOTE: We assume that `file_path` has already validated via `CollectionPath`
+            //       scalar.
+            let file_path_as_str: &String = file_path.borrow();
+            let filename_encoded = file_path_as_str.rsplit('/').next().unwrap();
+            odf::DatasetName::new_unchecked(filename_encoded)
+        };
+
+        odf::DatasetAlias::new(Some(project_account_name), new_file_name)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeDataRoomMutV2 {
+impl MoleculeDataRoomMutV2<'_> {
     /// Starts the process of uploading a file to the data room.
     #[graphql(guard = "LoggedInGuard")]
     #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_start_upload_file, skip_all)]
@@ -105,66 +203,120 @@ impl MoleculeDataRoomMutV2 {
         todo!()
     }
 
-    #[expect(clippy::unused_async)]
     /// Moves an entry in the data room.
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_move_entry, skip_all)]
     async fn move_entry(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         from_path: CollectionPath,
         to_path: CollectionPath,
-        expected_head: Multihash<'static>,
-    ) -> Result<MoleculeDataRoomMoveEntryResultV2> {
-        let _ = from_path;
-        let _ = to_path;
-        let _ = expected_head;
-        todo!()
+        expected_head: Option<Multihash<'static>>,
+    ) -> Result<CollectionUpdateResult> {
+        // TODO: Revisit after rebase.
+        //       Temporary hacky path -- should use domain
+        //       instead of reusing the adapter.
+        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
+
+        data_room_collection
+            .move_entry(ctx, from_path, to_path, None, expected_head)
+            .await
     }
 
-    #[expect(clippy::unused_async)]
     /// Removes an entry from the data room.
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_remove_entry, skip_all)]
     async fn remove_entry(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         path: CollectionPath,
-        expected_head: Multihash<'static>,
-    ) -> Result<MoleculeDataRoomRemoveEntryResultV2> {
-        let _ = path;
-        let _ = expected_head;
-        todo!()
+        expected_head: Option<Multihash<'static>>,
+    ) -> Result<CollectionUpdateResult> {
+        // TODO: Revisit after rebase.
+        //       Temporary hacky path -- should use domain
+        //       instead of reusing the adapter.
+        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
+
+        data_room_collection
+            .remove_entry(ctx, path, expected_head)
+            .await
     }
 
-    #[expect(clippy::unused_async)]
     /// Updates the metadata of a file in the data room.
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_update_file_metadata, skip_all)]
     async fn update_file_metadata(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
-        // TODO: use update object w/ optional fields instead
+        // TODO: use update object w/ optional fields instead?
         access_level: MoleculeAccessLevelV2,
         change_by: AccountID<'static>,
         description: String,
         categories: Vec<String>,
         tags: Vec<String>,
         content_text: String,
-        expected_head: Multihash<'static>,
+        encryption_metadata: Option<Json<EncryptionMetadata>>,
+        expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResultV2> {
-        let _ = reference;
-        let _ = access_level;
-        let _ = change_by;
-        let _ = description;
-        let _ = categories;
-        let _ = tags;
-        let _ = content_text;
-        let _ = expected_head;
-        todo!()
+        let (update_version_file_use_case, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn UpdateVersionFileUseCase,
+            Arc<dyn kamu_core::DatasetRegistry>
+        );
+
+        // NOTE: Access rights will be checked inside the use case.
+        let entry_dataset_handle = {
+            use odf::DatasetRefUnresolvedError as E;
+            match dataset_registry
+                .resolve_dataset_handle_by_ref(&reference.as_ref().as_local_ref())
+                .await
+            {
+                Ok(hdl) => hdl,
+                Err(E::NotFound(_)) => {
+                    return Ok(MoleculeDataRoomUpdateFileMetadataResultV2::EntryNotFound(
+                        MoleculeDataRoomEntryNotFoundV2 { r#ref: reference },
+                    ));
+                }
+                Err(e @ E::Internal(_)) => return Err(e.int_err().into()),
+            }
+        };
+
+        let extra_data = MoleculeDataRoomEntryV2::build_extra_data_json_map(
+            access_level,
+            change_by,
+            description,
+            categories,
+            tags,
+            content_text,
+            encryption_metadata,
+        );
+
+        match update_version_file_use_case
+            .execute(
+                &entry_dataset_handle,
+                None,
+                expected_head.map(Into::into),
+                Some(ExtraDataFields::new(extra_data)),
+            )
+            .await
+        {
+            Ok(res) => Ok(MoleculeDataRoomUpdateFileMetadataResultV2::Success(
+                UpdateVersionSuccess {
+                    new_version: res.new_version,
+                    old_head: res.old_head.into(),
+                    new_head: res.new_head.into(),
+                    content_hash: res.content_hash.into(),
+                },
+            )),
+            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
+                Ok(MoleculeDataRoomUpdateFileMetadataResultV2::CasFailed(
+                    UpdateVersionErrorCasFailed {
+                        expected_head: err.expected.unwrap().into(),
+                        actual_head: err.actual.unwrap().into(),
+                    },
+                ))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomUploadFileResultV2 {
-    pub dummy: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,23 +328,32 @@ pub struct MoleculeDataRoomFinishUploadFileResultV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomMoveEntryResultV2 {
-    pub dummy: String,
+#[derive(Interface)]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
+pub enum MoleculeDataRoomUpdateFileMetadataResultV2 {
+    Success(UpdateVersionSuccess),
+    EntryNotFound(MoleculeDataRoomEntryNotFoundV2),
+    CasFailed(UpdateVersionErrorCasFailed),
+    InvalidExtraData(UpdateVersionErrorInvalidExtraData),
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject)]
-pub struct MoleculeDataRoomRemoveEntryResultV2 {
-    pub dummy: String,
+#[graphql(complex)]
+pub struct MoleculeDataRoomEntryNotFoundV2 {
+    pub r#ref: DatasetID<'static>,
 }
+#[ComplexObject]
+impl MoleculeDataRoomEntryNotFoundV2 {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomUpdateFileMetadataResultV2 {
-    pub dummy: String,
+    pub async fn message(&self) -> String {
+        "Data room entry not found".to_string()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

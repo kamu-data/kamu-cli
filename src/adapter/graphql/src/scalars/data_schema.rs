@@ -130,6 +130,26 @@ pub struct DataTypeInput {
     pub ddl: String,
 }
 
+impl ColumnInput {
+    pub fn string(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            data_type: DataTypeInput {
+                ddl: "STRING".into(),
+            },
+        }
+    }
+
+    pub fn string_array(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            data_type: DataTypeInput {
+                ddl: "ARRAY<STRING>".into(),
+            },
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

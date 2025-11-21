@@ -158,7 +158,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         )
         .await?;
 
-        // TODO: HACK: SEC: When creating a dataaset under another account we currently
+        // TODO: HACK: SEC: When creating a dataset under another account we currently
         // give subject a "maintainer" role on it. In future this should be refactored
         // into organization-level permissions.
         //
