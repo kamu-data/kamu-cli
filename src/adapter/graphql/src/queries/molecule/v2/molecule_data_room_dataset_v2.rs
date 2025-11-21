@@ -26,6 +26,39 @@ use crate::queries::{Collection, Dataset, FileVersion, VersionedFile};
 
 pub struct MoleculeDataRoomDatasetV2;
 
+impl MoleculeDataRoomDatasetV2 {
+    // Extra columns
+    pub const COLUMN_NAME_CHANGE_BY: &'static str = "molecule_change_by";
+    pub const COLUMN_NAME_ACCESS_LEVEL: &'static str = "molecule_access_level";
+    // Denormalized values from the latest file state
+    pub const COLUMN_NAME_CONTENT_TYPE: &'static str = "content_type";
+    pub const COLUMN_NAME_CONTENT_LENGTH: &'static str = "content_length";
+    pub const COLUMN_NAME_CATEGORIES: &'static str = "categories";
+    pub const COLUMN_NAME_TAGS: &'static str = "tags";
+    pub const COLUMN_NAME_VERSION: &'static str = "version";
+
+    #[expect(dead_code)]
+    pub fn dataset_snapshot(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+        Collection::dataset_snapshot(
+            alias,
+            vec![
+                // Extra columns
+                ColumnInput::string(Self::COLUMN_NAME_ACCESS_LEVEL),
+                ColumnInput::string(Self::COLUMN_NAME_CHANGE_BY),
+                // Denormalized values from the latest file state
+                ColumnInput::string(Self::COLUMN_NAME_CONTENT_TYPE),
+                ColumnInput::int(Self::COLUMN_NAME_CONTENT_LENGTH),
+                ColumnInput::string_array(Self::COLUMN_NAME_CATEGORIES),
+                ColumnInput::string_array(Self::COLUMN_NAME_TAGS),
+                // TODO: unsinged int?
+                ColumnInput::int(Self::COLUMN_NAME_VERSION),
+            ],
+            Vec::new(),
+        )
+        .expect("Schema is always valid as there are no user inputs")
+    }
+}
+
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomDatasetV2 {
@@ -69,36 +102,6 @@ impl MoleculeDataRoomDatasetV2 {
 pub struct MoleculeDataRoomEntryV2;
 
 impl MoleculeDataRoomEntryV2 {
-    // Extra columns
-    pub const COLUMN_NAME_CHANGE_BY: &'static str = "molecule_change_by";
-    pub const COLUMN_NAME_ACCESS_LEVEL: &'static str = "molecule_access_level";
-    // Denormalized values from the latest file state
-    pub const COLUMN_NAME_CONTENT_TYPE: &'static str = "content_type";
-    pub const COLUMN_NAME_CONTENT_LENGTH: &'static str = "content_length";
-    pub const COLUMN_NAME_CATEGORIES: &'static str = "categories";
-    pub const COLUMN_NAME_TAGS: &'static str = "tags";
-    pub const COLUMN_NAME_VERSION: &'static str = "version";
-
-    pub fn dataset_snapshot(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        Collection::dataset_snapshot(
-            alias,
-            vec![
-                // Extra columns
-                ColumnInput::string(Self::COLUMN_NAME_ACCESS_LEVEL),
-                ColumnInput::string(Self::COLUMN_NAME_CHANGE_BY),
-                // Denormalized values from the latest file state
-                ColumnInput::string(Self::COLUMN_NAME_CONTENT_TYPE),
-                ColumnInput::int(Self::COLUMN_NAME_CONTENT_LENGTH),
-                ColumnInput::string_array(Self::COLUMN_NAME_CATEGORIES),
-                ColumnInput::string_array(Self::COLUMN_NAME_TAGS),
-                // TODO: unsinged int?
-                ColumnInput::int(Self::COLUMN_NAME_VERSION),
-            ],
-            Vec::new(),
-        )
-        .expect("Schema is always valid as there are no user inputs")
-    }
-
     pub fn build_extra_data_json_map(
         access_level: &MoleculeAccessLevelV2,
         change_by: &AccountID<'static>,
@@ -109,13 +112,13 @@ impl MoleculeDataRoomEntryV2 {
         version: u32,
     ) -> serde_json::Map<String, serde_json::Value> {
         let json_object = serde_json::json!({
-            Self::COLUMN_NAME_ACCESS_LEVEL: access_level,
-            Self::COLUMN_NAME_CHANGE_BY: change_by.to_string(),
-            Self::COLUMN_NAME_CONTENT_TYPE: content_type,
-            Self::COLUMN_NAME_CONTENT_LENGTH: content_length,
-            Self::COLUMN_NAME_CATEGORIES: categories,
-            Self::COLUMN_NAME_TAGS: tags,
-            Self::COLUMN_NAME_VERSION: version,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_ACCESS_LEVEL: access_level,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CHANGE_BY: change_by.to_string(),
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CONTENT_TYPE: content_type,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CONTENT_LENGTH: content_length,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CATEGORIES: categories,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_TAGS: tags,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_VERSION: version,
         });
 
         let serde_json::Value::Object(json_map) = json_object else {

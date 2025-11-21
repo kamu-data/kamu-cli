@@ -9,16 +9,15 @@
 
 use std::sync::Arc;
 
+use datafusion::logical_expr::{col, lit};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
     ContentArgs,
-    CreateDatasetFromSnapshotError,
     CreateDatasetUseCaseOptions,
     ExtraDataFields,
     UpdateVersionFileUseCase,
-    UpdateVersionFileUseCaseError,
 };
 use kamu_datasets_services::utils::{ContentSource, UpdateVersionFileUseCaseHelper};
 use odf::utils::data::DataFrameExt;
@@ -26,18 +25,12 @@ use odf::utils::data::DataFrameExt;
 use crate::mutations::{
     CollectionEntryInput,
     CollectionMut,
-    CollectionUpdateErrorCasFailed,
-    CollectionUpdateErrorNotFound,
     CollectionUpdateResult,
-    CollectionUpdateSuccess,
-    CollectionUpdateUpToDate,
     StartUploadVersionErrorTooLarge,
     StartUploadVersionResult,
     StartUploadVersionSuccess,
     UpdateVersionErrorCasFailed,
     UpdateVersionErrorInvalidExtraData,
-    UpdateVersionResult,
-    UpdateVersionSuccess,
     map_get_content_args_error,
 };
 use crate::prelude::*;
@@ -49,7 +42,7 @@ use crate::queries::molecule::v2::{
     MoleculeTagV2,
     MoleculeVersionedFileV2,
 };
-use crate::queries::{Account, DatasetRequestState};
+use crate::queries::{Account, CollectionEntry, DatasetRequestState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -92,7 +85,7 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
         // 1. Create an empty versioned dataset.
 
         let alias = self.build_new_file_dataset_alias(ctx, &path).await;
-        let versioned_file_snapshot = MoleculeDataRoomEntryV2::dataset_snapshot(alias);
+        let versioned_file_snapshot = MoleculeVersionedFileV2::dataset_snapshot(alias);
 
         let create_versioned_file_res = create_dataset_from_snapshot_use_case
             .execute(
@@ -101,6 +94,8 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
             )
             .await
             .int_err()?;
+
+        // 2. Upload the first version to just created dataset.
 
         let versioned_file_extra_data = MoleculeVersionedFileV2::build_extra_data_json_map(
             &access_level,
@@ -119,8 +114,6 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
             // TODO: is it OK to have no content type?
             .unwrap_or_default();
         let content_length = content_args.content_length;
-
-        // 2. Upload the first version to just created dataset.
 
         let new_version = update_version_file_use_case
             .execute(
@@ -171,6 +164,108 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
         }
     }
 
+    // TODO: Specialize error handling
+    async fn finish_upload_file_new_file_version(
+        &self,
+        ctx: &Context<'_>,
+        content_args: ContentArgs,
+        reference: DatasetID<'static>,
+        access_level: MoleculeAccessLevelV2,
+        change_by: AccountID<'static>,
+        description: String,
+        categories: Vec<MoleculeCategoryV2>,
+        tags: Vec<MoleculeTagV2>,
+        content_text: String,
+        encryption_metadata: Option<Json<EncryptionMetadata>>,
+    ) -> Result<()> {
+        let (update_version_file_use_case, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn UpdateVersionFileUseCase,
+            Arc<dyn kamu_core::DatasetRegistry>
+        );
+
+        // 1. Get the existing versioned dataset entry -- we need to know `path`;
+        let Some(collection_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
+        else {
+            unreachable!();
+        };
+
+        // 2. Upload the next version to the specified dataset.
+
+        // NOTE: Access rights will be checked inside the use case.
+        let dataset_handle = dataset_registry
+            .resolve_dataset_handle_by_ref(&reference.as_ref().as_local_ref())
+            .await
+            .int_err()?;
+
+        let versioned_file_extra_data = MoleculeVersionedFileV2::build_extra_data_json_map(
+            &access_level,
+            &change_by,
+            &description,
+            &categories,
+            &tags,
+            &content_text,
+            &encryption_metadata,
+        );
+
+        let content_type = content_args
+            .content_type
+            .as_ref()
+            .map(|ct| ct.0.clone())
+            // TODO: is it OK to have no content type?
+            .unwrap_or_default();
+        let content_length = content_args.content_length;
+
+        let new_version = update_version_file_use_case
+            .execute(
+                &dataset_handle,
+                Some(content_args),
+                None,
+                Some(ExtraDataFields::new(versioned_file_extra_data)),
+            )
+            .await
+            .int_err()?
+            .new_version;
+
+        // 3. Update the file state in the data room.
+
+        // TODO: Revisit after rebase (Roman's retry changes).
+        //       Temporary hacky path -- should use domain
+        //       instead of reusing the adapter.
+        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
+
+        let data_room_entry_extra_data = MoleculeDataRoomEntryV2::build_extra_data_json_map(
+            &access_level,
+            &change_by,
+            &content_type,
+            content_length,
+            &categories,
+            &tags,
+            new_version,
+        );
+
+        let new_data_room_entry_input = CollectionEntryInput {
+            path: collection_entry.path,
+            reference,
+            extra_data: Some(ExtraData::new(data_room_entry_extra_data)),
+        };
+
+        match data_room_collection
+            .add_entry(ctx, new_data_room_entry_input, None)
+            .await
+        {
+            Ok(CollectionUpdateResult::Success(_)) => Ok(()),
+            Ok(CollectionUpdateResult::CasFailed(_)) => {
+                // TODO: Propagate a nice error
+                Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Ok(CollectionUpdateResult::UpToDate(_) | CollectionUpdateResult::NotFound(_)) => {
+                unreachable!()
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     async fn get_data_room_projection(
         &self,
         ctx: &Context<'_>,
@@ -202,6 +297,34 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
             })?;
 
         Ok((res.source, res.df))
+    }
+
+    // TODO: return typed collection entry
+    async fn get_data_room_entry(
+        &self,
+        ctx: &Context<'_>,
+        reference: &odf::DatasetID,
+    ) -> Result<Option<CollectionEntry>> {
+        let (_, maybe_projection_df) = self.get_data_room_projection(ctx).await?;
+
+        let Some(df) = maybe_projection_df else {
+            return Ok(None);
+        };
+
+        let df = df
+            .filter(col("ref").eq(lit(reference.to_string())))
+            .int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+        if records.is_empty() {
+            return Ok(None);
+        }
+
+        assert_eq!(records.len(), 1);
+
+        let entry = CollectionEntry::from_json(records.into_iter().next().unwrap())?;
+
+        Ok(Some(entry))
     }
 
     // TODO: Test with different paths
@@ -303,17 +426,57 @@ impl MoleculeDataRoomMutV2<'_> {
         categories: Vec<MoleculeCategoryV2>,
         tags: Vec<MoleculeTagV2>,
         content_text: String,
+        encryption_metadata: Option<Json<EncryptionMetadata>>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResultV2> {
-        let _ = upload_token;
-        let _ = reference;
-        let _ = path;
-        let _ = access_level;
-        let _ = change_by;
-        let _ = description;
-        let _ = categories;
-        let _ = tags;
-        let _ = content_text;
-        todo!()
+        // Warning: here be dragons.
+
+        // IMPORTANT: If after file creation or version update an error occurs,
+        //            all DB will be cleared (transaction rollback). Dataset data
+        //            (e.g., on S3) will need later cleanup (garbage collection).
+
+        let update_version_file_use_case_helper =
+            from_catalog_n!(ctx, UpdateVersionFileUseCaseHelper);
+
+        let content_args = update_version_file_use_case_helper
+            .get_content_args(ContentSource::Token(upload_token), None)
+            .await
+            .map_err(map_get_content_args_error)?;
+
+        match (path, reference) {
+            (Some(path), None) => {
+                self.finish_upload_file_new_file(
+                    ctx,
+                    content_args,
+                    path,
+                    access_level,
+                    change_by,
+                    description,
+                    categories,
+                    tags,
+                    content_text,
+                    encryption_metadata,
+                )
+                .await?;
+            }
+            (None, Some(reference)) => {
+                self.finish_upload_file_new_file_version(
+                    ctx,
+                    content_args,
+                    reference,
+                    access_level,
+                    change_by,
+                    description,
+                    categories,
+                    tags,
+                    content_text,
+                    encryption_metadata,
+                )
+                .await?
+            }
+            _ => return Err(GqlError::gql("Either `path` or `ref` must be specified")),
+        }
+
+        Ok(MoleculeDataRoomFinishUploadFileResultSuccessV2::default().into())
     }
 
     /// Moves an entry in the data room.
@@ -369,7 +532,6 @@ impl MoleculeDataRoomMutV2<'_> {
         tags: Vec<String>,
         content_text: String,
         encryption_metadata: Option<Json<EncryptionMetadata>>,
-        expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResultV2> {
         let (update_version_file_use_case, dataset_registry) = from_catalog_n!(
             ctx,
