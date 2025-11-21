@@ -13,24 +13,32 @@ use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
+    ContentArgs,
     CreateDatasetFromSnapshotError,
     CreateDatasetUseCaseOptions,
     ExtraDataFields,
     UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
 };
+use kamu_datasets_services::utils::{ContentSource, UpdateVersionFileUseCaseHelper};
 use odf::utils::data::DataFrameExt;
 
 use crate::mutations::{
     CollectionEntryInput,
     CollectionMut,
+    CollectionUpdateErrorCasFailed,
+    CollectionUpdateErrorNotFound,
     CollectionUpdateResult,
+    CollectionUpdateSuccess,
+    CollectionUpdateUpToDate,
     StartUploadVersionErrorTooLarge,
     StartUploadVersionResult,
     StartUploadVersionSuccess,
     UpdateVersionErrorCasFailed,
     UpdateVersionErrorInvalidExtraData,
+    UpdateVersionResult,
     UpdateVersionSuccess,
+    map_get_content_args_error,
 };
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
@@ -39,6 +47,7 @@ use crate::queries::molecule::v2::{
     MoleculeCategoryV2,
     MoleculeDataRoomEntryV2,
     MoleculeTagV2,
+    MoleculeVersionedFileV2,
 };
 use crate::queries::{Account, DatasetRequestState};
 
@@ -57,6 +66,112 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
         Self {
             project_account_id,
             data_room_writable_state,
+        }
+    }
+
+    // TODO: Specialize error handling
+    async fn finish_upload_file_new_file(
+        &self,
+        ctx: &Context<'_>,
+        content_args: ContentArgs,
+        path: CollectionPath,
+        access_level: MoleculeAccessLevelV2,
+        change_by: AccountID<'static>,
+        description: String,
+        categories: Vec<MoleculeCategoryV2>,
+        tags: Vec<MoleculeTagV2>,
+        content_text: String,
+        encryption_metadata: Option<Json<EncryptionMetadata>>,
+    ) -> Result<()> {
+        // IMPORTANT: If after file creation or version update an error occurs,
+        //            all DB will be cleared (transaction rollback). Dataset data
+        //            (e.g., on S3) will need later cleanup (garbage collection).
+
+        let (create_dataset_from_snapshot_use_case, update_version_file_use_case) = from_catalog_n!(
+            ctx,
+            dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
+            dyn UpdateVersionFileUseCase
+        );
+
+        // 1. Create an empty versioned dataset.
+
+        let alias = self.build_new_file_dataset_alias(ctx, &path).await;
+        let versioned_file_snapshot = MoleculeDataRoomEntryV2::dataset_snapshot(alias);
+
+        let create_versioned_file_res = create_dataset_from_snapshot_use_case
+            .execute(
+                versioned_file_snapshot,
+                CreateDatasetUseCaseOptions::default(),
+            )
+            .await
+            .int_err()?;
+
+        let versioned_file_extra_data = MoleculeVersionedFileV2::build_extra_data_json_map(
+            &access_level,
+            &change_by,
+            &description,
+            &categories,
+            &tags,
+            &content_text,
+            &encryption_metadata,
+        );
+
+        let content_type = content_args
+            .content_type
+            .as_ref()
+            .map(|ct| ct.0.clone())
+            // TODO: is it OK to have no content type?
+            .unwrap_or_default();
+        let content_length = content_args.content_length;
+
+        // 2. Upload the first version to just created dataset.
+
+        let new_version = update_version_file_use_case
+            .execute(
+                &create_versioned_file_res.dataset_handle,
+                Some(content_args),
+                None,
+                Some(ExtraDataFields::new(versioned_file_extra_data)),
+            )
+            .await
+            .int_err()?
+            .new_version;
+
+        // 3. Add the file to the data room.
+
+        // TODO: Revisit after rebase (Roman's retry changes).
+        //       Temporary hacky path -- should use domain
+        //       instead of reusing the adapter.
+        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
+
+        let data_room_entry_extra_data = MoleculeDataRoomEntryV2::build_extra_data_json_map(
+            &access_level,
+            &change_by,
+            &content_type,
+            content_length,
+            &categories,
+            &tags,
+            new_version,
+        );
+        let new_data_room_entry_input = CollectionEntryInput {
+            path,
+            reference: create_versioned_file_res.dataset_handle.id.into(),
+            extra_data: Some(ExtraData::new(data_room_entry_extra_data)),
+        };
+
+        match data_room_collection
+            .add_entry(ctx, new_data_room_entry_input, None)
+            .await
+        {
+            Ok(CollectionUpdateResult::Success(_)) => Ok(()),
+            Ok(CollectionUpdateResult::CasFailed(_)) => {
+                // TODO: Propagate a nice error
+                Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Ok(CollectionUpdateResult::UpToDate(_) | CollectionUpdateResult::NotFound(_)) => {
+                unreachable!()
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -176,14 +291,16 @@ impl MoleculeDataRoomMutV2<'_> {
         ))
     }
 
-    #[expect(clippy::unused_async)]
-    /// Finishes the process of uploading a file to the data room.
+    /// Allows creating a file, upload a new version, and link a file into the
+    /// data room via a single transaction.
+    #[graphql(guard = "LoggedInGuard")]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_finish_upload_file, skip_all)]
     async fn finish_upload_file(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         upload_token: String,
-        #[graphql(name = "ref")] reference: DatasetID<'static>,
-        path: CollectionPath,
+        #[graphql(name = "ref")] reference: Option<DatasetID<'static>>,
+        path: Option<CollectionPath>,
         access_level: MoleculeAccessLevelV2,
         change_by: AccountID<'static>,
         description: String,
@@ -212,7 +329,7 @@ impl MoleculeDataRoomMutV2<'_> {
         to_path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
-        // TODO: Revisit after rebase.
+        // TODO: Revisit after rebase (Roman's retry changes)
         //       Temporary hacky path -- should use domain
         //       instead of reusing the adapter.
         let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
@@ -230,7 +347,9 @@ impl MoleculeDataRoomMutV2<'_> {
         path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
-        // TODO: Revisit after rebase.
+        // TODO: delete file dataset?
+
+        // TODO: Revisit after rebase (Roman's retry changes)
         //       Temporary hacky path -- should use domain
         //       instead of reusing the adapter.
         let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
@@ -279,14 +398,14 @@ impl MoleculeDataRoomMutV2<'_> {
             }
         };
 
-        let extra_data = MoleculeDataRoomEntryV2::build_extra_data_json_map(
-            access_level,
-            change_by,
-            description,
-            categories,
-            tags,
-            content_text,
-            encryption_metadata,
+        let extra_data = MoleculeVersionedFileV2::build_extra_data_json_map(
+            &access_level,
+            &change_by,
+            &description,
+            &categories,
+            &tags,
+            &content_text,
+            &encryption_metadata,
         );
 
         match update_version_file_use_case
@@ -317,13 +436,6 @@ impl MoleculeDataRoomMutV2<'_> {
             Err(e) => Err(e.int_err().into()),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct MoleculeDataRoomFinishUploadFileResultV2 {
-    pub dummy: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

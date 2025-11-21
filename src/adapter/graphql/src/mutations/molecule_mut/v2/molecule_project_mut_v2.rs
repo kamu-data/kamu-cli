@@ -22,6 +22,7 @@ use crate::queries::DatasetRequestState;
 pub struct MoleculeProjectMutV2 {
     pub project_account_id: odf::AccountID,
     pub data_room_dataset_id: odf::DatasetID,
+    #[expect(dead_code)]
     pub announcements_dataset_id: odf::DatasetID,
 }
 
