@@ -106,6 +106,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
     #[tracing::instrument(level = "info", name = UpdateVersionFileUseCaseImpl_execute, skip_all, fields(%dataset_handle.id))]
     async fn execute(
         &self,
+        // TODO: use ResolvedDataset
         dataset_handle: &odf::DatasetHandle,
         content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,

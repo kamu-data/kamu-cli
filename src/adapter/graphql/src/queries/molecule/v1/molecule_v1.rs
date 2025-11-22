@@ -12,7 +12,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use kamu::domain;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::ResolvedDataset;
 use kamu_core::auth::DatasetAction;
 use odf::utils::data::DataFrameExt;
 
@@ -216,7 +215,7 @@ impl MoleculeV1 {
                     .int_err()?;
 
                 // TODO: Use case should return ResolvedDataset directly
-                Ok(ResolvedDataset::new(
+                Ok(domain::ResolvedDataset::new(
                     create_res.dataset,
                     create_res.dataset_handle,
                 ))
@@ -231,7 +230,7 @@ impl MoleculeV1 {
         ctx: &Context<'_>,
         action: DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<(ResolvedDataset, Option<DataFrameExt>)> {
+    ) -> Result<(domain::ResolvedDataset, Option<DataFrameExt>)> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let subject_molecule = molecule_subject(ctx)?;

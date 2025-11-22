@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::auth::DatasetAction;
+
 use crate::mutations::molecule_mut::v1;
 use crate::mutations::molecule_mut::v2::MoleculeProjectMutV2;
 use crate::prelude::*;
+use crate::queries::molecule::v1 as qv1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,12 +45,22 @@ impl MoleculeMutV2 {
     /// History of this project existing will be preserved,
     /// its symbol will remain reserved, data will remain intact,
     /// but the project will no longer appear in the listing.
-    #[tracing::instrument(level = "info", name = MoleculeMutV2_remove_project, skip_all, fields(?ipnft_uid))]
-    async fn remove_project(
+    #[tracing::instrument(level = "info", name = MoleculeMutV2_disable_project, skip_all, fields(?ipnft_uid))]
+    async fn disable_project(
         &self,
         _ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeRemoveProjectResultV2> {
+    ) -> Result<MoleculeDisableProjectResultV2> {
+        let _ = ipnft_uid;
+        todo!()
+    }
+
+    #[tracing::instrument(level = "info", name = MoleculeMutV2_enable_project, skip_all, fields(?ipnft_uid))]
+    async fn enable_project(
+        &self,
+        _ctx: &Context<'_>,
+        ipnft_uid: String,
+    ) -> Result<MoleculeEnableProjectResultV2> {
         let _ = ipnft_uid;
         todo!()
     }
@@ -56,18 +69,41 @@ impl MoleculeMutV2 {
     #[tracing::instrument(level = "info", name = MoleculeMutV2_project, skip_all, fields(?ipnft_uid))]
     async fn project(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProjectMutV2>> {
-        let _ = ipnft_uid;
-        todo!()
+        use datafusion::logical_expr::{col, lit};
+
+        let Some(df) = qv1::MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
+            .await?
+            .1
+        else {
+            return Ok(None);
+        };
+
+        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+        if records.is_empty() {
+            return Ok(None);
+        }
+
+        assert_eq!(records.len(), 1);
+        let entry = MoleculeProjectMutV2::from_json(records.into_iter().next().unwrap())?;
+
+        Ok(Some(entry))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct MoleculeRemoveProjectResultV2 {
+pub struct MoleculeDisableProjectResultV2 {
+    pub dummy: String,
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeEnableProjectResultV2 {
     pub dummy: String,
 }
 

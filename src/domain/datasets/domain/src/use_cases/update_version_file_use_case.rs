@@ -52,13 +52,6 @@ pub struct UpdateVersionFileResult {
 #[derive(Error, Debug)]
 pub enum UpdateVersionFileUseCaseError {
     #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-
-    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
@@ -67,6 +60,13 @@ pub enum UpdateVersionFileUseCaseError {
 
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

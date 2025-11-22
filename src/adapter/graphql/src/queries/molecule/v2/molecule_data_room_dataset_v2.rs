@@ -14,16 +14,50 @@ use url::Url;
 
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
+    EncryptionMetadata,
     MoleculeAccessLevelV2,
     MoleculeCategoryV2,
     MoleculeProjectV2,
     MoleculeTagV2,
 };
-use crate::queries::{Dataset, FileVersion};
+use crate::queries::{Collection, Dataset, FileVersion, VersionedFile};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeDataRoomDatasetV2;
+
+impl MoleculeDataRoomDatasetV2 {
+    // Extra columns
+    pub const COLUMN_NAME_CHANGE_BY: &'static str = "molecule_change_by";
+    pub const COLUMN_NAME_ACCESS_LEVEL: &'static str = "molecule_access_level";
+    // Denormalized values from the latest file state
+    pub const COLUMN_NAME_CONTENT_TYPE: &'static str = "content_type";
+    pub const COLUMN_NAME_CONTENT_LENGTH: &'static str = "content_length";
+    pub const COLUMN_NAME_CATEGORIES: &'static str = "categories";
+    pub const COLUMN_NAME_TAGS: &'static str = "tags";
+    pub const COLUMN_NAME_VERSION: &'static str = "version";
+
+    #[expect(dead_code)]
+    pub fn dataset_snapshot(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+        Collection::dataset_snapshot(
+            alias,
+            vec![
+                // Extra columns
+                ColumnInput::string(Self::COLUMN_NAME_ACCESS_LEVEL),
+                ColumnInput::string(Self::COLUMN_NAME_CHANGE_BY),
+                // Denormalized values from the latest file state
+                ColumnInput::string(Self::COLUMN_NAME_CONTENT_TYPE),
+                ColumnInput::int(Self::COLUMN_NAME_CONTENT_LENGTH),
+                ColumnInput::string_array(Self::COLUMN_NAME_CATEGORIES),
+                ColumnInput::string_array(Self::COLUMN_NAME_TAGS),
+                // TODO: unsinged int?
+                ColumnInput::int(Self::COLUMN_NAME_VERSION),
+            ],
+            Vec::new(),
+        )
+        .expect("Schema is always valid as there are no user inputs")
+    }
+}
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
@@ -57,7 +91,7 @@ impl MoleculeDataRoomDatasetV2 {
         &self,
         _ctx: &Context<'_>,
         path: CollectionPath,
-    ) -> Result<MoleculeDataRoomEntryV2> {
+    ) -> Result<Option<MoleculeDataRoomEntryV2>> {
         let _ = path;
         todo!()
     }
@@ -66,6 +100,34 @@ impl MoleculeDataRoomDatasetV2 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeDataRoomEntryV2;
+
+impl MoleculeDataRoomEntryV2 {
+    pub fn build_extra_data_json_map(
+        access_level: &MoleculeAccessLevelV2,
+        change_by: &String,
+        content_type: &String,
+        content_length: usize,
+        categories: &Vec<MoleculeCategoryV2>,
+        tags: &Vec<MoleculeTagV2>,
+        version: u32,
+    ) -> serde_json::Map<String, serde_json::Value> {
+        let json_object = serde_json::json!({
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_ACCESS_LEVEL: access_level,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CHANGE_BY: change_by,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CONTENT_TYPE: content_type,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CONTENT_LENGTH: content_length,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CATEGORIES: categories,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_TAGS: tags,
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_VERSION: version,
+        });
+
+        let serde_json::Value::Object(json_map) = json_object else {
+            unreachable!()
+        };
+
+        json_map
+    }
+}
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
@@ -118,6 +180,67 @@ page_based_connection!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeVersionedFileV2;
+
+impl MoleculeVersionedFileV2 {
+    // Extra columns
+    pub const COLUMN_NAME_ACCESS_LEVEL: &'static str = "molecule_access_level";
+    pub const COLUMN_NAME_CHANGE_BY: &'static str = "molecule_change_by";
+    // Extended metadata
+    pub const COLUMN_NAME_DESCRIPTION: &'static str = "description";
+    pub const COLUMN_NAME_CATEGORIES: &'static str = "categories";
+    pub const COLUMN_NAME_TAGS: &'static str = "tags";
+    // Semantic search
+    pub const COLUMN_NAME_CONTENT_TEXT: &'static str = "content_text";
+    // E2EE
+    pub const COLUMN_NAME_ENCRYPTION_METADATA: &'static str = "encryption_metadata";
+
+    pub fn dataset_snapshot(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+        VersionedFile::dataset_snapshot(
+            alias,
+            vec![
+                // Extra columns
+                ColumnInput::string(Self::COLUMN_NAME_ACCESS_LEVEL),
+                ColumnInput::string(Self::COLUMN_NAME_CHANGE_BY),
+                ColumnInput::string(Self::COLUMN_NAME_DESCRIPTION),
+                // Extended metadata
+                ColumnInput::string_array(Self::COLUMN_NAME_CATEGORIES),
+                ColumnInput::string_array(Self::COLUMN_NAME_TAGS),
+                // Semantic search
+                ColumnInput::string(Self::COLUMN_NAME_CONTENT_TEXT),
+                // E2EE
+                ColumnInput::string(Self::COLUMN_NAME_ENCRYPTION_METADATA),
+            ],
+            Vec::new(),
+        )
+        .expect("Schema is always valid as there are no user inputs")
+    }
+
+    pub fn build_extra_data_json_map(
+        access_level: &MoleculeAccessLevelV2,
+        change_by: &String,
+        description: &String,
+        categories: &Vec<MoleculeCategoryV2>,
+        tags: &Vec<MoleculeTagV2>,
+        content_text: &String,
+        encryption_metadata: Option<&Json<EncryptionMetadata>>,
+    ) -> serde_json::Map<String, serde_json::Value> {
+        let json_object = serde_json::json!({
+            Self::COLUMN_NAME_ACCESS_LEVEL: access_level,
+            Self::COLUMN_NAME_CHANGE_BY: change_by.to_string(),
+            Self::COLUMN_NAME_DESCRIPTION: description,
+            Self::COLUMN_NAME_CATEGORIES: categories,
+            Self::COLUMN_NAME_TAGS: tags,
+            Self::COLUMN_NAME_CONTENT_TEXT: content_text,
+            Self::COLUMN_NAME_ENCRYPTION_METADATA: encryption_metadata,
+        });
+
+        let serde_json::Value::Object(json_map) = json_object else {
+            unreachable!()
+        };
+
+        json_map
+    }
+}
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
@@ -172,6 +295,8 @@ impl MoleculeVersionedFileV2 {
     async fn content_url(&self, _ctx: &Context<'_>) -> Result<MoleculeVersionedFileContentUrlV2> {
         todo!()
     }
+
+    // todo encryptionMetadata
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
