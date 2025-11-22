@@ -8,16 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use base64::Engine as _;
-use bon::bon;
 use indoc::indoc;
-use kamu::testing::MockDatasetActionAuthorizer;
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
-use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use serde_json::json;
 
-use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs_ext};
+use super::test_gql_custom_molecule_v1::GraphQLMoleculeV1Harness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,21 +25,23 @@ const CREATE_PROJECT: &str = indoc!(
         $ipnftTokenId: Int!,
     ) {
         molecule {
-            createProject(
-                ipnftSymbol: $ipnftSymbol,
-                ipnftUid: $ipnftUid,
-                ipnftAddress: $ipnftAddress,
-                ipnftTokenId: $ipnftTokenId,
-            ) {
-                isSuccess
-                message
-                __typename
-                ... on CreateProjectSuccess {
-                    project {
-                        account { id accountName }
-                        ipnftUid
-                        dataRoom { id alias }
-                        announcements { id alias }
+            v2 {
+                createProject(
+                    ipnftSymbol: $ipnftSymbol,
+                    ipnftUid: $ipnftUid,
+                    ipnftAddress: $ipnftAddress,
+                    ipnftTokenId: $ipnftTokenId,
+                ) {
+                    isSuccess
+                    message
+                    __typename
+                    ... on CreateProjectSuccess {
+                        project {
+                            account { id accountName }
+                            ipnftUid
+                            dataRoom { id alias }
+                            announcements { id alias }
+                        }
                     }
                 }
             }
@@ -55,15 +52,34 @@ const CREATE_PROJECT: &str = indoc!(
 
 const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
-    mutation ($datasetAlias: DatasetAlias!) {
-        datasets {
-            createVersionedFile(
-                datasetAlias: $datasetAlias,
-                datasetVisibility: PRIVATE,
-            ) {
-                ... on CreateDatasetResultSuccess {
-                    dataset {
-                        id
+    mutation (
+        $ipnftUid: String!
+        $path: String!
+        $content: Base64Usnp!
+        $changeBy: String!
+        $accessLevel: String!
+        $description: String!
+        $categories: [String!]!
+        $tags: [String!]!
+        $contentText: String
+    ) {
+        molecule {
+            v2 {
+                project(ipnftUid: $ipnftUid) {
+                    dataRoom {
+                        uploadFile(
+                            path: $path
+                            content: $content
+                            changeBy: $changeBy
+                            accessLevel: $accessLevel
+                            description: $description
+                            categories: $categories
+                            tags: $tags
+                            contentText: $contentText
+                        ) {
+                            isSuccess
+                            message
+                        }
                     }
                 }
             }
@@ -75,7 +91,7 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_molecule_v1_provision_project() {
+async fn test_molecule_v2_provision_project() {
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -89,10 +105,12 @@ async fn test_molecule_v1_provision_project() {
         r#"
         query {
             molecule {
-                projects(page: 0, perPage: 100) {
-                    nodes {
-                        ipnftSymbol
-                        ipnftUid
+                v2 {
+                    projects(page: 0, perPage: 100) {
+                        nodes {
+                            ipnftSymbol
+                            ipnftUid
+                        }
                     }
                 }
             }
@@ -106,7 +124,7 @@ async fn test_molecule_v1_provision_project() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([]),
     );
 
@@ -123,7 +141,7 @@ async fn test_molecule_v1_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let res = &res.data.into_json().unwrap()["molecule"]["createProject"];
+    let res = &res.data.into_json().unwrap()["molecule"]["v2"]["createProject"];
     let project_account_id = res["project"]["account"]["id"].as_str().unwrap();
     let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
     let data_room_did = res["project"]["dataRoom"]["id"].as_str().unwrap();
@@ -161,12 +179,14 @@ async fn test_molecule_v1_provision_project() {
                 r#"
                 query ($ipnftUid: String!) {
                     molecule {
-                        project(ipnftUid: $ipnftUid) {
-                            account { id accountName }
-                            ipnftSymbol
-                            ipnftUid
-                            ipnftAddress
-                            ipnftTokenId
+                        v2 {
+                            project(ipnftUid: $ipnftUid) {
+                                account { id accountName }
+                                ipnftSymbol
+                                ipnftUid
+                                ipnftAddress
+                                ipnftTokenId
+                            }
                         }
                     }
                 }
@@ -180,7 +200,7 @@ async fn test_molecule_v1_provision_project() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
         json!({
             "account": {
                 "id": project_account_id,
@@ -200,7 +220,7 @@ async fn test_molecule_v1_provision_project() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([{
             "ipnftSymbol": "vitafast",
             "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
@@ -221,7 +241,7 @@ async fn test_molecule_v1_provision_project() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
         json!({
             "isSuccess": false,
             "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
@@ -243,7 +263,7 @@ async fn test_molecule_v1_provision_project() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
         json!({
             "isSuccess": false,
             "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
@@ -266,7 +286,7 @@ async fn test_molecule_v1_provision_project() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
         json!(true),
     );
 
@@ -277,7 +297,7 @@ async fn test_molecule_v1_provision_project() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([
             {
                 "ipnftSymbol": "vitafast",
@@ -294,7 +314,9 @@ async fn test_molecule_v1_provision_project() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_molecule_v1_data_room_operations() {
+async fn test_molecule_v2_data_room_operations() {
+    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -305,7 +327,7 @@ async fn test_molecule_v1_data_room_operations() {
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "ipnftUid": ipnft_uid,
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": "9",
             })),
@@ -313,127 +335,71 @@ async fn test_molecule_v1_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let res = &res.data.into_json().unwrap()["molecule"]["createProject"];
+    let res = &res.data.into_json().unwrap()["molecule"]["v2"]["createProject"];
     let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
     let data_room_did = res["project"]["dataRoom"]["id"].as_str().unwrap();
 
-    // Create versioned file
-    // Molecule account can create new dataset in project org
+    // This complex operation:
+    // - Creates versioned file dataset
+    // - Uploads new file version
+    // - Links new file into the project data room
+    //
+    // Molecule should have write access to the project account
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
                 async_graphql::Variables::from_json(json!({
-                    // TODO: Need ability  to create datasets with target AccountID
-                    "datasetAlias": format!("{project_account_name}/test-file"),
+                    "ipnftUid": ipnft_uid,
+                    "path": "/foo.txt",
+                    "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+                    "contentType": "text/plain",
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "accessLevel": "public",
+                    "description": "Plain text file",
+                    "categories": ["test-category"],
+                    "tags": ["test-tag1", "test-tag2"],
+                    "contentText": "hello",
                 })),
             ),
         )
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let test_file_did = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]
-        ["id"]
+    let res_data = res.data.into_json().unwrap();
+
+    pretty_assertions::assert_eq!(
+        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    let test_file_did = res_data["datasets"]["createVersionedFile"]["dataset"]["id"]
         .as_str()
         .unwrap()
         .to_string();
 
-    // Upload new file version
-    // Molecule should have write access to datasets it creates in the project
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
-                    datasets {
-                        byId(datasetId: $datasetId) {
-                            asVersionedFile {
-                                uploadNewVersion(content: $content) {
-                                    isSuccess
-                                    message
-                                }
-                            }
-                        }
-                    }
-                }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": &test_file_did,
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
-            }))),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
-        json!({
-            "isSuccess": true,
-            "message": "",
-        })
-    );
-
-    // Link new file into the project data room
-    // Molecule should have write access to core datasets
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($datasetId: DatasetID!, $entry: CollectionEntryInput!) {
-                    datasets {
-                        byId(datasetId: $datasetId) {
-                            asCollection {
-                                addEntry(entry: $entry) {
-                                    isSuccess
-                                    message
-                                }
-                            }
-                        }
-                    }
-                }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": data_room_did,
-                "entry": {
-                    "path": "/foo",
-                    "ref": test_file_did,
-                    "extraData": {
-                        "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
-                    },
-                },
-            }))),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"],
-        json!({
-            "isSuccess": true,
-            "message": "",
-        })
-    );
-
-    // Go from project to a file in one query
+    // Go from project to a file content in one query
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
                 query ($ipnftUid: String!) {
                     molecule {
-                        project(ipnftUid: $ipnftUid) {
-                            dataRoom {
-                                asCollection {
+                        v2 {
+                            project(ipnftUid: $ipnftUid) {
+                                dataRoom {
                                     latest {
                                         entry(path: "/foo") {
-                                            extraData
-                                            asDataset {
-                                                asVersionedFile {
-                                                    latest {
-                                                        content
-                                                        extraData
-                                                    }
+                                            path
+                                            changeBy
+
+                                            asVersionedFile {
+                                                latest {
+                                                    version
+                                                    content
+                                                    changeBy
                                                 }
                                             }
                                         }
@@ -453,28 +419,27 @@ async fn test_molecule_v1_data_room_operations() {
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["dataRoom"]["asCollection"]["latest"]
-            ["entry"],
+        res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entry"],
         json!({
-            "asDataset": {
-                "asVersionedFile": {
-                    "latest": {
-                        "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
-                        "extraData": {},
-                    }
+            "path": "/foo",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "asVersionedFile": {
+                "latest": {
+                    "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 }
-            },
-            "extraData": {
-                "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             },
         }),
     );
+
+    // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!! Upload new version for existing file
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 #[test_log::test(tokio::test)]
-async fn test_molecule_v1_announcements_operations() {
+async fn test_molecule_v2_announcements_operations() {
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -779,11 +744,13 @@ async fn test_molecule_v1_announcements_operations() {
         )
     );
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 #[test_log::test(tokio::test)]
-async fn test_molecule_v1_activity() {
+async fn test_molecule_v2_activity() {
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1408,107 +1375,6 @@ async fn test_molecule_v1_activity() {
         ])
     );
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Harness
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-pub struct GraphQLMoleculeV1Harness {
-    base_gql_harness: BaseGQLDatasetHarness,
-    catalog_authorized: dill::Catalog,
-    pub molecule_account_id: odf::AccountID,
-}
-
-#[bon]
-impl GraphQLMoleculeV1Harness {
-    #[builder]
-    pub async fn new(
-        tenancy_config: TenancyConfig,
-        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
-    ) -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(tenancy_config)
-            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
-            .build();
-
-        let cache_dir = base_gql_harness.temp_dir().join("cache");
-        std::fs::create_dir(&cache_dir).unwrap();
-
-        let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
-            .add::<kamu_datasets_services::UpdateVersionFileUseCaseImpl>()
-            .add::<kamu_datasets_services::utils::UpdateVersionFileUseCaseHelper>()
-            .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
-            .add::<kamu::QueryServiceImpl>()
-            .add::<kamu::QueryDatasetDataUseCaseImpl>()
-            .add::<kamu::SessionContextBuilder>()
-            .add::<kamu::ObjectStoreRegistryImpl>()
-            .add::<kamu::ObjectStoreBuilderLocalFs>()
-            .add_value(kamu::EngineConfigDatafusionEmbeddedIngest::default())
-            .add::<kamu::EngineProvisionerNull>()
-            .add::<kamu::DataFormatRegistryImpl>()
-            .add::<kamu::PushIngestPlannerImpl>()
-            .add::<kamu::PushIngestExecutorImpl>()
-            .add::<kamu::PushIngestDataUseCaseImpl>()
-            .add::<kamu_adapter_http::platform::UploadServiceLocal>()
-            .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
-            .add_value(kamu_core::ServerUrlConfig::new_test(None))
-            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100500))
-            .build();
-
-        let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
-
-        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs_ext(
-            &base_catalog,
-            Some(CurrentAccountSubject::Logged(LoggedAccount {
-                account_id: molecule_account_id.clone(),
-                account_name: "molecule".parse().unwrap(),
-            })),
-            PredefinedAccountOpts {
-                is_admin: false,
-                can_provision_accounts: true,
-            },
-        )
-        .await;
-
-        Self {
-            base_gql_harness,
-            catalog_authorized,
-            molecule_account_id,
-        }
-    }
-
-    pub async fn create_projects_dataset(&self) -> CreateDatasetResult {
-        let snapshot = kamu_adapter_graphql::molecule::Molecule::dataset_snapshot_projects_v1(
-            "molecule/projects".parse().unwrap(),
-        );
-
-        let create_dataset = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset
-            .execute(snapshot, Default::default())
-            .await
-            .unwrap()
-    }
-
-    pub async fn execute_authorized_query(
-        &self,
-        query: impl Into<async_graphql::Request>,
-    ) -> async_graphql::Response {
-        let catalog = self.catalog_authorized.clone();
-        kamu_adapter_graphql::schema_quiet()
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&catalog))
-                    .data(dataset_handle_data_loader(&catalog))
-                    .data(catalog),
-            )
-            .await
-    }
-}
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

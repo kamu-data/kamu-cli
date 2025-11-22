@@ -16,6 +16,7 @@ use crate::mutations::molecule_mut::v2::{
 };
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
+use crate::queries::molecule::v2::MoleculeProjectV2ChangelogRecord;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,3 +66,15 @@ impl MoleculeProjectMutV2 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MoleculeProjectMutV2 {
+    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        let record: MoleculeProjectV2ChangelogRecord = serde_json::from_value(record).int_err()?;
+
+        Ok(Self {
+            project_account_id: record.data.account_id,
+            data_room_dataset_id: record.data.data_room_dataset_id,
+            announcements_dataset_id: record.data.announcements_dataset_id,
+        })
+    }
+}

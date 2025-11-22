@@ -23,7 +23,6 @@ use crate::queries::molecule::v2::{
 #[derive(SimpleObject, Clone)]
 #[graphql(complex)]
 pub struct MoleculeProjectV2 {
-    #[expect(dead_code)]
     #[graphql(skip)]
     pub account_id: odf::AccountID,
 
@@ -61,8 +60,9 @@ pub struct MoleculeProjectV2 {
 impl MoleculeProjectV2 {
     /// Project's organizational account
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_account, skip_all)]
-    async fn account(&self, _ctx: &Context<'_>) -> Result<Account> {
-        todo!()
+    async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
+        let account = Account::from_account_id(ctx, self.account_id.clone()).await?;
+        Ok(account)
     }
 
     /// Strongly typed data room accessor
@@ -111,3 +111,56 @@ pub struct MoleculeProjectActivityFiltersV2 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serde
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MoleculeProjectV2 {
+    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        let record: MoleculeProjectV2ChangelogRecord = serde_json::from_value(record).int_err()?;
+
+        Ok(Self {
+            system_time: record.system_time,
+            event_time: record.event_time,
+            ipnft_symbol: record.data.ipnft_symbol,
+            ipnft_uid: record.data.ipnft_uid,
+            ipnft_address: record.data.ipnft_address,
+            ipnft_token_id: BigInt::new(record.data.ipnft_token_id.parse().int_err()?),
+            account_id: record.data.account_id,
+            data_room_dataset_id: record.data.data_room_dataset_id,
+            announcements_dataset_id: record.data.announcements_dataset_id,
+        })
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct MoleculeProjectV2ChangelogRecord {
+    pub offset: u64,
+
+    pub op: u8,
+
+    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+
+    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
+    pub event_time: DateTime<Utc>,
+
+    #[serde(flatten)]
+    pub data: MoleculeProjectV2Data,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct MoleculeProjectV2Data {
+    pub ipnft_symbol: String,
+
+    pub ipnft_uid: String,
+
+    pub ipnft_address: String,
+
+    pub ipnft_token_id: String,
+
+    pub account_id: odf::AccountID,
+
+    pub data_room_dataset_id: odf::DatasetID,
+
+    pub announcements_dataset_id: odf::DatasetID,
+}

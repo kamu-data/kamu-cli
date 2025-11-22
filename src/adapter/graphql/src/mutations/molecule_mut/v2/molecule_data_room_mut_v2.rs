@@ -69,7 +69,7 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
         content_args: ContentArgs,
         path: CollectionPath,
         access_level: MoleculeAccessLevelV2,
-        change_by: AccountID<'static>,
+        change_by: String,
         description: String,
         categories: Vec<MoleculeCategoryV2>,
         tags: Vec<MoleculeTagV2>,
@@ -171,7 +171,7 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
         content_args: ContentArgs,
         reference: DatasetID<'static>,
         access_level: MoleculeAccessLevelV2,
-        change_by: AccountID<'static>,
+        change_by: String,
         description: String,
         categories: Vec<MoleculeCategoryV2>,
         tags: Vec<MoleculeTagV2>,
@@ -364,6 +364,73 @@ impl<'a> MoleculeDataRoomMutV2<'a> {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomMutV2<'_> {
+    /// Allows creating a file, upload a new version, and link a file into the
+    /// data room via a single transaction. Uploads a new version of content
+    /// in-band, so should be used only for very small files.
+    #[graphql(guard = "LoggedInGuard")]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_finish_upload_file, skip_all)]
+    async fn upload_file(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Base64-encoded file content (url-safe, no padding)")] content: Base64Usnp,
+        #[graphql(name = "ref")] reference: Option<DatasetID<'static>>,
+        path: Option<CollectionPath>,
+        #[graphql(desc = "Media type of content (e.g. application/pdf)")] content_type: Option<
+            String,
+        >,
+        access_level: MoleculeAccessLevelV2,
+        change_by: String,
+        description: String,
+        categories: Vec<MoleculeCategoryV2>,
+        tags: Vec<MoleculeTagV2>,
+        content_text: String,
+        encryption_metadata: Option<Json<EncryptionMetadata>>,
+    ) -> Result<MoleculeDataRoomFinishUploadFileResultV2> {
+        let update_version_file_use_case_helper =
+            from_catalog_n!(ctx, UpdateVersionFileUseCaseHelper);
+
+        let content_args = update_version_file_use_case_helper
+            .get_content_args(ContentSource::Bytes(&content), None)
+            .await
+            .map_err(map_get_content_args_error)?;
+
+        match (path, reference) {
+            (Some(path), None) => {
+                self.finish_upload_file_new_file(
+                    ctx,
+                    content_args,
+                    path,
+                    access_level,
+                    change_by,
+                    description,
+                    categories,
+                    tags,
+                    content_text,
+                    encryption_metadata,
+                )
+                .await?;
+            }
+            (None, Some(reference)) => {
+                self.finish_upload_file_new_file_version(
+                    ctx,
+                    content_args,
+                    reference,
+                    access_level,
+                    change_by,
+                    description,
+                    categories,
+                    tags,
+                    content_text,
+                    encryption_metadata,
+                )
+                .await?;
+            }
+            _ => return Err(GqlError::gql("Either `path` or `ref` must be specified")),
+        }
+
+        Ok(MoleculeDataRoomFinishUploadFileResultSuccessV2::default().into())
+    }
+
     /// Starts the process of uploading a file to the data room.
     #[graphql(guard = "LoggedInGuard")]
     #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_start_upload_file, skip_all)]
@@ -421,7 +488,7 @@ impl MoleculeDataRoomMutV2<'_> {
         #[graphql(name = "ref")] reference: Option<DatasetID<'static>>,
         path: Option<CollectionPath>,
         access_level: MoleculeAccessLevelV2,
-        change_by: AccountID<'static>,
+        change_by: String,
         description: String,
         categories: Vec<MoleculeCategoryV2>,
         tags: Vec<MoleculeTagV2>,
@@ -526,7 +593,7 @@ impl MoleculeDataRoomMutV2<'_> {
         #[graphql(name = "ref")] reference: DatasetID<'static>,
         // TODO: use update object w/ optional fields instead?
         access_level: MoleculeAccessLevelV2,
-        change_by: AccountID<'static>,
+        change_by: String,
         description: String,
         categories: Vec<String>,
         tags: Vec<String>,

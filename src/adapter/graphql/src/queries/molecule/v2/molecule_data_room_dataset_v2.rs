@@ -104,7 +104,7 @@ pub struct MoleculeDataRoomEntryV2;
 impl MoleculeDataRoomEntryV2 {
     pub fn build_extra_data_json_map(
         access_level: &MoleculeAccessLevelV2,
-        change_by: &AccountID<'static>,
+        change_by: &String,
         content_type: &String,
         content_length: usize,
         categories: &Vec<MoleculeCategoryV2>,
@@ -113,7 +113,7 @@ impl MoleculeDataRoomEntryV2 {
     ) -> serde_json::Map<String, serde_json::Value> {
         let json_object = serde_json::json!({
             MoleculeDataRoomDatasetV2::COLUMN_NAME_ACCESS_LEVEL: access_level,
-            MoleculeDataRoomDatasetV2::COLUMN_NAME_CHANGE_BY: change_by.to_string(),
+            MoleculeDataRoomDatasetV2::COLUMN_NAME_CHANGE_BY: change_by,
             MoleculeDataRoomDatasetV2::COLUMN_NAME_CONTENT_TYPE: content_type,
             MoleculeDataRoomDatasetV2::COLUMN_NAME_CONTENT_LENGTH: content_length,
             MoleculeDataRoomDatasetV2::COLUMN_NAME_CATEGORIES: categories,
@@ -217,7 +217,7 @@ impl MoleculeVersionedFileV2 {
 
     pub fn build_extra_data_json_map(
         access_level: &MoleculeAccessLevelV2,
-        change_by: &AccountID<'static>,
+        change_by: &String,
         description: &String,
         categories: &Vec<MoleculeCategoryV2>,
         tags: &Vec<MoleculeTagV2>,
