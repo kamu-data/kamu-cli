@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
 use crate::utils::CreateDatasetUseCaseHelper;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
+pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool) {
     if needs_indexing {
         b.add::<DatasetEntryIndexer>();
         b.add::<DatasetReferenceIndexer>();

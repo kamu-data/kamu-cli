@@ -2873,11 +2873,6 @@ A scalar that can represent any JSON value.
 """
 scalar JSON
 
-"""
-A scalar that can represent any JSON Object value.
-"""
-scalar JSONObject
-
 type JdbcDesc {
 	url: String!
 }
@@ -3159,7 +3154,7 @@ type Molecule {
 }
 
 type MoleculeActivityAnnouncementV2 {
-	announcement: MoleculeAnnouncementEntryV2!
+	announcement: MoleculeAnnouncementEntry!
 }
 
 union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityAnnouncementV2
@@ -3181,18 +3176,18 @@ type MoleculeActivityEventV2Edge {
 }
 
 type MoleculeActivityFileAddedV2 {
-	entry: MoleculeDataRoomEntryV2!
+	entry: MoleculeDataRoomEntry!
 }
 
 type MoleculeActivityFileRemovedV2 {
-	entry: MoleculeDataRoomEntryV2!
+	entry: MoleculeDataRoomEntry!
 }
 
 type MoleculeActivityFileUpdatedV2 {
-	entry: MoleculeDataRoomEntryV2!
+	entry: MoleculeDataRoomEntry!
 }
 
-type MoleculeAnnouncementEntryV2 {
+type MoleculeAnnouncementEntry {
 	project: MoleculeProjectV2!
 	id: String!
 	headline: String!
@@ -3204,11 +3199,11 @@ type MoleculeAnnouncementEntryV2 {
 	tags: [String!]!
 }
 
-type MoleculeAnnouncementEntryV2Connection {
+type MoleculeAnnouncementEntryConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MoleculeAnnouncementEntryV2!]!
+	nodes: [MoleculeAnnouncementEntry!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -3217,11 +3212,20 @@ type MoleculeAnnouncementEntryV2Connection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [MoleculeAnnouncementEntryV2Edge!]!
+	edges: [MoleculeAnnouncementEntryEdge!]!
 }
 
-type MoleculeAnnouncementEntryV2Edge {
-	node: MoleculeAnnouncementEntryV2!
+type MoleculeAnnouncementEntryEdge {
+	node: MoleculeAnnouncementEntry!
+}
+
+type MoleculeAnnouncements {
+	"""
+	Access the underlying core Dataset
+	"""
+	dataset: Dataset!
+	tail(page: Int, perPage: Int, filters: MoleculeAnnouncementsFilters): MoleculeAnnouncementEntryConnection!
+	byId(id: String!): MoleculeAnnouncementEntry!
 }
 
 type MoleculeAnnouncementsDatasetMutV2 {
@@ -3236,51 +3240,49 @@ type MoleculeAnnouncementsDatasetMutV2 {
 	): CreateAnnouncementResult!
 }
 
-type MoleculeAnnouncementsDatasetV2 {
-	"""
-	Access the underlying core Dataset
-	"""
-	dataset: Dataset!
-	tail(page: Int, perPage: Int, filters: MoleculeAnnouncementsFiltersV2): MoleculeAnnouncementEntryV2Connection!
-	byId(id: String!): MoleculeAnnouncementEntryV2!
-}
-
-input MoleculeAnnouncementsFiltersV2 {
+input MoleculeAnnouncementsFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
 }
 
-type MoleculeDataRoomDatasetV2 {
+type MoleculeDataRoom {
 	"""
 	Access the underlying core Dataset
 	"""
 	dataset: Dataset!
-	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int): MoleculeDataRoomEntryV2Connection!
-	entry(path: CollectionPath!): MoleculeDataRoomEntryV2!
+	latest: MoleculeDataRoomProjection!
+	asOf(blockHash: Multihash!): MoleculeDataRoomProjection!
 }
 
-type MoleculeDataRoomEntryV2 {
+input MoleculeDataRoomEntriesFilters {
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+}
+
+type MoleculeDataRoomEntry {
+	"""
+	Back link to the project
+	"""
 	project: MoleculeProjectV2!
+	"""
+	Access the linked core Dataset
+	"""
+	asDataset: Dataset
 	systemTime: DateTime!
 	eventTime: DateTime!
 	path: CollectionPath!
 	ref: DatasetID!
-	"""
-	Access the linked core Dataset
-	"""
-	asDataset: Dataset!
-	"""
-	Strongly typed [`MoleculeVersionedFileV2`] object
-	"""
-	asVersionedFile: MoleculeVersionedFileV2!
+	changeBy: String!
+	asVersionedFile: MoleculeVersionedFile
 }
 
-type MoleculeDataRoomEntryV2Connection {
+type MoleculeDataRoomEntryConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MoleculeDataRoomEntryV2!]!
+	nodes: [MoleculeDataRoomEntry!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -3289,53 +3291,127 @@ type MoleculeDataRoomEntryV2Connection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [MoleculeDataRoomEntryV2Edge!]!
+	edges: [MoleculeDataRoomEntryEdge!]!
 }
 
-type MoleculeDataRoomEntryV2Edge {
-	node: MoleculeDataRoomEntryV2!
+type MoleculeDataRoomEntryEdge {
+	node: MoleculeDataRoomEntry!
 }
 
-type MoleculeDataRoomFinishUploadFileResultV2 {
-	dummy: String!
+interface MoleculeDataRoomFinishUploadFileResult {
+	isSuccess: Boolean!
+	message: String!
 }
 
-type MoleculeDataRoomMoveEntryResultV2 {
-	dummy: String!
+type MoleculeDataRoomFinishUploadFileResultSuccess implements MoleculeDataRoomFinishUploadFileResult {
+	entry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface MoleculeDataRoomMoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
 }
 
 type MoleculeDataRoomMutV2 {
 	"""
+	Allows creating a file, upload a new version, and link a file into the
+	data room via a single transaction. Uploads a new version of content
+	in-band, so should be used only for very small files.
+	"""
+	uploadFile(
+		"""
+		Base64-encoded file content (url-safe, no padding)
+		"""
+		content: Base64Usnp!,		ref: DatasetID,		path: CollectionPath,
+		"""
+		Media type of content (e.g. application/pdf)
+		"""
+		contentType: String,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String,		encryptionMetadata: String
+	): MoleculeDataRoomFinishUploadFileResult!
+	"""
 	Starts the process of uploading a file to the data room.
 	"""
-	startUploadFile(contentSize: Int!): MoleculeDataRoomUploadFileResultV2!
+	startUploadFile(
+		"""
+		Size of the file being uploaded
+		"""
+		contentLength: Int!,
+		"""
+		Media type of content (e.g. application/pdf)
+		"""
+		contentType: String
+	): StartUploadVersionResult!
 	"""
-	Finishes the process of uploading a file to the data room.
+	Allows creating a file, upload a new version, and link a file into the
+	data room via a single transaction.
 	"""
-	finishUploadFile(uploadToken: String!, ref: DatasetID!, path: CollectionPath!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!): MoleculeDataRoomFinishUploadFileResultV2!
+	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPath, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: String): MoleculeDataRoomFinishUploadFileResult!
 	"""
 	Moves an entry in the data room.
 	"""
-	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomMoveEntryResultV2!
+	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
 	"""
 	Removes an entry from the data room.
 	"""
-	removeEntry(path: CollectionPath!, expectedHead: Multihash!): MoleculeDataRoomRemoveEntryResultV2!
+	removeEntry(path: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
 	"""
 	Updates the metadata of a file in the data room.
 	"""
-	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: AccountID!, description: String!, categories: [String!]!, tags: [String!]!, contentText: String!, expectedHead: Multihash!): MoleculeDataRoomUpdateFileMetadataResultV2!
+	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: String): MoleculeDataRoomUpdateFileMetadataResult!
 }
 
-type MoleculeDataRoomRemoveEntryResultV2 {
+type MoleculeDataRoomProjection {
+	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int, filters: MoleculeDataRoomEntriesFilters): MoleculeDataRoomEntryConnection!
+	entry(path: CollectionPath!): MoleculeDataRoomEntry
+}
+
+interface MoleculeDataRoomRemoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateEntryNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+	path: CollectionPath!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface MoleculeDataRoomUpdateFileMetadataResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateFileMetadataResultEntryNotFound implements MoleculeDataRoomUpdateFileMetadataResult {
+	ref: DatasetID!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateFileMetadataResultSuccess implements MoleculeDataRoomUpdateFileMetadataResult {
+	entry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateSuccess implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+	oldHead: Multihash!
+	newHead: Multihash!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDisableProjectResultV2 {
 	dummy: String!
 }
 
-type MoleculeDataRoomUpdateFileMetadataResultV2 {
-	dummy: String!
-}
-
-type MoleculeDataRoomUploadFileResultV2 {
+type MoleculeEnableProjectResultV2 {
 	dummy: String!
 }
 
@@ -3376,7 +3452,8 @@ type MoleculeMutV2 {
 	its symbol will remain reserved, data will remain intact,
 	but the project will no longer appear in the listing.
 	"""
-	removeProject(ipnftUid: String!): MoleculeRemoveProjectResultV2!
+	disableProject(ipnftUid: String!): MoleculeDisableProjectResultV2!
+	enableProject(ipnftUid: String!): MoleculeEnableProjectResultV2!
 	"""
 	Looks up the project
 	"""
@@ -3426,7 +3503,7 @@ type MoleculeProject {
 	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
 }
 
-input MoleculeProjectActivityFiltersV2 {
+input MoleculeProjectActivityFilters {
 	"""
 	This filter is provided as an example.
 	"""
@@ -3563,11 +3640,11 @@ type MoleculeProjectMutV2 {
 
 type MoleculeProjectV2 {
 	"""
-	System time when this version was created/updated
+	System time when this project was created/updated
 	"""
 	systemTime: DateTime!
 	"""
-	Event time when this version was created/updated
+	Event time when this project was created/updated
 	"""
 	eventTime: DateTime!
 	"""
@@ -3593,15 +3670,15 @@ type MoleculeProjectV2 {
 	"""
 	Strongly typed data room accessor
 	"""
-	dataRoom: MoleculeDataRoomDatasetV2!
+	dataRoom: MoleculeDataRoom!
 	"""
 	Strongly typed announcements accessor
 	"""
-	announcements: MoleculeAnnouncementsDatasetV2!
+	announcements: MoleculeAnnouncements!
 	"""
 	Project's activity events in reverse chronological order
 	"""
-	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFiltersV2): MoleculeActivityEventV2Connection!
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventV2Connection!
 }
 
 type MoleculeProjectV2Connection {
@@ -3624,31 +3701,27 @@ type MoleculeProjectV2Edge {
 	node: MoleculeProjectV2!
 }
 
-type MoleculeRemoveProjectResultV2 {
-	dummy: String!
-}
-
-input MoleculeSemanticSearchFiltersV2 {
+input MoleculeSemanticSearchFilters {
 	byIpnftUids: [String!]
 	byCategories: [String!]
 	byTags: [String!]
 }
 
-type MoleculeSemanticSearchFoundAnnouncementV2 {
-	entry: MoleculeAnnouncementEntryV2!
+type MoleculeSemanticSearchFoundAnnouncement {
+	entry: MoleculeAnnouncementEntry!
 }
 
-type MoleculeSemanticSearchFoundFileV2 {
-	entry: MoleculeVersionedFileV2!
+type MoleculeSemanticSearchFoundFile {
+	entry: MoleculeVersionedFile!
 }
 
-union MoleculeSemanticSearchFoundItemV2 = MoleculeSemanticSearchFoundFileV2 | MoleculeSemanticSearchFoundAnnouncementV2
+union MoleculeSemanticSearchFoundItem = MoleculeSemanticSearchFoundFile | MoleculeSemanticSearchFoundAnnouncement
 
-type MoleculeSemanticSearchFoundItemV2Connection {
+type MoleculeSemanticSearchFoundItemConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MoleculeSemanticSearchFoundItemV2!]!
+	nodes: [MoleculeSemanticSearchFoundItem!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -3657,11 +3730,11 @@ type MoleculeSemanticSearchFoundItemV2Connection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [MoleculeSemanticSearchFoundItemV2Edge!]!
+	edges: [MoleculeSemanticSearchFoundItemEdge!]!
 }
 
-type MoleculeSemanticSearchFoundItemV2Edge {
-	node: MoleculeSemanticSearchFoundItemV2!
+type MoleculeSemanticSearchFoundItemEdge {
+	node: MoleculeSemanticSearchFoundItem!
 }
 
 type MoleculeV1 {
@@ -3693,7 +3766,7 @@ type MoleculeV2 {
 	Latest activity events across all projects in reverse chronological
 	order
 	"""
-	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFiltersV2): MoleculeActivityEventV2Connection!
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventV2Connection!
 	"""
 	Performs a semantic search
 	Using `filters` parameters, a search can be narrowed down to:
@@ -3701,17 +3774,14 @@ type MoleculeV2 {
 	- specific categories and tags
 	- only returning files or announcements
 	"""
-	search(prompt: String!, filters: MoleculeSemanticSearchFiltersV2, page: Int, perPage: Int): MoleculeSemanticSearchFoundItemV2Connection!
+	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int): MoleculeSemanticSearchFoundItemConnection!
 }
 
-type MoleculeVersionedFileContentUrlV2 {
-	url: Url!
-	headers: JSONObject!
-	method: String!
-	expiresAt: DateTime!
+type MoleculeVersionedFile {
+	latest: MoleculeVersionedFileEntry
 }
 
-type MoleculeVersionedFileV2 {
+type MoleculeVersionedFileEntry {
 	systemTime: DateTime!
 	eventTime: DateTime!
 	version: Int!
@@ -3719,9 +3789,21 @@ type MoleculeVersionedFileV2 {
 	contentLength: Int!
 	contentType: String!
 	accessLevel: String!
+	changeBy: String!
+	description: String
 	categories: [String!]!
 	tags: [String!]!
-	contentUrl: MoleculeVersionedFileContentUrlV2!
+	contentText: String
+	encryptionMetadata: String
+	"""
+	Returns encoded content in-band. Should be used for small files only and
+	will return an error if called on large data.
+	"""
+	content: Base64Usnp!
+	"""
+	Returns a direct download URL
+	"""
+	contentUrl: VersionedFileContentDownload!
 }
 
 """
@@ -4908,14 +4990,14 @@ interface UpdateReadmeResult {
 	message: String!
 }
 
-type UpdateVersionErrorCasFailed implements UpdateVersionResult {
+type UpdateVersionErrorCasFailed implements UpdateVersionResult & MoleculeDataRoomUpdateFileMetadataResult {
 	expectedHead: Multihash!
 	actualHead: Multihash!
 	isSuccess: Boolean!
 	message: String!
 }
 
-type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
+type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult & MoleculeDataRoomUpdateFileMetadataResult {
 	message: String!
 	isSuccess: Boolean!
 }

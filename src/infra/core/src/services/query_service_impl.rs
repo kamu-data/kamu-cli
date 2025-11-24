@@ -15,7 +15,7 @@ use std::sync::Arc;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use futures::TryStreamExt;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt as _};
 use kamu_core::*;
 use odf::utils::data::DataFrameExt;
@@ -579,6 +579,113 @@ impl QueryService for QueryServiceImpl {
                 latest_image: docker_images::RISINGWAVE.to_string(),
             },
         ])
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_changelog_projection, skip_all, fields(hdl=%source.get_handle()))]
+    async fn get_changelog_projection(
+        &self,
+        source: ResolvedDataset,
+        options: GetChangelogProjectionOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        let (head, maybe_df) = self
+            .single_dataset(&source, None, options.block_hash)
+            .await?;
+
+        let Some(df) = maybe_df else {
+            // Dataset has no schema yet.
+            return Ok(GetDataResponse {
+                df: None,
+                source,
+                block_hash: head,
+            });
+        };
+
+        enum PrimaryKeyValue {
+            Preresolved(Vec<String>),
+            NeedToScan,
+        }
+        enum DatasetVocabularyValue {
+            Preresolved(odf::metadata::DatasetVocabulary),
+            NeedToScan,
+        }
+
+        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
+        // TODO: Remove these visitors once schema contains primary keys -->
+        let mut active_polling_source_visitor =
+            odf::dataset::SearchActivePollingSourceVisitor::new(source.get_kind());
+        let mut active_push_sources_visitor =
+            odf::dataset::SearchActivePushSourcesVisitor::new(source.get_kind());
+        // <--
+
+        let mut visitors =
+            Vec::<&mut dyn odf::dataset::MetadataChainVisitor<Error = _>>::with_capacity(3);
+
+        let primary_key_value = if let Some(value) = options.hints.primary_key {
+            PrimaryKeyValue::Preresolved(value)
+        } else {
+            visitors.push(&mut active_polling_source_visitor);
+            visitors.push(&mut active_push_sources_visitor);
+            PrimaryKeyValue::NeedToScan
+        };
+        let dataset_vocabulary_value = if let Some(value) = options.hints.dataset_vocabulary {
+            DatasetVocabularyValue::Preresolved(value)
+        } else {
+            visitors.push(&mut set_vocab_visitor);
+            DatasetVocabularyValue::NeedToScan
+        };
+
+        use odf::dataset::MetadataChainExt;
+
+        source
+            .as_metadata_chain()
+            .accept_by_interval(&mut visitors, Some(&head), None)
+            .await
+            .int_err()?;
+
+        let primary_key = match primary_key_value {
+            PrimaryKeyValue::Preresolved(value) => value,
+            PrimaryKeyValue::NeedToScan => {
+                // TODO: Revisit once schema contains primary keys
+                let merge_strategy = if let Some(event) = active_polling_source_visitor.into_event()
+                {
+                    // Use the active polling source if any.
+                    Some(event.merge)
+                } else if let Some(event) = active_push_sources_visitor.into_events().pop() {
+                    // Use the (!) last active push source, if any.
+                    // It's OK until the schema starts containing primary keys.
+                    Some(event.merge)
+                } else {
+                    None
+                };
+
+                let Some(primary_key) =
+                    merge_strategy.and_then(odf::metadata::MergeStrategy::primary_key)
+                else {
+                    return Err(DatasetHasNoPrimaryKeysError {
+                        dataset_handle: source.take_handle(),
+                    }
+                    .int_err()
+                    .into());
+                };
+
+                primary_key
+            }
+        };
+        let dataset_vocabulary = match dataset_vocabulary_value {
+            DatasetVocabularyValue::Preresolved(value) => value,
+            DatasetVocabularyValue::NeedToScan => {
+                set_vocab_visitor.into_event().unwrap_or_default().into()
+            }
+        };
+
+        let projection_df =
+            odf::utils::data::changelog::project(df, &primary_key, &dataset_vocabulary)?;
+
+        Ok(GetDataResponse {
+            df: Some(projection_df),
+            source,
+            block_hash: head,
+        })
     }
 }
 

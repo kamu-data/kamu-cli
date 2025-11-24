@@ -43,6 +43,7 @@ kamu-auth-rebac = { workspace = true }
 kamu-auth-web3 = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-search = { workspace = true }
@@ -83,6 +84,7 @@ secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
 sha3 = "0.10"
+thiserror = "2"
 tokio = { version = "1", default-features = false, features = [] }
 tracing = "0.1"
 url = { version = "2", default-features = false }

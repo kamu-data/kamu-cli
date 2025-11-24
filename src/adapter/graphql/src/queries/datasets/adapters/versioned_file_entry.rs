@@ -22,7 +22,7 @@ pub type FileVersion = u32;
 #[graphql(complex)]
 pub struct VersionedFileEntry {
     #[graphql(skip)]
-    dataset: ResolvedDataset,
+    pub dataset: ResolvedDataset,
 
     /// System time when this version was created/updated
     pub system_time: DateTime<Utc>,

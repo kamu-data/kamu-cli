@@ -75,7 +75,7 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_molecule_provision_project() {
+async fn test_molecule_v1_provision_project() {
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -294,7 +294,7 @@ async fn test_molecule_provision_project() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_molecule_data_room_operations() {
+async fn test_molecule_v1_data_room_operations() {
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -466,6 +466,15 @@ async fn test_molecule_data_room_operations() {
             },
             "extraData": {
                 "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                // V2 fields
+                "categories": null,
+                "content_hash": null,
+                "content_length": null,
+                "content_type": null,
+                "description": null,
+                "molecule_access_level": null,
+                "tags": null,
+                "version": null,
             },
         }),
     );
@@ -474,7 +483,7 @@ async fn test_molecule_data_room_operations() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_molecule_announcements_operations() {
+async fn test_molecule_v1_announcements_operations() {
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -783,7 +792,7 @@ async fn test_molecule_announcements_operations() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_molecule_activity() {
+async fn test_molecule_v1_activity() {
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1414,10 +1423,11 @@ async fn test_molecule_activity() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-struct GraphQLMoleculeV1Harness {
+pub struct GraphQLMoleculeV1Harness {
     base_gql_harness: BaseGQLDatasetHarness,
-    catalog_authorized: dill::Catalog,
-    molecule_account_id: odf::AccountID,
+    pub schema: kamu_adapter_graphql::Schema,
+    pub catalog_authorized: dill::Catalog,
+    pub molecule_account_id: odf::AccountID,
 }
 
 #[bon]
@@ -1450,6 +1460,10 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<kamu_adapter_http::platform::UploadServiceLocal>()
+            .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
+            .add_value(kamu_core::ServerUrlConfig::new_test(None))
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
             .build();
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
@@ -1469,6 +1483,7 @@ impl GraphQLMoleculeV1Harness {
 
         Self {
             base_gql_harness,
+            schema: kamu_adapter_graphql::schema_quiet(),
             catalog_authorized,
             molecule_account_id,
         }
@@ -1495,7 +1510,7 @@ impl GraphQLMoleculeV1Harness {
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
         let catalog = self.catalog_authorized.clone();
-        kamu_adapter_graphql::schema_quiet()
+        self.schema
             .execute(
                 query
                     .into()

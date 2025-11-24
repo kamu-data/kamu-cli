@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use file_utils::{MediaType, MediaTypeRef};
-use odf::Multihash;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type FileVersion = u32;
 
@@ -58,7 +59,7 @@ pub struct VersionedFileEntity {
     pub content_length: usize,
 
     /// Multihash of the file content
-    pub content_hash: Multihash,
+    pub content_hash: odf::Multihash,
 
     /// Extra data associated with this file version
     #[serde(flatten)]

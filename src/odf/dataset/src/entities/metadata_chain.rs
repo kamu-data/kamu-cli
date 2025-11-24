@@ -354,6 +354,10 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + Send,
     {
+        if visitors.is_empty() {
+            return Ok(());
+        }
+
         // Collect initial decisions of visitors
         let mut decisions: Vec<_> = visitors
             .iter()

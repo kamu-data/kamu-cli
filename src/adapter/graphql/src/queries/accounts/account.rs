@@ -149,7 +149,7 @@ impl Account {
             .map(AsRef::as_ref)
     }
 
-    pub(crate) fn account_name_internal(&self) -> &AccountName<'_> {
+    pub(crate) fn account_name_internal(&self) -> &odf::AccountName {
         &self.account_name
     }
 
