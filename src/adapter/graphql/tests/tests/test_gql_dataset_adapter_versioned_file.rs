@@ -713,6 +713,7 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<UpdateVersionFileUseCaseImpl>()
+            .add::<kamu_datasets_services::utils::UpdateVersionFileUseCaseHelper>()
             .add::<UploadServiceLocal>()
             .add_value(ServerUrlConfig::new_test(None))
             .add_value(CacheDir::new(cache_dir))

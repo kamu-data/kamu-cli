@@ -110,8 +110,7 @@ fn convert_sql_to_odf_data_type(
                 | ArrayElemTypeDef::SquareBracket(_, _)
                 | ArrayElemTypeDef::Parenthesis(_) => {
                     return Err(UnsupportedSchema::new(format!(
-                        "Unsupported SQL type when converting to ODF schema: {}",
-                        data_type
+                        "Unsupported SQL type when converting to ODF schema: {data_type}"
                     )));
                 }
             };
@@ -202,8 +201,7 @@ fn convert_sql_to_odf_data_type(
         | SqlDataType::TsVector
         | SqlDataType::TsQuery => {
             return Err(UnsupportedSchema::new(format!(
-                "Unsupported SQL type when converting to ODF schema: {}",
-                data_type
+                "Unsupported SQL type when converting to ODF schema: {data_type}"
             )));
         }
     };

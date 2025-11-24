@@ -466,6 +466,15 @@ async fn test_molecule_v1_data_room_operations() {
             },
             "extraData": {
                 "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                // V2 fields
+                "categories": null,
+                "content_hash": null,
+                "content_length": null,
+                "content_type": null,
+                "description": null,
+                "molecule_access_level": null,
+                "tags": null,
+                "version": null,
             },
         }),
     );
@@ -1453,7 +1462,7 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
-            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100500))
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
             .build();
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;

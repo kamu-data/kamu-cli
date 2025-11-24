@@ -92,10 +92,7 @@ impl CollectionEntry {
     /// Resolves the reference to linked dataset
     #[tracing::instrument(level = "info", name = CollectionEntry_as_dataset, skip_all)]
     pub async fn as_dataset(&self, ctx: &Context<'_>) -> Result<Option<Dataset>> {
-        match Dataset::try_from_ref(ctx, &self.reference.as_local_ref()).await? {
-            TransformInputDataset::Accessible(v) => Ok(Some(v.dataset)),
-            TransformInputDataset::NotAccessible(_) => Ok(None),
-        }
+        Dataset::try_from_ref(ctx, &self.reference.as_local_ref()).await
     }
 }
 

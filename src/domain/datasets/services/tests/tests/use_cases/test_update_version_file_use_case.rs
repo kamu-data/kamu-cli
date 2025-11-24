@@ -146,6 +146,7 @@ impl UpdateVersionFileCaseHarness {
 
         let catalog = b
             .add::<UpdateVersionFileUseCaseImpl>()
+            .add::<kamu_datasets_services::utils::UpdateVersionFileUseCaseHelper>()
             .add::<PushIngestDataUseCaseImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()

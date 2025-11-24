@@ -10,20 +10,20 @@
 use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
-    MoleculeAccessLevelV2,
-    MoleculeAnnouncementIdV2,
-    MoleculeCategoryV2,
+    MoleculeAccessLevel,
+    MoleculeAnnouncementId,
+    MoleculeCategory,
     MoleculeProjectV2,
-    MoleculeTagV2,
+    MoleculeTag,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeAnnouncementsDatasetV2;
+pub struct MoleculeAnnouncements;
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeAnnouncementsDatasetV2 {
+impl MoleculeAnnouncements {
     #[expect(clippy::unused_async)]
     /// Access the underlying core Dataset
     async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
@@ -36,20 +36,20 @@ impl MoleculeAnnouncementsDatasetV2 {
         _ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filters: Option<MoleculeAnnouncementsFiltersV2>,
-    ) -> Result<MoleculeAnnouncementEntryV2Connection> {
+        filters: Option<MoleculeAnnouncementsFilters>,
+    ) -> Result<MoleculeAnnouncementEntryConnection> {
         let _ = page;
         let _ = per_page;
         let _ = filters;
-        Ok(MoleculeAnnouncementEntryV2Connection::new(vec![], 0, 0, 0))
+        Ok(MoleculeAnnouncementEntryConnection::new(vec![], 0, 0, 0))
     }
 
     #[expect(clippy::unused_async)]
     async fn by_id(
         &self,
         _ctx: &Context<'_>,
-        id: MoleculeAnnouncementIdV2,
-    ) -> Result<MoleculeAnnouncementEntryV2> {
+        id: MoleculeAnnouncementId,
+    ) -> Result<MoleculeAnnouncementEntry> {
         let _ = id;
         todo!()
     }
@@ -57,18 +57,18 @@ impl MoleculeAnnouncementsDatasetV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeAnnouncementEntryV2;
+pub struct MoleculeAnnouncementEntry;
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeAnnouncementEntryV2 {
+impl MoleculeAnnouncementEntry {
     #[expect(clippy::unused_async)]
     async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
         todo!()
     }
 
     #[expect(clippy::unused_async)]
-    async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementIdV2> {
+    async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementId> {
         todo!()
     }
 
@@ -88,7 +88,7 @@ impl MoleculeAnnouncementEntryV2 {
     }
 
     #[expect(clippy::unused_async)]
-    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevelV2> {
+    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
         todo!()
     }
 
@@ -98,29 +98,29 @@ impl MoleculeAnnouncementEntryV2 {
     }
 
     #[expect(clippy::unused_async)]
-    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeCategoryV2>> {
+    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeCategory>> {
         todo!()
     }
 
     #[expect(clippy::unused_async)]
-    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeTagV2>> {
+    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeTag>> {
         todo!()
     }
 }
 
 page_based_connection!(
-    MoleculeAnnouncementEntryV2,
-    MoleculeAnnouncementEntryV2Connection,
-    MoleculeAnnouncementEntryV2Edge
+    MoleculeAnnouncementEntry,
+    MoleculeAnnouncementEntryConnection,
+    MoleculeAnnouncementEntryEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
-pub struct MoleculeAnnouncementsFiltersV2 {
-    by_tags: Option<Vec<MoleculeTagV2>>,
-    by_categories: Option<Vec<MoleculeCategoryV2>>,
-    by_access_levels: Option<Vec<MoleculeAccessLevelV2>>,
+pub struct MoleculeAnnouncementsFilters {
+    by_tags: Option<Vec<MoleculeTag>>,
+    by_categories: Option<Vec<MoleculeCategory>>,
+    by_access_levels: Option<Vec<MoleculeAccessLevel>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

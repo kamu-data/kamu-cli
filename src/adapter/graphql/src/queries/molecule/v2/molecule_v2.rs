@@ -13,13 +13,13 @@ use crate::prelude::*;
 use crate::queries::molecule::v1::MoleculeV1;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2Connection,
-    MoleculeAnnouncementEntryV2,
-    MoleculeCategoryV2,
-    MoleculeProjectActivityFiltersV2,
+    MoleculeAnnouncementEntry,
+    MoleculeCategory,
+    MoleculeProjectActivityFilters,
     MoleculeProjectV2,
     MoleculeProjectV2Connection,
-    MoleculeTagV2,
-    MoleculeVersionedFileV2,
+    MoleculeTag,
+    MoleculeVersionedFile,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -111,7 +111,7 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filters: Option<MoleculeProjectActivityFiltersV2>,
+        filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
         let _ = page;
         let _ = per_page;
@@ -131,16 +131,16 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         // TODO: update types
         prompt: String,
-        filters: Option<MoleculeSemanticSearchFiltersV2>,
+        filters: Option<MoleculeSemanticSearchFilters>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeSemanticSearchFoundItemV2Connection> {
+    ) -> Result<MoleculeSemanticSearchFoundItemConnection> {
         let _ = prompt;
         let _ = filters;
         let _ = page;
         let _ = per_page;
         // TODO: implement
-        Ok(MoleculeSemanticSearchFoundItemV2Connection::new(
+        Ok(MoleculeSemanticSearchFoundItemConnection::new(
             vec![],
             0,
             0,
@@ -152,34 +152,34 @@ impl MoleculeV2 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
-pub struct MoleculeSemanticSearchFiltersV2 {
+pub struct MoleculeSemanticSearchFilters {
     // TODO: replace w/ real filters.
     // These filters are provided as an example.
     by_ipnft_uids: Option<Vec<String>>,
-    by_categories: Option<Vec<MoleculeCategoryV2>>,
-    by_tags: Option<Vec<MoleculeTagV2>>,
+    by_categories: Option<Vec<MoleculeCategory>>,
+    by_tags: Option<Vec<MoleculeTag>>,
 }
 
 #[derive(Union)]
-pub enum MoleculeSemanticSearchFoundItemV2 {
-    File(MoleculeSemanticSearchFoundFileV2),
-    Announcement(MoleculeSemanticSearchFoundAnnouncementV2),
+pub enum MoleculeSemanticSearchFoundItem {
+    File(MoleculeSemanticSearchFoundFile),
+    Announcement(MoleculeSemanticSearchFoundAnnouncement),
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeSemanticSearchFoundFileV2 {
-    pub entry: MoleculeVersionedFileV2,
+pub struct MoleculeSemanticSearchFoundFile {
+    pub entry: MoleculeVersionedFile,
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeSemanticSearchFoundAnnouncementV2 {
-    pub entry: MoleculeAnnouncementEntryV2,
+pub struct MoleculeSemanticSearchFoundAnnouncement {
+    pub entry: MoleculeAnnouncementEntry,
 }
 
 page_based_connection!(
-    MoleculeSemanticSearchFoundItemV2,
-    MoleculeSemanticSearchFoundItemV2Connection,
-    MoleculeSemanticSearchFoundItemV2Edge
+    MoleculeSemanticSearchFoundItem,
+    MoleculeSemanticSearchFoundItemConnection,
+    MoleculeSemanticSearchFoundItemEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

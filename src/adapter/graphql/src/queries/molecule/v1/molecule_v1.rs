@@ -17,7 +17,7 @@ use odf::utils::data::DataFrameExt;
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::{Account, Collection, CollectionEntry, Dataset, VersionedFileEntry};
+use crate::queries::{Account, CollectionEntry, Dataset, VersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -96,20 +96,6 @@ impl MoleculeV1 {
                 .into(),
             ],
         }
-    }
-
-    pub fn dataset_snapshot_data_room(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        Collection::dataset_snapshot(
-            alias,
-            vec![ColumnInput {
-                name: "molecule_change_by".into(),
-                data_type: DataTypeInput {
-                    ddl: "STRING".into(),
-                },
-            }],
-            vec![],
-        )
-        .expect("Schema is always valid as there are no user inputs")
     }
 
     pub fn dataset_snapshot_announcements(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
@@ -831,10 +817,10 @@ impl MoleculeProject {
     #[tracing::instrument(level = "info", name = MoleculeProject_data_room, skip_all)]
     async fn data_room(&self, ctx: &Context<'_>) -> Result<Dataset> {
         match Dataset::try_from_ref(ctx, &self.data_room_dataset_id.as_local_ref()).await? {
-            TransformInputDataset::Accessible(ds) => Ok(ds.dataset),
-            TransformInputDataset::NotAccessible(_) => Err(GqlError::Access(
-                odf::AccessError::Unauthorized("Dataset inaccessible".into()),
-            )),
+            Some(ds) => Ok(ds),
+            None => Err(GqlError::Access(odf::AccessError::Unauthorized(
+                "Dataset inaccessible".into(),
+            ))),
         }
     }
 
@@ -842,10 +828,10 @@ impl MoleculeProject {
     #[tracing::instrument(level = "info", name = MoleculeProject_announcements, skip_all)]
     async fn announcements(&self, ctx: &Context<'_>) -> Result<Dataset> {
         match Dataset::try_from_ref(ctx, &self.announcements_dataset_id.as_local_ref()).await? {
-            TransformInputDataset::Accessible(ds) => Ok(ds.dataset),
-            TransformInputDataset::NotAccessible(_) => Err(GqlError::Access(
-                odf::AccessError::Unauthorized("Dataset inaccessible".into()),
-            )),
+            Some(ds) => Ok(ds),
+            None => Err(GqlError::Access(odf::AccessError::Unauthorized(
+                "Dataset inaccessible".into(),
+            ))),
         }
     }
 

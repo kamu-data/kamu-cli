@@ -7,15 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 
 use crate::prelude::*;
-use crate::queries::Account;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2Connection,
-    MoleculeAnnouncementsDatasetV2,
-    MoleculeDataRoomDatasetV2,
+    MoleculeAnnouncements,
+    MoleculeDataRoom,
 };
+use crate::queries::{Account, Dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +28,6 @@ pub struct MoleculeProjectV2 {
     #[graphql(skip)]
     pub account_id: odf::AccountID,
 
-    #[expect(dead_code)]
     #[graphql(skip)]
     pub data_room_dataset_id: odf::DatasetID,
 
@@ -34,10 +35,10 @@ pub struct MoleculeProjectV2 {
     #[graphql(skip)]
     pub announcements_dataset_id: odf::DatasetID,
 
-    /// System time when this version was created/updated
+    /// System time when this project was created/updated
     pub system_time: DateTime<Utc>,
 
-    /// Event time when this version was created/updated
+    /// Event time when this project was created/updated
     pub event_time: DateTime<Utc>,
 
     /// Symbolic name of the project
@@ -67,13 +68,24 @@ impl MoleculeProjectV2 {
 
     /// Strongly typed data room accessor
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_data_room, skip_all)]
-    async fn data_room(&self, _ctx: &Context<'_>) -> Result<MoleculeDataRoomDatasetV2> {
-        todo!()
+    async fn data_room(&self, ctx: &Context<'_>) -> Result<MoleculeDataRoom> {
+        let Some(dataset) =
+            Dataset::try_from_ref(ctx, &self.data_room_dataset_id.as_local_ref()).await?
+        else {
+            return Err(GqlError::Access(odf::AccessError::Unauthorized(
+                "Dataset inaccessible".into(),
+            )));
+        };
+
+        Ok(MoleculeDataRoom {
+            dataset,
+            project: Arc::new(self.clone()),
+        })
     }
 
     /// Strongly typed announcements accessor
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_announcements, skip_all)]
-    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetV2> {
+    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncements> {
         todo!()
     }
 
@@ -84,7 +96,7 @@ impl MoleculeProjectV2 {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filters: Option<MoleculeProjectActivityFiltersV2>,
+        filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
         let _ = ctx;
         let _ = page;
@@ -104,7 +116,7 @@ page_based_connection!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
-pub struct MoleculeProjectActivityFiltersV2 {
+pub struct MoleculeProjectActivityFilters {
     // TODO: replace w/ real filters.
     /// This filter is provided as an example.
     by_ipnft_uids: Option<Vec<String>>,
