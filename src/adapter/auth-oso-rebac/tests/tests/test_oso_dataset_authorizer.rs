@@ -12,6 +12,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::Utc;
 use dill::Component;
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::{
@@ -765,6 +766,7 @@ impl DatasetAuthorizerHarness {
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                     DatasetLifecycleMessage::created(
+                        Utc::now(),
                         dataset_handle.id.clone(),
                         account_id,
                         visibility,

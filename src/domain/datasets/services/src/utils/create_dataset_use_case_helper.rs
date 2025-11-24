@@ -24,6 +24,7 @@ use kamu_datasets::{
 use messaging_outbox::{Outbox, OutboxExt};
 use nutype::nutype;
 use thiserror::Error;
+use time_source::SystemTimeSource;
 
 use crate::{CreateDatasetEntryError, DatasetEntryWriter};
 
@@ -34,6 +35,7 @@ pub struct CreateDatasetUseCaseHelper {
     tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
+    time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 
     // TODO: This is here temporarily - using Lazy to avoid modifying all tests
@@ -232,6 +234,7 @@ impl CreateDatasetUseCaseHelper {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
+                    self.time_source.now(),
                     dataset_id.clone(),
                     owner_account_id.clone(),
                     visibility,

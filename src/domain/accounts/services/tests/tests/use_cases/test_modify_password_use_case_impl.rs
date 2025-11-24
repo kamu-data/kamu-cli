@@ -286,11 +286,11 @@ impl ModifyAccountPasswordUseCaseImplHarness {
                             m.display_name == "new-account"
                                 && m.email == "kamu+new-account@example.com".parse().unwrap()
                         }
-                        AccountLifecycleMessage::Renamed(_)
+                        AccountLifecycleMessage::Updated(_)
                         | AccountLifecycleMessage::Deleted(_) => false,
                     }
                 }),
-                eq(1),
+                eq(2),
             )
             .returning(|_, _, _| Ok(()));
     }

@@ -24,7 +24,7 @@ use crate::output::*;
 #[dill::interface(dyn Command)]
 pub struct SearchCommand {
     search_svc: Arc<dyn SearchServiceRemote>,
-    search_local_svc: Arc<dyn SearchServiceLocal>,
+    natural_language_search_svc: Arc<dyn NaturalLanguageSearchService>,
     output_config: Arc<OutputConfig>,
 
     #[dill::component(explicit)]
@@ -64,7 +64,7 @@ impl SearchCommand {
         }
 
         let res = self
-            .search_local_svc
+            .natural_language_search_svc
             .search_natural_language(
                 &prompt,
                 SearchNatLangOpts {

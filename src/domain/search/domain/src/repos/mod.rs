@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod full_text_search_repository;
 mod vector_repository;
 
+pub use full_text_search_repository::*;
 pub use vector_repository::*;
