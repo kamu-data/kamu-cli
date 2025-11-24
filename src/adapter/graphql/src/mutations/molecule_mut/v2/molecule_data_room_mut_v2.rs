@@ -13,7 +13,17 @@ use datafusion::logical_expr::{col, lit};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{ContentArgs, CreateDatasetUseCaseOptions, UpdateVersionFileUseCase};
+use kamu_core::DatasetRegistryExt;
+use kamu_datasets::{
+    CollectionUpdateOperation,
+    ContentArgs,
+    CreateDatasetUseCaseOptions,
+    ExtraDataFields,
+    UpdateCollectionEntriesResult,
+    UpdateCollectionEntriesUseCase,
+    UpdateCollectionEntriesUseCaseError,
+    UpdateVersionFileUseCase,
+};
 use odf::utils::data::DataFrameExt;
 
 use crate::mutations::{
@@ -205,10 +215,11 @@ impl MoleculeDataRoomMutV2 {
         // TODO: Align timestamps with ingest
         let now = chrono::Utc::now();
 
-        let (update_version_file_use_case, dataset_registry) = from_catalog_n!(
+        let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
             ctx,
             dyn UpdateVersionFileUseCase,
-            dyn kamu_core::DatasetRegistry
+            dyn kamu_core::DatasetRegistry,
+            dyn UpdateCollectionEntriesUseCase
         );
 
         // 1. Get the existing versioned dataset entry -- we need to know `path`;
@@ -220,14 +231,10 @@ impl MoleculeDataRoomMutV2 {
         // 2. Upload the next version to the specified dataset.
 
         // NOTE: Access rights will be checked inside the use case.
-        let file_dataset_handle = dataset_registry
-            .resolve_dataset_handle_by_ref(&reference.as_ref().as_local_ref())
+        let file_dataset = dataset_registry
+            .get_dataset_by_ref(&reference.as_ref().as_local_ref())
             .await
             .int_err()?;
-
-        let file_dataset = dataset_registry
-            .get_dataset_by_handle(&file_dataset_handle)
-            .await;
 
         // NOTE: Version and content hash get updated to correct values below
         let mut versioned_file_entry = MoleculeVersionedFileEntry {
@@ -262,7 +269,7 @@ impl MoleculeDataRoomMutV2 {
 
         let update_version_result = update_version_file_use_case
             .execute(
-                &file_dataset_handle,
+                versioned_file_entry.entry.dataset.get_handle(),
                 Some(content_args),
                 None,
                 Some(versioned_file_entry.to_versioned_file_extra_data()),
@@ -275,42 +282,42 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Update the file state in the data room.
 
-        // TODO: Revisit after rebase (Roman's retry changes).
-        //       Temporary hacky path -- should use domain
-        //       instead of reusing the adapter.
         let data_room_entry = MoleculeDataRoomEntry {
             entry: collection_entry,
             project: self.project.clone(),
             denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
         };
 
-        let collection_entry_input = CollectionEntryInput {
-            path: data_room_entry.entry.path.clone(),
-            reference: data_room_entry.entry.reference.clone(),
-            extra_data: Some(data_room_entry.to_collection_extra_data()),
-        };
-
-        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
-
-        match data_room_collection
-            .add_entry(ctx, collection_entry_input, None)
+        match update_entries_use_case
+            .execute(
+                self.data_room_writable_state.dataset_handle(),
+                vec![CollectionUpdateOperation::add(
+                    data_room_entry.entry.path.to_string(),
+                    data_room_entry.entry.reference.as_ref().clone(),
+                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
+                )],
+                None,
+            )
             .await
         {
-            Ok(CollectionUpdateResult::Success(_)) => Ok(()),
-            Ok(CollectionUpdateResult::CasFailed(_)) => {
-                // TODO: Propagate a nice error
+            Ok(UpdateCollectionEntriesResult::Success(_)) => {
+                Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
+                    entry: data_room_entry,
+                }
+                .into())
+            }
+            Ok(
+                UpdateCollectionEntriesResult::UpToDate
+                | UpdateCollectionEntriesResult::NotFound(_),
+            ) => {
+                unimplemented!()
+            }
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Ok(CollectionUpdateResult::UpToDate(_) | CollectionUpdateResult::NotFound(_)) => {
-                unreachable!()
-            }
-            Err(e) => Err(e),
-        }?;
-
-        Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
-            entry: data_room_entry,
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }
-        .into())
     }
 
     async fn get_data_room_projection(

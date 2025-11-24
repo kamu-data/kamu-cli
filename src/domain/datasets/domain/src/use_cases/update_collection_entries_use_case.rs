@@ -19,6 +19,7 @@ use crate::ExtraDataFields;
 pub trait UpdateCollectionEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
+        // TODO: PERF: use ResolvedDataset instead of DatasetHandle
         dataset_handle: &odf::DatasetHandle,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
@@ -30,8 +31,30 @@ pub trait UpdateCollectionEntriesUseCase: Send + Sync {
 #[derive(Clone)]
 pub enum CollectionUpdateOperation {
     Add(CollectionEntryUpdate),
-    Remove(CollectionEntryRemove),
     Move(CollectionEntryMove),
+    Remove(CollectionEntryRemove),
+}
+
+impl CollectionUpdateOperation {
+    pub fn add(path: String, reference: odf::DatasetID, extra_data: ExtraDataFields) -> Self {
+        Self::Add(CollectionEntryUpdate {
+            path,
+            reference,
+            extra_data,
+        })
+    }
+
+    pub fn r#move(path_from: String, path_to: String, extra_data: Option<ExtraDataFields>) -> Self {
+        Self::Move(CollectionEntryMove {
+            path_from,
+            path_to,
+            extra_data,
+        })
+    }
+
+    pub fn remove(path: String) -> Self {
+        Self::Remove(CollectionEntryRemove { path })
+    }
 }
 
 #[derive(Clone)]
@@ -78,13 +101,6 @@ pub struct CollectionEntryNotFound {
 #[derive(Error, Debug)]
 pub enum UpdateCollectionEntriesUseCaseError {
     #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-
-    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
@@ -93,6 +109,13 @@ pub enum UpdateCollectionEntriesUseCaseError {
 
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
