@@ -1066,7 +1066,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "moveEntry": {
                                 "isSuccess": false,
-                                "message": "File not found",
+                                "message": "Data room entry not found",
                             }
                         }
                     }
@@ -1208,7 +1208,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "removeEntry": {
                                 "isSuccess": false,
-                                "message": "File not found",
+                                "message": "Data room entry not found",
                             }
                         }
                     }
@@ -1217,7 +1217,7 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
-    // Actual file move
+    // Actual file removal
     assert_eq!(
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
@@ -1290,6 +1290,193 @@ async fn test_molecule_v2_data_room_operations() {
                     }
                 },
             ],
+        })
+    );
+
+    ////////////////////////
+    // updateFileMetadata //
+    ////////////////////////
+    const UPDATE_METADATA_QUERY: &str = indoc!(
+        r#"
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: String) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  updateFileMetadata(
+                    ref: $ref
+                    accessLevel: $accessLevel
+                    changeBy: $changeBy
+                    description: $description
+                    categories: $categories
+                    tags: $tags
+                    contentText: $contentText
+                    encryptionMetadata: $encryptionMetadata
+                  ) {
+                    isSuccess
+                    message
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    // Non-existent file
+    let random_dataset_id = odf::DatasetID::new_generated_ed25519().1;
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPDATE_METADATA_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "ref": random_dataset_id.to_string(),
+                "accessLevel": "holder",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                "description": "Plain text file that was updated... again",
+                "categories": ["test-category-1", "test-category-2"],
+                "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                "contentText": "bye bye bye",
+                "encryptionMetadata": r#"{"encryption": "lit", "chain": 1 }"#,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "updateFileMetadata": {
+                                "isSuccess": false,
+                                "message": "Data room entry not found",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Actual update
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPDATE_METADATA_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "ref": file_1_did,
+                "accessLevel": "holder",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                "description": "Plain text file that was updated... again",
+                "categories": ["test-category-1", "test-category-2"],
+                "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                "contentText": "bye bye bye",
+                "encryptionMetadata": r#"{"encryption": "lit", "chain": 1 }"#,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "updateFileMetadata": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 2,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "holder",
+                            "contentType": "text/plain",
+                            "version": 3,
+                            "description": "Plain text file that was updated... again",
+                            "categories": ["test-category-1", "test-category-2"],
+                            "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                        }
+                    }
+                },
+                {
+                    "path": "/bar.txt",
+                    "ref": file_2_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": "Plain text file",
+                            "categories": ["test-category"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
+            ],
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query ($ref: DatasetID!) {
+                  datasets {
+                    byId(datasetId: $ref) {
+                      asVersionedFile {
+                        latest {
+                          extraData
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            ),
+            async_graphql::Variables::from_json(json!({
+                "ref": file_1_did,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["datasets"]["byId"]["asVersionedFile"]["latest"]["extraData"],
+        json!({
+            "categories": ["test-category-1", "test-category-2"],
+            "content_text": "bye bye bye",
+            "description": "Plain text file that was updated... again",
+            "encryption_metadata": "{\"encryption\": \"lit\", \"chain\": 1 }",
+            "molecule_access_level": "holder",
+            "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+            "tags": ["test-tag1", "test-tag2", "test-tag3"],
         })
     );
 

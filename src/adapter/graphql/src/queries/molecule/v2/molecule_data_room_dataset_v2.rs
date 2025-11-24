@@ -379,7 +379,7 @@ impl MoleculeVersionedFileEntry {
             .await
     }
 
-    async fn read_detailed_info(
+    pub(crate) async fn read_detailed_info(
         &self,
         ctx: &Context<'_>,
     ) -> Result<MoleculeVersionedFileEntryDetailedInfo> {

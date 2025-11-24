@@ -379,14 +379,6 @@ impl MoleculeDataRoomMutV2 {
 
         assert_eq!(records.len(), 1);
 
-        // let collection_entry =
-        // CollectionEntry::from_json(records.into_iter().next().unwrap())?; let
-        // data_room_entry =
-        //     MoleculeDataRoomEntry::new_from_collection_entry(&self.project,
-        // collection_entry)?;
-        //
-        // Ok(Some(data_room_entry))
-
         let entry = CollectionEntry::from_json(records.into_iter().next().unwrap())?;
 
         Ok(Some(entry))
@@ -702,7 +694,7 @@ impl MoleculeDataRoomMutV2 {
         let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
             ctx,
             dyn UpdateVersionFileUseCase,
-            Arc<dyn kamu_core::DatasetRegistry>,
+            dyn kamu_core::DatasetRegistry,
             dyn UpdateCollectionEntriesUseCase
         );
 
@@ -751,16 +743,26 @@ impl MoleculeDataRoomMutV2 {
         if let Some(tags) = tags {
             data_room_entry.denormalized_latest_file_info.tags = tags;
         }
-        if let Some(_content_text) = content_text {
-            unimplemented!();
-        }
-        if let Some(_encryption_metadata) = encryption_metadata {
-            unimplemented!();
-        }
 
         let prefetch = MoleculeVersionedFilePrefetch::new_from_data_room_entry(&data_room_entry);
         let file_dataset_handle = file_dataset.get_handle().clone();
-        let file_entry = MoleculeVersionedFileEntry::new_from_prefetched(file_dataset, prefetch);
+        let mut file_entry =
+            MoleculeVersionedFileEntry::new_from_prefetched(file_dataset, prefetch);
+
+        {
+            // Read the current values: content_text & encryption_metadata
+            let _ = file_entry.detailed_info(ctx).await?;
+
+            // Safety: we just initialized the value
+            let detailed_info = file_entry.detailed_info.get_mut().unwrap();
+
+            if let Some(content_text) = content_text {
+                detailed_info.content_text = Some(content_text);
+            }
+            if let Some(encryption_metadata) = encryption_metadata {
+                detailed_info.encryption_metadata = Some(encryption_metadata);
+            }
+        }
 
         // TODO: we need to do a retraction if any errors...
         let new_version = update_version_file_use_case
@@ -883,7 +885,7 @@ impl MoleculeDataRoomUpdateEntryNotFound {
     }
 
     pub async fn message(&self) -> String {
-        "File not found".into()
+        "Data room entry not found".into()
     }
 }
 
