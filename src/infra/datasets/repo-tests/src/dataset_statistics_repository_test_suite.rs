@@ -48,10 +48,10 @@ pub async fn test_set_and_get_statistics(catalog: &Catalog) {
     let statistics = DatasetStatistics {
         last_pulled: Some(Utc.with_ymd_and_hms(2025, 1, 1, 12, 0, 0).unwrap()),
         num_records: 42,
-        data_size: 1234,
-        checkpoints_size: 4321,
+        data_size_bytes: 1234,
+        checkpoints_size_bytes: 4321,
         num_object_links: 11,
-        object_links_size: 34,
+        object_links_size_bytes: 34,
     };
 
     let set_result = stats_repo
@@ -93,19 +93,19 @@ pub async fn test_overwrite_statistics(catalog: &Catalog) {
     let statistics_1 = DatasetStatistics {
         last_pulled: Some(Utc.timestamp_opt(1000, 0).unwrap()),
         num_records: 10,
-        data_size: 100,
-        checkpoints_size: 200,
+        data_size_bytes: 100,
+        checkpoints_size_bytes: 200,
         num_object_links: 20,
-        object_links_size: 50,
+        object_links_size_bytes: 50,
     };
 
     let statistics_2 = DatasetStatistics {
         last_pulled: Some(Utc.timestamp_opt(2000, 0).unwrap()),
         num_records: 20,
-        data_size: 200,
-        checkpoints_size: 400,
+        data_size_bytes: 200,
+        checkpoints_size_bytes: 400,
         num_object_links: 40,
-        object_links_size: 100,
+        object_links_size_bytes: 100,
     };
 
     stats_repo
@@ -159,19 +159,19 @@ pub async fn test_multiple_datasets_statistics(catalog: &Catalog) {
     let statistics_1 = DatasetStatistics {
         last_pulled: None,
         num_records: 11,
-        data_size: 101,
-        checkpoints_size: 201,
+        data_size_bytes: 101,
+        checkpoints_size_bytes: 201,
         num_object_links: 21,
-        object_links_size: 51,
+        object_links_size_bytes: 51,
     };
 
     let statistics_2 = DatasetStatistics {
         last_pulled: None,
         num_records: 22,
-        data_size: 202,
-        checkpoints_size: 402,
+        data_size_bytes: 202,
+        checkpoints_size_bytes: 402,
         num_object_links: 22,
-        object_links_size: 52,
+        object_links_size_bytes: 52,
     };
 
     stats_repo
@@ -220,8 +220,8 @@ pub async fn test_remove_dataset_entry_removes_statistics(catalog: &Catalog) {
     let statistics = DatasetStatistics {
         last_pulled: Some(Utc.timestamp_opt(1000, 0).unwrap()),
         num_records: 10,
-        data_size: 100,
-        checkpoints_size: 200,
+        data_size_bytes: 100,
+        checkpoints_size_bytes: 200,
         ..Default::default()
     };
 
@@ -278,19 +278,19 @@ pub async fn test_get_total_statistics(catalog: &Catalog) {
     let statistics_1 = DatasetStatistics {
         last_pulled: None,
         num_records: 11,
-        data_size: 101,
-        checkpoints_size: 201,
+        data_size_bytes: 101,
+        checkpoints_size_bytes: 201,
         num_object_links: 21,
-        object_links_size: 51,
+        object_links_size_bytes: 51,
     };
 
     let statistics_2 = DatasetStatistics {
         last_pulled: None,
         num_records: 22,
-        data_size: 202,
-        checkpoints_size: 402,
+        data_size_bytes: 202,
+        checkpoints_size_bytes: 402,
         num_object_links: 22,
-        object_links_size: 52,
+        object_links_size_bytes: 52,
     };
 
     stats_repo
@@ -319,10 +319,12 @@ pub async fn test_get_total_statistics(catalog: &Catalog) {
 
     let expected_total_statistic = TotalStatistic {
         num_records: statistics_1.num_records + statistics_2.num_records,
-        data_size: statistics_1.data_size + statistics_2.data_size,
-        checkpoints_size: statistics_1.checkpoints_size + statistics_2.checkpoints_size,
+        data_size_bytes: statistics_1.data_size_bytes + statistics_2.data_size_bytes,
+        checkpoints_size_bytes: statistics_1.checkpoints_size_bytes
+            + statistics_2.checkpoints_size_bytes,
         num_object_links: statistics_1.num_object_links + statistics_2.num_object_links,
-        object_links_size: statistics_1.object_links_size + statistics_2.object_links_size,
+        object_links_size_bytes: statistics_1.object_links_size_bytes
+            + statistics_2.object_links_size_bytes,
     };
 
     assert_matches!(total_statistic, Ok(s) if s == expected_total_statistic);
