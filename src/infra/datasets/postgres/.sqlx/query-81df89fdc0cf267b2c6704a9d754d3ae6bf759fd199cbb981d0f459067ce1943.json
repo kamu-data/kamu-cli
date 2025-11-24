@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO dataset_statistics (\n                dataset_id,\n                block_ref_name,\n                last_pulled,\n                num_records,\n                data_size,\n                checkpoints_size,\n                num_object_links,\n                object_links_size\n            )\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n                ON CONFLICT (dataset_id, block_ref_name)\n                DO UPDATE SET\n                    last_pulled = EXCLUDED.last_pulled,\n                    num_records = EXCLUDED.num_records,\n                    data_size = EXCLUDED.data_size,\n                    checkpoints_size = EXCLUDED.checkpoints_size,\n                    num_object_links = EXCLUDED.num_object_links,\n                    object_links_size = EXCLUDED.object_links_size\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "81df89fdc0cf267b2c6704a9d754d3ae6bf759fd199cbb981d0f459067ce1943"
+}

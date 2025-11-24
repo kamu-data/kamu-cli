@@ -19,6 +19,14 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## [0.253.0] - 2025-11-24
+### Added
+- GQL: new entity `usage` for account which return full combined account statistic
+### Changed
+- GQL: `list_flows` accepts list of flow statuses for filtering
+- Dataset statistics now stores information about object links
+- GQL: `add_entry`, `move_entry`, `remove_entry` now retries in case of race calls
+
 ## [0.252.4] - 2025-11-10
 ### Changed
 - Refactor: QueryService was split on 3 parts (queries, schema, and session context builder)

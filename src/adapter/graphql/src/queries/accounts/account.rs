@@ -19,7 +19,13 @@ use tokio::sync::OnceCell;
 
 use super::AccountFlows;
 use crate::prelude::*;
-use crate::queries::{AccountAccessTokens, AccountQuotas, Dataset, DatasetConnection};
+use crate::queries::{
+    AccountAccessTokens,
+    AccountQuotas,
+    AccountUsage,
+    Dataset,
+    DatasetConnection,
+};
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -227,10 +233,16 @@ impl Account {
         Ok(AccountFlows::new(full_account_info))
     }
 
-    /// Access to the flow configurations of this account
+    /// Access to the access token management
     #[expect(clippy::unused_async)]
     async fn access_tokens(&self) -> Result<AccountAccessTokens<'_>> {
         Ok(AccountAccessTokens::new(&self.account_id))
+    }
+
+    /// Access to account usage statistic
+    #[expect(clippy::unused_async)]
+    async fn usage(&self) -> Result<AccountUsage<'_>> {
+        Ok(AccountUsage::new(&self.account_id))
     }
 
     /// Returns datasets belonging to this account

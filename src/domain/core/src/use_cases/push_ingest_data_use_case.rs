@@ -35,10 +35,19 @@ pub trait PushIngestDataUseCase: Send + Sync {
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError>;
+
+    async fn execute_multi(
+        &self,
+        target: ResolvedDataset,
+        data_sources: Vec<DataSource>,
+        options: PushIngestDataUseCaseOptions,
+        listener_maybe: Option<Arc<dyn PushIngestListener>>,
+    ) -> Result<PushIngestResult, PushIngestDataError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct PushIngestDataUseCaseOptions {
     pub source_name: Option<String>,
     pub source_event_time: Option<DateTime<Utc>>,
