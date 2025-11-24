@@ -43,6 +43,17 @@ impl DatasetRequestState {
         }
     }
 
+    pub fn new_resolved(dataset: ResolvedDataset) -> Self {
+        Self {
+            dataset_handle: dataset.get_handle().clone(),
+            resolved_dataset: OnceCell::new_with(Some(dataset)),
+            dataset_statistics: OnceCell::new(),
+            allowed_dataset_actions: OnceCell::new(),
+            authorized_accounts: OnceCell::new(),
+            archetype: OnceCell::new(),
+        }
+    }
+
     pub fn with_owner(self, owner: Account) -> DatasetRequestStateWithOwner {
         DatasetRequestStateWithOwner { inner: self, owner }
     }

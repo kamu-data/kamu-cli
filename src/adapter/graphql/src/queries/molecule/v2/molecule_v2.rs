@@ -7,16 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::auth::DatasetAction;
+
 use crate::prelude::*;
+use crate::queries::molecule::v1::MoleculeV1;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2Connection,
-    MoleculeAnnouncementEntryV2,
-    MoleculeCategoryV2,
-    MoleculeProjectActivityFiltersV2,
+    MoleculeAnnouncementEntry,
+    MoleculeCategory,
+    MoleculeProjectActivityFilters,
     MoleculeProjectV2,
     MoleculeProjectV2Connection,
-    MoleculeTagV2,
-    MoleculeVersionedFileV2,
+    MoleculeTag,
+    MoleculeVersionedFile,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,29 +29,78 @@ pub struct MoleculeV2;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeV2 {
+    const DEFAULT_PROJECTS_PER_PAGE: usize = 15;
+    // const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
+
     /// Looks up the project
     #[tracing::instrument(level = "info", name = MoleculeV2_project, skip_all, fields(?ipnft_uid))]
     async fn project(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProjectV2>> {
-        let _ = ipnft_uid;
-        todo!()
+        use datafusion::logical_expr::{col, lit};
+
+        let Some(df) = MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
+            .await?
+            .1
+        else {
+            return Ok(None);
+        };
+
+        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+        if records.is_empty() {
+            return Ok(None);
+        }
+
+        assert_eq!(records.len(), 1);
+        let entry = MoleculeProjectV2::from_json(records.into_iter().next().unwrap())?;
+
+        Ok(Some(entry))
     }
 
     /// List the registered projects
     #[tracing::instrument(level = "info", name = MoleculeV2_projects, skip_all)]
     async fn projects(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MoleculeProjectV2Connection> {
-        let _ = page;
-        let _ = per_page;
-        // TODO: implement
-        Ok(MoleculeProjectV2Connection::new(Vec::new(), 0, 0, 0))
+        use datafusion::logical_expr::col;
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
+
+        let Some(df) = MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
+            .await?
+            .1
+        else {
+            return Ok(MoleculeProjectV2Connection::new(Vec::new(), 0, per_page, 0));
+        };
+
+        let total_count = df.clone().count().await.int_err()?;
+        let df = df
+            .sort(vec![col("ipnft_symbol").sort(true, false)])
+            .int_err()?
+            .limit(page * per_page, Some(per_page))
+            .int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+
+        let nodes = records
+            .into_iter()
+            .map(MoleculeProjectV2::from_json)
+            .collect::<Result<Vec<MoleculeProjectV2>, _>>()?;
+
+        Ok(MoleculeProjectV2Connection::new(
+            nodes,
+            page,
+            per_page,
+            total_count,
+        ))
     }
 
     /// Latest activity events across all projects in reverse chronological
@@ -59,7 +111,7 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filters: Option<MoleculeProjectActivityFiltersV2>,
+        filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
         let _ = page;
         let _ = per_page;
@@ -79,16 +131,16 @@ impl MoleculeV2 {
         _ctx: &Context<'_>,
         // TODO: update types
         prompt: String,
-        filters: Option<MoleculeSemanticSearchFiltersV2>,
+        filters: Option<MoleculeSemanticSearchFilters>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeSemanticSearchFoundItemV2Connection> {
+    ) -> Result<MoleculeSemanticSearchFoundItemConnection> {
         let _ = prompt;
         let _ = filters;
         let _ = page;
         let _ = per_page;
         // TODO: implement
-        Ok(MoleculeSemanticSearchFoundItemV2Connection::new(
+        Ok(MoleculeSemanticSearchFoundItemConnection::new(
             vec![],
             0,
             0,
@@ -100,34 +152,34 @@ impl MoleculeV2 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
-pub struct MoleculeSemanticSearchFiltersV2 {
+pub struct MoleculeSemanticSearchFilters {
     // TODO: replace w/ real filters.
     // These filters are provided as an example.
     by_ipnft_uids: Option<Vec<String>>,
-    by_categories: Option<Vec<MoleculeCategoryV2>>,
-    by_tags: Option<Vec<MoleculeTagV2>>,
+    by_categories: Option<Vec<MoleculeCategory>>,
+    by_tags: Option<Vec<MoleculeTag>>,
 }
 
 #[derive(Union)]
-pub enum MoleculeSemanticSearchFoundItemV2 {
-    File(MoleculeSemanticSearchFoundFileV2),
-    Announcement(MoleculeSemanticSearchFoundAnnouncementV2),
+pub enum MoleculeSemanticSearchFoundItem {
+    File(MoleculeSemanticSearchFoundFile),
+    Announcement(MoleculeSemanticSearchFoundAnnouncement),
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeSemanticSearchFoundFileV2 {
-    pub entry: MoleculeVersionedFileV2,
+pub struct MoleculeSemanticSearchFoundFile {
+    pub entry: MoleculeVersionedFile,
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeSemanticSearchFoundAnnouncementV2 {
-    pub entry: MoleculeAnnouncementEntryV2,
+pub struct MoleculeSemanticSearchFoundAnnouncement {
+    pub entry: MoleculeAnnouncementEntry,
 }
 
 page_based_connection!(
-    MoleculeSemanticSearchFoundItemV2,
-    MoleculeSemanticSearchFoundItemV2Connection,
-    MoleculeSemanticSearchFoundItemV2Edge
+    MoleculeSemanticSearchFoundItem,
+    MoleculeSemanticSearchFoundItemConnection,
+    MoleculeSemanticSearchFoundItemEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

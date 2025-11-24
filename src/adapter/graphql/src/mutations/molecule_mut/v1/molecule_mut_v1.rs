@@ -14,7 +14,7 @@ use kamu_core::auth::DatasetAction;
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::molecule::v1;
+use crate::queries::molecule::{v1, v2};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -128,7 +128,7 @@ impl MoleculeMutV1 {
         };
 
         // Create `data-room` dataset
-        let snapshot = v1::MoleculeV1::dataset_snapshot_data_room(odf::DatasetAlias::new(
+        let snapshot = v2::MoleculeDataRoom::dataset_snapshot(odf::DatasetAlias::new(
             Some(project_account_name.clone()),
             odf::DatasetName::new_unchecked("data-room"),
         ));

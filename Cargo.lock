@@ -7981,6 +7981,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sha3",
  "tempfile",
  "test-log",
  "thiserror 2.0.17",

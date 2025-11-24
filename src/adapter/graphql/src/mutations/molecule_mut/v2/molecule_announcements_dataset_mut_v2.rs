@@ -9,7 +9,7 @@
 
 use crate::mutations::molecule_mut::v1;
 use crate::prelude::*;
-use crate::queries::molecule::v2::MoleculeAccessLevelV2;
+use crate::queries::molecule::v2::MoleculeAccessLevel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +26,7 @@ impl MoleculeAnnouncementsDatasetMutV2 {
         headline: String,
         body: String,
         #[graphql(desc = "List of dataset DIDs to link")] attachments: Option<Vec<String>>,
-        molecule_access_level: MoleculeAccessLevelV2,
+        molecule_access_level: MoleculeAccessLevel,
         molecule_change_by: String,
         categories: Vec<String>,
         tags: Vec<String>,

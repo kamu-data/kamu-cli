@@ -93,14 +93,14 @@ impl<'a> Collection<'a> {
 
     /// Latest state projection of the state of a collection
     #[tracing::instrument(level = "info", name = Collection_latest, skip_all)]
-    pub async fn latest(&self) -> CollectionProjection<'_> {
+    pub async fn latest(&self) -> CollectionProjection<'a> {
         CollectionProjection::new(self.state, None)
     }
 
     /// State projection of the state of a collection at the specified point in
     /// time
     #[tracing::instrument(level = "info", name = Collection_as_of, skip_all)]
-    pub async fn as_of(&self, block_hash: Multihash<'static>) -> CollectionProjection<'_> {
+    pub async fn as_of(&self, block_hash: Multihash<'static>) -> CollectionProjection<'a> {
         CollectionProjection::new(self.state, Some(block_hash.into()))
     }
 }

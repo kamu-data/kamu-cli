@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::molecule::v2::{MoleculeAnnouncementEntryV2, MoleculeDataRoomEntryV2};
+use crate::queries::molecule::v2::{MoleculeAnnouncementEntry, MoleculeDataRoomEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,22 +22,22 @@ pub enum MoleculeActivityEventV2 {
 
 #[derive(SimpleObject)]
 pub struct MoleculeActivityFileAddedV2 {
-    pub entry: MoleculeDataRoomEntryV2,
+    pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]
 pub struct MoleculeActivityFileRemovedV2 {
-    pub entry: MoleculeDataRoomEntryV2,
+    pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]
 pub struct MoleculeActivityFileUpdatedV2 {
-    pub entry: MoleculeDataRoomEntryV2,
+    pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]
 pub struct MoleculeActivityAnnouncementV2 {
-    pub announcement: MoleculeAnnouncementEntryV2,
+    pub announcement: MoleculeAnnouncementEntry,
 }
 
 page_based_stream_connection!(

@@ -62,6 +62,7 @@ petgraph = { version = "0.8", default-features = false, features = [
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
+sha3 = { version = "0.10", default-features = false, features = [] }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
