@@ -527,7 +527,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .map(Self::prepare_initiator_filter);
 
         let by_flow_types = filters.by_flow_types.clone();
-        let by_flow_status = filters.by_flow_status;
+        let by_flow_statuses = filters.by_flow_statuses.clone();
 
         let pagination_limit = i64::try_from(pagination.limit).unwrap();
         let pagination_offset = i64::try_from(pagination.offset).unwrap();
@@ -550,7 +550,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 WHERE
                     ({scope_conditions})
                     AND (cast($1 as TEXT[]) IS NULL OR flow_type = ANY($1))
-                    AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                    AND (cast($2 as flow_status_type[]) IS NULL OR flow_status = ANY($2))
                     AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
                 ORDER BY flow_status, last_event_id DESC
                 LIMIT $4 OFFSET $5
@@ -559,7 +559,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
             let mut query = sqlx::query_scalar::<_, i64>(&query_str)
                 .bind(by_flow_types as Option<Vec<String>>)
-                .bind(by_flow_status as Option<FlowStatus>)
+                .bind(by_flow_statuses as Option<Vec<FlowStatus>>)
                 .bind(maybe_initiators as Option<Vec<String>>)
                 .bind(pagination_limit)
                 .bind(pagination_offset);
@@ -600,14 +600,14 @@ impl FlowEventStore for PostgresFlowEventStore {
             WHERE
                 ({scope_conditions})
                 AND (cast($1 as TEXT[]) IS NULL OR flow_type = ANY($1))
-                AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                AND (cast($2 as flow_status_type[]) IS NULL or flow_status = ANY($2))
                 AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
             "#,
         );
 
         let mut query = sqlx::query_scalar::<_, i64>(&query_str)
             .bind(filters.by_flow_types.clone())
-            .bind(filters.by_flow_status as Option<FlowStatus>)
+            .bind(filters.by_flow_statuses.clone())
             .bind(maybe_initiators as Option<Vec<String>>);
 
         for (_, values) in &flow_scope_query.attributes {
@@ -666,8 +666,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let maybe_by_flow_status = filters.by_flow_status;
-
+        let maybe_by_flow_statuses = filters.by_flow_statuses.clone();
         let maybe_by_flow_types = filters.by_flow_types.clone();
 
         Box::pin(async_stream::stream! {
@@ -682,13 +681,13 @@ impl FlowEventStore for PostgresFlowEventStore {
                 SELECT flow_id FROM flows
                 WHERE
                     (cast($1 as TEXT[]) IS NULL OR flow_type = ANY($1))
-                    AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
+                    AND (cast($2 as flow_status_type[]) IS NULL or flow_status = ANY($2))
                     AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
                 ORDER BY flow_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
                 maybe_by_flow_types.as_deref(),
-                maybe_by_flow_status as Option<FlowStatus>,
+                maybe_by_flow_statuses as Option<Vec<FlowStatus>>,
                 maybe_initiators.as_deref(),
                 i64::try_from(pagination.limit).unwrap(),
                 i64::try_from(pagination.offset).unwrap(),
@@ -714,8 +713,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let maybe_by_flow_status = filters.by_flow_status;
-
+        let maybe_by_flow_statuses = filters.by_flow_statuses.as_deref();
         let maybe_by_flow_types = filters.by_flow_types.as_deref();
 
         let query_result = sqlx::query!(
@@ -724,11 +722,11 @@ impl FlowEventStore for PostgresFlowEventStore {
             FROM flows
                 WHERE
                     (cast($1 as TEXT[]) IS NULL OR flow_type = ANY($1))
-                    AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
+                    AND (cast($2 as flow_status_type[]) IS NULL or flow_status = ANY($2))
                     AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
             "#,
             maybe_by_flow_types,
-            maybe_by_flow_status as Option<FlowStatus>,
+            maybe_by_flow_statuses as Option<&[FlowStatus]>,
             maybe_initiators.as_deref(),
         )
         .fetch_one(connection_mut)

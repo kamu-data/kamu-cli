@@ -20,6 +20,7 @@ use kamu_datasets::{
     DatasetStatisticsRepository,
     GetDatasetStatisticsError,
     SetDatasetStatisticsError,
+    TotalStatistic,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +55,15 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
     async fn has_any_stats(&self) -> Result<bool, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(!guard.statistics.is_empty())
+    }
+
+    async fn get_total_statistic_by_account_id(
+        &self,
+        _account_id: &odf::AccountID,
+    ) -> Result<TotalStatistic, InternalError> {
+        // Used only for testing, but to implement this logic requires to handle issues
+        // with transaction leaks
+        unimplemented!()
     }
 
     async fn get_dataset_statistics(

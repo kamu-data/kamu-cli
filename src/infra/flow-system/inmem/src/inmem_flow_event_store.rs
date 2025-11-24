@@ -83,7 +83,7 @@ struct FlowIndexEntry {
 impl FlowIndexEntry {
     pub fn matches_flow_filters(&self, filters: &FlowFilters) -> bool {
         self.flow_type_matches(filters.by_flow_types.as_deref())
-            && self.flow_status_matches(filters.by_flow_status)
+            && self.flow_statuses_matches(filters.by_flow_statuses.as_ref())
             && self.initiator_matches(filters.by_initiator.as_ref())
     }
 
@@ -94,11 +94,10 @@ impl FlowIndexEntry {
         }
     }
 
-    fn flow_status_matches(&self, maybe_flow_status_filter: Option<FlowStatus>) -> bool {
-        if let Some(flow_status_filter) = maybe_flow_status_filter {
-            flow_status_filter == self.flow_status
-        } else {
-            true
+    fn flow_statuses_matches(&self, maybe_flow_status_filter: Option<&Vec<FlowStatus>>) -> bool {
+        match maybe_flow_status_filter {
+            None => true,
+            Some(flow_status) => flow_status.contains(&self.flow_status),
         }
     }
 
@@ -297,25 +296,19 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        let waiting_filter = FlowFilters {
+        let pending_filter = FlowFilters {
             by_flow_types: Some(vec![flow_binding.flow_type.clone()]),
-            by_flow_status: Some(FlowStatus::Waiting),
-            by_initiator: None,
-        };
-
-        let running_filter = FlowFilters {
-            by_flow_types: Some(vec![flow_binding.flow_type.clone()]),
-            by_flow_status: Some(FlowStatus::Running),
+            by_flow_statuses: Some(vec![FlowStatus::Waiting, FlowStatus::Running]),
             by_initiator: None,
         };
 
         Ok(g.all_flows_by_scope
             .get(&flow_binding.scope)
             .map(|scope_flow_ids| {
-                scope_flow_ids.iter().rev().find(|flow_id| {
-                    g.matches_flow(**flow_id, &waiting_filter)
-                        || g.matches_flow(**flow_id, &running_filter)
-                })
+                scope_flow_ids
+                    .iter()
+                    .rev()
+                    .find(|flow_id| g.matches_flow(**flow_id, &pending_filter))
             })
             .unwrap_or_default()
             .copied())
@@ -328,21 +321,13 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        let waiting_filter = FlowFilters {
+        let pending_flow_filter = FlowFilters {
             by_flow_types: None,
-            by_flow_status: Some(FlowStatus::Waiting),
-            by_initiator: None,
-        };
-
-        let retrying_filter = FlowFilters {
-            by_flow_types: None,
-            by_flow_status: Some(FlowStatus::Retrying),
-            by_initiator: None,
-        };
-
-        let running_filter = FlowFilters {
-            by_flow_types: None,
-            by_flow_status: Some(FlowStatus::Running),
+            by_flow_statuses: Some(vec![
+                FlowStatus::Waiting,
+                FlowStatus::Retrying,
+                FlowStatus::Running,
+            ]),
             by_initiator: None,
         };
 
@@ -352,11 +337,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                 scope_flow_ids
                     .iter()
                     .rev()
-                    .filter(|flow_id| {
-                        g.matches_flow(**flow_id, &waiting_filter)
-                            || g.matches_flow(**flow_id, &retrying_filter)
-                            || g.matches_flow(**flow_id, &running_filter)
-                    })
+                    .filter(|flow_id| g.matches_flow(**flow_id, &pending_flow_filter))
                     .copied()
                     .collect()
             })

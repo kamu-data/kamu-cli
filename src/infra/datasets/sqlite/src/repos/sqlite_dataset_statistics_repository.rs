@@ -31,6 +31,29 @@ struct DatasetStatisticsRow {
     num_records: i64,
     data_size: i64,
     checkpoints_size: i64,
+    num_object_links: i64,
+    object_links_size: i64,
+}
+
+#[derive(FromRow)]
+struct DatasetStatisticsTotals {
+    num_records: i64,
+    data_size: i64,
+    checkpoints_size: i64,
+    num_object_links: i64,
+    object_links_size: i64,
+}
+
+impl From<DatasetStatisticsTotals> for TotalStatistic {
+    fn from(value: DatasetStatisticsTotals) -> Self {
+        Self {
+            num_records: u64::try_from(value.num_records).unwrap(),
+            data_size: u64::try_from(value.data_size).unwrap(),
+            checkpoints_size: u64::try_from(value.checkpoints_size).unwrap(),
+            num_object_links: u64::try_from(value.num_object_links).unwrap(),
+            object_links_size: u64::try_from(value.object_links_size).unwrap(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,6 +70,37 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
             .int_err()?;
 
         Ok(maybe_row.is_some())
+    }
+
+    async fn get_total_statistic_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<TotalStatistic, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_string = account_id.to_string();
+
+        let record = sqlx::query_as!(
+            DatasetStatisticsTotals,
+            r#"
+                SELECT
+                    COALESCE(SUM(num_records), 0) AS num_records,
+                    COALESCE(SUM(data_size), 0) AS data_size,
+                    COALESCE(SUM(checkpoints_size), 0) AS checkpoints_size,
+                    COALESCE(SUM(num_object_links), 0) AS num_object_links,
+                    COALESCE(SUM(object_links_size), 0) AS object_links_size
+                FROM dataset_statistics ds
+                    LEFT JOIN dataset_entries de on ds.dataset_id = de.dataset_id
+                WHERE de.owner_id = $1
+                "#,
+            account_id_string
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(record.into())
     }
 
     async fn get_dataset_statistics(
@@ -68,7 +122,9 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
                 last_pulled as "last_pulled: _",
                 num_records,
                 data_size,
-                checkpoints_size
+                checkpoints_size,
+                num_object_links,
+                object_links_size
             FROM dataset_statistics
                 WHERE dataset_id = $1 AND block_ref_name = $2
             "#,
@@ -85,6 +141,8 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
                 num_records: u64::try_from(row.num_records).unwrap(),
                 data_size: u64::try_from(row.data_size).unwrap(),
                 checkpoints_size: u64::try_from(row.checkpoints_size).unwrap(),
+                num_object_links: u64::try_from(row.num_object_links).unwrap(),
+                object_links_size: u64::try_from(row.object_links_size).unwrap(),
             })
         } else {
             Err(DatasetStatisticsNotFoundError {
@@ -112,17 +170,30 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
         let num_records = i64::try_from(statistics.num_records).unwrap();
         let data_size = i64::try_from(statistics.data_size).unwrap();
         let checkpoints_size = i64::try_from(statistics.checkpoints_size).unwrap();
+        let num_object_links = i64::try_from(statistics.num_object_links).unwrap();
+        let object_links_size = i64::try_from(statistics.object_links_size).unwrap();
 
         sqlx::query!(
             r#"
-            INSERT INTO dataset_statistics (dataset_id, block_ref_name, last_pulled, num_records, data_size, checkpoints_size)
-                VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO dataset_statistics (
+                dataset_id,
+                block_ref_name,
+                last_pulled,
+                num_records,
+                data_size,
+                checkpoints_size,
+                num_object_links,
+                object_links_size
+            )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 ON CONFLICT (dataset_id, block_ref_name)
                 DO UPDATE SET
                     last_pulled = excluded.last_pulled,
                     num_records = excluded.num_records,
                     data_size = excluded.data_size,
-                    checkpoints_size = excluded.checkpoints_size
+                    checkpoints_size = excluded.checkpoints_size,
+                    num_object_links = EXCLUDED.num_object_links,
+                    object_links_size = EXCLUDED.object_links_size
             "#,
             stack_dataset_id_str,
             block_ref_str,
@@ -130,6 +201,8 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
             num_records,
             data_size,
             checkpoints_size,
+            num_object_links,
+            object_links_size,
         )
         .execute(connection_mut)
         .await

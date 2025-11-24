@@ -43,6 +43,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = dataset_statistics_repo::test_get_total_statistics,
+    harness = SqliteDatasetStatisticsRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = dataset_statistics_repo::test_remove_dataset_entry_removes_statistics,
     harness = SqliteDatasetStatisticsRepositoryHarness
 );

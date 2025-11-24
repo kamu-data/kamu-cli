@@ -35,12 +35,16 @@ use crate::compute_dataset_statistics_increment;
 pub struct DatasetStatisticsIndexer {
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
     dataset_entry_repo: Arc<dyn kamu_datasets::DatasetEntryRepository>,
-    dataset_statistics_repo: Arc<dyn DatasetStatisticsRepository>,
+    dataset_statistics_repo: dill::Lazy<Arc<dyn DatasetStatisticsRepository>>,
 }
 
 impl DatasetStatisticsIndexer {
     async fn has_any_stats(&self) -> Result<bool, InternalError> {
-        self.dataset_statistics_repo.has_any_stats().await
+        self.dataset_statistics_repo
+            .get()
+            .unwrap()
+            .has_any_stats()
+            .await
     }
 
     #[tracing::instrument(
@@ -92,6 +96,8 @@ impl DatasetStatisticsIndexer {
 
             assert!(increment.seen_seed);
             self.dataset_statistics_repo
+                .get()
+                .unwrap()
                 .set_dataset_statistics(&dataset_id, &odf::BlockRef::Head, increment.statistics)
                 .await
                 .int_err()?;

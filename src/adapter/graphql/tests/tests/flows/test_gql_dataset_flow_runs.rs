@@ -1739,7 +1739,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                                 runs {
                                     listFlows(
                                         filters: {
-                                            byStatus: "WAITING"
+                                            byStatus: ["WAITING"]
                                         }
                                     ) {
                                         nodes {
