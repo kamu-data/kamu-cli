@@ -27,7 +27,6 @@ use kamu_datasets::{
 use odf::utils::data::DataFrameExt;
 
 use crate::mutations::{
-    CollectionEntryInput,
     CollectionMut,
     CollectionUpdateResult,
     StartUploadVersionErrorTooLarge,
@@ -192,7 +191,7 @@ impl MoleculeDataRoomMutV2 {
                 UpdateCollectionEntriesResult::UpToDate
                 | UpdateCollectionEntriesResult::NotFound(_),
             ) => {
-                unimplemented!()
+                unreachable!()
             }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
@@ -314,7 +313,7 @@ impl MoleculeDataRoomMutV2 {
                 UpdateCollectionEntriesResult::UpToDate
                 | UpdateCollectionEntriesResult::NotFound(_),
             ) => {
-                unimplemented!()
+                unreachable!()
             }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
@@ -613,15 +612,36 @@ impl MoleculeDataRoomMutV2 {
         from_path: CollectionPath,
         to_path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
-    ) -> Result<CollectionUpdateResult> {
-        // TODO: Revisit after rebase (Roman's retry changes)
-        //       Temporary hacky path -- should use domain
-        //       instead of reusing the adapter.
-        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
+    ) -> Result<MoleculeDataRoomMoveEntryResult> {
+        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
-        data_room_collection
-            .move_entry(ctx, from_path, to_path, None, expected_head)
+        match update_entries_use_case
+            .execute(
+                self.data_room_writable_state.dataset_handle(),
+                vec![CollectionUpdateOperation::r#move(
+                    from_path.into(),
+                    to_path.into(),
+                    None,
+                )],
+                expected_head.map(Into::into),
+            )
             .await
+        {
+            Ok(UpdateCollectionEntriesResult::Success(r)) => Ok(MoleculeDataRoomUpdateSuccess {
+                old_head: r.old_head.into(),
+                new_head: r.new_head.into(),
+            }
+            .into()),
+            Ok(UpdateCollectionEntriesResult::UpToDate) => MoleculeDataRoomUpdateUpToDate.into(),
+            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
+                unreachable!()
+            }
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+                Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 
     /// Removes an entry from the data room.
@@ -808,6 +828,48 @@ impl MoleculeDataRoomFinishUploadFileResultSuccess {
     }
 
     pub async fn message(&self) -> String {
+        String::new()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
+pub enum MoleculeDataRoomMoveEntryResult {
+    Success(MoleculeDataRoomUpdateSuccess),
+    UpToDate(MoleculeDataRoomUpdateUpToDate),
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomUpdateSuccess {
+    pub old_head: Multihash<'static>,
+    pub new_head: Multihash<'static>,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomUpdateSuccess {
+    pub async fn is_success(&self) -> bool {
+        true
+    }
+
+    pub async fn message(&self) -> String {
+        String::new()
+    }
+}
+
+pub struct MoleculeDataRoomUpdateUpToDate;
+
+#[Object]
+impl MoleculeDataRoomUpdateUpToDate {
+    async fn is_success(&self) -> bool {
+        true
+    }
+    async fn message(&self) -> String {
         String::new()
     }
 }
