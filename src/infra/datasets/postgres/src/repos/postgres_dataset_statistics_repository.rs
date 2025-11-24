@@ -69,10 +69,10 @@ impl DatasetStatisticsRepository for PostgresDatasetStatisticsRepository {
             Ok(DatasetStatistics {
                 last_pulled: record.last_pulled,
                 num_records: u64::try_from(record.num_records).unwrap(),
-                data_size: u64::try_from(record.data_size).unwrap(),
-                checkpoints_size: u64::try_from(record.checkpoints_size).unwrap(),
+                data_size_bytes: u64::try_from(record.data_size).unwrap(),
+                checkpoints_size_bytes: u64::try_from(record.checkpoints_size).unwrap(),
                 num_object_links: u64::try_from(record.num_object_links).unwrap(),
-                object_links_size: u64::try_from(record.object_links_size).unwrap(),
+                object_links_size_bytes: u64::try_from(record.object_links_size).unwrap(),
             })
         } else {
             Err(DatasetStatisticsNotFoundError {
@@ -110,10 +110,10 @@ impl DatasetStatisticsRepository for PostgresDatasetStatisticsRepository {
 
         Ok(TotalStatistic {
             num_records: u64::try_from(record.num_records.unwrap()).unwrap(),
-            data_size: u64::try_from(record.data_size.unwrap()).unwrap(),
-            checkpoints_size: u64::try_from(record.checkpoints_size.unwrap()).unwrap(),
+            data_size_bytes: u64::try_from(record.data_size.unwrap()).unwrap(),
+            checkpoints_size_bytes: u64::try_from(record.checkpoints_size.unwrap()).unwrap(),
             num_object_links: u64::try_from(record.num_object_links.unwrap()).unwrap(),
-            object_links_size: u64::try_from(record.object_links_size.unwrap()).unwrap(),
+            object_links_size_bytes: u64::try_from(record.object_links_size.unwrap()).unwrap(),
         })
     }
 
@@ -152,10 +152,10 @@ impl DatasetStatisticsRepository for PostgresDatasetStatisticsRepository {
             block_ref.as_str(),
             statistics.last_pulled,
             i64::try_from(statistics.num_records).unwrap(),
-            i64::try_from(statistics.data_size).unwrap(),
-            i64::try_from(statistics.checkpoints_size).unwrap(),
+            i64::try_from(statistics.data_size_bytes).unwrap(),
+            i64::try_from(statistics.checkpoints_size_bytes).unwrap(),
             i64::try_from(statistics.num_object_links).unwrap(),
-            i64::try_from(statistics.object_links_size).unwrap(),
+            i64::try_from(statistics.object_links_size_bytes).unwrap(),
         )
         .execute(connection_mut)
         .await

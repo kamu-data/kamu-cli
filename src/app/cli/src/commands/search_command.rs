@@ -164,7 +164,7 @@ impl SearchCommand {
             description.push(Option::<String>::None);
             blocks.push(ds.num_blocks);
             records.push(ds.num_records);
-            size.push(ds.estimated_size);
+            size.push(ds.estimated_size_bytes);
         }
 
         let records = RecordBatch::try_new(
