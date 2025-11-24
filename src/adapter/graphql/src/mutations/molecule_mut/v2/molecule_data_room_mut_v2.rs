@@ -658,7 +658,7 @@ impl MoleculeDataRoomMutV2 {
         match update_entries_use_case
             .execute(
                 self.data_room_writable_state.dataset_handle(),
-                vec![CollectionUpdateOperation::remove(path.into())],
+                vec![CollectionUpdateOperation::remove(path.clone().into())],
                 expected_head.map(Into::into),
             )
             .await
@@ -668,10 +668,12 @@ impl MoleculeDataRoomMutV2 {
                 new_head: r.new_head.into(),
             }
             .into()),
-            Ok(
-                UpdateCollectionEntriesResult::UpToDate
-                | UpdateCollectionEntriesResult::NotFound(_),
-            ) => {
+            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+                // No action was performed - there was nothing to act upon
+                Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
+            }
+            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
+                // For moving operation
                 unreachable!()
             }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
@@ -906,6 +908,7 @@ impl MoleculeDataRoomUpdateUpToDate {
 )]
 pub enum MoleculeDataRoomRemoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
+    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
