@@ -49,18 +49,18 @@ pub(crate) async fn compute_dataset_statistics_increment(
                     .int_err()?
                 {
                     statistics.num_object_links += attr.linked_objects.num_objects_naive;
-                    statistics.object_links_size += attr.linked_objects.size_naive;
+                    statistics.object_links_size_bytes += attr.linked_objects.size_naive;
                 }
 
                 if let Some(output_data) = add_data.new_data {
                     let iv = output_data.offset_interval;
                     statistics.num_records += iv.end - iv.start + 1;
 
-                    statistics.data_size += output_data.size;
+                    statistics.data_size_bytes += output_data.size;
                 }
 
                 if let Some(checkpoint) = add_data.new_checkpoint {
-                    statistics.checkpoints_size += checkpoint.size;
+                    statistics.checkpoints_size_bytes += checkpoint.size;
                 }
             }
             odf::MetadataEvent::ExecuteTransform(execute_transform) => {
@@ -70,11 +70,11 @@ pub(crate) async fn compute_dataset_statistics_increment(
                     let iv = output_data.offset_interval;
                     statistics.num_records += iv.end - iv.start + 1;
 
-                    statistics.data_size += output_data.size;
+                    statistics.data_size_bytes += output_data.size;
                 }
 
                 if let Some(checkpoint) = execute_transform.new_checkpoint {
-                    statistics.checkpoints_size += checkpoint.size;
+                    statistics.checkpoints_size_bytes += checkpoint.size;
                 }
             }
             odf::MetadataEvent::SetDataSchema(_)
