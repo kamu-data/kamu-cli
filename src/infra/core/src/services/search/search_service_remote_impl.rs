@@ -55,7 +55,7 @@ impl SearchServiceRemoteImpl {
                     kind: None,
                     num_blocks: None,
                     num_records: None,
-                    estimated_size: None,
+                    estimated_size_bytes: None,
                 });
             }
         }
@@ -95,7 +95,7 @@ impl SearchServiceRemoteImpl {
                     kind: None,
                     num_blocks: None,
                     num_records: None,
-                    estimated_size: None,
+                    estimated_size_bytes: None,
                 });
             }
         }
@@ -132,7 +132,7 @@ impl SearchServiceRemoteImpl {
                       }
                       data {
                         numRecordsTotal
-                        estimatedSize
+                        estimatedSizeBytes
                       }
                     }
                   }
@@ -196,7 +196,7 @@ impl SearchServiceRemoteImpl {
                 kind: Some(ds.kind),
                 num_blocks: Some(ds.metadata.chain.blocks.total_count),
                 num_records: Some(ds.data.num_records_total),
-                estimated_size: Some(ds.data.estimated_size),
+                estimated_size_bytes: Some(ds.data.estimated_size_bytes),
             });
         }
 
@@ -305,7 +305,7 @@ struct GqlMetadataChainBlocks {
 #[serde(rename_all = "camelCase")]
 struct GqlData {
     num_records_total: u64,
-    estimated_size: u64,
+    estimated_size_bytes: u64,
 }
 
 #[derive(::serde::Deserialize)]
