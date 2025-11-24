@@ -3372,6 +3372,12 @@ interface MoleculeDataRoomRemoveEntryResult {
 	message: String!
 }
 
+type MoleculeDataRoomUpdateEntryNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+	path: CollectionPath!
+	isSuccess: Boolean!
+	message: String!
+}
+
 interface MoleculeDataRoomUpdateFileMetadataResult {
 	isSuccess: Boolean!
 	message: String!
