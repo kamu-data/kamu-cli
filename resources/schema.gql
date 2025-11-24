@@ -3309,6 +3309,11 @@ type MoleculeDataRoomFinishUploadFileResultSuccess implements MoleculeDataRoomFi
 	message: String!
 }
 
+interface MoleculeDataRoomMoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
 type MoleculeDataRoomMutV2 {
 	"""
 	Allows creating a file, upload a new version, and link a file into the
@@ -3346,11 +3351,11 @@ type MoleculeDataRoomMutV2 {
 	"""
 	Moves an entry in the data room.
 	"""
-	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash): CollectionUpdateResult!
+	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
 	"""
 	Removes an entry from the data room.
 	"""
-	removeEntry(path: CollectionPath!, expectedHead: Multihash): CollectionUpdateResult!
+	removeEntry(path: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
 	"""
 	Updates the metadata of a file in the data room.
 	"""
@@ -3360,6 +3365,11 @@ type MoleculeDataRoomMutV2 {
 type MoleculeDataRoomProjection {
 	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int, filters: MoleculeDataRoomEntriesFilters): MoleculeDataRoomEntryConnection!
 	entry(path: CollectionPath!): MoleculeDataRoomEntry
+}
+
+interface MoleculeDataRoomRemoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
 }
 
 interface MoleculeDataRoomUpdateFileMetadataResult {
@@ -3375,6 +3385,18 @@ type MoleculeDataRoomUpdateFileMetadataResultEntryNotFound implements MoleculeDa
 
 type MoleculeDataRoomUpdateFileMetadataResultSuccess implements MoleculeDataRoomUpdateFileMetadataResult {
 	entry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateSuccess implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+	oldHead: Multihash!
+	newHead: Multihash!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
 	isSuccess: Boolean!
 	message: String!
 }
