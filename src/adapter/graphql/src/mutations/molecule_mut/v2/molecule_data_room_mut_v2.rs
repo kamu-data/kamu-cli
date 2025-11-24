@@ -46,6 +46,7 @@ use crate::queries::molecule::v2::{
     MoleculeVersionedFileEntry,
     MoleculeVersionedFileEntryBasicInfo,
     MoleculeVersionedFileEntryDetailedInfo,
+    MoleculeVersionedFilePrefetch,
 };
 use crate::queries::{Account, CollectionEntry, DatasetRequestState, VersionedFileEntry};
 use crate::utils::{ContentSource, get_content_args};
@@ -687,7 +688,7 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
-        // TODO: use update object w/ optional fields instead?
+        // TODO: not optional?
         access_level: MoleculeAccessLevel,
         change_by: String,
         description: Option<String>,
@@ -696,127 +697,115 @@ impl MoleculeDataRoomMutV2 {
         content_text: Option<String>,
         encryption_metadata: Option<EncryptionMetadata>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
-        let _ = ctx;
-        let _ = reference;
-        let _ = access_level;
-        let _ = change_by;
-        let _ = description;
-        let _ = categories;
-        let _ = tags;
-        let _ = content_text;
-        let _ = encryption_metadata;
-        todo!()
-        // let (update_version_file_use_case, dataset_registry) =
-        // from_catalog_n!(     ctx,
-        //     dyn UpdateVersionFileUseCase,
-        //     Arc<dyn kamu_core::DatasetRegistry>
-        // );
-
-        // // 1. Update the versioned dataset.
-
-        // // NOTE: Access rights will be checked inside the use case.
-        // let entry_dataset_handle = {
-        //     use odf::DatasetRefUnresolvedError as E;
-        //     match dataset_registry
-        //         .resolve_dataset_handle_by_ref(&reference.as_ref().
-        // as_local_ref())         .await
-        //     {
-        //         // TODO: Check if the versioned dataset is in data room at
-        // all?         Ok(hdl) => hdl,
-        //         Err(E::NotFound(_)) => {
-        //             return
-        // Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
-        //                 MoleculeDataRoomUpdateFileMetadataResultEntryNotFound
-        // { r#ref: reference },             ));
-        //         }
-        //         Err(e @ E::Internal(_)) => return Err(e.int_err().into()),
-        //     }
-        // };
-
-        // let versioned_file_extra_data =
-        // MoleculeVersionedFile::build_extra_data_json_map(
-        //     &access_level,
-        //     &change_by,
-        //     &description,
-        //     &categories,
-        //     &tags,
-        //     &content_text,
-        //     encryption_metadata.as_ref(),
-        // );
-
-        // // TODO: we need to do a retraction if any errors...
-        // let _new_version = update_version_file_use_case
-        //     .execute(
-        //         &entry_dataset_handle,
-        //         None,
-        //         None,
-        //         Some(ExtraDataFields::new(versioned_file_extra_data)),
-        //     )
-        //     .await
-        //     .int_err()?
-        //     .new_version;
-
-        // Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {
-        //     entry: MoleculeDataRoomEntry {
-        //         project: todo!(),
-        //         system_time: todo!(),
-        //         event_time: todo!(),
-        //         path: todo!(),
-        //         reference,
-        //         access_level,
-        //         change_by,
-        //     },
-        // }
-        // .into())
-
-        // TODO: Can be unlocked by "!!! Read from the last entry..." step
-
-        /*// 2. Update the file state in the data room.
-
-        // TODO: Revisit after rebase (Roman's retry changes).
-        //       Temporary hacky path -- should use domain
-        //       instead of reusing the adapter.
-        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
-
-        // TODO: !!! Read from the last entry...
-        //       Return from UpdateVersionFileUseCase?
-        //       -->
-        let content_type = String::new();
-        let content_length = 0;
-        let path = String::new().into();
-        //       <--
-
-        let data_room_entry_extra_data = MoleculeDataRoomEntry::build_extra_data_json_map(
-            &access_level,
-            &change_by,
-            &content_type,
-            content_length,
-            &categories,
-            &tags,
-            new_version,
+        let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
+            ctx,
+            dyn UpdateVersionFileUseCase,
+            Arc<dyn kamu_core::DatasetRegistry>,
+            dyn UpdateCollectionEntriesUseCase
         );
-        let new_data_room_entry_input = CollectionEntryInput {
-            path,
-            reference: entry_dataset_handle.id.into(),
-            extra_data: Some(ExtraData::new(data_room_entry_extra_data)),
+
+        // NOTE: Access rights will be checked inside the use case.
+        let file_dataset = {
+            use odf::DatasetRefUnresolvedError as E;
+            match dataset_registry
+                .get_dataset_by_ref(&reference.as_ref().as_local_ref())
+                .await
+            {
+                // TODO: Check if the versioned dataset is in data room at all?
+                Ok(hdl) => hdl,
+                Err(E::NotFound(_)) => {
+                    return Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
+                        MoleculeDataRoomUpdateFileMetadataResultEntryNotFound { r#ref: reference },
+                    ));
+                }
+                Err(e @ E::Internal(_)) => return Err(e.int_err().into()),
+            }
         };
 
-        match data_room_collection
-            .add_entry(ctx, new_data_room_entry_input, None)
+        let Some(collection_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
+        else {
+            // TODO: Should we differentiate between 'file not found'
+            //       and 'file not linked to data room'?
+            return Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
+                MoleculeDataRoomUpdateFileMetadataResultEntryNotFound { r#ref: reference },
+            ));
+        };
+
+        // 1. Update the versioned dataset.
+
+        let mut data_room_entry =
+            MoleculeDataRoomEntry::new_from_collection_entry(&self.project, collection_entry)?;
+
+        data_room_entry.denormalized_latest_file_info.access_level = access_level;
+
+        data_room_entry.denormalized_latest_file_info.change_by = change_by;
+
+        if let Some(description) = description {
+            data_room_entry.denormalized_latest_file_info.description = Some(description);
+        }
+        if let Some(categories) = categories {
+            data_room_entry.denormalized_latest_file_info.categories = categories;
+        }
+        if let Some(tags) = tags {
+            data_room_entry.denormalized_latest_file_info.tags = tags;
+        }
+        if let Some(_content_text) = content_text {
+            unimplemented!();
+        }
+        if let Some(_encryption_metadata) = encryption_metadata {
+            unimplemented!();
+        }
+
+        let prefetch = MoleculeVersionedFilePrefetch::new_from_data_room_entry(&data_room_entry);
+        let file_dataset_handle = file_dataset.get_handle().clone();
+        let file_entry = MoleculeVersionedFileEntry::new_from_prefetched(file_dataset, prefetch);
+
+        // TODO: we need to do a retraction if any errors...
+        let new_version = update_version_file_use_case
+            .execute(
+                &file_dataset_handle,
+                None,
+                None,
+                Some(file_entry.to_versioned_file_extra_data()),
+            )
+            .await
+            .int_err()?
+            .new_version;
+
+        // 2. Update the file state in the data room.
+
+        data_room_entry.denormalized_latest_file_info.version = new_version;
+
+        match update_entries_use_case
+            .execute(
+                self.data_room_writable_state.dataset_handle(),
+                vec![CollectionUpdateOperation::add(
+                    data_room_entry.entry.path.to_string(),
+                    reference.into(),
+                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
+                )],
+                None,
+            )
             .await
         {
-            Ok(CollectionUpdateResult::Success(_)) => {
-                Ok(MoleculeDataRoomUpdateFileMetadataResultSuccessV2::default().into())
+            Ok(UpdateCollectionEntriesResult::Success(_)) => {
+                Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {
+                    entry: data_room_entry,
+                }
+                .into())
             }
-            Ok(CollectionUpdateResult::CasFailed(_)) => {
-                // TODO: Propagate a nice error
-                Err(GqlError::gql("Data room linking: CAS failed"))
-            }
-            Ok(CollectionUpdateResult::UpToDate(_) | CollectionUpdateResult::NotFound(_)) => {
+            Ok(
+                UpdateCollectionEntriesResult::UpToDate
+                | UpdateCollectionEntriesResult::NotFound(_),
+            ) => {
                 unreachable!()
             }
-            Err(e) => Err(e),
-        }*/
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+                Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 }
 

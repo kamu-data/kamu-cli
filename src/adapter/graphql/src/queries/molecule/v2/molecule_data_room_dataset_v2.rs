@@ -260,11 +260,7 @@ impl MoleculeDataRoomEntry {
     async fn as_versioned_file(&self) -> Result<Option<MoleculeVersionedFile>> {
         Ok(Some(MoleculeVersionedFile {
             dataset: self.entry.reference.clone().into(),
-            prefetched_latest: MoleculeVersionedFilePrefetch {
-                system_time: self.entry.system_time,
-                event_time: self.entry.event_time,
-                denorm: self.denormalized_latest_file_info.clone(),
-            },
+            prefetched_latest: MoleculeVersionedFilePrefetch::new_from_data_room_entry(self),
         }))
     }
 }
@@ -282,7 +278,7 @@ page_based_connection!(
 pub struct MoleculeVersionedFile {
     pub dataset: odf::DatasetID,
 
-    // Filled from denormalized data storad alongside data room entry
+    // Filled from denormalized data stored alongside data room entry
     pub prefetched_latest: MoleculeVersionedFilePrefetch,
 }
 
@@ -423,6 +419,9 @@ impl MoleculeVersionedFileEntry {
             description: self.basic_info.description.clone(),
             categories: self.basic_info.categories.clone(),
             tags: self.basic_info.tags.clone(),
+            // TODO
+            // content_text
+            // encryption_metadata
         }
     }
 }
@@ -529,6 +528,16 @@ pub struct MoleculeVersionedFilePrefetch {
     pub denorm: MoleculeDenormalizeFileToDataRoom,
 }
 
+impl MoleculeVersionedFilePrefetch {
+    pub fn new_from_data_room_entry(data_room_entry: &MoleculeDataRoomEntry) -> Self {
+        Self {
+            system_time: data_room_entry.entry.system_time,
+            event_time: data_room_entry.entry.event_time,
+            denorm: data_room_entry.denormalized_latest_file_info.clone(),
+        }
+    }
+}
+
 /// These fields are stored as extra columns in data room collection
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
@@ -544,6 +553,9 @@ pub struct MoleculeDenormalizeFileToDataRoom {
     pub description: Option<String>,
     pub categories: Vec<MoleculeCategory>,
     pub tags: Vec<MoleculeTag>,
+    // TODO:
+    // pub content_text: String,
+    // pub encryption_metadata: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
