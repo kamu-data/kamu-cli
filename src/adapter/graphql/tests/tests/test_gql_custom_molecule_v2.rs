@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use async_graphql::value;
 use base64::Engine as _;
 use indoc::indoc;
 use kamu_core::*;
@@ -14,6 +15,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use super::test_gql_custom_molecule_v1::GraphQLMoleculeV1Harness;
+use crate::utils::GraphQLQueryRequest;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -666,33 +668,29 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // List data room entries and denormalized file fields
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                query ($ipnftUid: String!) {
-                    molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                dataRoom {
-                                    latest {
-                                        entries {
-                                            totalCount
-                                            nodes {
-                                                path
-                                                ref
-                                                changeBy
+    const LIST_QUERY: &str = indoc!(
+        r#"
+        query ($ipnftUid: String!) {
+            molecule {
+                v2 {
+                    project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                            latest {
+                                entries {
+                                    totalCount
+                                    nodes {
+                                        path
+                                        ref
+                                        changeBy
 
-                                                asVersionedFile {
-                                                    latest {
-                                                        contentType
-                                                        categories
-                                                        tags
-                                                        accessLevel
-                                                        version
-                                                        description
-                                                    }
-                                                }
+                                        asVersionedFile {
+                                            latest {
+                                                contentType
+                                                categories
+                                                tags
+                                                accessLevel
+                                                version
+                                                description
                                             }
                                         }
                                     }
@@ -701,12 +699,17 @@ async fn test_molecule_v2_data_room_operations() {
                         }
                     }
                 }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
+            }
+        }
+        "#
+    );
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(LIST_QUERY).variables(
+            async_graphql::Variables::from_json(json!({
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            }))),
-        )
+            })),
+        ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
@@ -1021,13 +1024,155 @@ async fn test_molecule_v2_data_room_operations() {
         }),
     );
 
+    ///////////////
+    // moveEntry //
+    ///////////////
+    const MOVE_QUERY: &str = indoc!(
+        r#"
+        mutation ($ipnftUid: String!, $fromPath: CollectionPath!, $toPath: CollectionPath!) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  moveEntry(fromPath: $fromPath, toPath: $toPath) {
+                    isSuccess
+                    message
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    // Non-existent file
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            MOVE_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "fromPath": "/non-existent-path.txt",
+                "toPath": "/2025/foo.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "moveEntry": {
+                                "isSuccess": false,
+                                "message": "File not found",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Actual file move
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            MOVE_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "fromPath": "/foo.txt",
+                "toPath": "/2025/foo.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "moveEntry": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 3,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
+                {
+                    "path": "/bar.txt",
+                    "ref": file_2_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": "Plain text file",
+                            "categories": ["test-category"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
+                {
+                    "path": "/baz.txt",
+                    "ref": file_3_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": null,
+                            "categories": [],
+                            "tags": [],
+                        }
+                    }
+                },
+            ],
+        })
+    );
+
     // !!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!
     //
     // Ensure our logic for converting entry path into file dataset name is
     // similar to what Molecule does on their side currently.
     //
     // Introduce tests for:
-    // - Rename/move entry
     // - Remove entry
     // - Attempt to create new file with path that already exists - expect error
     // - Filter by: accessLevel

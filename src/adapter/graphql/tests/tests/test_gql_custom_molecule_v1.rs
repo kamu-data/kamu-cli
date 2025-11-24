@@ -1425,7 +1425,8 @@ async fn test_molecule_v1_activity() {
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 pub struct GraphQLMoleculeV1Harness {
     base_gql_harness: BaseGQLDatasetHarness,
-    catalog_authorized: dill::Catalog,
+    pub schema: kamu_adapter_graphql::Schema,
+    pub catalog_authorized: dill::Catalog,
     pub molecule_account_id: odf::AccountID,
 }
 
@@ -1482,6 +1483,7 @@ impl GraphQLMoleculeV1Harness {
 
         Self {
             base_gql_harness,
+            schema: kamu_adapter_graphql::schema_quiet(),
             catalog_authorized,
             molecule_account_id,
         }
@@ -1508,7 +1510,7 @@ impl GraphQLMoleculeV1Harness {
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
         let catalog = self.catalog_authorized.clone();
-        kamu_adapter_graphql::schema_quiet()
+        self.schema
             .execute(
                 query
                     .into()

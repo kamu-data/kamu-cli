@@ -618,7 +618,7 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 self.data_room_writable_state.dataset_handle(),
                 vec![CollectionUpdateOperation::r#move(
-                    from_path.into(),
+                    from_path.clone().into(),
                     to_path.into(),
                     None,
                 )],
@@ -635,7 +635,7 @@ impl MoleculeDataRoomMutV2 {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
             Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
-                unreachable!()
+                Ok(MoleculeDataRoomUpdateEntryNotFound { path: from_path }.into())
             }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
@@ -847,6 +847,7 @@ impl MoleculeDataRoomFinishUploadFileResultSuccess {
 )]
 pub enum MoleculeDataRoomMoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
+    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
     UpToDate(MoleculeDataRoomUpdateUpToDate),
 }
 
@@ -865,6 +866,22 @@ impl MoleculeDataRoomUpdateSuccess {
 
     pub async fn message(&self) -> String {
         String::new()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomUpdateEntryNotFound {
+    pub path: CollectionPath,
+}
+#[ComplexObject]
+impl MoleculeDataRoomUpdateEntryNotFound {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        "File not found".into()
     }
 }
 
