@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - GQL: `list_flows` accepts list of flow statuses for filtering
 - Dataset statistics now stores information about object links
+- GQL: `add_entry`, `move_entry`, `remove_entry` now retries in case of race calls
 
 ## [0.252.4] - 2025-11-10
 ### Changed

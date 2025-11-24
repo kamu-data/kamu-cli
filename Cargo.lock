@@ -7985,6 +7985,7 @@ dependencies = [
  "pretty_assertions",
  "s3-utils",
  "secrecy",
+ "serde",
  "serde_json",
  "tempfile",
  "test-log",

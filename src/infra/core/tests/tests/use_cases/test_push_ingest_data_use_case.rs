@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
@@ -136,6 +137,71 @@ async fn test_push_ingest_data_from_file() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_execute_multi() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let create_dataset_result = harness
+        .create_root_dataset_with_push_source(&alias_foo)
+        .await;
+
+    let target_dataset = ResolvedDataset::from_created(&create_dataset_result);
+    let initial_head = target_dataset
+        .as_metadata_chain()
+        .resolve_ref(&odf::BlockRef::Head)
+        .await
+        .unwrap();
+
+    let data_sources = vec![
+        DataSource::Buffer(Bytes::from_static(br#"{"city":"foo","population":100}"#)),
+        DataSource::Buffer(Bytes::from_static(br#"{"city":"bar","population":200}"#)),
+    ];
+
+    let ingest_result = harness
+        .ingest_multi_data(
+            target_dataset.clone(),
+            data_sources,
+            PushIngestDataUseCaseOptions {
+                source_name: None,
+                source_event_time: None,
+                is_ingest_from_upload: false,
+                media_type: None,
+                expected_head: Some(initial_head.clone()),
+            },
+        )
+        .await
+        .expect("multi ingest succeeds");
+
+    match ingest_result {
+        PushIngestResult::Updated {
+            old_head,
+            new_head,
+            num_blocks,
+        } => {
+            assert_eq!(old_head, initial_head);
+            assert_ne!(new_head, old_head);
+            assert_eq!(num_blocks, 2);
+
+            let current_head = target_dataset
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .unwrap();
+            assert_eq!(current_head, new_head);
+        }
+        PushIngestResult::UpToDate => panic!("multi ingest should produce new blocks"),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -189,6 +255,17 @@ impl PushIngestDataUseCaseHarness {
     ) -> Result<PushIngestResult, PushIngestDataError> {
         self.use_case
             .execute(target, data_source, options, None)
+            .await
+    }
+
+    async fn ingest_multi_data(
+        &self,
+        target: ResolvedDataset,
+        data_sources: Vec<DataSource>,
+        options: PushIngestDataUseCaseOptions,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.use_case
+            .execute_multi(target, data_sources, options, None)
             .await
     }
 }

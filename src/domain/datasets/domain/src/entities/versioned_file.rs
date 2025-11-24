@@ -21,7 +21,7 @@ pub const CONTENT_HASH_COLUMN_NAME: &str = "content_hash";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ExtraDataFields(serde_json::Map<String, serde_json::Value>);
 
 impl ExtraDataFields {
@@ -31,6 +31,10 @@ impl ExtraDataFields {
 
     pub fn into_inner(self) -> serde_json::Map<String, serde_json::Value> {
         self.0
+    }
+
+    pub fn as_map(&self) -> &serde_json::Map<String, serde_json::Value> {
+        &self.0
     }
 }
 
