@@ -48,10 +48,10 @@ impl From<DatasetStatisticsTotals> for TotalStatistic {
     fn from(value: DatasetStatisticsTotals) -> Self {
         Self {
             num_records: u64::try_from(value.num_records).unwrap(),
-            data_size: u64::try_from(value.data_size).unwrap(),
-            checkpoints_size: u64::try_from(value.checkpoints_size).unwrap(),
+            data_size_bytes: u64::try_from(value.data_size).unwrap(),
+            checkpoints_size_bytes: u64::try_from(value.checkpoints_size).unwrap(),
             num_object_links: u64::try_from(value.num_object_links).unwrap(),
-            object_links_size: u64::try_from(value.object_links_size).unwrap(),
+            object_links_size_bytes: u64::try_from(value.object_links_size).unwrap(),
         }
     }
 }
@@ -139,10 +139,10 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
             Ok(DatasetStatistics {
                 last_pulled: row.last_pulled,
                 num_records: u64::try_from(row.num_records).unwrap(),
-                data_size: u64::try_from(row.data_size).unwrap(),
-                checkpoints_size: u64::try_from(row.checkpoints_size).unwrap(),
+                data_size_bytes: u64::try_from(row.data_size).unwrap(),
+                checkpoints_size_bytes: u64::try_from(row.checkpoints_size).unwrap(),
                 num_object_links: u64::try_from(row.num_object_links).unwrap(),
-                object_links_size: u64::try_from(row.object_links_size).unwrap(),
+                object_links_size_bytes: u64::try_from(row.object_links_size).unwrap(),
             })
         } else {
             Err(DatasetStatisticsNotFoundError {
@@ -168,10 +168,10 @@ impl DatasetStatisticsRepository for SqliteDatasetStatisticsRepository {
 
         let last_pulled = statistics.last_pulled;
         let num_records = i64::try_from(statistics.num_records).unwrap();
-        let data_size = i64::try_from(statistics.data_size).unwrap();
-        let checkpoints_size = i64::try_from(statistics.checkpoints_size).unwrap();
+        let data_size = i64::try_from(statistics.data_size_bytes).unwrap();
+        let checkpoints_size = i64::try_from(statistics.checkpoints_size_bytes).unwrap();
         let num_object_links = i64::try_from(statistics.num_object_links).unwrap();
-        let object_links_size = i64::try_from(statistics.object_links_size).unwrap();
+        let object_links_size = i64::try_from(statistics.object_links_size_bytes).unwrap();
 
         sqlx::query!(
             r#"

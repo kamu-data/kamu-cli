@@ -132,7 +132,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
                 kind: None,
                 num_blocks: None,
                 num_records: None,
-                estimated_size: None,
+                estimated_size_bytes: None,
             }]
         }
     );
@@ -149,7 +149,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
                 kind: None,
                 num_blocks: None,
                 num_records: None,
-                estimated_size: None,
+                estimated_size_bytes: None,
             }]
         }
     );

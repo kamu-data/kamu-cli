@@ -42,7 +42,7 @@ pub struct SearchRemoteResultDataset {
     pub kind: Option<odf::DatasetKind>,
     pub num_blocks: Option<u64>,
     pub num_records: Option<u64>,
-    pub estimated_size: Option<u64>,
+    pub estimated_size_bytes: Option<u64>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
