@@ -27,8 +27,6 @@ use kamu_datasets::{
 use odf::utils::data::DataFrameExt;
 
 use crate::mutations::{
-    CollectionMut,
-    CollectionUpdateResult,
     StartUploadVersionErrorTooLarge,
     StartUploadVersionResult,
     StartUploadVersionSuccess,
@@ -632,7 +630,9 @@ impl MoleculeDataRoomMutV2 {
                 new_head: r.new_head.into(),
             }
             .into()),
-            Ok(UpdateCollectionEntriesResult::UpToDate) => MoleculeDataRoomUpdateUpToDate.into(),
+            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+                Ok(MoleculeDataRoomUpdateUpToDate.into())
+            }
             Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
                 unreachable!()
             }
@@ -651,17 +651,34 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
-    ) -> Result<CollectionUpdateResult> {
-        // TODO: delete file dataset?
+    ) -> Result<MoleculeDataRoomRemoveEntryResult> {
+        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
-        // TODO: Revisit after rebase (Roman's retry changes)
-        //       Temporary hacky path -- should use domain
-        //       instead of reusing the adapter.
-        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
-
-        data_room_collection
-            .remove_entry(ctx, path, expected_head)
+        match update_entries_use_case
+            .execute(
+                self.data_room_writable_state.dataset_handle(),
+                vec![CollectionUpdateOperation::remove(path.into())],
+                expected_head.map(Into::into),
+            )
             .await
+        {
+            Ok(UpdateCollectionEntriesResult::Success(r)) => Ok(MoleculeDataRoomUpdateSuccess {
+                old_head: r.old_head.into(),
+                new_head: r.new_head.into(),
+            }
+            .into()),
+            Ok(
+                UpdateCollectionEntriesResult::UpToDate
+                | UpdateCollectionEntriesResult::NotFound(_),
+            ) => {
+                unreachable!()
+            }
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+                Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 
     /// Updates the metadata of a file in the data room.
@@ -872,6 +889,17 @@ impl MoleculeDataRoomUpdateUpToDate {
     async fn message(&self) -> String {
         String::new()
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
+pub enum MoleculeDataRoomRemoveEntryResult {
+    Success(MoleculeDataRoomUpdateSuccess),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
