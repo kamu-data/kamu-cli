@@ -279,6 +279,8 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                         odf::dataset::AppendError::RefCASFailed(e),
                     ),
                 ))) => {
+                    // We run retry only if expected_head was not specified by the caller
+                    // to cover case of concurrent updates
                     if expected_head.is_none() && retry_count < MAX_RETRIES {
                         tracing::warn!(
                             "RefCASFailed encountered during collection entries update. \
