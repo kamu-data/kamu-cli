@@ -1169,7 +1169,7 @@ type DatasetData {
 	An estimated size of data on disk not accounting for replication or
 	caching
 	"""
-	estimatedSize: Int!
+	estimatedSizeBytes: Int!
 	"""
 	Total number of linked objects in this dataset
 	"""
@@ -1177,11 +1177,11 @@ type DatasetData {
 	"""
 	An estimated size of linked objects
 	"""
-	estimatedLinkedObjectsSize: Int!
+	estimatedLinkedObjectsSizeBytes: Int!
 	"""
 	An estimated size of all objects in dataset
 	"""
-	totalSize: Int!
+	totalSizeBytes: Int!
 	"""
 	Returns the specified number of the latest records in the dataset
 	This is equivalent to SQL query like:
@@ -4109,11 +4109,11 @@ enum TimeUnit {
 
 type TotalDatasetsStatistic {
 	totalRecords: Int!
-	totalDataSize: Int!
-	totalCheckpointsSize: Int!
+	totalDataSizeBytes: Int!
+	totalCheckpointsSizeBytes: Int!
 	totalNumLinkedObjects: Int!
-	totalLinkedObjectsSize: Int!
-	totalSize: Int!
+	totalLinkedObjectsSizeBytes: Int!
+	totalSizeBytes: Int!
 }
 
 """

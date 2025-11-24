@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- GQL: `usage` section contains size measure unit
+
 ## [0.253.0] - 2025-11-24
 ### Added
 - GQL: new entity `usage` for account which return full combined account statistic

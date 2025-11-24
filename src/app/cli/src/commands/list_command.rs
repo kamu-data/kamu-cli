@@ -298,7 +298,7 @@ impl Command for ListCommand {
             kind.push(self.get_kind(&target).await?);
             pulled.push(statistics.last_pulled.map(|t| t.timestamp_micros()));
             records.push(statistics.num_records);
-            size.push(statistics.data_size);
+            size.push(statistics.data_size_bytes);
 
             if self.detail_level > 0 {
                 let num_blocks = target
