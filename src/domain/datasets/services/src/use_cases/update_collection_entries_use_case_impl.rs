@@ -155,7 +155,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
     async fn run_retriable_ingest(
         &self,
         target: ResolvedDataset,
-        ndjson: bytes::Bytes,
+        ndjson_batches: Vec<bytes::Bytes>,
         mut expected_head: odf::Multihash,
         should_retry_on_cas_failed: bool,
     ) -> Result<
@@ -166,11 +166,17 @@ impl UpdateCollectionEntriesUseCaseImpl {
         let mut retry_count = 0usize;
 
         loop {
+            let data_sources: Vec<_> = ndjson_batches
+                .iter()
+                .cloned()
+                .map(kamu_core::DataSource::Buffer)
+                .collect();
+
             match self
                 .push_ingest_data_use_case
-                .execute(
+                .execute_multi(
                     target.clone(),
-                    kamu_core::DataSource::Buffer(ndjson.clone()),
+                    data_sources,
                     kamu_core::PushIngestDataUseCaseOptions {
                         source_name: None,
                         source_event_time: None,
@@ -221,34 +227,24 @@ impl UpdateCollectionEntriesUseCaseImpl {
         }
     }
 
-    async fn write_records(
+    fn build_data_batches(
         &self,
-        target: ResolvedDataset,
         entries: Vec<(Op, CollectionEntryState)>,
-        expected_head: odf::Multihash,
-        should_retry_on_cas_failed: bool,
-    ) -> Result<kamu_core::PushIngestResult, UpdateCollectionEntriesUseCaseError> {
+    ) -> Result<Vec<bytes::Bytes>, UpdateCollectionEntriesUseCaseError> {
         use std::io::Write;
 
-        let mut ndjson = Vec::<u8>::new();
-        for (op, entry) in entries {
-            let mut record = entry.into_record_data();
-            record["op"] = u8::from(op).into();
-            writeln!(&mut ndjson, "{record}").int_err()?;
-        }
-
-        match self
-            .run_retriable_ingest(
-                target,
-                bytes::Bytes::from_owner(ndjson),
-                expected_head,
-                should_retry_on_cas_failed,
-            )
-            .await?
-        {
-            Ok(res) => Ok(res),
-            Err(err) => Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)),
-        }
+        entries
+            .into_iter()
+            .map(|(op, entry)| {
+                let mut ndjson = Vec::<u8>::new();
+                let mut record = entry.into_record_data();
+                record["op"] = u8::from(op).into();
+                writeln!(&mut ndjson, "{record}")
+                    .int_err()
+                    .map_err(UpdateCollectionEntriesUseCaseError::Internal)?;
+                Ok(bytes::Bytes::from_owner(ndjson))
+            })
+            .collect()
     }
 }
 
@@ -296,50 +292,44 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
             return Ok(UpdateCollectionEntriesResult::UpToDate);
         }
 
-        // TODO: PERF: Manage batching when changelog sorting issue is resolved.
-        let mut next_expected_head = expected_head;
-        let mut current_head = chain_head;
-        let mut last_result = None;
-
-        for (operation, state) in diff {
+        for (operation, state) in &diff {
             tracing::debug!(
                 ?operation,
                 path = %state.path,
                 reference = %state.reference,
                 extra = ?state.extra_data,
-                "Applying collection diff operation"
+                "Preparing collection diff operation"
             );
-            let should_retry_on_cas_failed = next_expected_head.is_none();
-            let expected_head_value = next_expected_head
-                .clone()
-                .unwrap_or_else(|| current_head.clone());
-
-            let ingest_result = self
-                .write_records(
-                    target_dataset.clone(),
-                    vec![(operation, state)],
-                    expected_head_value.clone(),
-                    should_retry_on_cas_failed,
-                )
-                .await?;
-
-            match ingest_result {
-                kamu_core::PushIngestResult::Updated {
-                    old_head,
-                    new_head,
-                    num_blocks: _,
-                } => {
-                    current_head = new_head.clone();
-                    next_expected_head = Some(new_head.clone());
-                    last_result = Some(UpdateCollectionEntriesSuccess { old_head, new_head });
-                }
-                kamu_core::PushIngestResult::UpToDate => unreachable!(),
-            }
         }
 
-        Ok(UpdateCollectionEntriesResult::Success(
-            last_result.expect("at least one operation must succeed"),
-        ))
+        let should_retry_on_cas_failed = expected_head.is_none();
+        let expected_head_value = expected_head.unwrap_or_else(|| chain_head.clone());
+
+        let data_batches = self.build_data_batches(diff)?;
+
+        let ingest_result = match self
+            .run_retriable_ingest(
+                target_dataset.clone(),
+                data_batches,
+                expected_head_value,
+                should_retry_on_cas_failed,
+            )
+            .await?
+        {
+            Ok(res) => res,
+            Err(err) => return Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)),
+        };
+
+        match ingest_result {
+            kamu_core::PushIngestResult::Updated {
+                old_head,
+                new_head,
+                num_blocks: _,
+            } => Ok(UpdateCollectionEntriesResult::Success(
+                UpdateCollectionEntriesSuccess { old_head, new_head },
+            )),
+            kamu_core::PushIngestResult::UpToDate => unreachable!(),
+        }
     }
 }
 
