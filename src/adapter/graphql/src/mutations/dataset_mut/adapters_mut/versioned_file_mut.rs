@@ -11,14 +11,10 @@ use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
-use kamu_datasets_services::utils::{
-    ContentSource,
-    GetContentArgsError,
-    UpdateVersionFileUseCaseHelper,
-};
 
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, FileVersion};
+use crate::utils::{ContentSource, GetContentArgsError, get_content_args};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,16 +52,15 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let (update_version_file_use_case_helper, update_version_file_use_case) = from_catalog_n!(
-            ctx,
-            UpdateVersionFileUseCaseHelper,
-            dyn UpdateVersionFileUseCase
-        );
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
-        let content_args = update_version_file_use_case_helper
-            .get_content_args(ContentSource::Bytes(&content), content_type.map(Into::into))
-            .await
-            .map_err(map_get_content_args_error)?;
+        let content_args = get_content_args(
+            ctx,
+            ContentSource::Bytes(&content),
+            content_type.map(Into::into),
+        )
+        .await
+        .map_err(map_get_content_args_error)?;
 
         match update_version_file_use_case
             .execute(
@@ -153,14 +148,9 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let (update_version_file_use_case_helper, update_version_file_use_case) = from_catalog_n!(
-            ctx,
-            UpdateVersionFileUseCaseHelper,
-            dyn UpdateVersionFileUseCase
-        );
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
-        let content_args = update_version_file_use_case_helper
-            .get_content_args(ContentSource::Token(upload_token), None)
+        let content_args = get_content_args(ctx, ContentSource::Token(upload_token), None)
             .await
             .map_err(map_get_content_args_error)?;
 

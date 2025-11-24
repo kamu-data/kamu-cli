@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::{CreateDatasetUseCaseHelper, UpdateVersionFileUseCaseHelper};
+use crate::utils::CreateDatasetUseCaseHelper;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +32,6 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool)
     b.add::<UpdateVersionFileUseCaseImpl>();
 
     b.add::<CreateDatasetUseCaseHelper>();
-    b.add::<UpdateVersionFileUseCaseHelper>();
 
     b.add::<DatasetEntryServiceImpl>();
     b.add::<DependencyGraphServiceImpl>();

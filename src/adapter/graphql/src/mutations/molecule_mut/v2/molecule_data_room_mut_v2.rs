@@ -14,7 +14,6 @@ use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{ContentArgs, CreateDatasetUseCaseOptions, UpdateVersionFileUseCase};
-use kamu_datasets_services::utils::{ContentSource, UpdateVersionFileUseCaseHelper};
 use odf::utils::data::DataFrameExt;
 
 use crate::mutations::{
@@ -42,6 +41,7 @@ use crate::queries::molecule::v2::{
     MoleculeVersionedFileEntryDetailedInfo,
 };
 use crate::queries::{Account, CollectionEntry, DatasetRequestState, VersionedFileEntry};
+use crate::utils::{ContentSource, get_content_args};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -433,13 +433,13 @@ impl MoleculeDataRoomMutV2 {
         content_text: Option<String>,
         encryption_metadata: Option<EncryptionMetadata>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
-        let update_version_file_use_case_helper =
-            from_catalog_n!(ctx, UpdateVersionFileUseCaseHelper);
-
-        let content_args = update_version_file_use_case_helper
-            .get_content_args(ContentSource::Bytes(&content), content_type.map(Into::into))
-            .await
-            .map_err(map_get_content_args_error)?;
+        let content_args = get_content_args(
+            ctx,
+            ContentSource::Bytes(&content),
+            content_type.map(Into::into),
+        )
+        .await
+        .map_err(map_get_content_args_error)?;
 
         match (path, reference) {
             (Some(path), None) => {
@@ -546,11 +546,7 @@ impl MoleculeDataRoomMutV2 {
         //            all DB will be cleared (transaction rollback). Dataset data
         //            (e.g., on S3) will need later cleanup (garbage collection).
 
-        let update_version_file_use_case_helper =
-            from_catalog_n!(ctx, UpdateVersionFileUseCaseHelper);
-
-        let content_args = update_version_file_use_case_helper
-            .get_content_args(ContentSource::Token(upload_token), None)
+        let content_args = get_content_args(ctx, ContentSource::Token(upload_token), None)
             .await
             .map_err(map_get_content_args_error)?;
 

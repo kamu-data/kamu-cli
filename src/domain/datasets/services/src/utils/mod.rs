@@ -8,7 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod create_dataset_use_case_helper;
-mod update_version_file_use_case_helper;
 
 pub use create_dataset_use_case_helper::*;
-pub use update_version_file_use_case_helper::*;
