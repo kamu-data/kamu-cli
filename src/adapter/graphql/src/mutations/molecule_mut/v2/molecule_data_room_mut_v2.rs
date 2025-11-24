@@ -88,10 +88,15 @@ impl MoleculeDataRoomMutV2 {
         // TODO: Align timestamps with ingest
         let now = chrono::Utc::now();
 
-        let (create_dataset_from_snapshot_use_case, update_version_file_use_case) = from_catalog_n!(
+        let (
+            create_dataset_from_snapshot_use_case,
+            update_version_file_use_case,
+            update_entries_use_case,
+        ) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
-            dyn UpdateVersionFileUseCase
+            dyn UpdateVersionFileUseCase,
+            dyn UpdateCollectionEntriesUseCase
         );
 
         // 1. Create an empty versioned dataset.
@@ -153,10 +158,6 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Add the file to the data room.
 
-        // TODO: Revisit after rebase (Roman's retry changes).
-        //       Temporary hacky path -- should use domain
-        //       instead of reusing the adapter.
-
         let data_room_entry = MoleculeDataRoomEntry {
             entry: CollectionEntry {
                 system_time: now,
@@ -169,33 +170,36 @@ impl MoleculeDataRoomMutV2 {
             denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
         };
 
-        let new_data_room_entry_input = CollectionEntryInput {
-            path: data_room_entry.entry.path.clone(),
-            reference: data_room_entry.entry.reference.clone(),
-            extra_data: Some(data_room_entry.to_collection_extra_data()),
-        };
-
-        let data_room_collection = CollectionMut::new(&self.data_room_writable_state);
-
-        match data_room_collection
-            .add_entry(ctx, new_data_room_entry_input, None)
+        match update_entries_use_case
+            .execute(
+                self.data_room_writable_state.dataset_handle(),
+                vec![CollectionUpdateOperation::add(
+                    data_room_entry.entry.path.to_string(),
+                    data_room_entry.entry.reference.as_ref().clone(),
+                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
+                )],
+                None,
+            )
             .await
         {
-            Ok(CollectionUpdateResult::Success(_)) => Ok(()),
-            Ok(CollectionUpdateResult::CasFailed(_)) => {
-                // TODO: Propagate a nice error
+            Ok(UpdateCollectionEntriesResult::Success(_)) => {
+                Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
+                    entry: data_room_entry,
+                }
+                .into())
+            }
+            Ok(
+                UpdateCollectionEntriesResult::UpToDate
+                | UpdateCollectionEntriesResult::NotFound(_),
+            ) => {
+                unimplemented!()
+            }
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Ok(CollectionUpdateResult::UpToDate(_) | CollectionUpdateResult::NotFound(_)) => {
-                unreachable!()
-            }
-            Err(e) => Err(e),
-        }?;
-
-        Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
-            entry: data_room_entry,
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }
-        .into())
     }
 
     // TODO: Specialize error handling
@@ -359,6 +363,7 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         reference: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>> {
+        // ) -> Result<Option<MoleculeDataRoomEntry>> {
         let (_, maybe_projection_df) = self.get_data_room_projection(ctx).await?;
 
         let Some(df) = maybe_projection_df else {
@@ -375,6 +380,14 @@ impl MoleculeDataRoomMutV2 {
         }
 
         assert_eq!(records.len(), 1);
+
+        // let collection_entry =
+        // CollectionEntry::from_json(records.into_iter().next().unwrap())?; let
+        // data_room_entry =
+        //     MoleculeDataRoomEntry::new_from_collection_entry(&self.project,
+        // collection_entry)?;
+        //
+        // Ok(Some(data_room_entry))
 
         let entry = CollectionEntry::from_json(records.into_iter().next().unwrap())?;
 
@@ -588,7 +601,7 @@ impl MoleculeDataRoomMutV2 {
                 )
                 .await
             }
-            _ => return Err(GqlError::gql("Either `path` or `ref` must be specified")),
+            _ => Err(GqlError::gql("Either `path` or `ref` must be specified")),
         }
     }
 
