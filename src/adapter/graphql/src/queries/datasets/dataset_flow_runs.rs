@@ -101,7 +101,9 @@ impl<'a> DatasetFlowRuns<'a> {
 
                 Some(kamu_flow_system::FlowFilters {
                     by_flow_types,
-                    by_flow_status: filters.by_status.map(Into::into),
+                    by_flow_statuses: filters
+                        .by_status
+                        .map(|statuses| statuses.into_iter().map(Into::into).collect()),
                     by_initiator,
                 })
             }
@@ -194,7 +196,7 @@ impl GetFlowSuccess {
 
 #[derive(InputObject, Debug, Clone)]
 pub(crate) struct DatasetFlowFilters {
-    by_status: Option<FlowStatus>,
+    by_status: Option<Vec<FlowStatus>>,
     by_initiator: Option<InitiatorFilterInput>,
     by_process_type: Option<FlowProcessTypeFilterInput>,
 }

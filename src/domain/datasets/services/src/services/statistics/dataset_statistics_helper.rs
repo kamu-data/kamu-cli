@@ -42,6 +42,15 @@ pub(crate) async fn compute_dataset_statistics_increment(
             }
             odf::MetadataEvent::AddData(add_data) => {
                 statistics.last_pulled.get_or_insert(block.system_time);
+                if let Some(attr) = add_data
+                    .extra
+                    .unwrap_or_default()
+                    .get::<odf::schema::ext::AttrLinkedObjects>()
+                    .int_err()?
+                {
+                    statistics.num_object_links += attr.linked_objects.num_objects_naive;
+                    statistics.object_links_size += attr.linked_objects.size_naive;
+                }
 
                 if let Some(output_data) = add_data.new_data {
                     let iv = output_data.offset_interval;

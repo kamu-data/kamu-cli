@@ -589,20 +589,28 @@ impl FlowEventStore for SqliteFlowEventStore {
             .map(Self::prepare_initiator_filter);
 
         let maybe_by_flow_types = filters.by_flow_types.clone();
-        let maybe_by_flow_status = filters.by_flow_status;
+        let maybe_by_flow_statuses = filters.by_flow_statuses.clone();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-            let (scope_clauses, flow_types_parameter_index) = generate_scope_query_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
-            let scope_values = form_scope_query_condition_values(flow_scope_query);
+            let (scope_clauses, flow_types_parameter_index) =
+                generate_scope_query_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
+            let scope_values = form_scope_query_condition_values(flow_scope_query.clone());
 
-            let initiators_parameter_index = flow_types_parameter_index + if let Some(flow_types) = &maybe_by_flow_types {
-                flow_types.len()
-            } else {
-                0
-            };
+            let statuses_parameter_index = flow_types_parameter_index
+                + if let Some(flow_types) = &maybe_by_flow_types {
+                    flow_types.len()
+                } else {
+                    0
+                };
+            let initiators_parameter_index = statuses_parameter_index
+                + if let Some(flow_statuses) = &maybe_by_flow_statuses {
+                    flow_statuses.len()
+                } else {
+                    0
+                };
 
             let query_str = format!(
                 r#"
@@ -610,7 +618,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 WHERE
                     ({scope_clauses})
                     AND ($1 = 0 OR flow_type IN ({}))
-                    AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                    AND ($2 = 0 OR flow_status IN ({}))
                     AND ($3 = 0 OR initiator IN ({}))
                 ORDER BY flow_status DESC, last_event_id DESC
                 LIMIT $4 OFFSET $5
@@ -619,6 +627,12 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .map(|flow_types| sqlite_generate_placeholders_list(
                         flow_types.len(),
                         NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                    ))
+                    .unwrap_or_default(),
+                maybe_by_flow_statuses.as_ref()
+                    .map(|flow_statuses| sqlite_generate_placeholders_list(
+                        flow_statuses.len(),
+                        NonZeroUsize::new(statuses_parameter_index).unwrap()
                     ))
                     .unwrap_or_default(),
                 maybe_initiators
@@ -632,7 +646,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
             let mut query = sqlx::query_scalar::<_, i64>(&query_str)
                 .bind(i32::from(maybe_by_flow_types.is_some()))
-                .bind(maybe_by_flow_status)
+                .bind(i32::from(maybe_by_flow_statuses.is_some()))
                 .bind(i32::from(maybe_initiators.is_some()))
                 .bind(i64::try_from(pagination.limit).unwrap())
                 .bind(i64::try_from(pagination.offset).unwrap());
@@ -644,6 +658,12 @@ impl FlowEventStore for SqliteFlowEventStore {
             if let Some(flow_types) = maybe_by_flow_types {
                 for flow_type in flow_types {
                     query = query.bind(flow_type);
+                }
+            }
+
+            if let Some(statuses) = maybe_by_flow_statuses {
+                for status in statuses {
+                    query = query.bind(status);
                 }
             }
 
@@ -675,14 +695,20 @@ impl FlowEventStore for SqliteFlowEventStore {
             .map(Self::prepare_initiator_filter);
 
         let maybe_by_flow_types = filters.by_flow_types.as_deref();
-        let maybe_by_flow_status = filters.by_flow_status;
+        let maybe_by_flow_statuses = filters.by_flow_statuses.as_deref();
 
         let (scope_clauses, flow_types_parameter_index) =
             generate_scope_query_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
 
-        let initiators_parameter_index = flow_types_parameter_index
-            + if let Some(flow_types) = &maybe_by_flow_types {
+        let statuses_parameter_index = flow_types_parameter_index
+            + if let Some(flow_types) = maybe_by_flow_types {
                 flow_types.len()
+            } else {
+                0
+            };
+        let initiators_parameter_index = statuses_parameter_index
+            + if let Some(flow_statuses) = maybe_by_flow_statuses {
+                flow_statuses.len()
             } else {
                 0
             };
@@ -694,7 +720,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             WHERE
                 ({scope_clauses})
                 AND ($1 = 0 OR flow_type In ({}))
-                AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                AND ($2 = 0 OR flow_status IN ({}))
                 AND ($3 = 0 OR initiator IN ({}))
             "#,
             maybe_by_flow_types
@@ -702,6 +728,13 @@ impl FlowEventStore for SqliteFlowEventStore {
                 .map(|flow_types| sqlite_generate_placeholders_list(
                     flow_types.len(),
                     NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                ))
+                .unwrap_or_default(),
+            maybe_by_flow_statuses
+                .as_ref()
+                .map(|flow_statuses| sqlite_generate_placeholders_list(
+                    flow_statuses.len(),
+                    NonZeroUsize::new(statuses_parameter_index).unwrap()
                 ))
                 .unwrap_or_default(),
             maybe_initiators
@@ -717,7 +750,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
         let mut query = sqlx::query_scalar::<_, i64>(&query_str)
             .bind(i32::from(maybe_by_flow_types.is_some()))
-            .bind(maybe_by_flow_status)
+            .bind(i32::from(maybe_by_flow_statuses.is_some()))
             .bind(i32::from(maybe_initiators.is_some()));
 
         for (_, values) in &flow_scope_query.attributes {
@@ -729,6 +762,12 @@ impl FlowEventStore for SqliteFlowEventStore {
         if let Some(flow_types) = maybe_by_flow_types {
             for flow_type in flow_types {
                 query = query.bind(flow_type);
+            }
+        }
+
+        if let Some(statuses) = maybe_by_flow_statuses {
+            for status in statuses {
+                query = query.bind(status);
             }
         }
 
@@ -783,7 +822,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
-        let maybe_by_flow_status = filters.by_flow_status;
+        let maybe_by_flow_statuses = filters.by_flow_statuses.clone();
 
         let maybe_initiators = filters
             .by_initiator
@@ -797,9 +836,14 @@ impl FlowEventStore for SqliteFlowEventStore {
 
             let connection_mut = tr.connection_mut().await?;
 
-            let flow_types_parameter_index = 5;
-            let initiators_parameter_index = flow_types_parameter_index + if let Some(flow_types) = &maybe_by_flow_types {
+            let flow_types_parameter_index = 6;
+            let statuses_parameter_index = flow_types_parameter_index + if let Some(flow_types) = &maybe_by_flow_types {
                 flow_types.len()
+            } else {
+                0
+            };
+            let initiators_parameter_index = statuses_parameter_index + if let Some(flow_statuses) = &maybe_by_flow_statuses {
+                flow_statuses.len()
             } else {
                 0
             };
@@ -809,7 +853,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 SELECT flow_id FROM flows
                 WHERE
                     ($1 = 0 OR flow_type IN ({}))
-                    AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                    AND ($2 = 0 OR flow_status IN ({}))
                     AND ($3 = 0 OR initiator IN ({}))
                 ORDER BY flow_id DESC
                 LIMIT $4 OFFSET $5
@@ -818,6 +862,12 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .map(|flow_types| sqlite_generate_placeholders_list(
                         flow_types.len(),
                         NonZeroUsize::new(flow_types_parameter_index).unwrap()
+                    ))
+                    .unwrap_or_default(),
+                maybe_by_flow_statuses.as_ref()
+                    .map(|flow_statuses| sqlite_generate_placeholders_list(
+                        flow_statuses.len(),
+                        NonZeroUsize::new(statuses_parameter_index).unwrap()
                     ))
                     .unwrap_or_default(),
                 maybe_initiators
@@ -830,7 +880,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
             let mut query = sqlx::query_scalar::<_, i64>(&query_str)
                 .bind(i32::from(maybe_by_flow_types.is_some()))
-                .bind(maybe_by_flow_status)
+                .bind(i32::from(maybe_by_flow_statuses.is_some()))
                 .bind(i32::from(maybe_initiators.is_some()))
                 .bind(i64::try_from(pagination.limit).unwrap())
                 .bind(i64::try_from(pagination.offset).unwrap());
@@ -838,6 +888,12 @@ impl FlowEventStore for SqliteFlowEventStore {
             if let Some(flow_types) = maybe_by_flow_types {
                 for flow_type in flow_types {
                     query = query.bind(flow_type);
+                }
+            }
+
+            if let Some(statuses) = maybe_by_flow_statuses {
+                for status in statuses {
+                    query = query.bind(status);
                 }
             }
 
@@ -859,7 +915,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let maybe_by_flow_status = filters.by_flow_status;
+        let maybe_by_flow_statuses = filters.by_flow_statuses.clone();
 
         let maybe_by_flow_types = filters.by_flow_types.as_deref();
 
@@ -868,10 +924,16 @@ impl FlowEventStore for SqliteFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let flow_types_parameter_index = 3;
-        let initiators_parameter_index = flow_types_parameter_index
+        let flow_types_parameter_index = 4;
+        let statuses_parameter_index = flow_types_parameter_index
             + if let Some(flow_types) = &maybe_by_flow_types {
                 flow_types.len()
+            } else {
+                0
+            };
+        let initiators_parameter_index = statuses_parameter_index
+            + if let Some(flow_statuses) = &maybe_by_flow_types {
+                flow_statuses.len()
             } else {
                 0
             };
@@ -882,7 +944,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             FROM flows
             WHERE
                 ($1 = 0 OR flow_type IN ({}))
-                AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                AND ($2 = 0 OR flow_status IN ({}))
                 AND ($3 = 0 OR initiator IN ({}))
             "#,
             maybe_by_flow_types
@@ -891,6 +953,15 @@ impl FlowEventStore for SqliteFlowEventStore {
                     sqlite_generate_placeholders_list(
                         flow_types.len(),
                         NonZeroUsize::new(flow_types_parameter_index).unwrap(),
+                    )
+                })
+                .unwrap_or_default(),
+            maybe_by_flow_statuses
+                .as_ref()
+                .map(|flow_statuses| {
+                    sqlite_generate_placeholders_list(
+                        flow_statuses.len(),
+                        NonZeroUsize::new(statuses_parameter_index).unwrap(),
                     )
                 })
                 .unwrap_or_default(),
@@ -907,12 +978,18 @@ impl FlowEventStore for SqliteFlowEventStore {
 
         let mut query = sqlx::query_scalar::<_, i64>(&query_str)
             .bind(i32::from(maybe_by_flow_types.is_some()))
-            .bind(maybe_by_flow_status)
+            .bind(i32::from(maybe_by_flow_statuses.is_some()))
             .bind(i32::from(maybe_initiators.is_some()));
 
         if let Some(flow_types) = maybe_by_flow_types {
             for flow_type in flow_types {
                 query = query.bind(flow_type);
+            }
+        }
+
+        if let Some(statuses) = maybe_by_flow_statuses {
+            for status in statuses {
+                query = query.bind(status);
             }
         }
 

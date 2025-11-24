@@ -706,7 +706,7 @@ impl DataWriterDataFusion {
     }
 
     /// Reads output file back to collect sizes of all linked objects, verifying
-    /// referrential integrity at the same time
+    /// referential integrity at the same time
     #[tracing::instrument(level = "info", skip_all)]
     async fn compute_linked_objects_summary(
         &self,
