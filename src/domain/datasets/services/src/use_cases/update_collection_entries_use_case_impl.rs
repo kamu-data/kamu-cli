@@ -152,81 +152,6 @@ impl UpdateCollectionEntriesUseCaseImpl {
         Ok(diff)
     }
 
-    async fn run_retriable_ingest(
-        &self,
-        target: ResolvedDataset,
-        ndjson_batches: Vec<bytes::Bytes>,
-        mut expected_head: odf::Multihash,
-        should_retry_on_cas_failed: bool,
-    ) -> Result<
-        std::result::Result<kamu_core::PushIngestResult, odf::dataset::RefCASError>,
-        InternalError,
-    > {
-        const MAX_RETRIES: usize = 3;
-        let mut retry_count = 0usize;
-
-        loop {
-            let data_sources: Vec<_> = ndjson_batches
-                .iter()
-                .cloned()
-                .map(kamu_core::DataSource::Buffer)
-                .collect();
-
-            match self
-                .push_ingest_data_use_case
-                .execute_multi(
-                    target.clone(),
-                    data_sources,
-                    kamu_core::PushIngestDataUseCaseOptions {
-                        source_name: None,
-                        source_event_time: None,
-                        is_ingest_from_upload: false,
-                        media_type: Some(MediaType::NDJSON.to_owned()),
-                        expected_head: Some(expected_head.clone()),
-                    },
-                    None,
-                )
-                .await
-            {
-                Ok(res) => return Ok(Ok(res)),
-                Err(PushIngestDataError::Planning(PushIngestPlanningError::HeadNotFound(e))) => {
-                    return Ok(Err(odf::dataset::RefCASError {
-                        reference: odf::BlockRef::Head,
-                        expected: Some(e.hash),
-                        actual: None,
-                    }));
-                }
-                Err(PushIngestDataError::Execution(PushIngestError::CommitError(
-                    odf::dataset::CommitError::MetadataAppendError(
-                        odf::dataset::AppendError::RefCASFailed(e),
-                    ),
-                ))) => {
-                    if should_retry_on_cas_failed && retry_count < MAX_RETRIES {
-                        tracing::warn!(
-                            "RefCASFailed encountered during collection entries update. \
-                             Retrying... (attempt #{}), dataset: {}",
-                            retry_count + 1,
-                            target.get_alias(),
-                        );
-                        retry_count += 1;
-                        expected_head = target
-                            .as_metadata_chain()
-                            .resolve_ref(&odf::BlockRef::Head)
-                            .await
-                            .int_err()?;
-                        sleep(Duration::from_secs(retry_count as u64)).await;
-                        continue;
-                    }
-
-                    return Ok(Err(e));
-                }
-                Err(err) => {
-                    return Err(err.int_err());
-                }
-            }
-        }
-    }
-
     fn build_data_batches(
         &self,
         entries: Vec<(Op, CollectionEntryState)>,
@@ -278,57 +203,100 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                 }
             })?;
 
-        let (current_entries, chain_head) =
-            self.load_current_entries(target_dataset.clone()).await?;
+        const MAX_RETRIES: usize = 3;
+        let mut retry_count = 0usize;
 
-        let diff = match self.apply_operations(current_entries, operations) {
-            Ok(diff) => diff,
-            Err(not_found) => {
-                return Ok(UpdateCollectionEntriesResult::NotFound(not_found));
+        loop {
+            let (current_entries, chain_head) =
+                self.load_current_entries(target_dataset.clone()).await?;
+
+            let diff = match self.apply_operations(current_entries, operations.clone()) {
+                Ok(diff) => diff,
+                Err(not_found) => {
+                    return Ok(UpdateCollectionEntriesResult::NotFound(not_found));
+                }
+            };
+
+            if diff.is_empty() {
+                return Ok(UpdateCollectionEntriesResult::UpToDate);
             }
-        };
 
-        if diff.is_empty() {
-            return Ok(UpdateCollectionEntriesResult::UpToDate);
-        }
+            for (operation, state) in &diff {
+                tracing::debug!(
+                    ?operation,
+                    path = %state.path,
+                    reference = %state.reference,
+                    extra = ?state.extra_data,
+                    "Preparing collection diff operation"
+                );
+            }
 
-        for (operation, state) in &diff {
-            tracing::debug!(
-                ?operation,
-                path = %state.path,
-                reference = %state.reference,
-                extra = ?state.extra_data,
-                "Preparing collection diff operation"
-            );
-        }
+            let expected_head_value = expected_head.clone().unwrap_or_else(|| chain_head.clone());
 
-        let should_retry_on_cas_failed = expected_head.is_none();
-        let expected_head_value = expected_head.unwrap_or_else(|| chain_head.clone());
+            let data_sources: Vec<_> = self
+                .build_data_batches(diff)?
+                .into_iter()
+                .map(kamu_core::DataSource::Buffer)
+                .collect();
 
-        let data_batches = self.build_data_batches(diff)?;
+            match self
+                .push_ingest_data_use_case
+                .execute_multi(
+                    target_dataset.clone(),
+                    data_sources,
+                    kamu_core::PushIngestDataUseCaseOptions {
+                        source_name: None,
+                        source_event_time: None,
+                        is_ingest_from_upload: false,
+                        media_type: Some(MediaType::NDJSON.to_owned()),
+                        expected_head: Some(expected_head_value),
+                    },
+                    None,
+                )
+                .await
+            {
+                Ok(kamu_core::PushIngestResult::Updated {
+                    old_head,
+                    new_head,
+                    num_blocks: _,
+                }) => {
+                    return Ok(UpdateCollectionEntriesResult::Success(
+                        UpdateCollectionEntriesSuccess { old_head, new_head },
+                    ));
+                }
+                Ok(kamu_core::PushIngestResult::UpToDate) => unreachable!(),
+                Err(PushIngestDataError::Planning(PushIngestPlanningError::HeadNotFound(e))) => {
+                    return Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(
+                        odf::dataset::RefCASError {
+                            reference: odf::BlockRef::Head,
+                            expected: Some(e.hash),
+                            actual: None,
+                        },
+                    ));
+                }
+                Err(PushIngestDataError::Execution(PushIngestError::CommitError(
+                    odf::dataset::CommitError::MetadataAppendError(
+                        odf::dataset::AppendError::RefCASFailed(e),
+                    ),
+                ))) => {
+                    if expected_head.is_none() && retry_count < MAX_RETRIES {
+                        tracing::warn!(
+                            "RefCASFailed encountered during collection entries update. \
+                             Retrying... (attempt #{}), dataset: {}",
+                            retry_count + 1,
+                            target_dataset.get_alias(),
+                        );
+                        retry_count += 1;
+                        sleep(Duration::from_secs(retry_count as u64)).await;
+                        continue;
+                    }
 
-        let ingest_result = match self
-            .run_retriable_ingest(
-                target_dataset.clone(),
-                data_batches,
-                expected_head_value,
-                should_retry_on_cas_failed,
-            )
-            .await?
-        {
-            Ok(res) => res,
-            Err(err) => return Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)),
-        };
-
-        match ingest_result {
-            kamu_core::PushIngestResult::Updated {
-                old_head,
-                new_head,
-                num_blocks: _,
-            } => Ok(UpdateCollectionEntriesResult::Success(
-                UpdateCollectionEntriesSuccess { old_head, new_head },
-            )),
-            kamu_core::PushIngestResult::UpToDate => unreachable!(),
+                    return Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e));
+                }
+                Err(err) => {
+                    return Err(UpdateCollectionEntriesUseCaseError::Internal(err.int_err()));
+                }
+            }
         }
     }
 }
