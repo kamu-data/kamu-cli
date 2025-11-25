@@ -165,7 +165,12 @@ impl MoleculeDatasetSnapshots {
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn announcements(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+    pub fn announcements(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+        let alias = odf::DatasetAlias::new(
+            Some(molecule_account_name),
+            odf::DatasetName::new_unchecked("announcements"),
+        );
+
         odf::DatasetSnapshot {
             name: alias,
             kind: odf::DatasetKind::Root,

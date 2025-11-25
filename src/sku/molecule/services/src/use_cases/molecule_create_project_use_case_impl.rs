@@ -143,10 +143,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = MoleculeDatasetSnapshots::announcements(odf::DatasetAlias::new(
-            Some(project_account_name.clone()),
-            odf::DatasetName::new_unchecked("announcements"),
-        ));
+        let snapshot = MoleculeDatasetSnapshots::announcements(project_account_name);
         let announcements_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(
