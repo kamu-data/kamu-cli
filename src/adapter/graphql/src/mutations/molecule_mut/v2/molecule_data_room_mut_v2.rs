@@ -24,6 +24,7 @@ use kamu_datasets::{
     UpdateCollectionEntriesUseCaseError,
     UpdateVersionFileUseCase,
 };
+use kamu_molecule_domain::MoleculeDatasetSnapshots;
 use odf::utils::data::DataFrameExt;
 
 use crate::mutations::{
@@ -42,7 +43,6 @@ use crate::queries::molecule::v2::{
     MoleculeDataRoomEntry,
     MoleculeProjectV2,
     MoleculeTag,
-    MoleculeVersionedFile,
     MoleculeVersionedFileEntry,
     MoleculeVersionedFileEntryBasicInfo,
     MoleculeVersionedFileEntryDetailedInfo,
@@ -99,7 +99,7 @@ impl MoleculeDataRoomMutV2 {
 
         // 1. Create an empty versioned dataset.
         let alias = self.build_new_file_dataset_alias(ctx, &path).await;
-        let versioned_file_snapshot = MoleculeVersionedFile::dataset_snapshot(alias);
+        let versioned_file_snapshot = MoleculeDatasetSnapshots::versioned_file_v2(alias);
 
         let create_versioned_file_res = create_dataset_from_snapshot_use_case
             .execute(
@@ -392,12 +392,12 @@ impl MoleculeDataRoomMutV2 {
     ) -> odf::DatasetAlias {
         // TODO: PERF: Add AccountRequestState similar to DatasetRequestState and reuse
         //             possibly resolved account?
-        let project_account = Account::from_account_id(ctx, self.project.account_id.clone())
+        let project_account = Account::from_account_id(ctx, self.project.entity.account_id.clone())
             .await
             .unwrap_or_else(|e| {
                 panic!(
                     "Failed to load project account [{}]: {e}",
-                    self.project.account_id
+                    self.project.entity.account_id
                 )
             });
         let project_account_name = project_account.account_name_internal().clone();

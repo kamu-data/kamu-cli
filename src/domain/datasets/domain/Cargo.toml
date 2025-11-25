@@ -33,12 +33,14 @@ database-common = { workspace = true }
 file-utils = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, features = ["datafusion"] }
 kamu-search = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
-cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
+cheap-clone = { version = "0.3", default-features = false, features = [
+    "alloc",
+] }
 chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
 merge = "0.2"

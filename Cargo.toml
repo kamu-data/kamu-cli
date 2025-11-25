@@ -118,6 +118,9 @@ members = [
     "src/adapter/http",
     "src/adapter/oauth",
     "src/adapter/odata",
+    # SKU modules
+    "src/sku/molecule/domain",
+    "src/sku/molecule/services",
     # Apps
     "src/app/cli",
     # E2E
@@ -194,7 +197,10 @@ odf-storage-s3 = { version = "0.253.1", path = "src/odf/storage-s3", default-fea
 kamu-accounts-services = { version = "0.253.1", path = "src/domain/accounts/services", default-features = false }
 kamu-auth-rebac-services = { version = "0.253.1", path = "src/domain/auth-rebac/services", default-features = false }
 kamu-auth-web3-services = { version = "0.253.1", path = "src/domain/auth-web3/services", default-features = false }
-kamu-datasets-services = { version = "0.253.1", path = "src/domain/datasets/services", default-features = false, features = ["lfs", "s3"] }
+kamu-datasets-services = { version = "0.253.1", path = "src/domain/datasets/services", default-features = false, features = [
+    "lfs",
+    "s3",
+] }
 kamu-flow-system-services = { version = "0.253.1", path = "src/domain/flow-system/services", default-features = false }
 kamu-search-services = { version = "0.253.1", path = "src/domain/search/services", default-features = false }
 kamu-task-system-services = { version = "0.253.1", path = "src/domain/task-system/services", default-features = false }
@@ -264,6 +270,10 @@ kamu-adapter-graphql = { version = "0.253.1", path = "src/adapter/graphql", defa
 kamu-adapter-http = { version = "0.253.1", path = "src/adapter/http", default-features = false }
 kamu-adapter-odata = { version = "0.253.1", path = "src/adapter/odata", default-features = false }
 kamu-adapter-oauth = { version = "0.253.1", path = "src/adapter/oauth", default-features = false }
+
+# SKU modules
+kamu-molecule-domain = { version = "0.253.1", path = "src/sku/molecule/domain", default-features = false }
+kamu-molecule-services = { version = "0.253.1", path = "src/sku/molecule/services", default-features = false }
 
 # E2E
 kamu-cli-e2e-common = { version = "0.253.1", path = "src/e2e/app/cli/common", default-features = false }

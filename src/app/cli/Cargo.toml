@@ -127,6 +127,8 @@ kamu-auth-web3-postgres = { workspace = true }
 kamu-auth-web3-services = { workspace = true }
 kamu-auth-web3-sqlite = { workspace = true }
 
+kamu-molecule-services = { workspace = true }
+
 # Top-level TLS configuration
 # TODO: Include alloy, aws-smithy
 # TODO: Unify deps around either ring or aws-lc-rs

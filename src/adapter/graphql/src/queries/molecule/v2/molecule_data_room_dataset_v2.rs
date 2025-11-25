@@ -23,7 +23,6 @@ use crate::queries::molecule::v2::{
     MoleculeTag,
 };
 use crate::queries::{
-    Collection,
     CollectionEntry,
     CollectionProjection,
     Dataset,
@@ -41,41 +40,6 @@ use crate::queries::{
 pub struct MoleculeDataRoom {
     pub dataset: Dataset,
     pub project: Arc<MoleculeProjectV2>,
-}
-
-impl MoleculeDataRoom {
-    // Extra columns
-    pub const COLUMN_NAME_CHANGE_BY: &'static str = "molecule_change_by";
-    // Denormalized values from the latest file state
-    pub const COLUMN_NAME_ACCESS_LEVEL: &'static str = "molecule_access_level";
-    pub const COLUMN_NAME_CONTENT_TYPE: &'static str = "content_type";
-    pub const COLUMN_NAME_CONTENT_HASH: &'static str = "content_hash";
-    pub const COLUMN_NAME_CONTENT_LENGTH: &'static str = "content_length";
-    pub const COLUMN_NAME_DESCRIPTION: &'static str = "description";
-    pub const COLUMN_NAME_CATEGORIES: &'static str = "categories";
-    pub const COLUMN_NAME_TAGS: &'static str = "tags";
-    pub const COLUMN_NAME_VERSION: &'static str = "version";
-
-    pub fn dataset_snapshot(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        Collection::dataset_snapshot(
-            alias,
-            vec![
-                // Extra columns
-                ColumnInput::string(Self::COLUMN_NAME_CHANGE_BY),
-                // Denormalized values from the latest file state
-                ColumnInput::string(Self::COLUMN_NAME_ACCESS_LEVEL),
-                ColumnInput::string(Self::COLUMN_NAME_CONTENT_TYPE),
-                ColumnInput::string(Self::COLUMN_NAME_CONTENT_HASH),
-                ColumnInput::int(Self::COLUMN_NAME_CONTENT_LENGTH),
-                ColumnInput::string(Self::COLUMN_NAME_DESCRIPTION),
-                ColumnInput::string_array(Self::COLUMN_NAME_CATEGORIES),
-                ColumnInput::string_array(Self::COLUMN_NAME_TAGS),
-                ColumnInput::int(Self::COLUMN_NAME_VERSION),
-            ],
-            Vec::new(),
-        )
-        .expect("Schema is always valid as there are no user inputs")
-    }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -280,41 +244,6 @@ pub struct MoleculeVersionedFile {
 
     // Filled from denormalized data stored alongside data room entry
     pub prefetched_latest: MoleculeVersionedFilePrefetch,
-}
-
-impl MoleculeVersionedFile {
-    // Extra columns
-    pub const COLUMN_NAME_ACCESS_LEVEL: &'static str = "molecule_access_level";
-    pub const COLUMN_NAME_CHANGE_BY: &'static str = "molecule_change_by";
-    // Extended metadata
-    pub const COLUMN_NAME_DESCRIPTION: &'static str = "description";
-    pub const COLUMN_NAME_CATEGORIES: &'static str = "categories";
-    pub const COLUMN_NAME_TAGS: &'static str = "tags";
-    // Semantic search
-    pub const COLUMN_NAME_CONTENT_TEXT: &'static str = "content_text";
-    // E2EE
-    pub const COLUMN_NAME_ENCRYPTION_METADATA: &'static str = "encryption_metadata";
-
-    pub fn dataset_snapshot(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        VersionedFile::dataset_snapshot(
-            alias,
-            vec![
-                // Extra columns
-                ColumnInput::string(Self::COLUMN_NAME_ACCESS_LEVEL),
-                ColumnInput::string(Self::COLUMN_NAME_CHANGE_BY),
-                ColumnInput::string(Self::COLUMN_NAME_DESCRIPTION),
-                // Extended metadata
-                ColumnInput::string_array(Self::COLUMN_NAME_CATEGORIES),
-                ColumnInput::string_array(Self::COLUMN_NAME_TAGS),
-                // Semantic search
-                ColumnInput::string(Self::COLUMN_NAME_CONTENT_TEXT),
-                // E2EE
-                ColumnInput::string(Self::COLUMN_NAME_ENCRYPTION_METADATA),
-            ],
-            Vec::new(),
-        )
-        .expect("Schema is always valid as there are no user inputs")
-    }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]

@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod collection;
 mod dataset_block;
+mod dataset_column;
 #[cfg(feature = "sqlx")]
 mod dataset_dependency_entry;
 mod dataset_entry;
@@ -16,7 +18,9 @@ mod dataset_statistics;
 mod metadata_event_type;
 mod versioned_file;
 
+pub use collection::*;
 pub use dataset_block::*;
+pub use dataset_column::*;
 #[cfg(feature = "sqlx")]
 pub use dataset_dependency_entry::*;
 pub use dataset_entry::*;
