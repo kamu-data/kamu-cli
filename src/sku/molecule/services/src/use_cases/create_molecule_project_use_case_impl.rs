@@ -48,7 +48,7 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: num_bigint::BigInt,
-    ) -> Result<serde_json::Value, CreateMoleculeProjectError> {
+    ) -> Result<MoleculeProjectEntity, CreateMoleculeProjectError> {
         // Resolve projects snapshot with Write privileges
         let (projects_dataset, df) = self
             .project_service
@@ -74,7 +74,9 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
 
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
-                return Err(CreateMoleculeProjectError::Conflict { project: record });
+                return Err(CreateMoleculeProjectError::Conflict {
+                    project: MoleculeProjectEntity::from_json(record).int_err()?,
+                });
             }
         }
 
@@ -172,27 +174,25 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
 
         // Add project entry
         let now = chrono::Utc::now();
-        let project_json = serde_json::json!({
-            "account_id": project_account.id,
-            "system_time": now,
-            "event_time": now,
-            "ipnft_symbol": lowercase_ipnft_symbol,
-            "ipnft_address": ipnft_address,
-            "ipnft_token_id": ipnft_token_id.to_string(),
-            "ipnft_uid": ipnft_uid,
-            "data_room_dataset_id": data_room_create_res.dataset_handle.id,
-            "announcements_dataset_id": announcements_create_res.dataset_handle.id,
-        });
+        let project = MoleculeProjectEntity {
+            account_id: project_account.id,
+            system_time: now,
+            event_time: now,
+            ipnft_symbol: lowercase_ipnft_symbol,
+            ipnft_address,
+            ipnft_token_id,
+            ipnft_uid,
+            data_room_dataset_id: data_room_create_res.dataset_handle.id,
+            announcements_dataset_id: announcements_create_res.dataset_handle.id,
+        };
 
-        let mut project_internal_json = project_json.clone();
-        project_internal_json["op"] = u8::from(odf::metadata::OperationType::Append).into();
-        let project_internal_bytes =
-            bytes::Bytes::from_owner(project_internal_json.to_string().into_bytes());
+        let changelog_record =
+            project.into_changelog_record(u8::from(odf::metadata::OperationType::Append));
 
         self.push_ingest_use_case
             .execute(
                 projects_dataset,
-                kamu_core::DataSource::Buffer(project_internal_bytes),
+                kamu_core::DataSource::Buffer(changelog_record.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
@@ -205,7 +205,7 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
             .await
             .int_err()?;
 
-        Ok(project_json)
+        Ok(project)
     }
 }
 

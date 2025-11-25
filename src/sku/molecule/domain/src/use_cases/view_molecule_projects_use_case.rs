@@ -11,7 +11,7 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::MoleculeGetProjectsError;
+use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +28,7 @@ pub trait ViewMoleculeProjectsUseCase: Send + Sync {
 
 #[derive(Debug, Default)]
 pub struct MoleculeProjectListing {
-    pub records: Vec<serde_json::Value>,
+    pub projects: Vec<MoleculeProjectEntity>,
     pub total_count: usize,
 }
 

@@ -75,7 +75,7 @@ impl MoleculeV2 {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
-        let maybe_project_json = find_molecule_project
+        let maybe_project_entity = find_molecule_project
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
@@ -84,10 +84,7 @@ impl MoleculeV2 {
                 FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
             })?;
 
-        let maybe_project_v2 = maybe_project_json
-            .map(MoleculeProjectV2::from_json)
-            .transpose()?;
-        Ok(maybe_project_v2)
+        Ok(maybe_project_entity.map(MoleculeProjectV2::new))
     }
 
     /// List the registered projects
@@ -112,10 +109,10 @@ impl MoleculeV2 {
             .await?;
 
         let nodes = listing
-            .records
+            .projects
             .into_iter()
-            .map(MoleculeProjectV2::from_json)
-            .collect::<Result<Vec<MoleculeProjectV2>, _>>()?;
+            .map(MoleculeProjectV2::new)
+            .collect();
 
         Ok(MoleculeProjectV2Connection::new(
             nodes,

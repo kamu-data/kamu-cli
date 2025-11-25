@@ -75,7 +75,7 @@ impl MoleculeMutV2 {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
-        let maybe_project_json = find_molecule_project
+        let maybe_project_entity = find_molecule_project
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
@@ -84,10 +84,7 @@ impl MoleculeMutV2 {
                 FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
             })?;
 
-        let maybe_project_v2 = maybe_project_json
-            .map(MoleculeProjectMutV2::from_json)
-            .transpose()?;
-        Ok(maybe_project_v2)
+        Ok(maybe_project_entity.map(MoleculeProjectMutV2::from_entity))
     }
 }
 

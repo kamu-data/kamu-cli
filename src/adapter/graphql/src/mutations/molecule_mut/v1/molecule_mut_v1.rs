@@ -43,7 +43,7 @@ impl MoleculeMutV1 {
         let molecule_subject = molecule_subject(ctx)?;
 
         let create_molecule_project = from_catalog_n!(ctx, dyn CreateMoleculeProjectUseCase);
-        let project_json = match create_molecule_project
+        let project = match create_molecule_project
             .execute(
                 &molecule_subject,
                 ipnft_symbol,
@@ -53,9 +53,9 @@ impl MoleculeMutV1 {
             )
             .await
         {
-            Ok(project_json) => project_json,
+            Ok(project_entity) => v1::MoleculeProject::new(project_entity),
             Err(CreateMoleculeProjectError::Conflict { project }) => {
-                let project = v1::MoleculeProject::from_json(project);
+                let project = v1::MoleculeProject::new(project);
                 return Ok(CreateProjectResult::Conflict(CreateProjectErrorConflict {
                     project,
                 }));
@@ -66,7 +66,6 @@ impl MoleculeMutV1 {
             }
         };
 
-        let project = v1::MoleculeProject::from_json(project_json);
         Ok(CreateProjectResult::Success(CreateProjectSuccess {
             project,
         }))
@@ -82,16 +81,16 @@ impl MoleculeMutV1 {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
-        let maybe_project_json = find_molecule_project
+        let maybe_project = find_molecule_project
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
                 FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
                 FindMoleculeProjectError::Access(e) => GqlError::Access(e),
                 FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
-            })?;
+            })
+            .map(|opt| opt.map(MoleculeProjectMut::from_entity))?;
 
-        let maybe_project = maybe_project_json.map(MoleculeProjectMut::from_json);
         Ok(maybe_project)
     }
 }
@@ -106,25 +105,11 @@ pub struct MoleculeProjectMut {
 }
 
 impl MoleculeProjectMut {
-    pub fn from_json(record: serde_json::Value) -> Self {
-        let serde_json::Value::Object(record) = record else {
-            unreachable!()
-        };
-
-        let account_id =
-            odf::AccountID::from_did_str(record["account_id"].as_str().unwrap()).unwrap();
-
-        let data_room_dataset_id =
-            odf::DatasetID::from_did_str(record["data_room_dataset_id"].as_str().unwrap()).unwrap();
-
-        let announcements_dataset_id =
-            odf::DatasetID::from_did_str(record["announcements_dataset_id"].as_str().unwrap())
-                .unwrap();
-
+    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
         Self {
-            account_id,
-            data_room_dataset_id,
-            announcements_dataset_id,
+            account_id: entity.account_id,
+            data_room_dataset_id: entity.data_room_dataset_id,
+            announcements_dataset_id: entity.announcements_dataset_id,
         }
     }
 }
@@ -259,7 +244,7 @@ impl CreateProjectErrorConflict {
     async fn message(&self) -> String {
         format!(
             "Conflict with existing project {} ({})",
-            self.project.ipnft_symbol, self.project.ipnft_uid,
+            self.project.entity.ipnft_symbol, self.project.entity.ipnft_uid,
         )
     }
 }

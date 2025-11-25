@@ -22,47 +22,57 @@ use crate::queries::{Account, Dataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: revisit after IPNFT-less projects changes.
-#[derive(SimpleObject, Clone)]
-#[graphql(complex)]
+#[derive(Clone)]
 pub struct MoleculeProjectV2 {
-    #[graphql(skip)]
-    pub account_id: odf::AccountID,
+    pub(crate) entity: kamu_molecule_domain::MoleculeProjectEntity,
+}
 
-    #[graphql(skip)]
-    pub data_room_dataset_id: odf::DatasetID,
-
-    #[expect(dead_code)]
-    #[graphql(skip)]
-    pub announcements_dataset_id: odf::DatasetID,
-
-    /// System time when this project was created/updated
-    pub system_time: DateTime<Utc>,
-
-    /// Event time when this project was created/updated
-    pub event_time: DateTime<Utc>,
-
-    /// Symbolic name of the project
-    pub ipnft_symbol: String,
-
-    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
-    pub ipnft_uid: String,
-
-    /// Address of the IPNFT contract
-    pub ipnft_address: String,
-
-    // NOTE: For backward compatibility (and existing projects),
-    //       we continue using BigInt type, which is wider than needed U256.
-    /// Token ID withing the IPNFT contract
-    pub ipnft_token_id: BigInt,
+impl MoleculeProjectV2 {
+    pub fn new(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+        Self { entity }
+    }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[ComplexObject]
+#[Object]
 impl MoleculeProjectV2 {
+    /// System time when this project was created/updated
+    pub async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_time
+    }
+
+    /// Event time when this project was created/updated
+    pub async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.event_time
+    }
+
+    /// Symbolic name of the project
+    pub async fn ipnft_symbol(&self) -> &str {
+        &self.entity.ipnft_symbol
+    }
+
+    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+    pub async fn ipnft_uid(&self) -> &str {
+        &self.entity.ipnft_uid
+    }
+
+    /// Address of the IPNFT contract
+    pub async fn ipnft_address(&self) -> &str {
+        &self.entity.ipnft_address
+    }
+
+    // NOTE: For backward compatibility (and existing projects),
+    //       we continue using BigInt type, which is wider than needed U256.
+
+    /// Token ID withing the IPNFT contract
+    pub async fn ipnft_token_id(&self) -> BigInt {
+        BigInt::new(self.entity.ipnft_token_id.clone())
+    }
+
     /// Project's organizational account
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_account, skip_all)]
     async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
-        let account = Account::from_account_id(ctx, self.account_id.clone()).await?;
+        let account = Account::from_account_id(ctx, self.entity.account_id.clone()).await?;
         Ok(account)
     }
 
@@ -70,7 +80,7 @@ impl MoleculeProjectV2 {
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_data_room, skip_all)]
     async fn data_room(&self, ctx: &Context<'_>) -> Result<MoleculeDataRoom> {
         let Some(dataset) =
-            Dataset::try_from_ref(ctx, &self.data_room_dataset_id.as_local_ref()).await?
+            Dataset::try_from_ref(ctx, &self.entity.data_room_dataset_id.as_local_ref()).await?
         else {
             return Err(GqlError::Access(odf::AccessError::Unauthorized(
                 "Dataset inaccessible".into(),
@@ -120,61 +130,6 @@ pub struct MoleculeProjectActivityFilters {
     // TODO: replace w/ real filters.
     /// This filter is provided as an example.
     by_ipnft_uids: Option<Vec<String>>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Serde
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MoleculeProjectV2 {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        let record: MoleculeProjectV2ChangelogRecord = serde_json::from_value(record).int_err()?;
-
-        Ok(Self {
-            system_time: record.system_time,
-            event_time: record.event_time,
-            ipnft_symbol: record.data.ipnft_symbol,
-            ipnft_uid: record.data.ipnft_uid,
-            ipnft_address: record.data.ipnft_address,
-            ipnft_token_id: BigInt::new(record.data.ipnft_token_id.parse().int_err()?),
-            account_id: record.data.account_id,
-            data_room_dataset_id: record.data.data_room_dataset_id,
-            announcements_dataset_id: record.data.announcements_dataset_id,
-        })
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct MoleculeProjectV2ChangelogRecord {
-    pub offset: u64,
-
-    pub op: u8,
-
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub system_time: DateTime<Utc>,
-
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub event_time: DateTime<Utc>,
-
-    #[serde(flatten)]
-    pub data: MoleculeProjectV2Data,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct MoleculeProjectV2Data {
-    pub ipnft_symbol: String,
-
-    pub ipnft_uid: String,
-
-    pub ipnft_address: String,
-
-    pub ipnft_token_id: String,
-
-    pub account_id: odf::AccountID,
-
-    pub data_room_dataset_id: odf::DatasetID,
-
-    pub announcements_dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

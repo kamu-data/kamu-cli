@@ -392,12 +392,12 @@ impl MoleculeDataRoomMutV2 {
     ) -> odf::DatasetAlias {
         // TODO: PERF: Add AccountRequestState similar to DatasetRequestState and reuse
         //             possibly resolved account?
-        let project_account = Account::from_account_id(ctx, self.project.account_id.clone())
+        let project_account = Account::from_account_id(ctx, self.project.entity.account_id.clone())
             .await
             .unwrap_or_else(|e| {
                 panic!(
                     "Failed to load project account [{}]: {e}",
-                    self.project.account_id
+                    self.project.entity.account_id
                 )
             });
         let project_account_name = project_account.account_name_internal().clone();

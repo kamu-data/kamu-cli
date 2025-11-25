@@ -64,9 +64,16 @@ impl ViewMoleculeProjectsUseCase for ViewMoleculeProjectsUseCaseImpl {
         // Convert to JSON AoS
         let records = df.collect_json_aos().await.int_err()?;
 
+        // Map to entities
+        let projects = records
+            .into_iter()
+            .map(|record| MoleculeProjectEntity::from_json(record).int_err())
+            .collect::<Result<Vec<_>, _>>()
+            .int_err()?;
+
         // Return listing
         Ok(MoleculeProjectListing {
-            records,
+            projects,
             total_count,
         })
     }

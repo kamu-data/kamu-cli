@@ -31,7 +31,7 @@ impl FindMoleculeProjectUseCase for FindMoleculeProjectUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<Option<serde_json::Value>, FindMoleculeProjectError> {
+    ) -> Result<Option<MoleculeProjectEntity>, FindMoleculeProjectError> {
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self
@@ -52,9 +52,10 @@ impl FindMoleculeProjectUseCase for FindMoleculeProjectUseCaseImpl {
         }
 
         assert_eq!(records.len(), 1);
-        let entry = records.into_iter().next().unwrap();
+        let record = records.into_iter().next().unwrap();
 
-        Ok(Some(entry))
+        let entity = MoleculeProjectEntity::from_json(record).int_err()?;
+        Ok(Some(entity))
     }
 }
 

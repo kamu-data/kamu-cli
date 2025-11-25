@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::MoleculeGetProjectsError;
+use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub trait FindMoleculeProjectUseCase: Send + Sync {
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<Option<serde_json::Value>, FindMoleculeProjectError>;
+    ) -> Result<Option<MoleculeProjectEntity>, FindMoleculeProjectError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

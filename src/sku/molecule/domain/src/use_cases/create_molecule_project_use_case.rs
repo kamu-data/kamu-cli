@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::MoleculeGetProjectsError;
+use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ pub trait CreateMoleculeProjectUseCase: Send + Sync {
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: num_bigint::BigInt,
-    ) -> Result<serde_json::Value, CreateMoleculeProjectError>;
+    ) -> Result<MoleculeProjectEntity, CreateMoleculeProjectError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +31,7 @@ pub trait CreateMoleculeProjectUseCase: Send + Sync {
 #[derive(thiserror::Error, Debug)]
 pub enum CreateMoleculeProjectError {
     #[error("Project with the same IPNFT UID or symbol already exists")]
-    Conflict { project: serde_json::Value },
+    Conflict { project: MoleculeProjectEntity },
 
     #[error(transparent)]
     Access(

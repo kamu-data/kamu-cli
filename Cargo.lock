@@ -8265,6 +8265,8 @@ name = "kamu-molecule-domain"
 version = "0.253.1"
 dependencies = [
  "async-trait",
+ "bytes",
+ "chrono",
  "database-common",
  "indoc 2.0.7",
  "internal-error",
@@ -8273,6 +8275,7 @@ dependencies = [
  "kamu-datasets",
  "num-bigint",
  "opendatafabric",
+ "serde",
  "serde_json",
  "thiserror 2.0.17",
 ]
