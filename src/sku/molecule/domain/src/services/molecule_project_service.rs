@@ -19,7 +19,7 @@ use odf::utils::data::DataFrameExt;
 pub trait MoleculeProjectService: Send + Sync {
     async fn get_projects_dataset(
         &self,
-        molecule_account_name: &odf::AccountName,
+        molecule_subject: &LoggedAccount,
         action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetProjectsError>;

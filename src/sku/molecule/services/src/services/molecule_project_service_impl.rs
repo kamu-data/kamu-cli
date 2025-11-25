@@ -11,9 +11,15 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::auth::DatasetAction;
-use kamu_core::{GetDataOptions, QueryError, QueryService, ResolvedDataset};
+use kamu_core::{
+    DatasetRegistry,
+    DatasetRegistryExt,
+    GetDataOptions,
+    QueryError,
+    QueryService,
+    ResolvedDataset,
+};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use odf::utils::data::DataFrameExt;
 
@@ -24,7 +30,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeProjectService)]
 pub struct MoleculeProjectServiceImpl {
-    rebac_dataset_registry: Arc<dyn RebacDatasetRegistryFacade>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     create_dataset_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     query_service: Arc<dyn QueryService>,
 }
@@ -38,28 +44,28 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
         level = "debug",
         name = MoleculeProjectServiceImpl_get_projects_dataset,
         skip_all,
-        fields(molecule_account_name, ?action, create_if_not_exist)
+        fields(molecule_account_name, ?_action, create_if_not_exist)
     )]
     async fn get_projects_dataset(
         &self,
-        molecule_account_name: &odf::AccountName,
-        action: DatasetAction,
+        molecule_subject: &LoggedAccount,
+        _action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetProjectsError> {
         const PROJECTS_DATASET_NAME: &str = "projects";
 
         let projects_dataset_alias = odf::DatasetAlias::new(
-            Some(molecule_account_name.clone()),
+            Some(molecule_subject.account_name.clone()),
             odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
         );
 
         match self
-            .rebac_dataset_registry
-            .resolve_dataset_by_ref(&projects_dataset_alias.as_local_ref(), action)
+            .dataset_registry
+            .get_dataset_by_ref(&projects_dataset_alias.as_local_ref())
             .await
         {
             Ok(ds) => Ok(ds),
-            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
+            Err(odf::DatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
                 let snapshot = MoleculeDatasetSnapshots::projects(odf::DatasetAlias::new(
                     None,
                     odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
@@ -82,12 +88,6 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
                     create_res.dataset_handle,
                 ))
             }
-            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => {
-                Err(MoleculeGetProjectsError::NotFound(err))
-            }
-            Err(RebacDatasetRefUnresolvedError::Access(err)) => {
-                Err(MoleculeGetProjectsError::Access(err))
-            }
             Err(err) => Err(err.int_err().into()),
         }
     }
@@ -106,7 +106,7 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetProjectsError> {
         // Resolve projects dataset
         let projects_dataset = self
-            .get_projects_dataset(&molecule_subject.account_name, action, create_if_not_exist)
+            .get_projects_dataset(molecule_subject, action, create_if_not_exist)
             .await?;
 
         // Query full data
