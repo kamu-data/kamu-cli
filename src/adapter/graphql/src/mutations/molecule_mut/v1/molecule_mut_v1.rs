@@ -10,10 +10,10 @@
 use kamu::domain;
 use kamu_core::DatasetRegistryExt;
 use kamu_molecule_domain::{
-    CreateMoleculeProjectError,
-    CreateMoleculeProjectUseCase,
-    FindMoleculeProjectError,
-    FindMoleculeProjectUseCase,
+    MoleculeCreateProjectError,
+    MoleculeCreateProjectUseCase,
+    MoleculeFindProjectError,
+    MoleculeFindProjectUseCase,
 };
 
 use crate::molecule::molecule_subject;
@@ -40,10 +40,14 @@ impl MoleculeMutV1 {
         ipnft_address: String,
         ipnft_token_id: U256,
     ) -> Result<CreateProjectResult> {
+        if ipnft_uid != format!("{ipnft_address}_{}", ipnft_token_id.as_ref()) {
+            return Err(Error::new("Inconsistent ipnft info").into());
+        }
+
         let molecule_subject = molecule_subject(ctx)?;
 
-        let create_molecule_project = from_catalog_n!(ctx, dyn CreateMoleculeProjectUseCase);
-        let project = match create_molecule_project
+        let molecule_create_project = from_catalog_n!(ctx, dyn MoleculeCreateProjectUseCase);
+        let project = match molecule_create_project
             .execute(
                 &molecule_subject,
                 ipnft_symbol,
@@ -54,15 +58,15 @@ impl MoleculeMutV1 {
             .await
         {
             Ok(project_entity) => v1::MoleculeProject::new(project_entity),
-            Err(CreateMoleculeProjectError::Conflict { project }) => {
+            Err(MoleculeCreateProjectError::Conflict { project }) => {
                 let project = v1::MoleculeProject::new(project);
                 return Ok(CreateProjectResult::Conflict(CreateProjectErrorConflict {
                     project,
                 }));
             }
-            Err(CreateMoleculeProjectError::Access(e)) => return Err(GqlError::Access(e)),
-            Err(CreateMoleculeProjectError::Internal(e)) => {
-                return Err(GqlError::Gql(e.into()));
+            Err(MoleculeCreateProjectError::Access(e)) => return Err(GqlError::Access(e)),
+            Err(e @ MoleculeCreateProjectError::Internal(_)) => {
+                return Err(e.int_err().into());
             }
         };
 
@@ -80,14 +84,14 @@ impl MoleculeMutV1 {
     ) -> Result<Option<MoleculeProjectMut>> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
-        let maybe_project = find_molecule_project
+        let molecule_find_project = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
+        let maybe_project = molecule_find_project
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
-                FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
-                FindMoleculeProjectError::Access(e) => GqlError::Access(e),
-                FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
+                MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                MoleculeFindProjectError::Access(e) => GqlError::Access(e),
+                e @ MoleculeFindProjectError::Internal(_) => e.int_err().into(),
             })
             .map(|opt| opt.map(MoleculeProjectMut::from_entity))?;
 

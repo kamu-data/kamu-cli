@@ -28,8 +28,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn CreateMoleculeProjectUseCase)]
-pub struct CreateMoleculeProjectUseCaseImpl {
+#[dill::interface(dyn MoleculeCreateProjectUseCase)]
+pub struct MoleculeCreateProjectUseCaseImpl {
     project_service: Arc<dyn MoleculeProjectService>,
     account_service: Arc<dyn AccountService>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
@@ -43,10 +43,10 @@ pub struct CreateMoleculeProjectUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
+impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = CreateMoleculeProjectUseCaseImpl_execute,
+        name = MoleculeCreateProjectUseCaseImpl_execute,
         skip_all,
         fields(ipnft_symbol, ipnft_uid)
     )]
@@ -57,13 +57,12 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: num_bigint::BigInt,
-    ) -> Result<MoleculeProjectEntity, CreateMoleculeProjectError> {
+    ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError> {
         // Resolve projects snapshot with Write privileges
         let (projects_dataset, df) = self
             .project_service
-            .get_projects_snapshot(molecule_subject, DatasetAction::Write, true)
-            .await
-            .map_err(CreateMoleculeProjectError::from)?;
+            .get_projects_data_frame(molecule_subject, DatasetAction::Write, true)
+            .await?;
 
         use datafusion::prelude::*;
 
@@ -83,7 +82,7 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
 
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
-                return Err(CreateMoleculeProjectError::Conflict {
+                return Err(MoleculeCreateProjectError::Conflict {
                     project: MoleculeProjectEntity::from_json(record).int_err()?,
                 });
             }

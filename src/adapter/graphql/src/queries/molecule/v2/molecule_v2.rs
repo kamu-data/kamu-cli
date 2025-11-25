@@ -9,11 +9,11 @@
 
 use database_common::PaginationOpts;
 use kamu_molecule_domain::{
-    FindMoleculeProjectError,
-    FindMoleculeProjectUseCase,
+    MoleculeFindProjectError,
+    MoleculeFindProjectUseCase,
     MoleculeProjectListing,
-    ViewMoleculeProjectsError,
-    ViewMoleculeProjectsUseCase,
+    MoleculeViewProjectsError,
+    MoleculeViewProjectsUseCase,
 };
 
 use crate::molecule::molecule_subject;
@@ -43,14 +43,14 @@ impl MoleculeV2 {
     ) -> Result<MoleculeProjectListing> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let view_molecule_projects = from_catalog_n!(ctx, dyn ViewMoleculeProjectsUseCase);
-        let listing = view_molecule_projects
+        let molecule_view_projects = from_catalog_n!(ctx, dyn MoleculeViewProjectsUseCase);
+        let listing = molecule_view_projects
             .execute(&molecule_subject, pagination)
             .await
             .map_err(|e| match e {
-                ViewMoleculeProjectsError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
-                ViewMoleculeProjectsError::Access(e) => GqlError::Access(e),
-                ViewMoleculeProjectsError::Internal(e) => GqlError::Gql(e.into()),
+                MoleculeViewProjectsError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                MoleculeViewProjectsError::Access(e) => GqlError::Access(e),
+                e @ MoleculeViewProjectsError::Internal(_) => e.int_err().into(),
             })?;
 
         Ok(listing)
@@ -74,14 +74,14 @@ impl MoleculeV2 {
     ) -> Result<Option<MoleculeProjectV2>> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
-        let maybe_project_entity = find_molecule_project
+        let molecule_find_project = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
+        let maybe_project_entity = molecule_find_project
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
-                FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
-                FindMoleculeProjectError::Access(e) => GqlError::Access(e),
-                FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
+                MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                MoleculeFindProjectError::Access(e) => GqlError::Access(e),
+                e @ MoleculeFindProjectError::Internal(_) => e.int_err().into(),
             })?;
 
         Ok(maybe_project_entity.map(MoleculeProjectV2::new))

@@ -19,8 +19,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn ViewMoleculeProjectsUseCase)]
-pub struct ViewMoleculeProjectsUseCaseImpl {
+#[dill::interface(dyn MoleculeViewProjectsUseCase)]
+pub struct MoleculeViewProjectsUseCaseImpl {
     project_service: Arc<dyn MoleculeProjectService>,
 }
 
@@ -28,19 +28,18 @@ pub struct ViewMoleculeProjectsUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl ViewMoleculeProjectsUseCase for ViewMoleculeProjectsUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = ViewMoleculeProjectsUseCaseImpl_execute, skip_all, fields(?pagination))]
+impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = MoleculeViewProjectsUseCaseImpl_execute, skip_all, fields(?pagination))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeProjectListing, ViewMoleculeProjectsError> {
+    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
         // Access projects dataset snapshot
         let Some(df) = self
             .project_service
-            .get_projects_snapshot(molecule_subject, DatasetAction::Read, false)
-            .await
-            .map_err(ViewMoleculeProjectsError::from)?
+            .get_projects_data_frame(molecule_subject, DatasetAction::Read, false)
+            .await?
             .1
         else {
             return Ok(MoleculeProjectListing::default());

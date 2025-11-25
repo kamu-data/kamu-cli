@@ -18,8 +18,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn FindMoleculeProjectUseCase)]
-pub struct FindMoleculeProjectUseCaseImpl {
+#[dill::interface(dyn MoleculeFindProjectUseCase)]
+pub struct MoleculeFindProjectUseCaseImpl {
     project_service: Arc<dyn MoleculeProjectService>,
 }
 
@@ -27,20 +27,19 @@ pub struct FindMoleculeProjectUseCaseImpl {
 
 #[async_trait::async_trait]
 #[common_macros::method_names_consts]
-impl FindMoleculeProjectUseCase for FindMoleculeProjectUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = FindMoleculeProjectUseCaseImpl_execute, skip_all, fields(ipnft_uid))]
+impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = MoleculeFindProjectUseCaseImpl_execute, skip_all, fields(ipnft_uid))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectEntity>, FindMoleculeProjectError> {
+    ) -> Result<Option<MoleculeProjectEntity>, MoleculeFindProjectError> {
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self
             .project_service
-            .get_projects_snapshot(molecule_subject, DatasetAction::Read, false)
-            .await
-            .map_err(FindMoleculeProjectError::from)?
+            .get_projects_data_frame(molecule_subject, DatasetAction::Read, false)
+            .await?
             .1
         else {
             return Ok(None);

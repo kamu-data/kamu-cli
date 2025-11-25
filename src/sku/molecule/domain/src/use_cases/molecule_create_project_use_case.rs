@@ -15,20 +15,23 @@ use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FindMoleculeProjectUseCase: Send + Sync {
+pub trait MoleculeCreateProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        ipnft_symbol: String,
         ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectEntity>, FindMoleculeProjectError>;
+        ipnft_address: String,
+        ipnft_token_id: num_bigint::BigInt,
+    ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum FindMoleculeProjectError {
-    #[error(transparent)]
-    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
+pub enum MoleculeCreateProjectError {
+    #[error("Project with the same IPNFT UID or symbol already exists")]
+    Conflict { project: MoleculeProjectEntity },
 
     #[error(transparent)]
     Access(
@@ -41,14 +44,14 @@ pub enum FindMoleculeProjectError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetProjectsError> for FindMoleculeProjectError {
+impl From<MoleculeGetProjectsError> for MoleculeCreateProjectError {
     fn from(e: MoleculeGetProjectsError) -> Self {
         match e {
             MoleculeGetProjectsError::NotFound(err) => {
-                FindMoleculeProjectError::NoProjectsDataset(err)
+                unreachable!("Projects dataset should be created if not exist: {}", err)
             }
-            MoleculeGetProjectsError::Access(err) => FindMoleculeProjectError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => FindMoleculeProjectError::Internal(err),
+            MoleculeGetProjectsError::Access(err) => MoleculeCreateProjectError::Access(err),
+            MoleculeGetProjectsError::Internal(err) => MoleculeCreateProjectError::Internal(err),
         }
     }
 }

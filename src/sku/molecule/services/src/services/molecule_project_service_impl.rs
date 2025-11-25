@@ -94,11 +94,11 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectServiceImpl_get_projects_snapshot,
+        name = MoleculeProjectServiceImpl_get_projects_data_frame,
         skip_all,
         fields(molecule_account_name, ?action, create_if_not_exist)
     )]
-    async fn get_projects_snapshot(
+    async fn get_projects_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: DatasetAction,
