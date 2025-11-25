@@ -47,6 +47,7 @@ pub enum FullTextSchemaFieldRole {
     },
     Keyword,
     DateTime,
+    UnprocessedObject,
     // TODO: Add more field roles as needed, e.g., Numeric, Boolean,
 }
 
