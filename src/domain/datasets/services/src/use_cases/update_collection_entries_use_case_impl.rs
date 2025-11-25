@@ -11,7 +11,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use dill::{component, interface};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
@@ -40,8 +39,8 @@ use tokio::time::{Duration, sleep};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn UpdateCollectionEntriesUseCase)]
+#[dill::component]
+#[dill::interface(dyn UpdateCollectionEntriesUseCase)]
 pub struct UpdateCollectionEntriesUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
@@ -156,6 +155,9 @@ impl UpdateCollectionEntriesUseCaseImpl {
         &self,
         entries: Vec<(Op, CollectionEntryState)>,
     ) -> Result<Vec<bytes::Bytes>, UpdateCollectionEntriesUseCaseError> {
+        // TODO: PERF: FIXME: Writing each operation in a different block to work around
+        //       changelog sorting issue.
+        //       See: https://github.com/kamu-data/kamu-cli/issues/1228
         use std::io::Write;
 
         entries
