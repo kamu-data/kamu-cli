@@ -7088,6 +7088,8 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-molecule-domain",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-task-system",
  "kamu-task-system-inmem",
@@ -7564,6 +7566,7 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-search-openai",
  "kamu-search-qdrant",
@@ -8255,6 +8258,40 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+]
+
+[[package]]
+name = "kamu-molecule-domain"
+version = "0.253.1"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-core",
+ "opendatafabric",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "kamu-molecule-services"
+version = "0.253.1"
+dependencies = [
+ "async-trait",
+ "common-macros",
+ "database-common",
+ "datafusion",
+ "dill",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-molecule-domain",
+ "messaging-outbox",
+ "opendatafabric",
 ]
 
 [[package]]

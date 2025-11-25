@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use kamu_core::auth::DatasetAction;
+use kamu_molecule_domain::{ViewMoleculeProjectsError, ViewMoleculeProjectsUseCase};
 
+use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::molecule::v1::MoleculeV1;
 use crate::queries::molecule::v2::{
@@ -69,28 +72,29 @@ impl MoleculeV2 {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MoleculeProjectV2Connection> {
-        use datafusion::logical_expr::col;
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
-        let Some(df) = MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
-            return Ok(MoleculeProjectV2Connection::new(Vec::new(), 0, per_page, 0));
-        };
+        let molecule_subject = molecule_subject(ctx)?;
 
-        let total_count = df.clone().count().await.int_err()?;
-        let df = df
-            .sort(vec![col("ipnft_symbol").sort(true, false)])
-            .int_err()?
-            .limit(page * per_page, Some(per_page))
-            .int_err()?;
+        let view_molecule_projects = from_catalog_n!(ctx, dyn ViewMoleculeProjectsUseCase);
+        let listing = view_molecule_projects
+            .execute(
+                molecule_subject,
+                PaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                },
+            )
+            .await
+            .map_err(|e| match e {
+                ViewMoleculeProjectsError::NotFound(e) => GqlError::Gql(e.into()),
+                ViewMoleculeProjectsError::Access(e) => GqlError::Access(e),
+                ViewMoleculeProjectsError::Internal(e) => GqlError::Gql(e.into()),
+            })?;
 
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let nodes = records
+        let nodes = listing
+            .records
             .into_iter()
             .map(MoleculeProjectV2::from_json)
             .collect::<Result<Vec<MoleculeProjectV2>, _>>()?;
@@ -99,7 +103,7 @@ impl MoleculeV2 {
             nodes,
             page,
             per_page,
-            total_count,
+            listing.total_count,
         ))
     }
 
