@@ -58,9 +58,7 @@ const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_ACTIVITY_BODY_JSON,
-        role: FullTextSchemaFieldRole::Prose {
-            enable_positions: false,
-        }, // Note: need a better role, just store, not analyze
+        role: FullTextSchemaFieldRole::UnprocessedObject,
     },
     FullTextSchemaField {
         path: FIELD_TAGS,
