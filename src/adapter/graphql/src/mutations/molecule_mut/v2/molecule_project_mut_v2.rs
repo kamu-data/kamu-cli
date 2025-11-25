@@ -37,7 +37,7 @@ impl MoleculeProjectMutV2 {
 
         let data_room_handle = rebac_dataset_registry_facade
             .resolve_dataset_handle_by_ref(
-                &self.project.data_room_dataset_id.as_local_ref(),
+                &self.project.entity.data_room_dataset_id.as_local_ref(),
                 auth::DatasetAction::Write,
             )
             .await
@@ -67,10 +67,10 @@ impl MoleculeProjectMutV2 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MoleculeProjectMutV2 {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        Ok(Self {
-            project: Arc::new(MoleculeProjectV2::from_json(record)?),
-        })
+    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+        Self {
+            project: Arc::new(MoleculeProjectV2::new(entity)),
+        }
     }
 }
 

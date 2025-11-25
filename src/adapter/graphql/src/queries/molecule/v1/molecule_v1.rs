@@ -10,9 +10,15 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use kamu::domain;
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::auth::DatasetAction;
+use kamu_molecule_domain::{
+    MoleculeFindProjectError,
+    MoleculeFindProjectUseCase,
+    MoleculeProjectListing,
+    MoleculeViewProjectsError,
+    MoleculeViewProjectsUseCase,
+};
 use odf::utils::data::DataFrameExt;
 
 use crate::molecule::molecule_subject;
@@ -98,163 +104,24 @@ impl MoleculeV1 {
         }
     }
 
-    pub fn dataset_snapshot_announcements(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        odf::DatasetSnapshot {
-            name: alias,
-            kind: odf::DatasetKind::Root,
-            metadata: vec![
-                odf::metadata::AddPushSource {
-                    source_name: "default".to_string(),
-                    read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT",
-                                "announcement_id STRING",
-                                "headline STRING",
-                                "body STRING",
-                                "attachments Array<STRING>",
-                                "molecule_access_level STRING",
-                                "molecule_change_by STRING",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
-                        ..Default::default()
-                    }
-                    .into(),
-                    preprocess: None,
-                    merge: odf::metadata::MergeStrategyChangelogStream {
-                        primary_key: vec!["announcement_id".to_string()],
-                    }
-                    .into(),
-                }
-                .into(),
-                odf::metadata::SetInfo {
-                    description: Some("Project announcements".into()),
-                    keywords: Some(vec![
-                        "DeSci".to_string(),
-                        "BioTech".to_string(),
-                        "Funding".to_string(),
-                        "Crypto".to_string(),
-                    ]),
-                }
-                .into(),
-                odf::metadata::SetAttachments {
-                    attachments: odf::metadata::AttachmentsEmbedded {
-                        items: vec![odf::metadata::AttachmentEmbedded {
-                            path: "README.md".into(),
-                            content: indoc::indoc!(
-                                r#"
-                                # Project announcements
-
-                                TODO
-                                "#
-                            )
-                            .into(),
-                        }],
-                    }
-                    .into(),
-                }
-                .into(),
-            ],
-        }
-    }
-
-    pub async fn get_projects_dataset(
+    async fn get_molecule_projects_listing(
+        &self,
         ctx: &Context<'_>,
-        molecule_account_name: &odf::AccountName,
-        action: DatasetAction,
-        create_if_not_exist: bool,
-    ) -> Result<domain::ResolvedDataset> {
-        let dataset_reg = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectListing> {
+        let molecule_subject = molecule_subject(ctx)?;
 
-        const PROJECTS_DATASET_NAME: &str = "projects";
-
-        let projects_dataset_alias = odf::DatasetAlias::new(
-            Some(molecule_account_name.clone()),
-            odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
-        );
-
-        match dataset_reg
-            .resolve_dataset_by_ref(&projects_dataset_alias.as_local_ref(), action)
+        let molecule_view_projects = from_catalog_n!(ctx, dyn MoleculeViewProjectsUseCase);
+        let listing = molecule_view_projects
+            .execute(&molecule_subject, pagination)
             .await
-        {
-            Ok(ds) => Ok(ds),
-            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
-                let create_dataset_use_case =
-                    from_catalog_n!(ctx, dyn kamu_datasets::CreateDatasetFromSnapshotUseCase);
+            .map_err(|e| match e {
+                MoleculeViewProjectsError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                MoleculeViewProjectsError::Access(e) => GqlError::Access(e),
+                e @ MoleculeViewProjectsError::Internal(_) => e.int_err().into(),
+            })?;
 
-                let snapshot = Self::dataset_snapshot_projects(odf::DatasetAlias::new(
-                    None,
-                    odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
-                ));
-
-                let create_res = create_dataset_use_case
-                    .execute(
-                        snapshot,
-                        kamu_datasets::CreateDatasetUseCaseOptions {
-                            dataset_visibility: odf::DatasetVisibility::Private,
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                // TODO: Use case should return ResolvedDataset directly
-                Ok(domain::ResolvedDataset::new(
-                    create_res.dataset,
-                    create_res.dataset_handle,
-                ))
-            }
-            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => Err(GqlError::Gql(err.into())),
-            Err(RebacDatasetRefUnresolvedError::Access(err)) => Err(GqlError::Access(err)),
-            Err(err) => Err(err.int_err().into()),
-        }
-    }
-
-    pub async fn get_projects_snapshot(
-        ctx: &Context<'_>,
-        action: DatasetAction,
-        create_if_not_exist: bool,
-    ) -> Result<(domain::ResolvedDataset, Option<DataFrameExt>)> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        let subject_molecule = molecule_subject(ctx)?;
-
-        // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(
-            ctx,
-            &subject_molecule.account_name,
-            action,
-            create_if_not_exist,
-        )
-        .await?;
-
-        // Query full data
-        let df = match query_svc
-            .get_data(projects_dataset.clone(), domain::GetDataOptions::default())
-            .await
-        {
-            Ok(res) => Ok(res.df),
-            Err(domain::QueryError::Access(err)) => Err(GqlError::Access(err)),
-            Err(err) => Err(err.int_err().into()),
-        }?;
-
-        // Project into snapshot
-        let df = if let Some(df) = df {
-            Some(
-                odf::utils::data::changelog::project(
-                    df,
-                    &["account_id".to_string()],
-                    &odf::metadata::DatasetVocabulary::default(),
-                )
-                .int_err()?,
-            )
-        } else {
-            None
-        };
-
-        Ok((projects_dataset, df))
+        Ok(listing)
     }
 }
 
@@ -273,26 +140,20 @@ impl MoleculeV1 {
         ctx: &Context<'_>,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProject>> {
-        use datafusion::logical_expr::{col, lit};
+        let molecule_subject = molecule_subject(ctx)?;
 
-        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
-            return Ok(None);
-        };
+        let molecule_find_project = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
+        let maybe_project = molecule_find_project
+            .execute(&molecule_subject, ipnft_uid)
+            .await
+            .map_err(|e| match e {
+                MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                MoleculeFindProjectError::Access(e) => GqlError::Access(e),
+                e @ MoleculeFindProjectError::Internal(_) => e.int_err().into(),
+            })?
+            .map(MoleculeProject::new);
 
-        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-        let entry = MoleculeProject::from_json(records.into_iter().next().unwrap());
-
-        Ok(Some(entry))
+        Ok(maybe_project)
     }
 
     /// List the registered projects
@@ -303,37 +164,30 @@ impl MoleculeV1 {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MoleculeProjectConnection> {
-        use datafusion::logical_expr::col;
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
-        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
-            return Ok(MoleculeProjectConnection::new(Vec::new(), 0, per_page, 0));
-        };
+        let listing = self
+            .get_molecule_projects_listing(
+                ctx,
+                Some(PaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                }),
+            )
+            .await?;
 
-        let total_count = df.clone().count().await.int_err()?;
-        let df = df
-            .sort(vec![col("ipnft_symbol").sort(true, false)])
-            .int_err()?
-            .limit(page * per_page, Some(per_page))
-            .int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let nodes = records
+        let nodes = listing
+            .projects
             .into_iter()
-            .map(MoleculeProject::from_json)
+            .map(MoleculeProject::new)
             .collect();
 
         Ok(MoleculeProjectConnection::new(
             nodes,
             page,
             per_page,
-            total_count,
+            listing.total_count,
         ))
     }
 
@@ -355,23 +209,21 @@ impl MoleculeV1 {
 
         // TODO: PERF: This "brute force" approach will not scale with growth of
         // projects and has to be revisited
-        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
+        let projects_listing = self
+            .get_molecule_projects_listing(ctx, None /* unbounded */)
+            .await?;
+        if projects_listing.total_count == 0 {
             return Ok(MoleculeProjectEventConnection::new(Vec::new(), 0, per_page));
-        };
+        }
 
         let projects_by_announcement_dataset: std::collections::BTreeMap<
             odf::DatasetID,
             Arc<MoleculeProject>,
-        > = df
-            .collect_json_aos()
-            .await
-            .int_err()?
+        > = projects_listing
+            .projects
             .into_iter()
-            .map(MoleculeProject::from_json)
-            .map(|p| (p.announcements_dataset_id.clone(), Arc::new(p)))
+            .map(MoleculeProject::new)
+            .map(|p| (p.entity.announcements_dataset_id.clone(), Arc::new(p)))
             .collect();
 
         let announcement_dataset_refs: Vec<odf::DatasetRef> = projects_by_announcement_dataset
@@ -442,159 +294,14 @@ impl MoleculeV1 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone)]
-#[graphql(complex)]
+#[derive(Clone)]
 pub struct MoleculeProject {
-    #[graphql(skip)]
-    pub account_id: odf::AccountID,
-
-    /// System time when this version was created/updated
-    pub system_time: DateTime<Utc>,
-
-    /// Event time when this version was created/updated
-    pub event_time: DateTime<Utc>,
-
-    /// Symbolic name of the project
-    pub ipnft_symbol: String,
-
-    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
-    pub ipnft_uid: String,
-
-    /// Address of the IPNFT contract
-    pub ipnft_address: String,
-
-    // NOTE: For backward compatibility (and existing projects),
-    //       we continue using BigInt type, which is wider than needed U256.
-    /// Token ID withing the IPNFT contract
-    pub ipnft_token_id: BigInt,
-
-    #[graphql(skip)]
-    pub data_room_dataset_id: odf::DatasetID,
-
-    #[graphql(skip)]
-    pub announcements_dataset_id: odf::DatasetID,
+    pub(crate) entity: kamu_molecule_domain::MoleculeProjectEntity,
 }
 
 impl MoleculeProject {
-    pub fn from_json(record: serde_json::Value) -> Self {
-        let serde_json::Value::Object(mut record) = record else {
-            unreachable!()
-        };
-
-        // Parse system columns
-        let vocab = odf::metadata::DatasetVocabulary::default();
-
-        record.remove(&vocab.offset_column);
-
-        record.remove(&vocab.operation_type_column);
-
-        let system_time = DateTime::parse_from_rfc3339(
-            record
-                .remove(&vocab.system_time_column)
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .into();
-
-        let event_time = DateTime::parse_from_rfc3339(
-            record
-                .remove(&vocab.event_time_column)
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .into();
-
-        // Parse core columns
-        let account_id =
-            odf::AccountID::from_did_str(record.remove("account_id").unwrap().as_str().unwrap())
-                .unwrap();
-
-        let ipnft_symbol = record
-            .remove("ipnft_symbol")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-
-        let ipnft_uid = record
-            .remove("ipnft_uid")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-
-        let ipnft_address = record
-            .remove("ipnft_address")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-
-        let ipnft_token_id = {
-            let value = record.remove("ipnft_token_id").unwrap();
-
-            if let Some(s) = value.as_str() {
-                BigInt::new(s.parse().unwrap())
-            } else if let Some(n) = value.as_number() {
-                BigInt::new(n.to_string().parse().unwrap())
-            } else {
-                panic!("Unexpected value for ipnft_token_id: {value:?}");
-            }
-        };
-
-        let data_room_dataset_id = odf::DatasetID::from_did_str(
-            record
-                .remove("data_room_dataset_id")
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap();
-
-        let announcements_dataset_id = odf::DatasetID::from_did_str(
-            record
-                .remove("announcements_dataset_id")
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap();
-
-        Self {
-            account_id,
-            system_time,
-            event_time,
-            ipnft_symbol,
-            ipnft_uid,
-            ipnft_address,
-            ipnft_token_id,
-            data_room_dataset_id,
-            announcements_dataset_id,
-        }
-    }
-
-    pub fn to_record_data(&self) -> serde_json::Value {
-        let mut r = serde_json::Value::Object(Default::default());
-        r["account_id"] = self.account_id.to_string().into();
-        r["ipnft_symbol"] = self.ipnft_symbol.clone().into();
-        r["ipnft_uid"] = self.ipnft_uid.clone().into();
-        r["ipnft_address"] = self.ipnft_address.clone().into();
-        r["ipnft_token_id"] = self.ipnft_token_id.clone().into_inner().to_string().into();
-        r["data_room_dataset_id"] = self.data_room_dataset_id.to_string().into();
-        r["announcements_dataset_id"] = self.announcements_dataset_id.to_string().into();
-        r
-    }
-
-    pub fn to_bytes(&self, op: odf::metadata::OperationType) -> bytes::Bytes {
-        let mut record = self.to_record_data();
-        record["op"] = u8::from(op).into();
-
-        let buf = record.to_string().into_bytes();
-        bytes::Bytes::from_owner(buf)
+    pub fn new(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+        Self { entity }
     }
 
     async fn get_activity_announcements(
@@ -606,7 +313,7 @@ impl MoleculeProject {
 
         let df = match query_dataset_data
             .tail(
-                &self.announcements_dataset_id.as_local_ref(),
+                &self.entity.announcements_dataset_id.as_local_ref(),
                 0,
                 limit as u64,
                 domain::GetDataOptions::default(),
@@ -651,7 +358,7 @@ impl MoleculeProject {
 
         let df = match query_dataset_data
             .tail(
-                &self.data_room_dataset_id.as_local_ref(),
+                &self.entity.data_room_dataset_id.as_local_ref(),
                 0,
                 limit as u64,
                 domain::GetDataOptions::default(),
@@ -728,7 +435,7 @@ impl MoleculeProject {
 
         let df = match query_dataset_data
             .get_data(
-                &self.data_room_dataset_id.as_local_ref(),
+                &self.entity.data_room_dataset_id.as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
@@ -778,7 +485,8 @@ impl MoleculeProject {
 
             let records = df.collect_json_aos().await.int_err()?;
 
-            let project_account = Account::from_account_id(ctx, self.account_id.clone()).await?;
+            let project_account =
+                Account::from_account_id(ctx, self.entity.account_id.clone()).await?;
 
             // TODO: Assuming every collection entry is a versioned file
             for record in records {
@@ -802,21 +510,54 @@ impl MoleculeProject {
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[ComplexObject]
+#[Object]
 impl MoleculeProject {
     const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
 
+    /// System time when this project was created/updated
+    pub async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_time
+    }
+
+    /// Event time when this project was created/updated
+    pub async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.event_time
+    }
+
+    /// Symbolic name of the project
+    pub async fn ipnft_symbol(&self) -> &str {
+        &self.entity.ipnft_symbol
+    }
+
+    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+    pub async fn ipnft_uid(&self) -> &str {
+        &self.entity.ipnft_uid
+    }
+
+    /// Address of the IPNFT contract
+    pub async fn ipnft_address(&self) -> &str {
+        &self.entity.ipnft_address
+    }
+
+    // NOTE: For backward compatibility (and existing projects),
+    //       we continue using BigInt type, which is wider than needed U256.
+
+    /// Token ID withing the IPNFT contract
+    pub async fn ipnft_token_id(&self) -> BigInt {
+        BigInt::new(self.entity.ipnft_token_id.clone())
+    }
+
     /// Project's organizational account
     #[tracing::instrument(level = "info", name = MoleculeProject_account, skip_all)]
-    async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
-        let account = Account::from_account_id(ctx, self.account_id.clone()).await?;
+    pub async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
+        let account = Account::from_account_id(ctx, self.entity.account_id.clone()).await?;
         Ok(account)
     }
 
     /// Project's data room dataset
     #[tracing::instrument(level = "info", name = MoleculeProject_data_room, skip_all)]
-    async fn data_room(&self, ctx: &Context<'_>) -> Result<Dataset> {
-        match Dataset::try_from_ref(ctx, &self.data_room_dataset_id.as_local_ref()).await? {
+    pub async fn data_room(&self, ctx: &Context<'_>) -> Result<Dataset> {
+        match Dataset::try_from_ref(ctx, &self.entity.data_room_dataset_id.as_local_ref()).await? {
             Some(ds) => Ok(ds),
             None => Err(GqlError::Access(odf::AccessError::Unauthorized(
                 "Dataset inaccessible".into(),
@@ -826,8 +567,10 @@ impl MoleculeProject {
 
     /// Project's announcements dataset
     #[tracing::instrument(level = "info", name = MoleculeProject_announcements, skip_all)]
-    async fn announcements(&self, ctx: &Context<'_>) -> Result<Dataset> {
-        match Dataset::try_from_ref(ctx, &self.announcements_dataset_id.as_local_ref()).await? {
+    pub async fn announcements(&self, ctx: &Context<'_>) -> Result<Dataset> {
+        match Dataset::try_from_ref(ctx, &self.entity.announcements_dataset_id.as_local_ref())
+            .await?
+        {
             Some(ds) => Ok(ds),
             None => Err(GqlError::Access(odf::AccessError::Unauthorized(
                 "Dataset inaccessible".into(),
@@ -837,7 +580,7 @@ impl MoleculeProject {
 
     /// Project's activity events in reverse chronological order
     #[tracing::instrument(level = "info", name = MoleculeProject_activity, skip_all)]
-    async fn activity(
+    pub async fn activity(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
