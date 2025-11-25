@@ -150,6 +150,11 @@ impl ElasticSearchIndexMappings {
                 FullTextSchemaFieldRole::DateTime => serde_json::json!({
                     "type": "date"
                 }),
+
+                FullTextSchemaFieldRole::UnprocessedObject => serde_json::json!({
+                    "type": "object",
+                    "enabled": false
+                }),
             };
             mappings.insert(field.path.to_string(), field_mapping);
         }
