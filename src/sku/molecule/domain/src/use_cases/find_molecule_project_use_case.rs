@@ -18,7 +18,7 @@ use crate::MoleculeGetProjectsError;
 pub trait FindMoleculeProjectUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: LoggedAccount,
+        molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<Option<serde_json::Value>, FindMoleculeProjectError>;
 }

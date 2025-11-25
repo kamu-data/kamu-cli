@@ -19,7 +19,7 @@ use crate::MoleculeGetProjectsError;
 pub trait ViewMoleculeProjectsUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: LoggedAccount,
+        molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectListing, ViewMoleculeProjectsError>;
 }

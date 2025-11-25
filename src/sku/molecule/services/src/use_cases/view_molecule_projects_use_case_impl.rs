@@ -13,13 +13,8 @@ use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth::DatasetAction;
-use kamu_molecule_domain::MoleculeProjectService;
 
-use crate::domain::{
-    MoleculeProjectListing,
-    ViewMoleculeProjectsError,
-    ViewMoleculeProjectsUseCase,
-};
+use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +30,7 @@ pub struct ViewMoleculeProjectsUseCaseImpl {
 impl ViewMoleculeProjectsUseCase for ViewMoleculeProjectsUseCaseImpl {
     async fn execute(
         &self,
-        molecule_subject: LoggedAccount,
+        molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectListing, ViewMoleculeProjectsError> {
         // Access projects dataset snapshot

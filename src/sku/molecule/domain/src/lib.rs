@@ -10,7 +10,9 @@
 #![feature(error_generic_member_access)]
 
 mod services;
+mod snapshots;
 mod use_cases;
 
 pub use services::*;
+pub use snapshots::*;
 pub use use_cases::*;

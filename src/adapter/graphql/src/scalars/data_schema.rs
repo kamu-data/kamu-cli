@@ -130,38 +130,6 @@ pub struct DataTypeInput {
     pub ddl: String,
 }
 
-impl ColumnInput {
-    pub fn int(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            data_type: DataTypeInput {
-                // TODO: NOT NULL?
-                ddl: "INT".into(),
-            },
-        }
-    }
-
-    pub fn string(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            data_type: DataTypeInput {
-                // TODO: NOT NULL?
-                ddl: "STRING".into(),
-            },
-        }
-    }
-
-    pub fn string_array(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            data_type: DataTypeInput {
-                // TODO: NOT NULL?
-                ddl: "ARRAY<STRING>".into(),
-            },
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

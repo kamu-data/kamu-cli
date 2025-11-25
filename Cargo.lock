@@ -8266,9 +8266,12 @@ version = "0.253.1"
 dependencies = [
  "async-trait",
  "database-common",
+ "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
  "kamu-core",
+ "kamu-datasets",
+ "num-bigint",
  "opendatafabric",
  "serde_json",
  "thiserror 2.0.17",
@@ -8279,10 +8282,13 @@ name = "kamu-molecule-services"
 version = "0.253.1"
 dependencies = [
  "async-trait",
+ "bytes",
+ "chrono",
  "common-macros",
  "database-common",
  "datafusion",
  "dill",
+ "file-utils",
  "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
@@ -8291,6 +8297,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-molecule-domain",
  "messaging-outbox",
+ "num-bigint",
  "opendatafabric",
  "serde_json",
 ]

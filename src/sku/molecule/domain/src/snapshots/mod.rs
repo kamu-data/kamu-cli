@@ -7,10 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod create_molecule_project_use_case;
-mod find_molecule_project_use_case;
-mod view_molecule_projects_use_case;
+mod molecule_dataset_snapshots;
 
-pub use create_molecule_project_use_case::*;
-pub use find_molecule_project_use_case::*;
-pub use view_molecule_projects_use_case::*;
+pub use molecule_dataset_snapshots::*;

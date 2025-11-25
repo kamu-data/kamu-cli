@@ -76,7 +76,7 @@ impl MoleculeMutV2 {
 
         let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
         let maybe_project_json = find_molecule_project
-            .execute(molecule_subject, ipnft_uid)
+            .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
                 FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),

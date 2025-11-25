@@ -12,8 +12,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use kamu::domain;
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::auth::DatasetAction;
 use kamu_molecule_domain::{
     FindMoleculeProjectError,
     FindMoleculeProjectUseCase,
@@ -106,162 +104,6 @@ impl MoleculeV1 {
         }
     }
 
-    pub fn dataset_snapshot_announcements(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        odf::DatasetSnapshot {
-            name: alias,
-            kind: odf::DatasetKind::Root,
-            metadata: vec![
-                odf::metadata::AddPushSource {
-                    source_name: "default".to_string(),
-                    read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT",
-                                "announcement_id STRING",
-                                "headline STRING",
-                                "body STRING",
-                                "attachments Array<STRING>",
-                                "molecule_access_level STRING",
-                                "molecule_change_by STRING",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
-                        ..Default::default()
-                    }
-                    .into(),
-                    preprocess: None,
-                    merge: odf::metadata::MergeStrategyChangelogStream {
-                        primary_key: vec!["announcement_id".to_string()],
-                    }
-                    .into(),
-                }
-                .into(),
-                odf::metadata::SetInfo {
-                    description: Some("Project announcements".into()),
-                    keywords: Some(vec![
-                        "DeSci".to_string(),
-                        "BioTech".to_string(),
-                        "Funding".to_string(),
-                        "Crypto".to_string(),
-                    ]),
-                }
-                .into(),
-                odf::metadata::SetAttachments {
-                    attachments: odf::metadata::AttachmentsEmbedded {
-                        items: vec![odf::metadata::AttachmentEmbedded {
-                            path: "README.md".into(),
-                            content: indoc::indoc!(
-                                r#"
-                                # Project announcements
-
-                                TODO
-                                "#
-                            )
-                            .into(),
-                        }],
-                    }
-                    .into(),
-                }
-                .into(),
-            ],
-        }
-    }
-
-    pub async fn get_projects_dataset(
-        ctx: &Context<'_>,
-        molecule_account_name: &odf::AccountName,
-        action: DatasetAction,
-        create_if_not_exist: bool,
-    ) -> Result<domain::ResolvedDataset> {
-        let dataset_reg = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
-
-        const PROJECTS_DATASET_NAME: &str = "projects";
-
-        let projects_dataset_alias = odf::DatasetAlias::new(
-            Some(molecule_account_name.clone()),
-            odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
-        );
-
-        match dataset_reg
-            .resolve_dataset_by_ref(&projects_dataset_alias.as_local_ref(), action)
-            .await
-        {
-            Ok(ds) => Ok(ds),
-            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
-                let create_dataset_use_case =
-                    from_catalog_n!(ctx, dyn kamu_datasets::CreateDatasetFromSnapshotUseCase);
-
-                let snapshot = Self::dataset_snapshot_projects(odf::DatasetAlias::new(
-                    None,
-                    odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
-                ));
-
-                let create_res = create_dataset_use_case
-                    .execute(
-                        snapshot,
-                        kamu_datasets::CreateDatasetUseCaseOptions {
-                            dataset_visibility: odf::DatasetVisibility::Private,
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                // TODO: Use case should return ResolvedDataset directly
-                Ok(domain::ResolvedDataset::from_created(&create_res))
-            }
-            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => Err(GqlError::Gql(err.into())),
-            Err(RebacDatasetRefUnresolvedError::Access(err)) => Err(GqlError::Access(err)),
-            Err(err) => Err(err.int_err().into()),
-        }
-    }
-
-    pub async fn get_projects_snapshot(
-        ctx: &Context<'_>,
-        action: DatasetAction,
-        create_if_not_exist: bool,
-    ) -> Result<(domain::ResolvedDataset, Option<DataFrameExt>)> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        let subject_molecule = molecule_subject(ctx)?;
-
-        // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(
-            ctx,
-            &subject_molecule.account_name,
-            action,
-            create_if_not_exist,
-        )
-        .await?;
-
-        // Query full data
-        let df = match query_svc
-            .get_data(projects_dataset.clone(), domain::GetDataOptions::default())
-            .await
-        {
-            Ok(res) => Ok(res.df),
-            Err(domain::QueryError::Access(err)) => Err(GqlError::Access(err)),
-            Err(err) => Err(err.int_err().into()),
-        }?;
-
-        // Project into snapshot
-        let df = if let Some(df) = df {
-            Some(
-                odf::utils::data::changelog::project(
-                    df,
-                    &["account_id".to_string()],
-                    &odf::metadata::DatasetVocabulary::default(),
-                )
-                .int_err()?,
-            )
-        } else {
-            None
-        };
-
-        Ok((projects_dataset, df))
-    }
-
     async fn get_molecule_projects_listing(
         &self,
         ctx: &Context<'_>,
@@ -271,7 +113,7 @@ impl MoleculeV1 {
 
         let view_molecule_projects = from_catalog_n!(ctx, dyn ViewMoleculeProjectsUseCase);
         let listing = view_molecule_projects
-            .execute(molecule_subject, pagination)
+            .execute(&molecule_subject, pagination)
             .await
             .map_err(|e| match e {
                 ViewMoleculeProjectsError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
@@ -302,7 +144,7 @@ impl MoleculeV1 {
 
         let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
         let maybe_project_json = find_molecule_project
-            .execute(molecule_subject, ipnft_uid)
+            .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
                 FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
@@ -587,7 +429,7 @@ impl MoleculeProject {
         }
     }
 
-    pub fn to_record_data(&self) -> serde_json::Value {
+    /*pub fn to_record_data(&self) -> serde_json::Value {
         let mut r = serde_json::Value::Object(Default::default());
         r["account_id"] = self.account_id.to_string().into();
         r["ipnft_symbol"] = self.ipnft_symbol.clone().into();
@@ -605,7 +447,7 @@ impl MoleculeProject {
 
         let buf = record.to_string().into_bytes();
         bytes::Bytes::from_owner(buf)
-    }
+    }*/
 
     async fn get_activity_announcements(
         self: &Arc<Self>,

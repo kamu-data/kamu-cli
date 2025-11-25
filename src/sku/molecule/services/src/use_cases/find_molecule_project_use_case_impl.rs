@@ -12,9 +12,8 @@ use std::sync::Arc;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth::DatasetAction;
-use kamu_molecule_domain::MoleculeProjectService;
 
-use crate::domain::{FindMoleculeProjectError, FindMoleculeProjectUseCase};
+use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +29,7 @@ pub struct FindMoleculeProjectUseCaseImpl {
 impl FindMoleculeProjectUseCase for FindMoleculeProjectUseCaseImpl {
     async fn execute(
         &self,
-        molecule_subject: LoggedAccount,
+        molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<Option<serde_json::Value>, FindMoleculeProjectError> {
         use datafusion::logical_expr::{col, lit};
