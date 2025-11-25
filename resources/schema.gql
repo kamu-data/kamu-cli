@@ -3462,11 +3462,11 @@ type MoleculeMutV2 {
 
 type MoleculeProject {
 	"""
-	System time when this version was created/updated
+	System time when this project was created/updated
 	"""
 	systemTime: DateTime!
 	"""
-	Event time when this version was created/updated
+	Event time when this project was created/updated
 	"""
 	eventTime: DateTime!
 	"""

@@ -31,8 +31,15 @@ pub struct MoleculeProjectServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl MoleculeProjectService for MoleculeProjectServiceImpl {
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeProjectServiceImpl_get_projects_dataset,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist)
+    )]
     async fn get_projects_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
@@ -85,6 +92,12 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
         }
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeProjectServiceImpl_get_projects_snapshot,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist)
+    )]
     async fn get_projects_snapshot(
         &self,
         molecule_subject: &LoggedAccount,

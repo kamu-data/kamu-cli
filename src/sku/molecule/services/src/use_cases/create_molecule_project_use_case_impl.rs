@@ -39,8 +39,15 @@ pub struct CreateMoleculeProjectUseCaseImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = CreateMoleculeProjectUseCaseImpl_execute,
+        skip_all,
+        fields(ipnft_symbol, ipnft_uid)
+    )]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,

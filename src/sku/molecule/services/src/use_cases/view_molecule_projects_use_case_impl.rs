@@ -26,8 +26,10 @@ pub struct ViewMoleculeProjectsUseCaseImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl ViewMoleculeProjectsUseCase for ViewMoleculeProjectsUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = ViewMoleculeProjectsUseCaseImpl_execute, skip_all, fields(?pagination))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,

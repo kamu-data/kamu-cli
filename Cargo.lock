@@ -8303,6 +8303,7 @@ dependencies = [
  "num-bigint",
  "opendatafabric",
  "serde_json",
+ "tracing",
 ]
 
 [[package]]

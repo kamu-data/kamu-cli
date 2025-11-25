@@ -26,7 +26,9 @@ pub struct FindMoleculeProjectUseCaseImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
+#[common_macros::method_names_consts]
 impl FindMoleculeProjectUseCase for FindMoleculeProjectUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = FindMoleculeProjectUseCaseImpl_execute, skip_all, fields(ipnft_uid))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
