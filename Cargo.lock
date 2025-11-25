@@ -7223,21 +7223,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-adapter-molecule-services"
-version = "0.253.1"
-dependencies = [
- "async-trait",
- "common-macros",
- "dill",
- "internal-error",
- "kamu-search",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "kamu-adapter-oauth"
 version = "0.253.1"
 dependencies = [
@@ -7580,7 +7565,6 @@ dependencies = [
  "kamu-adapter-flow-webhook",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
- "kamu-adapter-molecule-services",
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
  "kamu-adapter-task-dataset",
@@ -8319,6 +8303,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-core",
  "kamu-datasets",
+ "kamu-search",
  "messaging-outbox",
  "num-bigint",
  "opendatafabric",
@@ -8346,10 +8331,12 @@ dependencies = [
  "kamu-core",
  "kamu-datasets",
  "kamu-molecule-domain",
+ "kamu-search",
  "messaging-outbox",
  "num-bigint",
  "opendatafabric",
  "serde_json",
+ "tokio",
  "tracing",
 ]
 

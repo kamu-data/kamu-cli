@@ -62,7 +62,6 @@ kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-flow-webhook = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
 kamu-adapter-task-webhook = { workspace = true }
-kamu-adapter-molecule-services = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 graphql-http = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [

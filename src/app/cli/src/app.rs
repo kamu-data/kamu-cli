@@ -656,7 +656,6 @@ pub fn configure_server_catalog(
         kamu_adapter_auth_web3::register_dependencies(&mut b);
     }
 
-    kamu_adapter_molecule_services::register_dependencies(&mut b);
     kamu_molecule_services::register_dependencies(&mut b);
 
     b.add::<UploadServiceLocal>();

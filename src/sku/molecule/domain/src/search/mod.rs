@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dependencies;
-mod search;
+mod schemas;
 
-pub use dependencies::*;
-pub use search::*;
+pub use schemas::*;

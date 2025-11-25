@@ -8,7 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod molecule_full_text_search_schema_provider;
-mod schemas;
 
 pub use molecule_full_text_search_schema_provider::*;
-pub use schemas::*;

@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_search::*;
 
-use crate::{
+use crate::domain::{
     molecule_activity_full_text_search_schema as activity_schema,
     molecule_announcement_full_text_search_schema as announcement_schema,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
