@@ -9,71 +9,53 @@
 
 use std::sync::Arc;
 
-use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth::DatasetAction;
 use kamu_molecule_domain::MoleculeProjectService;
 
-use crate::domain::{
-    MoleculeProjectListing,
-    ViewMoleculeProjectsError,
-    ViewMoleculeProjectsUseCase,
-};
+use crate::domain::{FindMoleculeProjectError, FindMoleculeProjectUseCase};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn ViewMoleculeProjectsUseCase)]
-pub struct ViewMoleculeProjectsUseCaseImpl {
+#[dill::interface(dyn FindMoleculeProjectUseCase)]
+pub struct FindMoleculeProjectUseCaseImpl {
     project_service: Arc<dyn MoleculeProjectService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ViewMoleculeProjectsUseCase for ViewMoleculeProjectsUseCaseImpl {
+impl FindMoleculeProjectUseCase for FindMoleculeProjectUseCaseImpl {
     async fn execute(
         &self,
         molecule_subject: LoggedAccount,
-        pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeProjectListing, ViewMoleculeProjectsError> {
-        // Access projects dataset snapshot
+        ipnft_uid: String,
+    ) -> Result<Option<serde_json::Value>, FindMoleculeProjectError> {
+        use datafusion::logical_expr::{col, lit};
+
         let Some(df) = self
             .project_service
             .get_projects_snapshot(molecule_subject, DatasetAction::Read, false)
             .await
-            .map_err(ViewMoleculeProjectsError::from)?
+            .map_err(FindMoleculeProjectError::from)?
             .1
         else {
-            return Ok(MoleculeProjectListing::default());
+            return Ok(None);
         };
 
-        // Get total count before pagination
-        let total_count = df.clone().count().await.int_err()?;
+        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
 
-        // Sort DF by ipnft_symbol
-        use datafusion::logical_expr::col;
-        let df = df
-            .sort(vec![col("ipnft_symbol").sort(true, false)])
-            .int_err()?;
-
-        // Apply pagination
-        let df = if let Some(pagination) = pagination {
-            df.limit(pagination.offset, Some(pagination.limit))
-                .int_err()?
-        } else {
-            df
-        };
-
-        // Convert to JSON AoS
         let records = df.collect_json_aos().await.int_err()?;
+        if records.is_empty() {
+            return Ok(None);
+        }
 
-        // Return listing
-        Ok(MoleculeProjectListing {
-            records,
-            total_count,
-        })
+        assert_eq!(records.len(), 1);
+        let entry = records.into_iter().next().unwrap();
+
+        Ok(Some(entry))
     }
 }
 

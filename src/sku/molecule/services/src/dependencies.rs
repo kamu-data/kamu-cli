@@ -17,6 +17,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<MoleculeProjectServiceImpl>();
 
     b.add::<ViewMoleculeProjectsUseCaseImpl>();
+    b.add::<FindMoleculeProjectUseCaseImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

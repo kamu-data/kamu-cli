@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
@@ -16,26 +15,18 @@ use crate::MoleculeGetProjectsError;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ViewMoleculeProjectsUseCase: Send + Sync {
+pub trait FindMoleculeProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: LoggedAccount,
-        pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeProjectListing, ViewMoleculeProjectsError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Default)]
-pub struct MoleculeProjectListing {
-    pub records: Vec<serde_json::Value>,
-    pub total_count: usize,
+        ipnft_uid: String,
+    ) -> Result<Option<serde_json::Value>, FindMoleculeProjectError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum ViewMoleculeProjectsError {
+pub enum FindMoleculeProjectError {
     #[error(transparent)]
     NoProjectsDataset(#[from] odf::DatasetNotFoundError),
 
@@ -50,14 +41,14 @@ pub enum ViewMoleculeProjectsError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetProjectsError> for ViewMoleculeProjectsError {
+impl From<MoleculeGetProjectsError> for FindMoleculeProjectError {
     fn from(e: MoleculeGetProjectsError) -> Self {
         match e {
             MoleculeGetProjectsError::NotFound(err) => {
-                ViewMoleculeProjectsError::NoProjectsDataset(err)
+                FindMoleculeProjectError::NoProjectsDataset(err)
             }
-            MoleculeGetProjectsError::Access(err) => ViewMoleculeProjectsError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => ViewMoleculeProjectsError::Internal(err),
+            MoleculeGetProjectsError::Access(err) => FindMoleculeProjectError::Access(err),
+            MoleculeGetProjectsError::Internal(err) => FindMoleculeProjectError::Internal(err),
         }
     }
 }

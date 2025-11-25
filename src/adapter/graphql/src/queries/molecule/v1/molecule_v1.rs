@@ -14,7 +14,13 @@ use database_common::PaginationOpts;
 use kamu::domain;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::auth::DatasetAction;
-use kamu_molecule_domain::{ViewMoleculeProjectsError, ViewMoleculeProjectsUseCase};
+use kamu_molecule_domain::{
+    FindMoleculeProjectError,
+    FindMoleculeProjectUseCase,
+    MoleculeProjectListing,
+    ViewMoleculeProjectsError,
+    ViewMoleculeProjectsUseCase,
+};
 use odf::utils::data::DataFrameExt;
 
 use crate::molecule::molecule_subject;
@@ -203,10 +209,7 @@ impl MoleculeV1 {
                     .int_err()?;
 
                 // TODO: Use case should return ResolvedDataset directly
-                Ok(domain::ResolvedDataset::new(
-                    create_res.dataset,
-                    create_res.dataset_handle,
-                ))
+                Ok(domain::ResolvedDataset::from_created(&create_res))
             }
             Err(RebacDatasetRefUnresolvedError::NotFound(err)) => Err(GqlError::Gql(err.into())),
             Err(RebacDatasetRefUnresolvedError::Access(err)) => Err(GqlError::Access(err)),
@@ -258,6 +261,26 @@ impl MoleculeV1 {
 
         Ok((projects_dataset, df))
     }
+
+    async fn get_molecule_projects_listing(
+        &self,
+        ctx: &Context<'_>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectListing> {
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let view_molecule_projects = from_catalog_n!(ctx, dyn ViewMoleculeProjectsUseCase);
+        let listing = view_molecule_projects
+            .execute(molecule_subject, pagination)
+            .await
+            .map_err(|e| match e {
+                ViewMoleculeProjectsError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                ViewMoleculeProjectsError::Access(e) => GqlError::Access(e),
+                ViewMoleculeProjectsError::Internal(e) => GqlError::Gql(e.into()),
+            })?;
+
+        Ok(listing)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -275,26 +298,20 @@ impl MoleculeV1 {
         ctx: &Context<'_>,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProject>> {
-        use datafusion::logical_expr::{col, lit};
+        let molecule_subject = molecule_subject(ctx)?;
 
-        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
-            return Ok(None);
-        };
+        let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
+        let maybe_project_json = find_molecule_project
+            .execute(molecule_subject, ipnft_uid)
+            .await
+            .map_err(|e| match e {
+                FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                FindMoleculeProjectError::Access(e) => GqlError::Access(e),
+                FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
+            })?;
 
-        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-        let entry = MoleculeProject::from_json(records.into_iter().next().unwrap());
-
-        Ok(Some(entry))
+        let maybe_project = maybe_project_json.map(MoleculeProject::from_json);
+        Ok(maybe_project)
     }
 
     /// List the registered projects
@@ -308,23 +325,15 @@ impl MoleculeV1 {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
-        let molecule_subject = molecule_subject(ctx)?;
-
-        let view_molecule_projects = from_catalog_n!(ctx, dyn ViewMoleculeProjectsUseCase);
-        let listing = view_molecule_projects
-            .execute(
-                molecule_subject,
-                PaginationOpts {
+        let listing = self
+            .get_molecule_projects_listing(
+                ctx,
+                Some(PaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
-                },
+                }),
             )
-            .await
-            .map_err(|e| match e {
-                ViewMoleculeProjectsError::NotFound(e) => GqlError::Gql(e.into()),
-                ViewMoleculeProjectsError::Access(e) => GqlError::Access(e),
-                ViewMoleculeProjectsError::Internal(e) => GqlError::Gql(e.into()),
-            })?;
+            .await?;
 
         let nodes = listing
             .records
@@ -358,20 +367,18 @@ impl MoleculeV1 {
 
         // TODO: PERF: This "brute force" approach will not scale with growth of
         // projects and has to be revisited
-        let Some(df) = Self::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
+        let projects_listing = self
+            .get_molecule_projects_listing(ctx, None /* unbounded */)
+            .await?;
+        if projects_listing.total_count == 0 {
             return Ok(MoleculeProjectEventConnection::new(Vec::new(), 0, per_page));
-        };
+        }
 
         let projects_by_announcement_dataset: std::collections::BTreeMap<
             odf::DatasetID,
             Arc<MoleculeProject>,
-        > = df
-            .collect_json_aos()
-            .await
-            .int_err()?
+        > = projects_listing
+            .records
             .into_iter()
             .map(MoleculeProject::from_json)
             .map(|p| (p.announcements_dataset_id.clone(), Arc::new(p)))

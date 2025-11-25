@@ -8,12 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_core::auth::DatasetAction;
-use kamu_molecule_domain::{ViewMoleculeProjectsError, ViewMoleculeProjectsUseCase};
+use kamu_molecule_domain::{
+    FindMoleculeProjectError,
+    FindMoleculeProjectUseCase,
+    MoleculeProjectListing,
+    ViewMoleculeProjectsError,
+    ViewMoleculeProjectsUseCase,
+};
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::molecule::v1::MoleculeV1;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncementEntry,
@@ -29,6 +33,32 @@ use crate::queries::molecule::v2::{
 
 pub struct MoleculeV2;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MoleculeV2 {
+    async fn get_molecule_projects_listing(
+        &self,
+        ctx: &Context<'_>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectListing> {
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let view_molecule_projects = from_catalog_n!(ctx, dyn ViewMoleculeProjectsUseCase);
+        let listing = view_molecule_projects
+            .execute(molecule_subject, pagination)
+            .await
+            .map_err(|e| match e {
+                ViewMoleculeProjectsError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                ViewMoleculeProjectsError::Access(e) => GqlError::Access(e),
+                ViewMoleculeProjectsError::Internal(e) => GqlError::Gql(e.into()),
+            })?;
+
+        Ok(listing)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeV2 {
@@ -42,26 +72,22 @@ impl MoleculeV2 {
         ctx: &Context<'_>,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProjectV2>> {
-        use datafusion::logical_expr::{col, lit};
+        let molecule_subject = molecule_subject(ctx)?;
 
-        let Some(df) = MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
-            return Ok(None);
-        };
+        let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
+        let maybe_project_json = find_molecule_project
+            .execute(molecule_subject, ipnft_uid)
+            .await
+            .map_err(|e| match e {
+                FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                FindMoleculeProjectError::Access(e) => GqlError::Access(e),
+                FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
+            })?;
 
-        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-        let entry = MoleculeProjectV2::from_json(records.into_iter().next().unwrap())?;
-
-        Ok(Some(entry))
+        let maybe_project_v2 = maybe_project_json
+            .map(MoleculeProjectV2::from_json)
+            .transpose()?;
+        Ok(maybe_project_v2)
     }
 
     /// List the registered projects
@@ -75,23 +101,15 @@ impl MoleculeV2 {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
-        let molecule_subject = molecule_subject(ctx)?;
-
-        let view_molecule_projects = from_catalog_n!(ctx, dyn ViewMoleculeProjectsUseCase);
-        let listing = view_molecule_projects
-            .execute(
-                molecule_subject,
-                PaginationOpts {
+        let listing = self
+            .get_molecule_projects_listing(
+                ctx,
+                Some(PaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
-                },
+                }),
             )
-            .await
-            .map_err(|e| match e {
-                ViewMoleculeProjectsError::NotFound(e) => GqlError::Gql(e.into()),
-                ViewMoleculeProjectsError::Access(e) => GqlError::Access(e),
-                ViewMoleculeProjectsError::Internal(e) => GqlError::Gql(e.into()),
-            })?;
+            .await?;
 
         let nodes = listing
             .records

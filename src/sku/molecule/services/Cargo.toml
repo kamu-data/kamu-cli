@@ -41,3 +41,4 @@ async-trait = { version = "0.1", default-features = false }
 datafusion = { version = "50", default-features = false }
 dill = { version = "0.14", default-features = false }
 indoc = { version = "2", default-features = false }
+serde_json = { version = "1.0", default-features = false }

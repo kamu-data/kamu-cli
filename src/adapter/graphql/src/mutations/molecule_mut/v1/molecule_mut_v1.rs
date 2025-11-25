@@ -11,6 +11,7 @@ use kamu::domain;
 use kamu_accounts::{AccountServiceExt as _, CreateAccountUseCaseOptions, CurrentAccountSubject};
 use kamu_core::DatasetRegistryExt;
 use kamu_core::auth::DatasetAction;
+use kamu_molecule_domain::{FindMoleculeProjectError, FindMoleculeProjectUseCase};
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
@@ -220,26 +221,20 @@ impl MoleculeMutV1 {
         ctx: &Context<'_>,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProjectMut>> {
-        use datafusion::logical_expr::{col, lit};
+        let molecule_subject = molecule_subject(ctx)?;
 
-        let Some(df) = v1::MoleculeV1::get_projects_snapshot(ctx, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
-            return Ok(None);
-        };
+        let find_molecule_project = from_catalog_n!(ctx, dyn FindMoleculeProjectUseCase);
+        let maybe_project_json = find_molecule_project
+            .execute(molecule_subject, ipnft_uid)
+            .await
+            .map_err(|e| match e {
+                FindMoleculeProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+                FindMoleculeProjectError::Access(e) => GqlError::Access(e),
+                FindMoleculeProjectError::Internal(e) => GqlError::Gql(e.into()),
+            })?;
 
-        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-        let entry = MoleculeProjectMut::from_json(records.into_iter().next().unwrap());
-
-        Ok(Some(entry))
+        let maybe_project = maybe_project_json.map(MoleculeProjectMut::from_json);
+        Ok(maybe_project)
     }
 }
 
