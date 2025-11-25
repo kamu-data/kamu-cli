@@ -11,10 +11,19 @@ use kamu_datasets::{CollectionEntity, DatasetColumn, VersionedFileEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDatasetSnapshots {}
+pub struct MoleculeDatasetSnapshots;
 
 impl MoleculeDatasetSnapshots {
-    pub fn projects(alias: odf::DatasetAlias) -> odf::metadata::DatasetSnapshot {
+    pub fn projects_alias(molecule_account_name: odf::AccountName) -> odf::DatasetAlias {
+        odf::DatasetAlias::new(
+            Some(molecule_account_name),
+            odf::DatasetName::new_unchecked("projects"),
+        )
+    }
+
+    pub fn projects(molecule_account_name: odf::AccountName) -> odf::metadata::DatasetSnapshot {
+        let alias = Self::projects_alias(molecule_account_name);
+
         odf::DatasetSnapshot {
             name: alias,
             kind: odf::DatasetKind::Root,

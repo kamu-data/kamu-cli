@@ -46,12 +46,8 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
         action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetProjectsError> {
-        const PROJECTS_DATASET_NAME: &str = "projects";
-
-        let projects_dataset_alias = odf::DatasetAlias::new(
-            Some(molecule_account_name.clone()),
-            odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
-        );
+        let projects_dataset_alias =
+            MoleculeDatasetSnapshots::projects_alias(molecule_account_name.clone());
 
         match self
             .rebac_dataset_registry
@@ -60,10 +56,7 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
         {
             Ok(ds) => Ok(ds),
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
-                let snapshot = MoleculeDatasetSnapshots::projects(odf::DatasetAlias::new(
-                    None,
-                    odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
-                ));
+                let snapshot = MoleculeDatasetSnapshots::projects(molecule_account_name.clone());
 
                 let create_res = self
                     .create_dataset_use_case
