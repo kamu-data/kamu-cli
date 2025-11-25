@@ -8273,6 +8273,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-core",
  "kamu-datasets",
+ "messaging-outbox",
  "num-bigint",
  "opendatafabric",
  "serde",

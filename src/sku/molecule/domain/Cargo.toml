@@ -28,6 +28,7 @@ default = []
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }

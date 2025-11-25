@@ -21,6 +21,7 @@ use kamu_auth_rebac::RebacService;
 use kamu_core::PushIngestDataUseCase;
 use kamu_core::auth::DatasetAction;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCaseOptions};
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::domain::*;
 
@@ -35,6 +36,7 @@ pub struct CreateMoleculeProjectUseCaseImpl {
     create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     rebac_service: Arc<dyn RebacService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -182,13 +184,13 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
         // Add project entry
         let now = chrono::Utc::now();
         let project = MoleculeProjectEntity {
-            account_id: project_account.id,
+            account_id: project_account.id.clone(),
             system_time: now,
             event_time: now,
-            ipnft_symbol: lowercase_ipnft_symbol,
+            ipnft_symbol: lowercase_ipnft_symbol.clone(),
             ipnft_address,
             ipnft_token_id,
-            ipnft_uid,
+            ipnft_uid: ipnft_uid.clone(),
             data_room_dataset_id: data_room_create_res.dataset_handle.id,
             announcements_dataset_id: announcements_create_res.dataset_handle.id,
         };
@@ -208,6 +210,20 @@ impl CreateMoleculeProjectUseCase for CreateMoleculeProjectUseCaseImpl {
                     expected_head: None,
                 },
                 None,
+            )
+            .await
+            .int_err()?;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+                MoleculeProjectMessage::created(
+                    now,
+                    molecule_subject.account_id.clone(),
+                    project_account.id,
+                    ipnft_uid,
+                    lowercase_ipnft_symbol,
+                ),
             )
             .await
             .int_err()?;

@@ -7,16 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod entities;
-mod messages;
-mod services;
-mod snapshots;
-mod use_cases;
+pub const MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE: &str =
+    "xyz.molecule.kamu.MoleculeProjectService";
 
-pub use entities::*;
-pub use messages::*;
-pub use services::*;
-pub use snapshots::*;
-pub use use_cases::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
