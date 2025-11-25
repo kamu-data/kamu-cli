@@ -130,10 +130,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         };
 
         // Create `data-room` dataset
-        let snapshot = MoleculeDatasetSnapshots::data_room_v2(odf::DatasetAlias::new(
-            Some(project_account_name.clone()),
-            odf::DatasetName::new_unchecked("data-room"),
-        ));
+        let snapshot = MoleculeDatasetSnapshots::data_room_v2(project_account_name.clone());
         let data_room_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(

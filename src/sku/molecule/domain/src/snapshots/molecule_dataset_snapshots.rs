@@ -85,7 +85,7 @@ impl MoleculeDatasetSnapshots {
         }
     }
 
-    pub fn data_room_v2(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+    pub fn data_room_v2(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         // Extra columns
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
         // Denormalized values from the latest file state
@@ -97,6 +97,11 @@ impl MoleculeDatasetSnapshots {
         const COLUMN_NAME_CATEGORIES: &str = "categories";
         const COLUMN_NAME_TAGS: &str = "tags";
         const COLUMN_NAME_VERSION: &str = "version";
+
+        let alias = odf::DatasetAlias::new(
+            Some(molecule_account_name),
+            odf::DatasetName::new_unchecked("data-room"),
+        );
 
         CollectionEntity::dataset_snapshot(
             alias,
