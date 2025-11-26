@@ -232,6 +232,99 @@ impl MoleculeDatasetSnapshots {
             ],
         }
     }
+
+    pub fn global_data_room_activity(
+        molecule_account_name: odf::AccountName,
+    ) -> odf::DatasetSnapshot {
+        let alias = odf::DatasetAlias::new(
+            Some(molecule_account_name),
+            odf::DatasetName::new_unchecked("data-room-activity"),
+        );
+
+        let schema = odf::schema::DataSchema::builder()
+            // Add these columns but use Append strategy
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
+            .extend([
+                odf::schema::DataField::string("ipnft_uid"),
+                odf::schema::DataField::string("path"),
+                odf::schema::DataField::string("ref"),
+                odf::schema::DataField::u32("version"),
+                odf::schema::DataField::string("molecule_change_by"),
+                odf::schema::DataField::string("molecule_access_level"),
+                odf::schema::DataField::string("content_type").optional(),
+                odf::schema::DataField::u64("content_length"),
+                odf::schema::DataField::list("categories", odf::schema::DataType::string()),
+                odf::schema::DataField::list("tags", odf::schema::DataType::string()),
+            ])
+            .build()
+            .expect("Schema is always valid as there are no user inputs");
+
+        odf::DatasetSnapshot {
+            name: alias,
+            kind: odf::DatasetKind::Root,
+            metadata: vec![
+                odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema::new(schema)),
+                odf::metadata::AddPushSource {
+                    source_name: "default".to_string(),
+                    read: odf::metadata::ReadStepNdJson {
+                        // TODO: NOT NULLs?
+                        schema: Some(
+                            [
+                                "op INT",
+                                "ipnft_uid STRING",
+                                "path STRING",
+                                "ref STRING",
+                                "version INT UNSIGNED",
+                                "molecule_change_by STRING",
+                                "molecule_access_level STRING",
+                                "content_type STRING",
+                                "content_length BIGINT UNSIGNED",
+                                "categories Array<STRING>",
+                                "tags Array<STRING>",
+                            ]
+                            .into_iter()
+                            .map(str::to_string)
+                            .collect(),
+                        ),
+                        ..Default::default()
+                    }
+                    .into(),
+                    // TODO: Set next version based on the previous?
+                    //       Remove version from read step in this case
+                    preprocess: None,
+                    merge: odf::metadata::MergeStrategyAppend {}.into(),
+                }
+                .into(),
+                odf::metadata::SetInfo {
+                    description: Some("Data room activity".into()),
+                    keywords: Some(vec![
+                        "DeSci".to_string(),
+                        "BioTech".to_string(),
+                        "Funding".to_string(),
+                        "Crypto".to_string(),
+                    ]),
+                }
+                .into(),
+                odf::metadata::SetAttachments {
+                    attachments: odf::metadata::AttachmentsEmbedded {
+                        items: vec![odf::metadata::AttachmentEmbedded {
+                            path: "README.md".into(),
+                            content: indoc::indoc!(
+                                r#"
+                                # Data room activity
+
+                                Dataset containing activity across all project data rooms in single feed.
+                                "#
+                            )
+                            .into(),
+                        }],
+                    }
+                    .into(),
+                }
+                .into(),
+            ],
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
