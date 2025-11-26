@@ -61,12 +61,9 @@ impl MoleculeProjectV2 {
         &self.entity.ipnft_address
     }
 
-    // NOTE: For backward compatibility (and existing projects),
-    //       we continue using BigInt type, which is wider than needed U256.
-
     /// Token ID withing the IPNFT contract
-    pub async fn ipnft_token_id(&self) -> BigInt {
-        BigInt::new(self.entity.ipnft_token_id.clone())
+    pub async fn ipnft_token_id(&self) -> U256 {
+        U256::new(self.entity.ipnft_token_id.clone())
     }
 
     /// Project's organizational account
