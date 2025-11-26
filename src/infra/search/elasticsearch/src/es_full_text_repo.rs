@@ -52,7 +52,28 @@ impl ElasticSearchFullTextRepo {
         Ok(client)
     }
 
-    fn resolve_index_name(
+    fn resolve_read_index_alias(
+        &self,
+        client: &es_client::ElasticSearchClient,
+        schema_name: FullTextEntitySchemaName,
+    ) -> Result<String, InternalError> {
+        let state = self.state.read().unwrap();
+        let Some(schema) = state.registered_schemas.get(&schema_name) else {
+            return Err(InternalError::new(format!(
+                "Entity schema '{schema_name}' is not registered in full-text search repository",
+            )));
+        };
+
+        let entity_index = es_helpers::ElasticSearchVersionedEntityIndex::new(
+            client,
+            &self.config,
+            schema.schema_name,
+            schema.version,
+        );
+        Ok(entity_index.alias_name())
+    }
+
+    fn resolve_writable_index_name(
         &self,
         client: &es_client::ElasticSearchClient,
         schema_name: FullTextEntitySchemaName,
@@ -98,7 +119,7 @@ impl ElasticSearchFullTextRepo {
         Ok(schemas)
     }
 
-    fn resolve_index_names(
+    fn resolve_read_index_aliases(
         &self,
         client: &es_client::ElasticSearchClient,
         entity_schemas: &[Arc<FullTextSearchEntitySchema>],
@@ -108,7 +129,7 @@ impl ElasticSearchFullTextRepo {
         entity_schemas
             .iter()
             .map(|schema| {
-                let index_name = self.resolve_index_name(client, schema.schema_name)?;
+                let index_name = self.resolve_read_index_alias(client, schema.schema_name)?;
                 Ok((index_name, schema.schema_name))
             })
             .collect::<Result<HashMap<_, _>, InternalError>>()
@@ -160,9 +181,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
 
         let mappings = es_helpers::ElasticSearchIndexMappings::from_entity_schema(schema);
 
-        let outcome = index
-            .ensure_version_existence(mappings, schema.upgrade_mode)
-            .await?;
+        let outcome = index.ensure_version_existence(mappings, schema).await?;
 
         use es_helpers::EntityIndexEnsureOutcome;
         match outcome {
@@ -224,7 +243,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         schema_name: FullTextEntitySchemaName,
     ) -> Result<u64, InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, schema_name)?;
+        let index_name = self.resolve_writable_index_name(client, schema_name)?; // wriatable index, because we need to count bannned too
         client.documents_in_index(&index_name).await.int_err()
     }
 
@@ -239,7 +258,8 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
         // Resolve affected index names
-        let schema_names_by_index_names = self.resolve_index_names(client, &entity_schemas)?;
+        let schema_names_by_index_names =
+            self.resolve_read_index_aliases(client, &entity_schemas)?;
 
         // Involved indexes
         let involved_index_names: Vec<&str> = schema_names_by_index_names
@@ -291,7 +311,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         docs: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, schema_name)?;
+        let index_name = self.resolve_writable_index_name(client, schema_name)?;
         client.bulk_index(&index_name, docs).await.int_err()
     }
 
@@ -302,7 +322,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         updates: Vec<(FullTextEntityId, serde_json::Value)>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, schema_name)?;
+        let index_name = self.resolve_writable_index_name(client, schema_name)?;
         client.bulk_update(&index_name, updates).await.int_err()
     }
 
@@ -313,7 +333,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         ids: Vec<FullTextEntityId>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
-        let index_name = self.resolve_index_name(client, schema_name)?;
+        let index_name = self.resolve_writable_index_name(client, schema_name)?;
         client.bulk_delete(&index_name, ids).await.int_err()
     }
 }

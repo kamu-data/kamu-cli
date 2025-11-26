@@ -70,6 +70,7 @@ impl ElasticSearchFullTextRepoContainer {
                 ("xpack.security.transport.ssl.enabled", "false"),
                 ("xpack.ml.enabled", "false"),
                 ("discovery.type", "single-node"),
+                ("cluster.routing.allocation.disk.threshold_enabled", "false"),
                 ("ELASTIC_PASSWORD", DUMMY_PASSWORD),
             ])
             .stdout(std::process::Stdio::null())

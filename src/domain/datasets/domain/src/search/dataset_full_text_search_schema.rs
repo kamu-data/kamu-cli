@@ -110,6 +110,7 @@ pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
     title_field: FIELD_ALIAS,
+    enable_banning: false, // Potentially might be useful for datasets
     upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
 };
 
