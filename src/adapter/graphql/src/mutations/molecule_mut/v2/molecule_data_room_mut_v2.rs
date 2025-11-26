@@ -550,8 +550,6 @@ impl MoleculeDataRoomMutV2 {
         content_text: Option<String>,
         encryption_metadata: Option<EncryptionMetadata>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
-        // Warning: here be dragons.
-
         // IMPORTANT: If after file creation or version update an error occurs,
         //            all DB will be cleared (transaction rollback). Dataset data
         //            (e.g., on S3) will need later cleanup (garbage collection).

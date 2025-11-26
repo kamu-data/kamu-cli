@@ -14,7 +14,7 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut CatalogBuilder) {
-    b.add::<MoleculeProjectServiceImpl>();
+    b.add::<MoleculeDatasetServiceImpl>();
 
     b.add::<MoleculeCreateProjectUseCaseImpl>();
     b.add::<MoleculeFindProjectUseCaseImpl>();

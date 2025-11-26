@@ -30,7 +30,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeCreateProjectUseCase)]
 pub struct MoleculeCreateProjectUseCaseImpl {
-    project_service: Arc<dyn MoleculeProjectService>,
+    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
     account_service: Arc<dyn AccountService>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
     create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -60,7 +60,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
     ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError> {
         // Resolve projects snapshot with Write privileges
         let (projects_dataset, df) = self
-            .project_service
+            .molecule_dataset_service
             .get_projects_data_frame(molecule_subject, DatasetAction::Write, true)
             .await?;
 

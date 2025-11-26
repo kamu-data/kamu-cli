@@ -7,6 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod molecule_project_service;
+mod molecule_dataset_service;
 
-pub use molecule_project_service::*;
+pub use molecule_dataset_service::*;

@@ -113,7 +113,6 @@ impl MoleculeDataRoomProjection<'_> {
             .map(|e| MoleculeDataRoomEntry::new_from_collection_entry(self.project, e))
             .collect::<Result<Vec<_>>>()?;
 
-        // TODO: implement
         Ok(MoleculeDataRoomEntryConnection::new(
             molecule_entries,
             entries.page_info.current_page,
@@ -189,7 +188,7 @@ impl MoleculeDataRoomEntry {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomEntry {
-    /// Back link to the project
+    /// Backlink to the project
     async fn project(&self) -> &MoleculeProjectV2 {
         self.project.as_ref()
     }
@@ -348,9 +347,6 @@ impl MoleculeVersionedFileEntry {
             description: self.basic_info.description.clone(),
             categories: self.basic_info.categories.clone(),
             tags: self.basic_info.tags.clone(),
-            // TODO
-            // content_text
-            // encryption_metadata
         }
     }
 }
@@ -482,9 +478,6 @@ pub struct MoleculeDenormalizeFileToDataRoom {
     pub description: Option<String>,
     pub categories: Vec<MoleculeCategory>,
     pub tags: Vec<MoleculeTag>,
-    // TODO:
-    // pub content_text: String,
-    // pub encryption_metadata: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

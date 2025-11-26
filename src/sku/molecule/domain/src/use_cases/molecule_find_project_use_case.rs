@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
+use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,14 +41,14 @@ pub enum MoleculeFindProjectError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetProjectsError> for MoleculeFindProjectError {
-    fn from(e: MoleculeGetProjectsError) -> Self {
+impl From<MoleculeGetDatasetError> for MoleculeFindProjectError {
+    fn from(e: MoleculeGetDatasetError) -> Self {
         match e {
-            MoleculeGetProjectsError::NotFound(err) => {
+            MoleculeGetDatasetError::NotFound(err) => {
                 MoleculeFindProjectError::NoProjectsDataset(err)
             }
-            MoleculeGetProjectsError::Access(err) => MoleculeFindProjectError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => MoleculeFindProjectError::Internal(err),
+            MoleculeGetDatasetError::Access(err) => MoleculeFindProjectError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeFindProjectError::Internal(err),
         }
     }
 }

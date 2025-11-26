@@ -16,26 +16,26 @@ use odf::utils::data::DataFrameExt;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeProjectService: Send + Sync {
+pub trait MoleculeDatasetService: Send + Sync {
     async fn get_projects_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
         action: DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<ResolvedDataset, MoleculeGetProjectsError>;
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
 
     async fn get_projects_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetProjectsError>;
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeGetProjectsError {
+pub enum MoleculeGetDatasetError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 

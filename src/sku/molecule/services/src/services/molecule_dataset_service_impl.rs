@@ -22,8 +22,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeProjectService)]
-pub struct MoleculeProjectServiceImpl {
+#[dill::interface(dyn MoleculeDatasetService)]
+pub struct MoleculeDatasetServiceImpl {
     rebac_dataset_registry: Arc<dyn RebacDatasetRegistryFacade>,
     create_dataset_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     query_service: Arc<dyn QueryService>,
@@ -33,7 +33,7 @@ pub struct MoleculeProjectServiceImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeProjectService for MoleculeProjectServiceImpl {
+impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
     #[tracing::instrument(
         level = "debug",
         name = MoleculeProjectServiceImpl_get_projects_dataset,
@@ -45,7 +45,7 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
         molecule_account_name: &odf::AccountName,
         action: DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<ResolvedDataset, MoleculeGetProjectsError> {
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError> {
         let projects_dataset_alias =
             MoleculeDatasetSnapshots::projects_alias(molecule_account_name.clone());
 
@@ -76,10 +76,10 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
                 ))
             }
             Err(RebacDatasetRefUnresolvedError::NotFound(err)) => {
-                Err(MoleculeGetProjectsError::NotFound(err))
+                Err(MoleculeGetDatasetError::NotFound(err))
             }
             Err(RebacDatasetRefUnresolvedError::Access(err)) => {
-                Err(MoleculeGetProjectsError::Access(err))
+                Err(MoleculeGetDatasetError::Access(err))
             }
             Err(err) => Err(err.int_err().into()),
         }
@@ -96,7 +96,7 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
         molecule_subject: &LoggedAccount,
         action: DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetProjectsError> {
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
         // Resolve projects dataset
         let projects_dataset = self
             .get_projects_dataset(&molecule_subject.account_name, action, create_if_not_exist)
@@ -109,8 +109,8 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
             .await
         {
             Ok(res) => Ok(res.df),
-            Err(QueryError::Access(err)) => Err(MoleculeGetProjectsError::Access(err)),
-            Err(err) => Err(MoleculeGetProjectsError::Internal(err.int_err())),
+            Err(QueryError::Access(err)) => Err(MoleculeGetDatasetError::Access(err)),
+            Err(err) => Err(MoleculeGetDatasetError::Internal(err.int_err())),
         }?;
 
         // Project into snapshot
