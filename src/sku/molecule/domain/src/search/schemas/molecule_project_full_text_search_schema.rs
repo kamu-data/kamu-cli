@@ -61,9 +61,10 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
 pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
+    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
     title_field: FIELD_IPNFT_SYMBOL,
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    enable_banning: true,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -75,9 +75,10 @@ const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
 pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
+    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
     title_field: "_id", // Questionable
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    enable_banning: false,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

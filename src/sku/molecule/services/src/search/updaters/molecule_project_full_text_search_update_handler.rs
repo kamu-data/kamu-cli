@@ -59,19 +59,41 @@ impl MoleculeProjectFullTextSearchUpdateHandler {
 
     async fn handle_disabled_message(
         &self,
-        _disabled_message: &MoleculeProjectMessageDisabled,
+        ctx: FullTextSearchContext<'_>,
+        disabled_message: &MoleculeProjectMessageDisabled,
     ) -> Result<(), InternalError> {
-        // TODO: Implement banning logic
-        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        let partial_update = schema_helpers::partial_update_project_when_ban_status_changed(
+            true,
+            disabled_message.event_time,
+        );
+        self.full_text_search_service
+            .update_bulk(
+                ctx,
+                project_schema::SCHEMA_NAME,
+                vec![(disabled_message.ipnft_uid.clone(), partial_update)],
+            )
+            .await?;
+
         Ok(())
     }
 
     async fn handle_reenabled_message(
         &self,
-        _reenabled_message: &MoleculeProjectMessageReenabled,
+        ctx: FullTextSearchContext<'_>,
+        reenabled_message: &MoleculeProjectMessageReenabled,
     ) -> Result<(), InternalError> {
-        // TODO: Implement unbanning logic
-        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        let partial_update = schema_helpers::partial_update_project_when_ban_status_changed(
+            false,
+            reenabled_message.event_time,
+        );
+        self.full_text_search_service
+            .update_bulk(
+                ctx,
+                project_schema::SCHEMA_NAME,
+                vec![(reenabled_message.ipnft_uid.clone(), partial_update)],
+            )
+            .await?;
+
         Ok(())
     }
 }
@@ -106,10 +128,11 @@ impl MessageConsumerT<MoleculeProjectMessage> for MoleculeProjectFullTextSearchU
                 self.handle_created_message(ctx, created_message).await?;
             }
             MoleculeProjectMessage::Disabled(disabled_message) => {
-                self.handle_disabled_message(disabled_message).await?;
+                self.handle_disabled_message(ctx, disabled_message).await?;
             }
             MoleculeProjectMessage::Reenabled(reenabled_message) => {
-                self.handle_reenabled_message(reenabled_message).await?;
+                self.handle_reenabled_message(ctx, reenabled_message)
+                    .await?;
             }
         }
 

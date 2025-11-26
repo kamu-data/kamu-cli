@@ -40,6 +40,19 @@ pub(crate) fn index_project_from_parts(
         project_schema::FIELD_ACCOUNT_ID: account_id,
         project_schema::FIELD_CREATED_AT: system_time,
         project_schema::FIELD_UPDATED_AT: system_time,
+        kamu_search::FULL_TEXT_SEARCH_FIELD_IS_BANNED: false,
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn partial_update_project_when_ban_status_changed(
+    is_banned: bool,
+    system_time: DateTime<Utc>,
+) -> serde_json::Value {
+    serde_json::json!({
+        project_schema::FIELD_UPDATED_AT: system_time,
+        "is_banned": is_banned,
     })
 }
 
