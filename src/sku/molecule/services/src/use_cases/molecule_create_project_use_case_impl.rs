@@ -189,7 +189,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         };
 
         let changelog_record =
-            project.into_changelog_record(u8::from(odf::metadata::OperationType::Append));
+            project.as_changelog_record(u8::from(odf::metadata::OperationType::Append));
 
         self.push_ingest_use_case
             .execute(

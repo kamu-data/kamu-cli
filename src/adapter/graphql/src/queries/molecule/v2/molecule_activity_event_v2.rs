@@ -15,8 +15,8 @@ use crate::queries::molecule::v2::{MoleculeAnnouncementEntry, MoleculeDataRoomEn
 #[derive(Union)]
 pub enum MoleculeActivityEventV2 {
     FileAdded(MoleculeActivityFileAddedV2),
-    FileRemoved(MoleculeActivityFileRemovedV2),
     FileUpdated(MoleculeActivityFileUpdatedV2),
+    FileRemoved(MoleculeActivityFileRemovedV2),
     Announcement(MoleculeActivityAnnouncementV2),
 }
 
@@ -26,12 +26,12 @@ pub struct MoleculeActivityFileAddedV2 {
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeActivityFileRemovedV2 {
+pub struct MoleculeActivityFileUpdatedV2 {
     pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeActivityFileUpdatedV2 {
+pub struct MoleculeActivityFileRemovedV2 {
     pub entry: MoleculeDataRoomEntry,
 }
 

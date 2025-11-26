@@ -251,6 +251,7 @@ impl MoleculeDatasetSnapshots {
             // Add these columns but use Append strategy
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
+                odf::schema::DataField::string("activity_type"),
                 odf::schema::DataField::string("ipnft_uid"),
                 odf::schema::DataField::string("path"),
                 odf::schema::DataField::string("ref"),
@@ -276,7 +277,8 @@ impl MoleculeDatasetSnapshots {
                         // TODO: NOT NULLs?
                         schema: Some(
                             [
-                                "op INT",
+                                "activity_type STRING",
+                                // "op INT",
                                 "ipnft_uid STRING",
                                 "path STRING",
                                 "ref STRING",

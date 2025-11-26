@@ -1448,7 +1448,7 @@ impl GraphQLMoleculeV1Harness {
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
             .add::<kamu_datasets_services::UpdateVersionFileUseCaseImpl>()
             .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeCreateProjectUseCaseImpl>()
+            .add::<kamu_molecule_services::MoleculeAppendDataRoomActivityUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeFindProjectUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeViewProjectsUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeDatasetServiceImpl>()

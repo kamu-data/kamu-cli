@@ -166,9 +166,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
                 let mut ndjson = Vec::<u8>::new();
                 let mut record = entry.into_record_data();
                 record["op"] = u8::from(op).into();
-                writeln!(&mut ndjson, "{record}")
-                    .int_err()
-                    .map_err(UpdateCollectionEntriesUseCaseError::Internal)?;
+                writeln!(&mut ndjson, "{record}").int_err()?;
                 Ok(bytes::Bytes::from_owner(ndjson))
             })
             .collect()
