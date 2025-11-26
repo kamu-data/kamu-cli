@@ -233,13 +233,19 @@ impl MoleculeDatasetSnapshots {
         }
     }
 
+    pub fn global_data_room_activity_alias(
+        molecule_account_name: odf::AccountName,
+    ) -> odf::DatasetAlias {
+        odf::DatasetAlias::new(
+            Some(molecule_account_name),
+            odf::DatasetName::new_unchecked("data-room-activity"),
+        )
+    }
+
     pub fn global_data_room_activity(
         molecule_account_name: odf::AccountName,
     ) -> odf::DatasetSnapshot {
-        let alias = odf::DatasetAlias::new(
-            Some(molecule_account_name),
-            odf::DatasetName::new_unchecked("data-room-activity"),
-        );
+        let alias = Self::global_data_room_activity_alias(molecule_account_name);
 
         let schema = odf::schema::DataSchema::builder()
             // Add these columns but use Append strategy

@@ -12,8 +12,7 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::auth::DatasetAction;
-use kamu_core::{GetDataOptions, QueryError, QueryService, ResolvedDataset};
+use kamu_core::{GetDataOptions, QueryError, QueryService, ResolvedDataset, auth};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use odf::utils::data::DataFrameExt;
 
@@ -36,14 +35,14 @@ pub struct MoleculeDatasetServiceImpl {
 impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectServiceImpl_get_projects_dataset,
+        name = MoleculeDatasetServiceImpl_get_projects_dataset,
         skip_all,
         fields(molecule_account_name, ?action, create_if_not_exist)
     )]
     async fn get_projects_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
-        action: DatasetAction,
+        action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetDatasetError> {
         let projects_dataset_alias =
@@ -87,14 +86,14 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectServiceImpl_get_projects_data_frame,
+        name = MoleculeDatasetServiceImpl_get_projects_data_frame,
         skip_all,
         fields(molecule_account_name, ?action, create_if_not_exist)
     )]
     async fn get_projects_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
-        action: DatasetAction,
+        action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
         // Resolve projects dataset
@@ -128,6 +127,61 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         };
 
         Ok((projects_dataset, df))
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDatasetServiceImpl_get_global_data_room_activity_dataset,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist)
+    )]
+    async fn get_global_data_room_activity_dataset(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError> {
+        let data_room_activity_dataset_alias =
+            MoleculeDatasetSnapshots::global_data_room_activity_alias(
+                molecule_account_name.clone(),
+            );
+
+        match self
+            .rebac_dataset_registry
+            .resolve_dataset_by_ref(&data_room_activity_dataset_alias.as_local_ref(), action)
+            .await
+        {
+            Ok(ds) => Ok(ds),
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
+                let snapshot = MoleculeDatasetSnapshots::global_data_room_activity(
+                    molecule_account_name.clone(),
+                );
+
+                let create_res = self
+                    .create_dataset_use_case
+                    .execute(
+                        snapshot,
+                        kamu_datasets::CreateDatasetUseCaseOptions {
+                            dataset_visibility: odf::DatasetVisibility::Private,
+                        },
+                    )
+                    .await
+                    .int_err()?;
+
+                // TODO: Use case should return ResolvedDataset directly
+                Ok(ResolvedDataset::new(
+                    create_res.dataset,
+                    create_res.dataset_handle,
+                ))
+            }
+            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => {
+                Err(MoleculeGetDatasetError::NotFound(err))
+            }
+            Err(RebacDatasetRefUnresolvedError::Access(err)) => {
+                Err(MoleculeGetDatasetError::Access(err))
+            }
+            Err(err) => Err(err.int_err().into()),
+        }
     }
 }
 

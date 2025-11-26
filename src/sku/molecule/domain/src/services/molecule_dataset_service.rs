@@ -30,6 +30,13 @@ pub trait MoleculeDatasetService: Send + Sync {
         action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
+
+    async fn get_global_data_room_activity_dataset(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
