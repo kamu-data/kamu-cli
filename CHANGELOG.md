@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Flow events now processed transactionally
+
 ## [0.253.1] - 2025-11-24
 ### Changed
 - GQL: `usage` section contains size measure unit
