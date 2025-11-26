@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod collection;
+mod collection_entry;
 mod dataset_block;
 mod dataset_column;
 #[cfg(feature = "sqlx")]
@@ -21,6 +22,7 @@ mod resolved_datasets_map;
 mod versioned_file;
 
 pub use collection::*;
+pub use collection_entry::*;
 pub use dataset_block::*;
 pub use dataset_column::*;
 #[cfg(feature = "sqlx")]

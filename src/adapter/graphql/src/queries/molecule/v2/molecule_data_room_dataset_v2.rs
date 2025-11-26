@@ -161,11 +161,11 @@ impl MoleculeDataRoomEntry {
         project: &Arc<MoleculeProjectV2>,
         mut entry: CollectionEntry,
     ) -> Result<Self> {
-        let mut extra_data = ExtraData::default();
-        std::mem::swap(&mut entry.extra_data, &mut extra_data);
+        let mut extra_data = serde_json::Map::default();
+        std::mem::swap(&mut entry.entity.extra_data, &mut extra_data);
 
         let denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom =
-            serde_json::from_value(extra_data.into_inner().into()).int_err()?;
+            serde_json::from_value(extra_data.into()).int_err()?;
 
         Ok(Self {
             entry,
@@ -199,20 +199,20 @@ impl MoleculeDataRoomEntry {
     }
 
     async fn system_time(&self) -> &DateTime<Utc> {
-        &self.entry.system_time
+        &self.entry.entity.system_time
     }
 
     async fn event_time(&self) -> &DateTime<Utc> {
-        &self.entry.event_time
+        &self.entry.entity.event_time
     }
 
-    async fn path(&self) -> &CollectionPath {
-        &self.entry.path
+    async fn path(&self) -> CollectionPath {
+        CollectionPath::from(self.entry.entity.path.clone())
     }
 
     #[graphql(name = "ref")]
-    async fn reference(&self) -> &DatasetID<'static> {
-        &self.entry.reference
+    async fn reference(&self) -> DatasetID<'static> {
+        self.entry.entity.reference.clone().into()
     }
 
     async fn change_by(&self) -> &MoleculeChangeBy {
@@ -222,7 +222,7 @@ impl MoleculeDataRoomEntry {
     #[expect(clippy::unused_async)]
     async fn as_versioned_file(&self) -> Result<Option<MoleculeVersionedFile>> {
         Ok(Some(MoleculeVersionedFile {
-            dataset: self.entry.reference.clone().into(),
+            dataset: self.entry.entity.reference.clone(),
             prefetched_latest: MoleculeVersionedFilePrefetch::new_from_data_room_entry(self),
         }))
     }
@@ -459,8 +459,8 @@ pub struct MoleculeVersionedFilePrefetch {
 impl MoleculeVersionedFilePrefetch {
     pub fn new_from_data_room_entry(data_room_entry: &MoleculeDataRoomEntry) -> Self {
         Self {
-            system_time: data_room_entry.entry.system_time,
-            event_time: data_room_entry.entry.event_time,
+            system_time: data_room_entry.entry.entity.system_time,
+            event_time: data_room_entry.entry.entity.event_time,
             denorm: data_room_entry.denormalized_latest_file_info.clone(),
         }
     }

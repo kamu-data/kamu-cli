@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod update_collection_entries_use_case;
+mod view_collection_entries_use_case;
 
 pub use update_collection_entries_use_case::*;
+pub use view_collection_entries_use_case::*;

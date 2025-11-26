@@ -651,7 +651,7 @@ pub struct MoleculeProjectEventDataRoomEntryAdded {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryAdded {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.entry.system_time
+        self.entry.entity.system_time
     }
 }
 
@@ -666,7 +666,7 @@ pub struct MoleculeProjectEventDataRoomEntryRemoved {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryRemoved {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.entry.system_time
+        self.entry.entity.system_time
     }
 }
 
@@ -681,7 +681,7 @@ pub struct MoleculeProjectEventDataRoomEntryUpdated {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryUpdated {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.new_entry.system_time
+        self.new_entry.entity.system_time
     }
 }
 

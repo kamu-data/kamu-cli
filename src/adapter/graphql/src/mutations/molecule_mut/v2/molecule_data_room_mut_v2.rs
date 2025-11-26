@@ -163,11 +163,13 @@ impl MoleculeDataRoomMutV2 {
 
         let data_room_entry = MoleculeDataRoomEntry {
             entry: CollectionEntry {
-                system_time: now,
-                event_time: now,
-                path,
-                reference: versioned_file_dataset.get_id().clone().into(),
-                extra_data: ExtraData::default(),
+                entity: kamu_datasets::CollectionEntry {
+                    system_time: now,
+                    event_time: now,
+                    path: path.into(),
+                    reference: versioned_file_dataset.get_id().clone().into(),
+                    extra_data: serde_json::Map::default(),
+                },
             },
             project: self.project.clone(),
             denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
@@ -180,8 +182,8 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.path.to_string(),
-                    data_room_entry.entry.reference.as_ref().clone(),
+                    data_room_entry.entry.entity.path.clone(),
+                    data_room_entry.entry.entity.reference.clone(),
                     ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
                 )],
                 None,
@@ -305,8 +307,8 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 WriteCheckedDataset(writable_data_room_dataset),
                 vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.path.to_string(),
-                    data_room_entry.entry.reference.as_ref().clone(),
+                    data_room_entry.entry.entity.path.clone(),
+                    data_room_entry.entry.entity.reference.clone(),
                     ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
                 )],
                 None,
@@ -802,7 +804,7 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.path.to_string(),
+                    data_room_entry.entry.entity.path.clone(),
                     reference.into(),
                     ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
                 )],

@@ -14,31 +14,19 @@ use crate::queries::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone)]
-#[graphql(complex)]
+#[derive(Clone)]
 pub struct CollectionEntry {
-    /// Time when this version was created
-    pub system_time: DateTime<Utc>,
-
-    /// Time when this version was created
-    pub event_time: DateTime<Utc>,
-
-    /// File system-like path
-    /// Rooted, separated by forward slashes, with elements URL-encoded
-    /// (e.g. `/foo%20bar/baz`)
-    pub path: CollectionPath,
-
-    /// DID of the linked dataset
-    #[graphql(name = "ref")]
-    pub reference: DatasetID<'static>,
-
-    /// Extra data associated with this entry
-    pub extra_data: ExtraData,
+    pub(crate) entity: kamu_datasets::CollectionEntry,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CollectionEntry {
+    pub fn new(entity: kamu_datasets::CollectionEntry) -> Self {
+        Self { entity }
+    }
+
+    // TODO: remove this when all use cases are migrated
     pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let mut event: CollectionEntryEvent = serde_json::from_value(record).int_err()?;
 
@@ -47,11 +35,13 @@ impl CollectionEntry {
         event.record.extra_data.remove(&vocab.operation_type_column);
 
         Ok(Self {
-            system_time: event.system_time,
-            event_time: event.event_time,
-            path: event.record.path.into(),
-            reference: event.record.reference.into(),
-            extra_data: ExtraData::new(event.record.extra_data),
+            entity: kamu_datasets::CollectionEntry {
+                system_time: event.system_time,
+                event_time: event.event_time,
+                path: event.record.path,
+                reference: event.record.reference,
+                extra_data: event.record.extra_data,
+            },
         })
     }
 }
@@ -59,12 +49,40 @@ impl CollectionEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[ComplexObject]
+#[Object]
 impl CollectionEntry {
+    /// Time when this entry was created
+    pub async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_time
+    }
+
+    /// Time when this entry was created
+    pub async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.event_time
+    }
+
+    /// File system-like path
+    /// Rooted, separated by forward slashes, with elements URL-encoded
+    /// (e.g. `/foo%20bar/baz`)
+    pub async fn path(&self) -> CollectionPath {
+        CollectionPath::from(self.entity.path.clone())
+    }
+
+    /// DID of the linked dataset
+    #[graphql(name = "ref")]
+    pub async fn reference(&self) -> DatasetID<'static> {
+        DatasetID::from(self.entity.reference.clone())
+    }
+
+    /// Extra data associated with this entry
+    pub async fn extra_data(&self) -> ExtraData {
+        ExtraData::new(self.entity.extra_data.clone())
+    }
+
     /// Resolves the reference to linked dataset
     #[tracing::instrument(level = "info", name = CollectionEntry_as_dataset, skip_all)]
     pub async fn as_dataset(&self, ctx: &Context<'_>) -> Result<Option<Dataset>> {
-        Dataset::try_from_ref(ctx, &self.reference.as_local_ref()).await
+        Dataset::try_from_ref(ctx, &self.entity.reference.as_local_ref()).await
     }
 }
 

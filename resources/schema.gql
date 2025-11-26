@@ -634,11 +634,11 @@ type Collection {
 
 type CollectionEntry {
 	"""
-	Time when this version was created
+	Time when this entry was created
 	"""
 	systemTime: DateTime!
 	"""
-	Time when this version was created
+	Time when this entry was created
 	"""
 	eventTime: DateTime!
 	"""
