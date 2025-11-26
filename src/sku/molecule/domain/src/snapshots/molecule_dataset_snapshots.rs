@@ -260,8 +260,34 @@ impl MoleculeDatasetSnapshots {
                 odf::schema::DataField::string("molecule_access_level"),
                 odf::schema::DataField::string("content_type").optional(),
                 odf::schema::DataField::u64("content_length"),
-                odf::schema::DataField::list("categories", odf::schema::DataType::string()),
-                odf::schema::DataField::list("tags", odf::schema::DataType::string()),
+                // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
+                //       types in the following columns:
+                //       REQUIRED group categories (LIST) {
+                //         REPEATED group list {
+                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (1)
+                //          }
+                //       }
+                //       REQUIRED group tags (LIST) {
+                //         REPEATED group list {
+                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (2)
+                //         }
+                //       }
+                //
+                // (1), (2) OPTIONAL by some reason, but it's not in data frame.
+                //          Expected: REQUIRED like it should be.
+                //
+                //       By the reason of this, we need to add these columns as optional into data
+                //       schema.
+                // -->
+                odf::schema::DataField::list(
+                    "categories",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                odf::schema::DataField::list(
+                    "tags",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                // <--
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");
@@ -278,7 +304,6 @@ impl MoleculeDatasetSnapshots {
                         schema: Some(
                             [
                                 "activity_type STRING",
-                                // "op INT",
                                 "ipnft_uid STRING",
                                 "path STRING",
                                 "ref STRING",

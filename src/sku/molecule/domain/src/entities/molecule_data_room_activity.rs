@@ -48,8 +48,6 @@ pub struct MoleculeDataRoomActivityEntity {
 
     pub content_length: usize,
 
-    pub data_room_dataset_id: odf::DatasetID,
-
     pub categories: Vec<String>,
 
     pub tags: Vec<String>,
@@ -69,15 +67,15 @@ impl MoleculeDataRoomActivityEntity {
                 event_time: self.event_time,
             },
             record: MoleculeDataRoomActivityDataRecord {
+                activity_type: self.activity_type,
                 ipnft_uid: self.ipnft_uid,
                 path: self.path,
                 r#ref: self.r#ref,
                 version: self.version,
                 change_by: self.change_by,
-                molecule_access_level: self.molecule_access_level,
+                access_level: self.molecule_access_level,
                 content_type: self.content_type,
                 content_length: self.content_length,
-                data_room_dataset_id: self.data_room_dataset_id,
                 categories: self.categories,
                 tags: self.tags,
             },
@@ -89,6 +87,8 @@ impl MoleculeDataRoomActivityEntity {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDataRoomActivityDataRecord {
+    pub activity_type: MoleculeDataRoomFileActivityType,
+
     pub ipnft_uid: String,
 
     pub path: String,
@@ -98,16 +98,16 @@ pub struct MoleculeDataRoomActivityDataRecord {
     pub version: u32,
 
     // NOTE: This should be odf::AccountID, but kept as String for safety.
+    #[serde(rename = "molecule_change_by")]
     pub change_by: String,
 
     // TODO: enum?
-    pub molecule_access_level: String,
+    #[serde(rename = "molecule_access_level")]
+    pub access_level: String,
 
     pub content_type: Option<MediaType>,
 
     pub content_length: usize,
-
-    pub data_room_dataset_id: odf::DatasetID,
 
     pub categories: Vec<String>,
 
