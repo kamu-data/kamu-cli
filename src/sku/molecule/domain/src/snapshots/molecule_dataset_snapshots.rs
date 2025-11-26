@@ -261,7 +261,7 @@ impl MoleculeDatasetSnapshots {
                 odf::schema::DataField::string("content_type").optional(),
                 odf::schema::DataField::u64("content_length"),
                 // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
-                //       types in the following columns:
+                //       types in the following columns during ingesting:
                 //       REQUIRED group categories (LIST) {
                 //         REPEATED group list {
                 //           OPTIONAL BYTE_ARRAY item (STRING); <-- (1)
@@ -273,7 +273,7 @@ impl MoleculeDatasetSnapshots {
                 //         }
                 //       }
                 //
-                // (1), (2) OPTIONAL by some reason, but it's not in data frame.
+                // (1), (2) OPTIONAL by some reason (in new data), but it's not in data frame.
                 //          Expected: REQUIRED like it should be.
                 //
                 //       By the reason of this, we need to add these columns as optional into data
