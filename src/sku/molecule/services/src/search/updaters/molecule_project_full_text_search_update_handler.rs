@@ -1,0 +1,120 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use internal_error::InternalError;
+use kamu_search::{FullTextSearchContext, FullTextSearchService};
+use messaging_outbox::{MessageConsumer, MessageConsumerT};
+
+use crate::domain::{
+    MoleculeProjectMessage,
+    MoleculeProjectMessageCreated,
+    MoleculeProjectMessageDisabled,
+    MoleculeProjectMessageReenabled,
+    molecule_project_full_text_search_schema as project_schema,
+};
+use crate::search::molecule_full_text_search_schema_helpers as schema_helpers;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn MessageConsumer)]
+#[dill::interface(dyn MessageConsumerT<MoleculeProjectMessage>)]
+pub struct MoleculeProjectFullTextSearchUpdateHandler {
+    full_text_search_service: Arc<dyn FullTextSearchService>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MoleculeProjectFullTextSearchUpdateHandler {
+    async fn handle_created_message(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        created_message: &MoleculeProjectMessageCreated,
+    ) -> Result<(), InternalError> {
+        let project_document = schema_helpers::index_project_from_parts(
+            &created_message.ipnft_uid,
+            &created_message.ipnft_symbol,
+            &created_message.project_account_id,
+            created_message.event_time,
+        );
+
+        self.full_text_search_service
+            .index_bulk(
+                ctx,
+                project_schema::SCHEMA_NAME,
+                vec![(created_message.ipnft_uid.clone(), project_document)],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn handle_disabled_message(
+        &self,
+        _disabled_message: &MoleculeProjectMessageDisabled,
+    ) -> Result<(), InternalError> {
+        // TODO: Implement banning logic
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        Ok(())
+    }
+
+    async fn handle_reenabled_message(
+        &self,
+        _reenabled_message: &MoleculeProjectMessageReenabled,
+    ) -> Result<(), InternalError> {
+        // TODO: Implement unbanning logic
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MessageConsumer for MoleculeProjectFullTextSearchUpdateHandler {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<MoleculeProjectMessage> for MoleculeProjectFullTextSearchUpdateHandler {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "MoleculeProjectFullTextSearchUpdateHandler[MoleculeProjectMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        target_catalog: &dill::Catalog,
+        message: &MoleculeProjectMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received Molecule project message");
+
+        let ctx = FullTextSearchContext {
+            catalog: target_catalog,
+            actor_account_id: None, // system actor
+        };
+
+        match message {
+            MoleculeProjectMessage::Created(created_message) => {
+                self.handle_created_message(ctx, created_message).await?;
+            }
+            MoleculeProjectMessage::Disabled(disabled_message) => {
+                self.handle_disabled_message(disabled_message).await?;
+            }
+            MoleculeProjectMessage::Reenabled(reenabled_message) => {
+                self.handle_reenabled_message(reenabled_message).await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

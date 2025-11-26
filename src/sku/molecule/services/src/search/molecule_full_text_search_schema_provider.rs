@@ -95,7 +95,7 @@ impl MoleculeFullTextSearchSchemaProvider {
         let mut documents_by_id = Vec::new();
         for project in projects_listing.projects {
             // Serialize project into search document
-            let document = helpers::index_project(&project);
+            let document = helpers::index_project_from_entity(&project);
 
             // Note: for now, use IPNFT UID as document ID
             // This should be revised after implementing non-tokenized projects
