@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows
 ### Fixed
 - Flow events now processed transactionally
 

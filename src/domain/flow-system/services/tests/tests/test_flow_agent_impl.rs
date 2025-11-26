@@ -659,6 +659,154 @@ async fn test_manual_trigger() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_manual_ingest_with_compaction_trigger() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let ingest_flow_binding = ingest_dataset_binding(&foo_id);
+    let compaction_flow_binding = compaction_dataset_binding(&foo_id);
+
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            compaction_flow_binding.clone(),
+            FlowTriggerRule::Schedule(Duration::milliseconds(120).into()),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            let ingest_task_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let ingest_task_handle = ingest_task_driver.run();
+
+            let compaction_task_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(130),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                }
+                .into_logical_plan(),
+            });
+            let compaction_task_handle = compaction_task_driver.run();
+
+            let manual_ingest_trigger =
+                harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                    flow_binding: ingest_flow_binding.clone(),
+                    run_since_start: Duration::milliseconds(10),
+                    initiator_id: None,
+                    maybe_forced_flow_config_rule: None,
+                });
+            let manual_ingest_handle = manual_ingest_trigger.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(200)).await;
+            };
+
+            tokio::join!(
+                ingest_task_handle,
+                compaction_task_handle,
+                manual_ingest_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting Manual
+
+            #3: +10ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting Manual Executor(task=1, since=10ms)
+
+            #4: +20ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+              "foo" Ingest:
+                Flow ID = 1 Running(task=1)
+
+            #5: +30ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+
+            #6: +130ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Running(task=0)
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+
+            #7: +140ms:
+              "foo" HardCompaction:
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+
+            #8: +140ms:
+              "foo" HardCompaction:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=260ms)
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_ingest_trigger_with_ingest_config() {
     let harness = FlowHarness::new();
 
