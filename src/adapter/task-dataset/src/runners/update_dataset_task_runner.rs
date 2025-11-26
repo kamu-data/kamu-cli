@@ -177,10 +177,12 @@ impl UpdateDatasetTaskRunner {
         transform_item: PullTransformItem,
     ) -> Result<TaskOutcome, InternalError> {
         let transform_elaboration = match self
-            .elaborate_transform_transactionally(
+            .transform_elaboration_service
+            .elaborate_transform(
                 transform_item.target.clone(),
                 transform_item.plan,
                 TransformOptions::default(),
+                None,
             )
             .await
         {
@@ -253,33 +255,6 @@ impl UpdateDatasetTaskRunner {
             }
             TransformElaboration::UpToDate => Ok(TaskOutcome::Success(TaskResult::empty())),
         }
-    }
-
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn elaborate_transform_transactionally(
-        &self,
-        target: ResolvedDataset,
-        plan: TransformPreliminaryPlan,
-        options: TransformOptions,
-    ) -> Result<TransformElaboration, TransformElaborateError> {
-        let refreshed_target = dataset_registry
-            .get_dataset_by_handle(target.get_handle())
-            .await;
-        let mut refreshed_plan = plan;
-        refreshed_plan
-            .datasets_map
-            .refresh_datasets_from_registry(dataset_registry.as_ref())
-            .await;
-
-        let result = self
-            .transform_elaboration_service
-            .elaborate_transform(refreshed_target, refreshed_plan, options, None)
-            .await;
-
-        if let Ok(TransformElaboration::Elaborated(elaboration)) = &result {
-            elaboration.datasets_map.detach_from_transaction();
-        }
-        result
     }
 
     #[transactional_method1(dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>)]
