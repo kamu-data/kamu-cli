@@ -195,16 +195,26 @@ impl ElasticSearchClient {
         Ok(index_settings.clone())
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_move_alias, skip_all, fields(alias_name, to_index))]
-    pub async fn move_alias(
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_assign_alias, skip_all, fields(alias_name, to_index))]
+    pub async fn assign_alias(
         &self,
         alias_name: &str,
         to_index: &str,
+        maybe_filter_json: Option<serde_json::Value>,
     ) -> Result<(), ElasticSearchClientError> {
+        let mut add_command_json = serde_json::json!({
+            "index": to_index,
+            "alias": alias_name,
+            "is_write_index": true,
+        });
+        if let Some(filter_json) = maybe_filter_json {
+            add_command_json["filter"] = filter_json;
+        }
+
         let body = serde_json::json!({
             "actions": [
                 { "remove": { "index": "*", "alias": alias_name } },
-                { "add": { "index": to_index, "alias": alias_name, "is_write_index": true } }
+                { "add": add_command_json }
             ]
         });
 

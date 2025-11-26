@@ -14,6 +14,7 @@ pub type FullTextEntitySchemaName = &'static str;
 pub type FullTextSearchFieldPath = &'static str;
 
 pub const FULL_TEXT_SEARCH_ALIAS_TITLE: &str = "title";
+pub const FULL_TEXT_SEARCH_FIELD_IS_BANNED: &str = "is_banned";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,9 +22,10 @@ pub const FULL_TEXT_SEARCH_ALIAS_TITLE: &str = "title";
 pub struct FullTextSearchEntitySchema {
     pub schema_name: FullTextEntitySchemaName,
     pub version: u32,
+    pub upgrade_mode: FullTextSearchEntitySchemaUpgradeMode,
     pub fields: &'static [FullTextSchemaField],
     pub title_field: FullTextSearchFieldPath,
-    pub upgrade_mode: FullTextSearchEntitySchemaUpgradeMode,
+    pub enable_banning: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,8 +49,9 @@ pub enum FullTextSchemaFieldRole {
     },
     Keyword,
     DateTime,
+    Boolean,
     UnprocessedObject,
-    // TODO: Add more field roles as needed, e.g., Numeric, Boolean,
+    // TODO: Add more field roles as needed, e.g., Numeric,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -58,6 +58,7 @@ pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
     title_field: FIELD_ACCOUNT_NAME,
+    enable_banning: true,
     upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
 };
 

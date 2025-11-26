@@ -122,7 +122,7 @@ impl Search {
     ) -> Result<FullTextSearchResponse> {
         let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
 
-        // use kamu_accounts::account_full_text_search_schema as account_schema;
+        use kamu_accounts::account_full_text_search_schema as account_schema;
         use kamu_datasets::dataset_full_text_search_schema as dataset_schema;
 
         // TODO: max limit is 10,000 in ES, otherwise we need cursors
@@ -149,7 +149,10 @@ impl Search {
                             Some(prompt)
                         },
                         source: FullTextSearchRequestSourceSpec::All,
-                        entity_schemas: vec![dataset_schema::SCHEMA_NAME],
+                        entity_schemas: vec![
+                            account_schema::SCHEMA_NAME,
+                            dataset_schema::SCHEMA_NAME,
+                        ],
                         filter: None,
                         // sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
                         sort: vec![],

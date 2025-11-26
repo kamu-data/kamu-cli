@@ -10,7 +10,12 @@
 use std::borrow::Cow;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_search::{FullTextEntitySchemaName, FullTextSearchEntitySchemaUpgradeMode};
+use kamu_search::{
+    FULL_TEXT_SEARCH_FIELD_IS_BANNED,
+    FullTextEntitySchemaName,
+    FullTextSearchEntitySchema,
+    FullTextSearchEntitySchemaUpgradeMode,
+};
 
 use super::ElasticSearchIndexMappings;
 use crate::ElasticSearchFullTextSearchConfig;
@@ -50,7 +55,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
     pub async fn ensure_version_existence(
         &self,
         mappings: ElasticSearchIndexMappings,
-        upgrade_mode: FullTextSearchEntitySchemaUpgradeMode,
+        schema: &FullTextSearchEntitySchema,
     ) -> Result<EntityIndexEnsureOutcome, InternalError> {
         let alias_name = self.alias_name();
         let index_name = self.index_name();
@@ -142,7 +147,8 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
                         alias_name,
                         existing_version = existing_version_metadata.schema_version,
                         new_version = self.version,
-                        upgrade_mode = ?upgrade_mode,
+                        upgrade_mode = ?schema.upgrade_mode,
+                        enable_banning = schema.enable_banning,
                         "Upgrading index to new version",
                     );
 
@@ -150,7 +156,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
                     self.create_new_index(&index_name, &mappings, version_metadata)
                         .await?;
 
-                    match upgrade_mode {
+                    match schema.upgrade_mode {
                         FullTextSearchEntitySchemaUpgradeMode::Reindex => {
                             // Try reindexing data from old index to new index
                             // Keep old data for retention, new index will have updated schema and
@@ -170,7 +176,11 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
                     // Assign alias to new index version
                     self.client
-                        .move_alias(&alias_name, &index_name)
+                        .assign_alias(
+                            &alias_name,
+                            &index_name,
+                            self.build_alias_filter_json(schema),
+                        )
                         .await
                         .int_err()?;
 
@@ -180,7 +190,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
                         to_index: index_name,
                         existing_version: existing_version_metadata.schema_version,
                         new_version: self.version,
-                        upgrade_mode,
+                        upgrade_mode: schema.upgrade_mode,
                     })
                 }
             }
@@ -194,7 +204,11 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
             // Assign alias to new index
             self.client
-                .move_alias(&alias_name, &index_name)
+                .assign_alias(
+                    &alias_name,
+                    &index_name,
+                    self.build_alias_filter_json(schema),
+                )
                 .await
                 .int_err()?;
 
@@ -202,6 +216,31 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
                 alias: alias_name,
                 index: index_name,
             })
+        }
+    }
+
+    fn build_alias_filter_json(
+        &self,
+        schema: &FullTextSearchEntitySchema,
+    ) -> Option<serde_json::Value> {
+        // Apply automatic banning filter in the alias if enabled in schema.
+        // This will make banned documents invisible in search results.
+        // Note that the documents will still exist in the index,
+        // just won't be returned in search queries.
+        if schema.enable_banning {
+            Some(serde_json::json!({
+                "bool": {
+                    "must_not": [
+                        {
+                            "term": {
+                                FULL_TEXT_SEARCH_FIELD_IS_BANNED: true
+                            }
+                        }
+                    ]
+                }
+            }))
+        } else {
+            None
         }
     }
 

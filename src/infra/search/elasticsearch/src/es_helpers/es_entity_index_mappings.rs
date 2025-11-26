@@ -9,6 +9,7 @@
 
 use kamu_search::{
     FULL_TEXT_SEARCH_ALIAS_TITLE,
+    FULL_TEXT_SEARCH_FIELD_IS_BANNED,
     FullTextSchemaFieldRole,
     FullTextSearchEntitySchema,
 };
@@ -151,6 +152,10 @@ impl ElasticSearchIndexMappings {
                     "type": "date"
                 }),
 
+                FullTextSchemaFieldRole::Boolean => serde_json::json!({
+                    "type": "boolean"
+                }),
+
                 FullTextSchemaFieldRole::UnprocessedObject => serde_json::json!({
                     "type": "object",
                     "enabled": false
@@ -166,6 +171,15 @@ impl ElasticSearchIndexMappings {
                 "path": entity_schema.title_field
             }),
         );
+
+        if entity_schema.enable_banning {
+            mappings.insert(
+                FULL_TEXT_SEARCH_FIELD_IS_BANNED.to_string(),
+                serde_json::json!({
+                    "type": "boolean"
+                }),
+            );
+        }
 
         let mappings_json = serde_json::json!({ "properties": mappings });
         let mappings_hash = Self::hash_json_normalized(&mappings_json);
