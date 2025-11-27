@@ -1,0 +1,74 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use internal_error::InternalError;
+use kamu_search::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn FullTextSearchService)]
+pub struct DummyFullTextSearchService {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FullTextSearchService for DummyFullTextSearchService {
+    async fn health(
+        &self,
+        _: FullTextSearchContext<'_>,
+    ) -> Result<serde_json::Value, InternalError> {
+        Ok(serde_json::json!({
+            "status": "ok",
+            "details": "This is a dummy full text search service"
+        }))
+    }
+
+    async fn search(
+        &self,
+        _: FullTextSearchContext<'_>,
+        _req: FullTextSearchRequest,
+    ) -> Result<FullTextSearchResponse, InternalError> {
+        Ok(FullTextSearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: 0,
+            hits: vec![],
+        })
+    }
+
+    async fn index_bulk(
+        &self,
+        _ctx: FullTextSearchContext<'_>,
+        _schema_name: FullTextEntitySchemaName,
+        _docs: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        Ok(())
+    }
+
+    async fn update_bulk(
+        &self,
+        _ctx: FullTextSearchContext<'_>,
+        _schema_name: FullTextEntitySchemaName,
+        _updates: Vec<(FullTextEntityId, serde_json::Value)>,
+    ) -> Result<(), InternalError> {
+        Ok(())
+    }
+
+    async fn delete_bulk(
+        &self,
+        _ctx: FullTextSearchContext<'_>,
+        _schema_name: FullTextEntitySchemaName,
+        _ids: Vec<FullTextEntityId>,
+    ) -> Result<(), InternalError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

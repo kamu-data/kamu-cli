@@ -12,4 +12,7 @@
 pub const MESSAGE_CONSUMER_KAMU_ACCOUNTS_DID_SECRET_SERVICE: &str =
     "dev.kamu.domain.accounts.DidSecretService";
 
+pub const MESSAGE_CONSUMER_KAMU_ACCOUNTS_FULL_TEXT_SEARCH_UPDATER: &str =
+    "dev.kamu.domain.accounts.FullTextSearchUpdater";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -383,6 +383,7 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
+                    self.system_time_source.now(),
                     dataset_handle.id.clone(),
                     owner_id,
                     odf::DatasetVisibility::Public,
@@ -422,6 +423,7 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
+                    self.system_time_source.now(),
                     dataset_handle.id.clone(),
                     owner_id,
                     odf::DatasetVisibility::Public,

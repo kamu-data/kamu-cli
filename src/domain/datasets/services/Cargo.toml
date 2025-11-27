@@ -39,6 +39,7 @@ kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-search = { workspace = true }
 messaging-outbox = { workspace = true }
 mockall = { optional = true, version = "0.13" }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }

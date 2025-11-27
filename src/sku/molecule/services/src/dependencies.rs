@@ -14,6 +14,10 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut CatalogBuilder) {
+    b.add::<MoleculeFullTextSearchSchemaProvider>();
+
+    b.add::<MoleculeProjectFullTextSearchUpdateHandler>();
+
     b.add::<MoleculeProjectServiceImpl>();
 
     b.add::<MoleculeCreateProjectUseCaseImpl>();

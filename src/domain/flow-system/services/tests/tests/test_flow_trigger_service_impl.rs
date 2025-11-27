@@ -459,7 +459,7 @@ impl FlowTriggerHarness {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::deleted(dataset_id.clone()),
+                DatasetLifecycleMessage::deleted(Utc::now(), dataset_id.clone()),
             )
             .await
             .unwrap();

@@ -33,6 +33,7 @@ odf = { workspace = true, default-features = false }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-search = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }

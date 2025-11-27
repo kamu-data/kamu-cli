@@ -13,6 +13,9 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool) {
+    b.add::<DatasetFullTextSearchSchemaProvider>();
+    b.add::<DatasetFullTextSearchUpdater>();
+
     if needs_indexing {
         b.add::<DatasetEntryIndexer>();
         b.add::<DatasetReferenceIndexer>();

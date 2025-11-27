@@ -35,6 +35,7 @@ const NEW_REGULAR_USER_NAME: &str = "regular-user-new";
 async fn test_update_account_email_success() {
     let mut mock_outbox = MockOutbox::new();
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_email_changed(&mut mock_outbox);
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .mock_account_authorization_helper(MockAccountAuthorizationHelper::allowing())
@@ -94,6 +95,44 @@ async fn test_update_account_email_duplicate_error() {
         harness.update_use_case.execute(&account_to_update).await,
         Err(UpdateAccountError::Duplicate(_))
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_update_account_display_name_success() {
+    let mut mock_outbox = MockOutbox::new();
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_display_name_changed(&mut mock_outbox);
+
+    let harness = UpdateAccountUseCaseImplHarness::builder()
+        .mock_account_authorization_helper(MockAccountAuthorizationHelper::allowing())
+        .mock_outbox(mock_outbox)
+        .build()
+        .await;
+
+    let account_name = odf::AccountName::new_unchecked("foo");
+    let created_account = harness.create_account(&account_name).await;
+
+    let new_display_name = AccountDisplayName::from("Foo Bar");
+    let account_to_update = Account {
+        display_name: new_display_name.clone(),
+        ..created_account.clone()
+    };
+
+    harness
+        .update_use_case
+        .execute(&account_to_update)
+        .await
+        .unwrap();
+
+    let account = harness
+        .account_service
+        .get_account_by_id(&created_account.id)
+        .await
+        .unwrap();
+
+    assert_eq!(account.display_name, new_display_name);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -371,6 +410,42 @@ impl UpdateAccountUseCaseImplHarness {
             .returning(|_, _, _| Ok(()));
     }
 
+    fn expect_outbox_account_email_changed(mock_outbox: &mut MockOutbox) {
+        use mockall::predicate::{eq, function};
+        mock_outbox
+            .expect_post_message_as_json()
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE),
+                function(|message_as_json: &serde_json::Value| {
+                    let message_res =
+                        serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone())
+                            .unwrap();
+                    matches!(message_res, AccountLifecycleMessage::Updated(u)
+                        if u.old_email != u.new_email)
+                }),
+                eq(2),
+            )
+            .returning(|_, _, _| Ok(()));
+    }
+
+    fn expect_outbox_account_display_name_changed(mock_outbox: &mut MockOutbox) {
+        use mockall::predicate::{eq, function};
+        mock_outbox
+            .expect_post_message_as_json()
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE),
+                function(|message_as_json: &serde_json::Value| {
+                    let message_res =
+                        serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone())
+                            .unwrap();
+                    matches!(message_res, AccountLifecycleMessage::Updated(u)
+                        if u.old_display_name != u.new_display_name)
+                }),
+                eq(2),
+            )
+            .returning(|_, _, _| Ok(()));
+    }
+
     fn expect_outbox_account_renamed(mock_outbox: &mut MockOutbox) {
         use mockall::predicate::{eq, function};
         mock_outbox
@@ -381,9 +456,10 @@ impl UpdateAccountUseCaseImplHarness {
                     let message_res =
                         serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone())
                             .unwrap();
-                    matches!(message_res, AccountLifecycleMessage::Renamed(_))
+                    matches!(message_res, AccountLifecycleMessage::Updated(u)
+                        if u.old_account_name != u.new_account_name)
                 }),
-                eq(1),
+                eq(2),
             )
             .returning(|_, _, _| Ok(()));
     }

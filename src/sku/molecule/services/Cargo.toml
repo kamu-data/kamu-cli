@@ -34,9 +34,10 @@ messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
+kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-molecule-domain = { workspace = true }
-kamu-core = { workspace = true }
+kamu-search = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
@@ -46,4 +47,5 @@ dill = { version = "0.14", default-features = false }
 indoc = { version = "2", default-features = false }
 num-bigint = { version = "0.4", default-features = false }
 serde_json = { version = "1.0", default-features = false }
+tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
