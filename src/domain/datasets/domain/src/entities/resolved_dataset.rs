@@ -76,8 +76,6 @@ impl ResolvedDataset {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl std::ops::Deref for ResolvedDataset {
     type Target = Arc<dyn odf::Dataset>;
     fn deref(&self) -> &Self::Target {
@@ -85,11 +83,38 @@ impl std::ops::Deref for ResolvedDataset {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl std::fmt::Debug for ResolvedDataset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.handle.fmt(f)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct WriteCheckedDataset<'a>(pub &'a ResolvedDataset);
+
+impl std::ops::Deref for WriteCheckedDataset<'_> {
+    type Target = ResolvedDataset;
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ReadCheckedDataset<'a>(pub &'a ResolvedDataset);
+
+impl std::ops::Deref for ReadCheckedDataset<'_> {
+    type Target = ResolvedDataset;
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+// Writing presumes Read access as well
+impl<'a> From<WriteCheckedDataset<'a>> for ReadCheckedDataset<'a> {
+    fn from(v: WriteCheckedDataset<'a>) -> Self {
+        ReadCheckedDataset(v.0)
     }
 }
 

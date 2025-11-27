@@ -12,14 +12,12 @@ use std::sync::Arc;
 use dill::{component, interface};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
     GetDataOptions,
     PushIngestDataError,
     PushIngestDataUseCase,
     PushIngestError,
     QueryService,
-    auth,
 };
 use kamu_datasets::{
     ContentArgs,
@@ -31,6 +29,7 @@ use kamu_datasets::{
     UpdateVersionFileUseCaseError,
     VERSION_COLUMN_NAME,
     VersionedFileEntity,
+    WriteCheckedDataset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,7 +37,6 @@ use kamu_datasets::{
 #[component]
 #[interface(dyn UpdateVersionFileUseCase)]
 pub struct UpdateVersionFileUseCaseImpl {
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
 }
@@ -46,12 +44,12 @@ pub struct UpdateVersionFileUseCaseImpl {
 impl UpdateVersionFileUseCaseImpl {
     async fn get_latest_version(
         &self,
-        target_dataset: ResolvedDataset,
+        file_dataset: ResolvedDataset,
     ) -> Result<(FileVersion, odf::Multihash), InternalError> {
         // TODO: Consider retractions / corrections
         let query_res = self
             .query_svc
-            .tail(target_dataset, 0, 1, GetDataOptions::default())
+            .tail(file_dataset, 0, 1, GetDataOptions::default())
             .await
             .int_err()?;
 
@@ -73,13 +71,13 @@ impl UpdateVersionFileUseCaseImpl {
 
     async fn get_versioned_file_entity_from_latest_entry(
         &self,
-        target_dataset: ResolvedDataset,
+        file_dataset: ResolvedDataset,
         extra_data: Option<ExtraDataFields>,
     ) -> Result<Option<VersionedFileEntity>, InternalError> {
         // TODO: Consider retractions / corrections
         let query_res = self
             .query_svc
-            .tail(target_dataset, 0, 1, GetDataOptions::default())
+            .tail(file_dataset, 0, 1, GetDataOptions::default())
             .await
             .int_err()?;
 
@@ -103,28 +101,16 @@ impl UpdateVersionFileUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
-    #[tracing::instrument(level = "info", name = UpdateVersionFileUseCaseImpl_execute, skip_all, fields(%dataset_handle.id))]
+    #[tracing::instrument(level = "info", name = UpdateVersionFileUseCaseImpl_execute, skip_all, fields(id = %file_dataset.get_id()))]
     async fn execute(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        file_dataset: WriteCheckedDataset<'_>,
         content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError> {
-        let target_dataset = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Write)
-            .await
-            .map_err(|e| {
-                use RebacDatasetIdUnresolvedError as E;
-                match e {
-                    E::Access(e) => UpdateVersionFileUseCaseError::Access(e),
-                    e @ E::Internal(_) => UpdateVersionFileUseCaseError::Internal(e.int_err()),
-                }
-            })?;
-
         let entity = if let Some(args) = content_args_maybe {
-            let (latest_version, _) = self.get_latest_version(target_dataset.clone()).await?;
+            let (latest_version, _) = self.get_latest_version(file_dataset.clone()).await?;
             let new_version = latest_version + 1;
 
             let result = VersionedFileEntity::new(
@@ -137,7 +123,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
 
             // Upload data object in case when content is present
             if let Some(content_stream) = args.content_stream {
-                let data_repo = target_dataset.as_data_repo();
+                let data_repo = file_dataset.as_data_repo();
                 data_repo
                     .insert_stream(
                         content_stream,
@@ -154,7 +140,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
             result
         } else {
             let mut last_entity = self
-                .get_versioned_file_entity_from_latest_entry(target_dataset.clone(), extra_data)
+                .get_versioned_file_entity_from_latest_entry(file_dataset.clone(), extra_data)
                 .await?
                 .unwrap();
 
@@ -170,7 +156,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
         let ingest_result = self
             .push_ingest_data_use_case
             .execute(
-                target_dataset,
+                file_dataset.clone(),
                 kamu_core::DataSource::Buffer(entity.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
