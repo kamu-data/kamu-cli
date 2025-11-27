@@ -15,8 +15,9 @@ use axum::response::Response;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_core::auth;
 use kamu_core::auth::DatasetActionAccess;
-use kamu_core::{DatasetRegistry, auth};
+use kamu_datasets::DatasetRegistry;
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;

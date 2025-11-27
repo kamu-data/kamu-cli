@@ -14,6 +14,7 @@ use dill::*;
 use engine::TransformRequestExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset, ResolvedDatasetsMap};
 use random_strings::get_random_name;
 
 use super::build_preliminary_request_ext;

@@ -10,8 +10,9 @@
 use cheap_clone::CheapClone;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_datasets::ResolvedDataset;
 
-use crate::{PushSourceNotFoundError, ResolvedDataset, WriterSourceEventVisitor};
+use crate::{PushSourceNotFoundError, WriterSourceEventVisitor};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

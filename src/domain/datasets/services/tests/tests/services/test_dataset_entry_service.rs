@@ -17,11 +17,12 @@ use init_on_startup::InitOnStartup;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject, DidSecretEncryptionConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
-use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_core::TenancyConfig;
 use kamu_datasets::{
     DatasetEntry,
     DatasetEntryRepository,
     DatasetLifecycleMessage,
+    DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     MockDatasetEntryRepository,
 };

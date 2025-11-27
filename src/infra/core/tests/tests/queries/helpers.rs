@@ -23,14 +23,8 @@ use kamu::{
     SessionContextBuilder,
 };
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{
-    DatasetRegistry,
-    DidGenerator,
-    DidGeneratorDefault,
-    ResolvedDataset,
-    TenancyConfig,
-    auth,
-};
+use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig, auth};
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use s3_utils::S3Context;

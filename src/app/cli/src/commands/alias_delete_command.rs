@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use futures::StreamExt;
 use kamu::domain::*;
+use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
 

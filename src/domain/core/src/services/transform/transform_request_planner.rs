@@ -9,6 +9,7 @@
 
 use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::InternalError;
+use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use thiserror::Error;
 
 use crate::engine::TransformRequestExt;

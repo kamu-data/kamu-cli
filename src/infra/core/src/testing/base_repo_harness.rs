@@ -12,17 +12,8 @@ use std::sync::Arc;
 
 use bon::bon;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{
-    DatasetRegistry,
-    DatasetRegistryExt,
-    DidGenerator,
-    DidGeneratorDefault,
-    MockDidGenerator,
-    ResolvedDataset,
-    RunInfoDir,
-    TenancyConfig,
-};
-use kamu_datasets::CreateDatasetResult;
+use kamu_core::{DidGenerator, DidGeneratorDefault, MockDidGenerator, RunInfoDir, TenancyConfig};
+use kamu_datasets::{CreateDatasetResult, DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;

@@ -25,6 +25,7 @@ doctest = false
 file-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
 odf = { workspace = true, features = ["arrow"] }
 
 datafusion = { version = "50", default-features = false }

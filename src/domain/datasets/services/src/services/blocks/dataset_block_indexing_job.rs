@@ -12,12 +12,13 @@ use std::sync::Arc;
 use database_common_macros::transactional_method3;
 use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::{DatasetRegistry, ResolvedDataset};
 use kamu_datasets::{
     DatasetBlock,
     DatasetDataBlockRepository,
     DatasetKeyBlockRepository,
+    DatasetRegistry,
     MetadataEventType,
+    ResolvedDataset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -76,9 +76,9 @@ impl DatasetsMut {
     ) -> Result<Option<DatasetMut>> {
         // TODO: PERF: GQL: DataLoader?
 
-        use kamu_core::DatasetRegistryExt;
+        use kamu_datasets::DatasetRegistryExt;
 
-        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
+        let dataset_registry = from_catalog_n!(ctx, dyn kamu_datasets::DatasetRegistry);
 
         let maybe_dataset_handle = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
@@ -240,7 +240,7 @@ impl DatasetsMut {
                     .expect("Account must exist");
                 let dataset = Dataset::from_resolved_authorized_dataset(
                     account,
-                    &kamu_core::ResolvedDataset::from_created(&result),
+                    &kamu_datasets::ResolvedDataset::from_created(&result),
                 );
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
             }

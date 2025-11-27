@@ -19,7 +19,7 @@ use kamu_auth_rebac::{
     RebacDatasetRegistryFacade,
 };
 use kamu_core::auth::{self, ClassifyByAllowanceDatasetActionUnauthorizedError};
-use kamu_core::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

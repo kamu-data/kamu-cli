@@ -252,7 +252,7 @@ impl Account {
     ) -> Result<DatasetConnection> {
         let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
-            dyn kamu_core::DatasetRegistry,
+            dyn kamu_datasets::DatasetRegistry,
             dyn DatasetActionAuthorizer
         );
 

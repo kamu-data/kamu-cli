@@ -10,10 +10,11 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
+use kamu_datasets::ResolvedDataset;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{CompactionListener, CompactionPlan, ResolvedDataset};
+use crate::{CompactionListener, CompactionPlan};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

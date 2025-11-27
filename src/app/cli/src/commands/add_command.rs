@@ -16,6 +16,8 @@ use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
+    DatasetRegistry,
+    DatasetRegistryExt,
     DeleteDatasetUseCase,
 };
 
