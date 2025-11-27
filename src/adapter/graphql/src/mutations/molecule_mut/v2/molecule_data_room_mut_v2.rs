@@ -167,7 +167,7 @@ impl MoleculeDataRoomMutV2 {
                     system_time: now,
                     event_time: now,
                     path: path.into(),
-                    reference: versioned_file_dataset.get_id().clone().into(),
+                    reference: versioned_file_dataset.get_id().clone(),
                     extra_data: serde_json::Map::default(),
                 },
             },

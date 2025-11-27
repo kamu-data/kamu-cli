@@ -9,7 +9,7 @@
 
 use database_common::PaginationOpts;
 use kamu::domain;
-use kamu_datasets::{ViewCollectionEntriesError, ViewCollectionEntriesUseCase};
+use kamu_datasets::{ReadCheckedDataset, ViewCollectionEntriesError, ViewCollectionEntriesUseCase};
 
 use super::{CollectionEntry, CollectionEntryConnection};
 use crate::prelude::*;
@@ -154,10 +154,12 @@ impl CollectionProjection<'_> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
 
+        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
+
         let view_collection_entries = from_catalog_n!(ctx, dyn ViewCollectionEntriesUseCase);
         let entries_listing = view_collection_entries
             .execute(
-                self.readable_state.dataset_handle(),
+                ReadCheckedDataset(readable_dataset),
                 self.as_of.clone(),
                 path_prefix.map(|p| p.to_string()),
                 max_depth,

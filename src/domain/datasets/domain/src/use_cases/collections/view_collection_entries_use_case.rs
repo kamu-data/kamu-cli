@@ -10,7 +10,7 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::CollectionEntry;
+use crate::{CollectionEntry, ReadCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,8 +18,7 @@ use crate::CollectionEntry;
 pub trait ViewCollectionEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
-        // TODO: PERF: use ResolvedDataset instead of DatasetHandle
-        dataset_handle: &odf::DatasetHandle,
+        collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         path_prefix: Option<String>,
         max_depth: Option<usize>,

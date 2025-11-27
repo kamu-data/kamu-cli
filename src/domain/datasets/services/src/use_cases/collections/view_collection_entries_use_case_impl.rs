@@ -10,12 +10,12 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{GetDataOptions, QueryService, auth};
+use internal_error::ResultIntoInternal;
+use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
     CollectionEntryListing,
+    ReadCheckedDataset,
     ViewCollectionEntriesError,
     ViewCollectionEntriesUseCase,
 };
@@ -26,7 +26,6 @@ use kamu_datasets::{
 #[dill::interface(dyn ViewCollectionEntriesUseCase)]
 pub struct ViewCollectionEntriesUseCaseImpl {
     query_svc: Arc<dyn QueryService>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +35,7 @@ pub struct ViewCollectionEntriesUseCaseImpl {
 impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
     async fn execute(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         path_prefix: Option<String>,
         max_depth: Option<usize>,
@@ -44,22 +43,10 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
     ) -> Result<CollectionEntryListing, ViewCollectionEntriesError> {
         use datafusion::logical_expr::{col, lit};
 
-        let readable_dataset = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Read)
-            .await
-            .map_err(|e| {
-                use RebacDatasetIdUnresolvedError as E;
-                match e {
-                    E::Access(e) => ViewCollectionEntriesError::Access(e),
-                    e @ E::Internal(_) => ViewCollectionEntriesError::Internal(e.int_err()),
-                }
-            })?;
-
         let df = self
             .query_svc
             .get_data(
-                readable_dataset.clone(),
+                (*collection_dataset).clone(),
                 GetDataOptions { block_hash: as_of },
             )
             .await
