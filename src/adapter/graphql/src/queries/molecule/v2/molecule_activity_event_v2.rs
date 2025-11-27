@@ -20,6 +20,25 @@ pub enum MoleculeActivityEventV2 {
     Announcement(MoleculeActivityAnnouncementV2),
 }
 
+impl MoleculeActivityEventV2 {
+    pub fn file_added(entry: MoleculeDataRoomEntry) -> Self {
+        Self::FileAdded(MoleculeActivityFileAddedV2 { entry })
+    }
+
+    pub fn file_updated(entry: MoleculeDataRoomEntry) -> Self {
+        Self::FileUpdated(MoleculeActivityFileUpdatedV2 { entry })
+    }
+
+    pub fn file_removed(entry: MoleculeDataRoomEntry) -> Self {
+        Self::FileRemoved(MoleculeActivityFileRemovedV2 { entry })
+    }
+
+    #[expect(dead_code)]
+    pub fn announcement(announcement: MoleculeAnnouncementEntry) -> Self {
+        Self::Announcement(MoleculeActivityAnnouncementV2 { announcement })
+    }
+}
+
 #[derive(SimpleObject)]
 pub struct MoleculeActivityFileAddedV2 {
     pub entry: MoleculeDataRoomEntry,

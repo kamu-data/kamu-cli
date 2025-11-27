@@ -136,6 +136,7 @@ impl MoleculeDataRoomMutV2 {
         // NOTE: Version and content hash get updated to correct values below
         let content_type = content_args.content_type.clone();
         let content_length = content_args.content_length;
+        let content_hash = create_versioned_file_res.head.clone();
 
         let mut versioned_file_entry = MoleculeVersionedFileEntry {
             entry: VersionedFileEntry {
@@ -149,13 +150,13 @@ impl MoleculeDataRoomMutV2 {
                     .map(|ct| ct.0.clone())
                     .unwrap_or_default(),
                 content_length: content_args.content_length,
-                content_hash: odf::Multihash::from_digest_sha3_256(b"").into(),
+                content_hash: create_versioned_file_res.head.into(),
                 extra_data: ExtraData::default(),
             },
             basic_info: MoleculeVersionedFileEntryBasicInfo {
                 access_level: access_level.clone(),
                 change_by: change_by.clone(),
-                description,
+                description: description.clone(),
                 categories: categories.clone().unwrap_or_default(),
                 tags: tags.clone().unwrap_or_default(),
             },
@@ -235,6 +236,8 @@ impl MoleculeDataRoomMutV2 {
                 access_level,
                 content_type,
                 content_length,
+                content_hash,
+                description,
                 categories: categories.unwrap_or_default(),
                 tags: tags.unwrap_or_default(),
             };
@@ -328,7 +331,7 @@ impl MoleculeDataRoomMutV2 {
             basic_info: MoleculeVersionedFileEntryBasicInfo {
                 access_level: access_level.clone(),
                 change_by: change_by.clone(),
-                description,
+                description: description.clone(),
                 categories: categories.clone().unwrap_or_default(),
                 tags: tags.clone().unwrap_or_default(),
             },
@@ -351,7 +354,7 @@ impl MoleculeDataRoomMutV2 {
             .int_err()?;
 
         versioned_file_entry.entry.version = update_version_result.new_version;
-        versioned_file_entry.entry.content_hash = update_version_result.content_hash.into();
+        versioned_file_entry.entry.content_hash = update_version_result.content_hash.clone().into();
 
         // 3. Update the file state in the data room.
 
@@ -393,7 +396,7 @@ impl MoleculeDataRoomMutV2 {
             let data_room_activity = MoleculeDataRoomActivityEntity {
                 system_time: now,
                 event_time: now,
-                activity_type: MoleculeDataRoomFileActivityType::Added,
+                activity_type: MoleculeDataRoomFileActivityType::Updated,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: path.into(),
                 r#ref: file_dataset_id,
@@ -402,6 +405,8 @@ impl MoleculeDataRoomMutV2 {
                 access_level,
                 content_type,
                 content_length,
+                content_hash: update_version_result.content_hash,
+                description,
                 categories: categories.unwrap_or_default(),
                 tags: tags.unwrap_or_default(),
             };

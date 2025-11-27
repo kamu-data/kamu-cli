@@ -13,7 +13,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MoleculeDataRoomFileActivityType {
     Added,
@@ -48,6 +48,10 @@ pub struct MoleculeDataRoomActivityEntity {
 
     pub content_length: usize,
 
+    pub content_hash: odf::Multihash,
+
+    pub description: Option<String>,
+
     pub categories: Vec<String>,
 
     pub tags: Vec<String>,
@@ -69,6 +73,8 @@ impl MoleculeDataRoomActivityEntity {
             access_level: r.record.access_level,
             content_type: r.record.content_type,
             content_length: r.record.content_length,
+            content_hash: r.record.content_hash,
+            description: r.record.description,
             categories: r.record.categories,
             tags: r.record.tags,
         })
@@ -92,6 +98,8 @@ impl MoleculeDataRoomActivityEntity {
                 access_level: self.access_level,
                 content_type: self.content_type,
                 content_length: self.content_length,
+                content_hash: self.content_hash,
+                description: self.description,
                 categories: self.categories,
                 tags: self.tags,
             },
@@ -124,6 +132,10 @@ pub struct MoleculeDataRoomActivityDataRecord {
     pub content_type: Option<MediaType>,
 
     pub content_length: usize,
+
+    pub content_hash: odf::Multihash,
+
+    pub description: Option<String>,
 
     pub categories: Vec<String>,
 

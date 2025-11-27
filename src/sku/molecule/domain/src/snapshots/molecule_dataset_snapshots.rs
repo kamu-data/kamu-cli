@@ -24,23 +24,38 @@ impl MoleculeDatasetSnapshots {
     pub fn projects(molecule_account_name: odf::AccountName) -> odf::metadata::DatasetSnapshot {
         let alias = Self::projects_alias(molecule_account_name);
 
+        let schema = odf::schema::DataSchema::builder()
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
+            .extend([
+                odf::schema::DataField::string("account_id"),
+                odf::schema::DataField::string("ipnft_symbol"),
+                odf::schema::DataField::string("ipnft_uid"),
+                odf::schema::DataField::string("ipnft_address"),
+                odf::schema::DataField::string("ipnft_token_id"),
+                odf::schema::DataField::string("data_room_dataset_id"),
+                odf::schema::DataField::string("announcements_dataset_id"),
+            ])
+            .build()
+            .expect("Schema is always valid as there are no user inputs");
+
         odf::DatasetSnapshot {
             name: alias,
             kind: odf::DatasetKind::Root,
             metadata: vec![
+                odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema::new(schema)),
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
                         schema: Some(
                             [
-                                "op INT",
-                                "account_id STRING",
-                                "ipnft_symbol STRING",
-                                "ipnft_uid STRING",
-                                "ipnft_address STRING",
-                                "ipnft_token_id STRING",
-                                "data_room_dataset_id STRING",
-                                "announcements_dataset_id STRING",
+                                "op INT NOT NULL",
+                                "account_id STRING NOT NULL",
+                                "ipnft_symbol STRING NOT NULL",
+                                "ipnft_uid STRING NOT NULL",
+                                "ipnft_address STRING NOT NULL",
+                                "ipnft_token_id STRING NOT NULL",
+                                "data_room_dataset_id STRING NOT NULL",
+                                "announcements_dataset_id STRING NOT NULL",
                             ]
                             .into_iter()
                             .map(str::to_string)
@@ -180,13 +195,13 @@ impl MoleculeDatasetSnapshots {
                     read: odf::metadata::ReadStepNdJson {
                         schema: Some(
                             [
-                                "op INT",
-                                "announcement_id STRING",
-                                "headline STRING",
-                                "body STRING",
-                                "attachments Array<STRING>",
-                                "molecule_access_level STRING",
-                                "molecule_change_by STRING",
+                                "op INT NOT NULL",
+                                "announcement_id STRING NOT NULL",
+                                "headline STRING NOT NULL",
+                                "body STRING NOT NULL",
+                                "attachments Array<STRING> NOT NULL",
+                                "molecule_access_level STRING NOT NULL",
+                                "molecule_change_by STRING NOT NULL",
                             ]
                             .into_iter()
                             .map(str::to_string)
@@ -260,6 +275,8 @@ impl MoleculeDatasetSnapshots {
                 odf::schema::DataField::string("molecule_access_level"),
                 odf::schema::DataField::string("content_type").optional(),
                 odf::schema::DataField::u64("content_length"),
+                odf::schema::DataField::string("content_hash"),
+                odf::schema::DataField::string("description").optional(),
                 // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
                 //       types in the following columns during ingesting:
                 //       REQUIRED group categories (LIST) {
@@ -300,20 +317,21 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        // TODO: NOT NULLs?
                         schema: Some(
                             [
-                                "activity_type STRING",
-                                "ipnft_uid STRING",
-                                "path STRING",
-                                "ref STRING",
-                                "version INT UNSIGNED",
-                                "molecule_change_by STRING",
-                                "molecule_access_level STRING",
-                                "content_type STRING",
-                                "content_length BIGINT UNSIGNED",
-                                "categories Array<STRING>",
-                                "tags Array<STRING>",
+                                "activity_type STRING NOT NULL",
+                                "ipnft_uid STRING NOT NULL",
+                                "path STRING NOT NULL",
+                                "ref STRING NOT NULL",
+                                "version INT UNSIGNED NOT NULL",
+                                "molecule_change_by STRING NOT NULL",
+                                "molecule_access_level STRING NOT NULL",
+                                "content_type STRING NOT NULL",
+                                "content_length BIGINT UNSIGNED NOT NULL",
+                                "content_hash STRING",
+                                "description STRING",
+                                "categories Array<STRING> NOT NULL",
+                                "tags Array<STRING> NOT NULL",
                             ]
                             .into_iter()
                             .map(str::to_string)

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use kamu_core::ResolvedDataset;
 use kamu_datasets::ExtraDataFields;
+use kamu_molecule_domain::MoleculeDataRoomActivityEntity;
 
 use crate::data_loader::AccessCheckedDatasetRef;
 use crate::prelude::*;
@@ -174,6 +175,36 @@ impl MoleculeDataRoomEntry {
             project: project.clone(),
             denormalized_latest_file_info,
         })
+    }
+
+    pub fn new_from_data_room_activity_entity(
+        project: &Arc<MoleculeProjectV2>,
+        activity_entity: MoleculeDataRoomActivityEntity,
+    ) -> Self {
+        let entry = CollectionEntry {
+            system_time: activity_entity.system_time,
+            event_time: activity_entity.event_time,
+            path: activity_entity.path.into(),
+            reference: activity_entity.r#ref.into(),
+            extra_data: Default::default(),
+        };
+        let denormalized_latest_file_info = MoleculeDenormalizeFileToDataRoom {
+            version: activity_entity.version,
+            content_type: activity_entity.content_type.unwrap_or_else(|| "".into()).0,
+            content_length: activity_entity.content_length,
+            content_hash: activity_entity.content_hash,
+            access_level: activity_entity.access_level,
+            change_by: activity_entity.change_by,
+            description: activity_entity.description,
+            categories: activity_entity.categories,
+            tags: activity_entity.tags,
+        };
+
+        Self {
+            entry,
+            denormalized_latest_file_info,
+            project: project.clone(),
+        }
     }
 
     pub fn to_collection_extra_data(&self) -> ExtraData {

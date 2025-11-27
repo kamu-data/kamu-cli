@@ -7,11 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use database_common::PaginationOpts;
 use kamu_molecule_domain::{
+    MoleculeDataRoomFileActivityType,
     MoleculeFindProjectError,
     MoleculeFindProjectUseCase,
     MoleculeProjectListing,
+    MoleculeViewDataRoomActivitiesError,
+    MoleculeViewDataRoomActivitiesUseCase,
     MoleculeViewProjectsError,
     MoleculeViewProjectsUseCase,
 };
@@ -19,9 +25,11 @@ use kamu_molecule_domain::{
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
+    MoleculeActivityEventV2,
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncementEntry,
     MoleculeCategory,
+    MoleculeDataRoomEntry,
     MoleculeProjectActivityFilters,
     MoleculeProjectV2,
     MoleculeProjectV2Connection,
@@ -63,7 +71,7 @@ impl MoleculeV2 {
 #[Object]
 impl MoleculeV2 {
     const DEFAULT_PROJECTS_PER_PAGE: usize = 15;
-    // const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
+    const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
 
     /// Looks up the project
     #[tracing::instrument(level = "info", name = MoleculeV2_project, skip_all, fields(?ipnft_uid))]
@@ -127,16 +135,92 @@ impl MoleculeV2 {
     #[tracing::instrument(level = "info", name = MoleculeV2_activity, skip_all)]
     async fn activity(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
-        let _ = page;
-        let _ = per_page;
+        // TODO: use filters
         let _ = filters;
-        // TODO: implement
-        Ok(MoleculeActivityEventV2Connection::new(Vec::new(), 0, 0))
+
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let (view_data_room_activities_use_case, molecule_view_projects_use_case) = from_catalog_n!(
+            ctx,
+            dyn MoleculeViewDataRoomActivitiesUseCase,
+            dyn MoleculeViewProjectsUseCase
+        );
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
+
+        // TODO: announcements
+
+        let listing = view_data_room_activities_use_case
+            .execute(
+                &molecule_subject,
+                Some(PaginationOpts::from_page(page, per_page)),
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeViewDataRoomActivitiesError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        let projects_mapping: HashMap<_, _> = {
+            let listing = molecule_view_projects_use_case
+                .execute(&molecule_subject, None)
+                .await
+                .map_err(|e| -> GqlError {
+                    use MoleculeViewProjectsError as E;
+                    match e {
+                        E::Access(e) => e.into(),
+                        E::NoProjectsDataset(_) | E::Internal(_) => e.int_err().into(),
+                    }
+                })?;
+
+            listing
+                .projects
+                .into_iter()
+                .map(|project| {
+                    (
+                        project.ipnft_uid.clone(),
+                        Arc::new(MoleculeProjectV2::new(project)),
+                    )
+                })
+                .collect()
+        };
+        let mut nodes = Vec::with_capacity(listing.list.len());
+
+        for activity in listing.list {
+            let Some(project) = projects_mapping.get(&activity.ipnft_uid) else {
+                return Err(GqlError::gql(format!(
+                    "Project [{}] unexpectedly not found",
+                    activity.ipnft_uid
+                )));
+            };
+
+            let activity_type = activity.activity_type;
+            let entry =
+                MoleculeDataRoomEntry::new_from_data_room_activity_entity(project, activity);
+
+            use MoleculeDataRoomFileActivityType as Type;
+
+            let activity_event = match activity_type {
+                Type::Added => MoleculeActivityEventV2::file_added(entry),
+                Type::Updated => MoleculeActivityEventV2::file_updated(entry),
+                Type::Removed => MoleculeActivityEventV2::file_removed(entry),
+            };
+
+            nodes.push(activity_event);
+        }
+
+        Ok(MoleculeActivityEventV2Connection::new(
+            nodes, page, per_page,
+        ))
     }
 
     /// Performs a semantic search
