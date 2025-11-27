@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
 use super::TransformPlan;
@@ -17,7 +18,6 @@ use crate::engine::EngineError;
 use crate::{
     DataNotReproducible,
     EngineProvisioningError,
-    ResolvedDataset,
     TransformListener,
     TransformResult,
     VerificationListener,

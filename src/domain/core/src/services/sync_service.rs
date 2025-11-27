@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use thiserror::Error;
 use url::Url;
 

@@ -15,7 +15,7 @@ use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::AuthenticationService;
-use kamu_core::{CorruptedSourceError, DatasetRegistry, OverwriteSeedBlockError};
+use kamu_core::{CorruptedSourceError, OverwriteSeedBlockError};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
@@ -23,6 +23,7 @@ use kamu_datasets::{
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     DatasetExternallyChangedMessage,
+    DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     SetRefCheckRefMode,
 };

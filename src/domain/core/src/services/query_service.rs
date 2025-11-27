@@ -13,10 +13,10 @@ use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
 use internal_error::*;
+use kamu_datasets::ResolvedDataset;
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
-use crate::ResolvedDataset;
 use crate::auth::DatasetActionUnauthorizedError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

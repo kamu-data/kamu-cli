@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_datasets::ResolvedDataset;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{ResetPlan, ResolvedDataset};
+use crate::ResetPlan;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

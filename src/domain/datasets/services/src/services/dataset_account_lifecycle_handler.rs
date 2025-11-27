@@ -16,7 +16,6 @@ use kamu_accounts::{
     AccountLifecycleMessageUpdated,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
-use kamu_core::DatasetRegistry;
 use kamu_datasets::*;
 use messaging_outbox::prelude::*;
 

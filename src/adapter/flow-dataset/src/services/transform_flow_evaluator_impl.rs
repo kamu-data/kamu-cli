@@ -10,13 +10,8 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_core::{
-    DatasetRegistry,
-    DatasetRegistryExt,
-    TransformRequestPlanner,
-    TransformStatus,
-    TransformStatusError,
-};
+use kamu_core::{TransformRequestPlanner, TransformStatus, TransformStatusError};
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
 use crate::TransformFlowEvaluator;
 

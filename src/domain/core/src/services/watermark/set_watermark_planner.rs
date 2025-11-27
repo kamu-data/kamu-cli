@@ -9,9 +9,10 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
-use crate::{DataWriterMetadataState, ResolvedDataset};
+use crate::DataWriterMetadataState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

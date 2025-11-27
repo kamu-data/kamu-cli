@@ -12,9 +12,10 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::InternalError;
 use kamu_accounts::{AccountLifecycleMessage, MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE};
-use kamu_core::{DatasetRegistry, DatasetRegistryExt};
 use kamu_datasets::{
     DatasetLifecycleMessage,
+    DatasetRegistry,
+    DatasetRegistryExt,
     MESSAGE_CONSUMER_KAMU_DATASET_ALIAS_UPDATE_HANDLER,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };

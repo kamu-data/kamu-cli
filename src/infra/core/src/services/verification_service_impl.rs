@@ -13,6 +13,7 @@ use dill::*;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 use odf::dataset::{MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};

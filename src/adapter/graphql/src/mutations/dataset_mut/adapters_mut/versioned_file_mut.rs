@@ -10,7 +10,7 @@
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
+use kamu_datasets::{UpdateVersionFileUseCase, UpdateVersionFileUseCaseError, WriteCheckedDataset};
 
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, FileVersion};
@@ -20,7 +20,7 @@ use crate::utils::{ContentSource, GetContentArgsError, get_content_args};
 
 #[derive(Debug)]
 pub struct VersionedFileMut<'a> {
-    dataset_request_state: &'a DatasetRequestState,
+    writable_state: &'a DatasetRequestState,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +29,8 @@ pub struct VersionedFileMut<'a> {
 #[Object]
 impl<'a> VersionedFileMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
-            dataset_request_state,
-        }
+    pub fn new(writable_state: &'a DatasetRequestState) -> Self {
+        Self { writable_state }
     }
 
     /// Uploads a new version of content in-band. Can be used for very small
@@ -62,9 +60,11 @@ impl<'a> VersionedFileMut<'a> {
         .await
         .map_err(map_get_content_args_error)?;
 
+        let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
+
         match update_version_file_use_case
             .execute(
-                self.dataset_request_state.dataset_handle(),
+                WriteCheckedDataset(file_dataset),
                 Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
@@ -154,9 +154,11 @@ impl<'a> VersionedFileMut<'a> {
             .await
             .map_err(map_get_content_args_error)?;
 
+        let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
+
         match update_version_file_use_case
             .execute(
-                self.dataset_request_state.dataset_handle(),
+                WriteCheckedDataset(file_dataset),
                 Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
@@ -192,9 +194,11 @@ impl<'a> VersionedFileMut<'a> {
     ) -> Result<UpdateVersionResult> {
         let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
+        let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
+
         match update_version_file_use_case
             .execute(
-                self.dataset_request_state.dataset_handle(),
+                WriteCheckedDataset(file_dataset),
                 None,
                 expected_head.map(Into::into),
                 Some(extra_data.into()),

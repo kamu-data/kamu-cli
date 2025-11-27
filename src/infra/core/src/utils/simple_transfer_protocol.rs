@@ -24,6 +24,8 @@ use kamu_datasets::{
     CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
+    DatasetRegistry,
+    DatasetRegistryExt,
     SetRefCheckRefMode,
 };
 use odf::dataset::{MetadataChainImpl, MetadataChainReferenceRepositoryImpl};

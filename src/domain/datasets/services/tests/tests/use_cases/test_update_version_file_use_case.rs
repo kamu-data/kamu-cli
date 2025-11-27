@@ -25,8 +25,15 @@ use kamu::{
     QueryServiceImpl,
     SessionContextBuilder,
 };
-use kamu_core::{DatasetRegistry, DidGenerator, FileUploadLimitConfig, MockDidGenerator};
-use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
+use kamu_core::{DidGenerator, FileUploadLimitConfig, MockDidGenerator};
+use kamu_datasets::{
+    ContentArgs,
+    DatasetRegistry,
+    ResolvedDataset,
+    UpdateVersionFileUseCase,
+    UpdateVersionFileUseCaseError,
+    WriteCheckedDataset,
+};
 use kamu_datasets_services::UpdateVersionFileUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -41,12 +48,12 @@ async fn test_update_versioned_file_use_case() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = UpdateVersionFileCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 2, true),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-    );
+    let harness =
+        UpdateVersionFileCaseHarness::new(MockDidGenerator::predefined_dataset_ids(vec![
+            dataset_id_foo,
+        ]));
 
-    let created_dataset_handle = harness.create_versioned_file(&alias_foo).await;
+    let file_dataset = harness.create_versioned_file(&alias_foo).await;
 
     let content_args = UpdateVersionFileCaseHarness::combine_content_args(b"foo");
     let content_hash = content_args.content_hash.clone();
@@ -54,7 +61,12 @@ async fn test_update_versioned_file_use_case() {
     // Upload first version
     let res = harness
         .use_case
-        .execute(&created_dataset_handle, Some(content_args), None, None)
+        .execute(
+            WriteCheckedDataset(&file_dataset),
+            Some(content_args),
+            None,
+            None,
+        )
         .await;
 
     assert_matches!(res, Ok(result) if result.new_version == 1 && result.content_hash == content_hash);
@@ -65,7 +77,12 @@ async fn test_update_versioned_file_use_case() {
     // Upload second version
     let res = harness
         .use_case
-        .execute(&created_dataset_handle, Some(content_args), None, None)
+        .execute(
+            WriteCheckedDataset(&file_dataset),
+            Some(content_args),
+            None,
+            None,
+        )
         .await;
 
     assert_matches!(res, Ok(result) if result.new_version == 2 && result.content_hash == content_hash);
@@ -78,21 +95,21 @@ async fn test_update_versioned_file_use_case_errors() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = UpdateVersionFileCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 2, true),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-    );
+    let harness =
+        UpdateVersionFileCaseHarness::new(MockDidGenerator::predefined_dataset_ids(vec![
+            dataset_id_foo,
+        ]));
 
-    let created_dataset_handle = harness.create_versioned_file(&alias_foo).await;
+    let file_dataset = harness.create_versioned_file(&alias_foo).await;
 
     let content_args = UpdateVersionFileCaseHarness::combine_content_args(b"foo");
 
-    let seed_bloch_hash = harness.get_seed_block_hash(&created_dataset_handle).await;
+    let seed_bloch_hash = harness.get_seed_block_hash(file_dataset.as_ref()).await;
 
     let res = harness
         .use_case
         .execute(
-            &created_dataset_handle,
+            WriteCheckedDataset(&file_dataset),
             Some(content_args),
             Some(seed_bloch_hash),
             None,
@@ -108,7 +125,7 @@ async fn test_update_versioned_file_use_case_errors() {
     let res = harness
         .use_case
         .execute(
-            &created_dataset_handle,
+            WriteCheckedDataset(&file_dataset),
             Some(content_args),
             Some(old_head),
             None,
@@ -131,14 +148,11 @@ struct UpdateVersionFileCaseHarness {
 }
 
 impl UpdateVersionFileCaseHarness {
-    fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
-        mock_did_generator: MockDidGenerator,
-    ) -> Self {
+    fn new(mock_did_generator: MockDidGenerator) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .without_outbox()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_authorizer(Some(MockDatasetActionAuthorizer::new()))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 
@@ -174,7 +188,7 @@ impl UpdateVersionFileCaseHarness {
     pub async fn create_versioned_file(
         &self,
         dataset_alias: &odf::DatasetAlias,
-    ) -> odf::DatasetHandle {
+    ) -> ResolvedDataset {
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
@@ -213,20 +227,11 @@ impl UpdateVersionFileCaseHarness {
         .await
         .unwrap();
 
-        odf::DatasetHandle::new(
-            store_result.dataset_id,
-            dataset_alias.clone(),
-            store_result.dataset_kind,
-        )
+        ResolvedDataset::from_stored(&store_result, dataset_alias)
     }
 
-    pub async fn get_seed_block_hash(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
-        let target_dataset = self
-            .dataset_registry
-            .get_dataset_by_handle(dataset_handle)
-            .await;
-
-        let seed_block = target_dataset
+    pub async fn get_seed_block_hash(&self, dataset: &dyn odf::Dataset) -> odf::Multihash {
+        let seed_block = dataset
             .as_metadata_chain()
             .iter_blocks()
             .try_first()

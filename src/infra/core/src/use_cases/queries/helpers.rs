@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::ErrorIntoInternal;
-use kamu_core::{QueryError, ResolvedDataset, auth};
+use kamu_core::{QueryError, auth};
+use kamu_datasets::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

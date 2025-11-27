@@ -14,8 +14,8 @@ use std::{fs, io};
 
 use datafusion::arrow::array::{Array, RecordBatch, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use kamu::domain::*;
 use kamu::testing::ParquetWriterHelper;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use odf::dataset::DatasetLayout;
 use odf::metadata::testing::{AddDataBuilder, MetadataFactory};
 use odf::storage::ObjectRepository as _;

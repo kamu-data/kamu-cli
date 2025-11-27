@@ -28,6 +28,7 @@ use datafusion_odata::error::{CollectionNotFound, ODataError};
 use internal_error::ResultIntoInternal;
 use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

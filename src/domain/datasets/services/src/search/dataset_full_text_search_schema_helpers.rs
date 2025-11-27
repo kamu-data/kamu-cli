@@ -9,8 +9,7 @@
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_core::ResolvedDataset;
-use kamu_datasets::dataset_full_text_search_schema as dataset_schema;
+use kamu_datasets::{ResolvedDataset, dataset_full_text_search_schema as dataset_schema};
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

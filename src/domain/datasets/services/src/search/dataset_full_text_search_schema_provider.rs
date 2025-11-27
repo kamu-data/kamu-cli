@@ -10,8 +10,12 @@
 use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::DatasetRegistryExt;
-use kamu_datasets::{DatasetEntryService, dataset_full_text_search_schema as dataset_schema};
+use kamu_datasets::{
+    DatasetEntryService,
+    DatasetRegistry,
+    DatasetRegistryExt,
+    dataset_full_text_search_schema as dataset_schema,
+};
 use kamu_search::*;
 
 use super::dataset_full_text_search_schema_helpers::*;
@@ -22,7 +26,7 @@ use super::dataset_full_text_search_schema_helpers::*;
 #[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
 pub struct DatasetFullTextSearchSchemaProvider {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
-    dataset_registry: Arc<dyn kamu_core::DatasetRegistry>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::ResolvedDataset;
-use kamu_datasets::VersionedFileEntity;
+use kamu_datasets::{ResolvedDataset, VersionedFileEntity};
 
 use crate::prelude::*;
 

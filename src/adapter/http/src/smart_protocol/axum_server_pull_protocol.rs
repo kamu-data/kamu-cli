@@ -13,7 +13,7 @@ use std::time::Duration;
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::DatasetRegistry;
+use kamu_datasets::DatasetRegistry;
 use tracing::Instrument;
 use url::Url;
 

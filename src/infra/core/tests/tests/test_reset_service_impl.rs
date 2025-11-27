@@ -13,6 +13,7 @@ use std::sync::Arc;
 use kamu::domain::*;
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
+use kamu_datasets::ResolvedDataset;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

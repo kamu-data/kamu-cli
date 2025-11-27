@@ -12,13 +12,8 @@ use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt, future};
 use internal_error::InternalError;
-use kamu_core::{
-    DatasetRegistry,
-    SearchRemoteError,
-    SearchRemoteOpts,
-    SearchServiceRemote,
-    TenancyConfig,
-};
+use kamu_core::{SearchRemoteError, SearchRemoteOpts, SearchServiceRemote, TenancyConfig};
+use kamu_datasets::DatasetRegistry;
 use tokio_stream::Stream;
 
 type FilteredDatasetHandleStream<'a> = Pin<
