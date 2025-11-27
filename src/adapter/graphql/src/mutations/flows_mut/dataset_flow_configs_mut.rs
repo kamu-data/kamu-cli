@@ -84,6 +84,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         &self,
         ctx: &Context<'_>,
         compaction_config_input: FlowConfigCompactionInput,
+        retry_policy_input: Option<FlowRetryPolicyInput>,
     ) -> Result<SetFlowConfigResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         if let Err(e) =
@@ -113,17 +114,14 @@ impl<'a> DatasetFlowConfigsMut<'a> {
                 }
             };
         let configuration_rule = compact_config_rule.into_flow_config();
+        let retry_policy: Option<fs::RetryPolicy> = retry_policy_input.map(Into::into);
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
         let flow_binding = afs::compaction_dataset_binding(self.dataset_request_state.dataset_id());
 
         let res = flow_config_service
-            .set_configuration(
-                flow_binding,
-                configuration_rule,
-                None, /* no retries for compacting */
-            )
+            .set_configuration(flow_binding, configuration_rule, retry_policy)
             .await
             .int_err()?;
 

@@ -660,9 +660,12 @@ impl BaseGQLFlowHarness {
         dataset_id: &odf::DatasetID,
         max_slice_size: u64,
         max_slice_records: u64,
+        retry_policy: Option<async_graphql::Value>,
     ) -> GraphQLQueryRequest {
         let mutation_code = r#"
-            mutation($datasetId: DatasetID!, $maxSliceSize: Int!, $maxSliceRecords: Int!) {
+            mutation(
+                $datasetId: DatasetID!, $maxSliceSize: Int!, $maxSliceRecords: Int!, $retryPolicy: FlowRetryPolicyInput
+            ) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
@@ -672,6 +675,7 @@ impl BaseGQLFlowHarness {
                                         maxSliceSize: $maxSliceSize,
                                         maxSliceRecords: $maxSliceRecords,
                                     }
+                                    retryPolicyInput: $retryPolicy
                                 ) {
                                     __typename,
                                     message
@@ -699,14 +703,20 @@ impl BaseGQLFlowHarness {
             }
             "#;
 
-        GraphQLQueryRequest::new(
-            mutation_code,
-            async_graphql::Variables::from_value(value!({
-                "datasetId": dataset_id.to_string(),
-                "maxSliceSize": max_slice_size,
-                "maxSliceRecords": max_slice_records,
-            })),
-        )
+        let mut vars = value!({
+            "datasetId": dataset_id.to_string(),
+            "maxSliceSize": max_slice_size,
+            "maxSliceRecords": max_slice_records,
+        });
+
+        use async_graphql::*;
+        if let Some(retry_policy) = retry_policy
+            && let Value::Object(ref mut map) = vars
+        {
+            map.insert(Name::new("retryPolicy"), retry_policy);
+        }
+
+        GraphQLQueryRequest::new(mutation_code, async_graphql::Variables::from_value(vars))
     }
 }
 
