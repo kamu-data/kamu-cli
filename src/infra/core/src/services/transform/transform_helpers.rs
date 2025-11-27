@@ -14,14 +14,13 @@ use kamu_core::engine::TransformRequestInputExt;
 use kamu_core::{
     InputSchemaNotDefinedError,
     InvalidInputIntervalError,
-    ResolvedDataset,
-    ResolvedDatasetsMap,
     TransformElaborateError,
     TransformNotDefinedError,
     TransformPlanError,
     TransformPreliminaryRequestExt,
     VerifyTransformPlanError,
 };
+use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -23,7 +23,9 @@ use kamu_datasets::{
     CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
+    DatasetRegistry,
     NameCollisionError,
+    ResolvedDataset,
     SetRefCheckRefMode,
 };
 use odf::metadata::AsTypedBlock as _;

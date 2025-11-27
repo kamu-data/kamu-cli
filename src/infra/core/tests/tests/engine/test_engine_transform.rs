@@ -21,6 +21,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;

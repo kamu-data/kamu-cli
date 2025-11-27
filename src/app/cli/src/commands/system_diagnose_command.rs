@@ -19,13 +19,9 @@ use file_utils::OwnedFile;
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::engine::normalize_logs;
-use kamu::domain::{
-    DatasetRegistry,
-    VerificationOptions,
-    VerificationRequest,
-    VerifyDatasetUseCase,
-};
+use kamu::domain::{VerificationOptions, VerificationRequest, VerifyDatasetUseCase};
 use kamu::utils::docker_images::BUSYBOX;
+use kamu_datasets::DatasetRegistry;
 use random_strings::get_random_name;
 use thiserror::Error;
 

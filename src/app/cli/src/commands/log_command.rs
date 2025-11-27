@@ -17,6 +17,7 @@ use console::style;
 use futures::{StreamExt, TryStreamExt};
 use kamu::domain::*;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
 use crate::output::OutputConfig;

@@ -12,10 +12,11 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{DatasetRegistry, auth};
+use kamu_core::auth;
 use kamu_datasets::{
     DanglingReferenceError,
     DatasetLifecycleMessage,
+    DatasetRegistry,
     DeleteDatasetError,
     DeleteDatasetUseCase,
     DependencyGraphService,

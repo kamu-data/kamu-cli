@@ -10,8 +10,7 @@
 use std::borrow::Cow;
 
 use kamu_adapter_flow_dataset::FlowScopeDataset;
-use kamu_core::DatasetRegistry;
-use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
+use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt, DatasetRegistry};
 use kamu_flow_system as fs;
 
 use crate::prelude::*;

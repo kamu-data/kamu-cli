@@ -12,6 +12,12 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows
+### Changed
+- Refactoring: `ResolvedDataset` and `DatasetRegistry` moved to `kamu-datasets` domain
+- Experiment: Introduce `WriteCheckedDataset` and `ReadCheckedDataset` types, 
+    clearly indicating the access check on the resolved dataset was already performed
 ### Fixed
 - Flow events now processed transactionally
 

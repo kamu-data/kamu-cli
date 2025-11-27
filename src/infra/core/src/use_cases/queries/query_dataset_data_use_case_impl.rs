@@ -17,9 +17,9 @@ use kamu_core::{
     QueryDatasetDataUseCase,
     QueryError,
     QueryService,
-    ResolvedDataset,
     auth,
 };
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 
 use super::helpers;
 
@@ -29,7 +29,7 @@ use super::helpers;
 #[dill::interface(dyn QueryDatasetDataUseCase)]
 pub struct QueryDatasetDataUseCaseImpl {
     query_service: Arc<dyn QueryService>,
-    dataset_registry: Arc<dyn kamu_core::DatasetRegistry>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 

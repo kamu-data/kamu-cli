@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::{ResolvedDataset, auth};
+use kamu_core::auth;
+use kamu_datasets::ResolvedDataset;
 use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::FlowNotFound;

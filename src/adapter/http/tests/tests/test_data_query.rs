@@ -17,6 +17,7 @@ use ed25519_dalek::Signer;
 use kamu::domain::*;
 use kamu::*;
 use kamu_adapter_http::data::query_types::IdentityConfig;
+use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;

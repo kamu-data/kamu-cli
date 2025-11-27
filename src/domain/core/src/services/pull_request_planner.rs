@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use thiserror::Error;
 
 use crate::*;

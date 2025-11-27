@@ -18,6 +18,7 @@ use http_common::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets::DatasetRegistry;
 use url::Url;
 
 use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;

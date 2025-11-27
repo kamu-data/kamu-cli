@@ -9,7 +9,7 @@
 
 use kamu_adapter_task_dataset::{TaskErrorDatasetReset, TaskErrorDatasetUpdate};
 use kamu_adapter_task_webhook::TaskErrorWebhookDelivery;
-use kamu_core::DatasetRegistry;
+use kamu_datasets::DatasetRegistry;
 use kamu_task_system as ts;
 
 use crate::prelude::*;

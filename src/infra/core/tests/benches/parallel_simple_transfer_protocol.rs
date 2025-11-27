@@ -28,6 +28,7 @@ use kamu::{
     SyncServiceImpl,
 };
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets::DatasetRegistry;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;

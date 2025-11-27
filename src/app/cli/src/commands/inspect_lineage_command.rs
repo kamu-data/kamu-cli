@@ -15,6 +15,7 @@ use std::sync::Arc;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::{DotStyle, DotVisitor};
+use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
 use crate::{OutputConfig, WorkspaceLayout};

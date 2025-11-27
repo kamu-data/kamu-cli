@@ -12,6 +12,7 @@ use futures::future;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::*;
+use kamu_datasets::*;
 use kamu_datasets_services::*;
 use odf::dataset::MetadataChainExt;
 use pretty_assertions::assert_eq;

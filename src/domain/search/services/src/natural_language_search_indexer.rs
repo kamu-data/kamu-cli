@@ -13,8 +13,7 @@ use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use itertools::Itertools;
-use kamu_core::{DatasetRegistry, ResolvedDataset};
-use kamu_datasets::JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER;
+use kamu_datasets::{DatasetRegistry, JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER, ResolvedDataset};
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

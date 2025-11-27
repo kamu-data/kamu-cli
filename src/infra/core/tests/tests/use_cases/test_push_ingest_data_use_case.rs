@@ -15,6 +15,7 @@ use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

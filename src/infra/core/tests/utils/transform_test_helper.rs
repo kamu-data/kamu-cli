@@ -14,9 +14,7 @@ use kamu::{TransformElaborationServiceImpl, TransformExecutorImpl, TransformRequ
 use kamu_core::{
     CompactionExecutor,
     CompactionPlanner,
-    DatasetRegistry,
     EngineProvisioner,
-    ResolvedDataset,
     TransformElaboration,
     TransformElaborationService,
     TransformExecutor,
@@ -25,6 +23,7 @@ use kamu_core::{
     TransformResult,
     VerifyTransformError,
 };
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

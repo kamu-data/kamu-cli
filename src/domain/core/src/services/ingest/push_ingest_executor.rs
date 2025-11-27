@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 

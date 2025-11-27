@@ -15,6 +15,7 @@ use database_common_macros::transactional_method1;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
+use kamu_datasets::DatasetRegistry;
 use odf::DatasetRefUnresolvedError;
 
 use super::{BatchError, CLIError, Command};

@@ -14,7 +14,6 @@ use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
     GetDataOptions,
     PushIngestDataError,
@@ -22,8 +21,6 @@ use kamu_core::{
     PushIngestError,
     PushIngestPlanningError,
     QueryService,
-    ResolvedDataset,
-    auth,
 };
 use kamu_datasets::{
     CollectionEntryNotFound,
@@ -34,6 +31,7 @@ use kamu_datasets::{
     UpdateCollectionEntriesSuccess,
     UpdateCollectionEntriesUseCase,
     UpdateCollectionEntriesUseCaseError,
+    WriteCheckedDataset,
 };
 use odf::metadata::OperationType as Op;
 use tokio::time::{Duration, sleep};
@@ -43,7 +41,6 @@ use tokio::time::{Duration, sleep};
 #[component]
 #[interface(dyn UpdateCollectionEntriesUseCase)]
 pub struct UpdateCollectionEntriesUseCaseImpl {
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
 }
@@ -51,12 +48,12 @@ pub struct UpdateCollectionEntriesUseCaseImpl {
 impl UpdateCollectionEntriesUseCaseImpl {
     async fn load_current_entries(
         &self,
-        target_dataset: ResolvedDataset,
+        collection_dataset: &WriteCheckedDataset<'_>,
     ) -> Result<(BTreeMap<String, CollectionEntryState>, odf::Multihash), InternalError> {
         // TODO: PERF: Filter paths relevant to operations
         let query_res = self
             .query_svc
-            .get_data(target_dataset, GetDataOptions::default())
+            .get_data((*collection_dataset).clone(), GetDataOptions::default())
             .await
             .int_err()?;
 
@@ -178,37 +175,27 @@ impl UpdateCollectionEntriesUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
-    #[tracing::instrument(level = "info", name = UpdateCollectionEntriesUseCaseImpl_execute, skip_all, fields(%dataset_handle.id))]
+    #[tracing::instrument(
+        level = "info",
+        name = UpdateCollectionEntriesUseCaseImpl_execute,
+        skip_all,
+        fields(id = %collection_dataset.get_id())
+    )]
     async fn execute(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        collection_dataset: WriteCheckedDataset<'_>,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<UpdateCollectionEntriesResult, UpdateCollectionEntriesUseCaseError> {
         if operations.is_empty() {
             return Ok(UpdateCollectionEntriesResult::UpToDate);
         }
-
-        let target_dataset = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Write)
-            .await
-            .map_err(|e| {
-                use RebacDatasetIdUnresolvedError as E;
-                match e {
-                    E::Access(e) => UpdateCollectionEntriesUseCaseError::Access(e),
-                    e @ E::Internal(_) => {
-                        UpdateCollectionEntriesUseCaseError::Internal(e.int_err())
-                    }
-                }
-            })?;
-
         const MAX_RETRIES: usize = 3;
         let mut retry_count = 0usize;
 
         loop {
             let (current_entries, chain_head) =
-                self.load_current_entries(target_dataset.clone()).await?;
+                self.load_current_entries(&collection_dataset).await?;
 
             let diff = match self.apply_operations(current_entries, operations.clone()) {
                 Ok(diff) => diff,
@@ -242,7 +229,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
             match self
                 .push_ingest_data_use_case
                 .execute_multi(
-                    target_dataset.clone(),
+                    collection_dataset.clone(),
                     data_sources,
                     kamu_core::PushIngestDataUseCaseOptions {
                         source_name: None,
@@ -286,7 +273,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                             "RefCASFailed encountered during collection entries update. \
                              Retrying... (attempt #{}), dataset: {}",
                             retry_count + 1,
-                            target_dataset.get_alias(),
+                            collection_dataset.get_alias(),
                         );
                         retry_count += 1;
                         sleep(Duration::from_secs(retry_count as u64)).await;
