@@ -9,8 +9,7 @@
 
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
-use kamu_core::ResolvedDataset;
-use kamu_core::auth::DatasetAction;
+use kamu_core::{ResolvedDataset, auth};
 use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,23 +19,30 @@ pub trait MoleculeDatasetService: Send + Sync {
     async fn get_projects_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
-        action: DatasetAction,
+        action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
 
     async fn get_projects_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
-        action: DatasetAction,
+        action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
 
     async fn get_global_data_room_activity_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
-        action: DatasetAction,
+        action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
+
+    async fn get_global_data_room_activity_data_frame(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

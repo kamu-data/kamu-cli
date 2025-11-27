@@ -55,7 +55,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         assert_eq!(records.len(), 1);
         let record = records.into_iter().next().unwrap();
 
-        let entity = MoleculeProjectEntity::from_json(record).int_err()?;
+        let entity = MoleculeProjectEntity::from_json(record)?;
         Ok(Some(entity))
     }
 }

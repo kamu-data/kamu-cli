@@ -183,6 +183,36 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
             Err(err) => Err(err.int_err().into()),
         }
     }
+
+    async fn get_global_data_room_activity_data_frame(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
+        let data_room_activity_dataset = self
+            .get_global_data_room_activity_dataset(
+                molecule_account_name,
+                action,
+                create_if_not_exist,
+            )
+            .await?;
+
+        let df = match self
+            .query_service
+            .get_data(
+                data_room_activity_dataset.clone(),
+                GetDataOptions::default(),
+            )
+            .await
+        {
+            Ok(res) => Ok(res.df),
+            Err(QueryError::Access(err)) => Err(MoleculeGetDatasetError::Access(err)),
+            Err(err) => Err(MoleculeGetDatasetError::Internal(err.int_err())),
+        }?;
+
+        Ok((data_room_activity_dataset, df))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -83,7 +83,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
                 return Err(MoleculeCreateProjectError::Conflict {
-                    project: MoleculeProjectEntity::from_json(record).int_err()?,
+                    project: MoleculeProjectEntity::from_json(record)?,
                 });
             }
         }

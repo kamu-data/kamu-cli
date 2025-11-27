@@ -10,9 +10,11 @@
 mod molecule_create_data_room_activity_use_case;
 mod molecule_create_project_use_case;
 mod molecule_find_project_use_case;
+mod molecule_view_data_room_activities_use_case;
 mod molecule_view_projects_use_case;
 
 pub use molecule_create_data_room_activity_use_case::*;
 pub use molecule_create_project_use_case::*;
 pub use molecule_find_project_use_case::*;
+pub use molecule_view_data_room_activities_use_case::*;
 pub use molecule_view_projects_use_case::*;

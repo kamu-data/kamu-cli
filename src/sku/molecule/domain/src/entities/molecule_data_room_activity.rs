@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +42,7 @@ pub struct MoleculeDataRoomActivityEntity {
     pub change_by: String,
 
     // TODO: enum?
-    pub molecule_access_level: String,
+    pub access_level: String,
 
     pub content_type: Option<MediaType>,
 
@@ -54,8 +54,24 @@ pub struct MoleculeDataRoomActivityEntity {
 }
 
 impl MoleculeDataRoomActivityEntity {
-    pub fn from_json(_record: serde_json::Value) -> Result<Self, InternalError> {
-        todo!()
+    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        let r: MoleculeDataRoomActivityRecord = serde_json::from_value(record).int_err()?;
+
+        Ok(Self {
+            system_time: r.system_columns.system_time,
+            event_time: r.system_columns.event_time,
+            activity_type: r.record.activity_type,
+            ipnft_uid: r.record.ipnft_uid,
+            path: r.record.path,
+            r#ref: r.record.r#ref,
+            version: r.record.version,
+            change_by: r.record.change_by,
+            access_level: r.record.access_level,
+            content_type: r.record.content_type,
+            content_length: r.record.content_length,
+            categories: r.record.categories,
+            tags: r.record.tags,
+        })
     }
 
     pub fn into_insert_record(self) -> MoleculeDataRoomActivityRecord {
@@ -73,7 +89,7 @@ impl MoleculeDataRoomActivityEntity {
                 r#ref: self.r#ref,
                 version: self.version,
                 change_by: self.change_by,
-                access_level: self.molecule_access_level,
+                access_level: self.access_level,
                 content_type: self.content_type,
                 content_length: self.content_length,
                 categories: self.categories,
