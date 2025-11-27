@@ -15,10 +15,9 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::SessionContext;
 use file_utils::OwnedFile;
 use internal_error::*;
+use kamu_datasets::ResolvedDatasetsMap;
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
-
-use crate::ResolvedDatasetsMap;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Engine

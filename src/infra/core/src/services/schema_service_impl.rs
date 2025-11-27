@@ -14,7 +14,8 @@ use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::prelude::ParquetReadOptions;
 use internal_error::ResultIntoInternal;
-use kamu_core::{QueryError, QueryOptions, ResolvedDataset, SchemaService};
+use kamu_core::{QueryError, QueryOptions, SchemaService};
+use kamu_datasets::ResolvedDataset;
 
 use crate::SessionContextBuilder;
 

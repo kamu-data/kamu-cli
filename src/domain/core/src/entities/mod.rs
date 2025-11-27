@@ -8,12 +8,8 @@
 // by the Apache License, Version 2.0.
 
 pub mod engine;
-mod resolved_dataset;
-mod resolved_datasets_map;
 mod writer_metadata_state;
 mod writer_source_visitor;
 
-pub use resolved_dataset::*;
-pub use resolved_datasets_map::*;
 pub use writer_metadata_state::*;
 pub use writer_source_visitor::*;

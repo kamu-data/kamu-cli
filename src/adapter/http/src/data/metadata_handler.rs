@@ -14,7 +14,7 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use internal_error::*;
-use kamu_core::*;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
 use super::query_types;
 use crate::DatasetAliasInPath;

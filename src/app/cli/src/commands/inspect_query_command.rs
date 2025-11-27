@@ -15,6 +15,7 @@ use console::style;
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_datasets::ResolvedDataset;
 
 use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};

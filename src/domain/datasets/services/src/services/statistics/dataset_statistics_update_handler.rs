@@ -11,15 +11,17 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetReferenceMessageUpdated,
+    DatasetRegistry,
+    DatasetRegistryExt,
     DatasetStatistics,
     DatasetStatisticsRepository,
     GetDatasetStatisticsError,
     MESSAGE_CONSUMER_KAMU_DATASET_STATISTICS_UPDATE_HANDLER,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    ResolvedDataset,
 };
 use messaging_outbox::*;
 

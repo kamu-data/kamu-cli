@@ -11,7 +11,7 @@ use internal_error::InternalError;
 use odf::dataset::RefCASError;
 use thiserror::Error;
 
-use crate::ExtraDataFields;
+use crate::{ExtraDataFields, WriteCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,8 +19,7 @@ use crate::ExtraDataFields;
 pub trait UpdateCollectionEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
-        // TODO: PERF: use ResolvedDataset instead of DatasetHandle
-        dataset_handle: &odf::DatasetHandle,
+        collection_dataset: WriteCheckedDataset<'_>,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<UpdateCollectionEntriesResult, UpdateCollectionEntriesUseCaseError>;

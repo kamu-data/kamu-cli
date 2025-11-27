@@ -10,8 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use kamu_core::{DatasetRegistryExt, ResolvedDataset};
-use kamu_datasets::ExtraDataFields;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ExtraDataFields, ResolvedDataset};
 
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
@@ -251,7 +250,7 @@ pub struct MoleculeVersionedFile {
 impl MoleculeVersionedFile {
     async fn latest(&self, ctx: &Context<'_>) -> Result<Option<MoleculeVersionedFileEntry>> {
         // TODO: PERF: Resolving datasets one by one is inefficient
-        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
+        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
         let dataset = dataset_registry
             .get_dataset_by_ref(&self.dataset.as_local_ref())
             .await

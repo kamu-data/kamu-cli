@@ -14,7 +14,7 @@ use futures::{StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
-use kamu_datasets::DependencyGraphService;
+use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 
 use super::{BatchError, CLIError, Command};
 use crate::VerificationMultiProgress;

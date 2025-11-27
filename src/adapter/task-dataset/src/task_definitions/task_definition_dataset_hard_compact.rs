@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CompactionPlan, ResolvedDataset};
+use kamu_core::CompactionPlan;
+use kamu_datasets::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

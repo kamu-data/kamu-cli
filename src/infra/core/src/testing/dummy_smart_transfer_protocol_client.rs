@@ -9,7 +9,8 @@
 
 use std::sync::Arc;
 
-use kamu_core::{ResolvedDataset, SyncError, SyncListener, SyncResult};
+use kamu_core::{SyncError, SyncListener, SyncResult};
+use kamu_datasets::ResolvedDataset;
 use url::Url;
 
 use crate::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};

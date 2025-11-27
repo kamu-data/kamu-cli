@@ -278,11 +278,10 @@ impl FlowTriggerRuleInput {
         flow_type: DatasetFlowType,
     ) -> Result<(), FlowTypeIsNotSupported> {
         match self {
-            Self::Schedule(_) => {
-                if flow_type == DatasetFlowType::Ingest {
-                    return Ok(());
-                }
-            }
+            Self::Schedule(_) => match flow_type {
+                DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => return Ok(()),
+                _ => {}
+            },
             Self::Reactive(_) => {
                 if flow_type == DatasetFlowType::ExecuteTransform {
                     return Ok(());

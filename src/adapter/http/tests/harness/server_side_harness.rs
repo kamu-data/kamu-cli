@@ -23,12 +23,13 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
+use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
     DatasetReferenceService,
+    DatasetRegistry,
 };
 use kamu_datasets_services::DatasetEntryWriter;
 use odf::dataset::DatasetLayout;

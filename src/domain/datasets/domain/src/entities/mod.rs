@@ -16,6 +16,8 @@ mod dataset_entry;
 mod dataset_env_var;
 mod dataset_statistics;
 mod metadata_event_type;
+mod resolved_dataset;
+mod resolved_datasets_map;
 mod versioned_file;
 
 pub use collection::*;
@@ -27,4 +29,6 @@ pub use dataset_entry::*;
 pub use dataset_env_var::*;
 pub use dataset_statistics::*;
 pub use metadata_event_type::*;
+pub use resolved_dataset::*;
+pub use resolved_datasets_map::*;
 pub use versioned_file::*;

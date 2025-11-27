@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 

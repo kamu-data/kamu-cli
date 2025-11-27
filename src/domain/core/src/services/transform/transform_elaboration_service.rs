@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
+use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use thiserror::Error;
 
 use super::TransformPreliminaryPlan;
@@ -17,8 +18,6 @@ use crate::engine::TransformRequestExt;
 use crate::{
     InputSchemaNotDefinedError,
     InvalidInputIntervalError,
-    ResolvedDataset,
-    ResolvedDatasetsMap,
     TransformListener,
     TransformOptions,
 };

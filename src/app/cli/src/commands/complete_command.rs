@@ -17,6 +17,7 @@ use futures::TryStreamExt;
 use glob;
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
+use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
 use crate::config::ConfigService;

@@ -14,6 +14,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
+use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
 use crate::output::*;

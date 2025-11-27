@@ -18,6 +18,7 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt as _};
 use kamu_core::*;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use odf::utils::data::DataFrameExt;
 
 use crate::SessionContextBuilder;

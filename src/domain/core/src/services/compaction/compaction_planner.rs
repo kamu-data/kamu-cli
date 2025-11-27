@@ -11,11 +11,12 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_datasets::ResolvedDataset;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-use crate::{CompactionListener, ResolvedDataset};
+use crate::CompactionListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

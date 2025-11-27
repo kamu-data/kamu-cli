@@ -419,7 +419,7 @@ kamu_cli_run_api_server_e2e_test!(
                   checkingIntervalSecs: 1
             "#
         )),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion, flaky"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -442,7 +442,7 @@ kamu_cli_run_api_server_e2e_test!(
                   checkingIntervalSecs: 1
             "#
         )),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion, flaky"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

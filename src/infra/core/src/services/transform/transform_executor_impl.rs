@@ -13,6 +13,7 @@ use dill::*;
 use engine::{TransformRequestExt, TransformResponseExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
+use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use kamu_ingest_datafusion::DataWriterDataFusion;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
