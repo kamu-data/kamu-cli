@@ -15,7 +15,6 @@ use kamu_accounts::{
     AccountLifecycleMessageUpdated,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
-use kamu_core::{DatasetRegistry, DatasetRegistryExt};
 use kamu_datasets::{dataset_full_text_search_schema as dataset_schema, *};
 use kamu_search::*;
 use messaging_outbox::*;
