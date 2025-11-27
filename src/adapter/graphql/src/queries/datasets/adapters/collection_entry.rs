@@ -65,17 +65,20 @@ impl CollectionEntry {
     /// Rooted, separated by forward slashes, with elements URL-encoded
     /// (e.g. `/foo%20bar/baz`)
     pub async fn path(&self) -> CollectionPath {
+        // TODO: avoid clone
         CollectionPath::from(self.entity.path.clone())
     }
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
     pub async fn reference(&self) -> DatasetID<'static> {
+        // TODO: avoid clone
         DatasetID::from(self.entity.reference.clone())
     }
 
     /// Extra data associated with this entry
     pub async fn extra_data(&self) -> ExtraData {
+        // TODO: avoid clone
         ExtraData::new(self.entity.extra_data.clone())
     }
 

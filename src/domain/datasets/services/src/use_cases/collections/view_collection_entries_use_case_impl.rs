@@ -33,6 +33,10 @@ pub struct ViewCollectionEntriesUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
+    #[tracing::instrument(
+        name = ViewCollectionEntriesUseCaseImpl_execute,
+        skip_all,
+    )]
     async fn execute(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,

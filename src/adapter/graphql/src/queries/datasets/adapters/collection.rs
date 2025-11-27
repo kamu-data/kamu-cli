@@ -8,8 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu::domain;
-use kamu_datasets::{ReadCheckedDataset, ViewCollectionEntriesError, ViewCollectionEntriesUseCase};
+use kamu_datasets::{
+    FindCollectionEntryUseCase,
+    FindCollectionEntryUseCaseError,
+    ReadCheckedDataset,
+    ViewCollectionEntriesError,
+    ViewCollectionEntriesUseCase,
+};
 
 use super::{CollectionEntry, CollectionEntryConnection};
 use crate::prelude::*;
@@ -95,49 +100,22 @@ impl CollectionProjection<'_> {
         ctx: &Context<'_>,
         path: CollectionPath,
     ) -> Result<Option<CollectionEntry>> {
-        use datafusion::logical_expr::{col, lit};
-
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let Some(df) = query_svc
-            .get_data(
-                readable_dataset.clone(),
-                domain::GetDataOptions {
-                    block_hash: self.as_of.clone(),
-                },
+        let find_collection_entry = from_catalog_n!(ctx, dyn FindCollectionEntryUseCase);
+        let maybe_entry = find_collection_entry
+            .execute_by_path(
+                ReadCheckedDataset(readable_dataset),
+                self.as_of.clone(),
+                &(path.to_string()),
             )
             .await
-            .int_err()?
-            .df
-        else {
-            return Ok(None);
-        };
+            .map_err(|e| match e {
+                e @ FindCollectionEntryUseCaseError::Internal(_) => e.int_err(),
+            })?
+            .map(CollectionEntry::new);
 
-        // Apply filters
-        // Note: we are still working with a changelog here in hope to narrow down the
-        // record set before projecting
-        let df = df.filter(col("path").eq(lit(path.to_string()))).int_err()?;
-
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-        let record = records.into_iter().next().unwrap();
-        let entry = CollectionEntry::from_json(record)?;
-
-        Ok(Some(entry))
+        Ok(maybe_entry)
     }
 
     /// Returns the state of entries as they existed at a specified point in
@@ -195,51 +173,29 @@ impl CollectionProjection<'_> {
         ctx: &Context<'_>,
         refs: Vec<DatasetID<'_>>,
     ) -> Result<Vec<CollectionEntry>> {
-        use datafusion::logical_expr::{col, lit};
-
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let Some(df) = query_svc
-            .get_data(
-                readable_dataset.clone(),
-                domain::GetDataOptions {
-                    block_hash: self.as_of.clone(),
-                },
+        let odf_refs = refs
+            .iter()
+            .map(|r| r as &odf::DatasetID)
+            .collect::<Vec<&odf::DatasetID>>();
+
+        let find_collection_entry = from_catalog_n!(ctx, dyn FindCollectionEntryUseCase);
+        let entries = find_collection_entry
+            .execute_multi_by_refs(
+                ReadCheckedDataset(readable_dataset),
+                self.as_of.clone(),
+                &odf_refs,
             )
             .await
-            .int_err()?
-            .df
-        else {
-            return Ok(Vec::new());
-        };
+            .map_err(|e| match e {
+                e @ FindCollectionEntryUseCaseError::Internal(_) => e.int_err(),
+            })?;
 
-        // Apply filters
-        // Note: we are still working with a changelog here in hope to narrow down the
-        // record set before projecting
-        let df = df
-            .filter(col("ref").in_list(
-                refs.into_iter().map(|r| lit(r.to_string())).collect(),
-                false,
-            ))
-            .int_err()?;
-
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
-
-        let df = df.sort(vec![col("path").sort(true, false)]).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let nodes = records
+        let nodes = entries
             .into_iter()
-            .map(CollectionEntry::from_json)
-            .collect::<Result<_, _>>()?;
+            .map(CollectionEntry::new)
+            .collect::<Vec<_>>();
 
         Ok(nodes)
     }
