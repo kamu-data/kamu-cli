@@ -92,9 +92,6 @@ impl Loader<odf::AccountName> for AccountEntityLoader {
 // DatasetHandleLoader
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype::nutype(derive(AsRef, Clone, Debug, Eq, Hash, Into, PartialEq))]
-pub struct AccessCheckedDatasetRef(odf::DatasetRef);
-
 pub struct DatasetHandleLoader {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -139,40 +136,11 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetHandleLoader: AccessCheckedDatasetRef(odf::DatasetRef)
-//                      -> odf::DatasetHandle
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
-    type Value = odf::DatasetHandle;
-    type Error = Arc<InternalError>;
-
-    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::<AccessCheckedDatasetRef, odf::DatasetHandle>::load", skip_all, fields(num_keys = keys.len()))]
-    async fn load(
-        &self,
-        keys: &[AccessCheckedDatasetRef],
-    ) -> Result<HashMap<AccessCheckedDatasetRef, Self::Value>, Self::Error> {
-        let dataset_refs: Vec<&_> = keys.iter().map(AsRef::as_ref).collect();
-
-        let resolution = self
-            .dataset_registry
-            .resolve_dataset_handles_by_refs(&dataset_refs)
-            .await
-            .int_err()?;
-
-        Ok(resolution
-            .resolved_handles
-            .into_iter()
-            .map(|(dataset_ref, dataset_handle)| {
-                (AccessCheckedDatasetRef::new(dataset_ref), dataset_handle)
-            })
-            .collect())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetHandleLoader: AccessCheckedDatasetRef(odf::DatasetRef)
 //                      -> ResolvedDataset
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, Eq, Hash, Into, PartialEq))]
+pub struct AccessCheckedDatasetRef(odf::DatasetRef);
 
 impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
     type Value = ResolvedDataset;
@@ -193,7 +161,7 @@ impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
         let futures_iter = resolution
             .resolved_handles
             .into_iter()
-            .map(|(dataset_ref, dataset_handle)| async {
+            .map(|(dataset_ref, dataset_handle)| async move {
                 let resolved_dataset = self
                     .dataset_registry
                     .get_dataset_by_handle(&dataset_handle)

@@ -10,9 +10,10 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use kamu_core::{DatasetRegistryExt, ResolvedDataset};
+use kamu_core::ResolvedDataset;
 use kamu_datasets::ExtraDataFields;
 
+use crate::data_loader::AccessCheckedDatasetRef;
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
     EncryptionMetadata,
@@ -32,6 +33,7 @@ use crate::queries::{
     VersionedFileContentDownload,
     VersionedFileEntry,
 };
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MoleculeDataRoom
@@ -222,7 +224,7 @@ impl MoleculeDataRoomEntry {
     #[expect(clippy::unused_async)]
     async fn as_versioned_file(&self) -> Result<Option<MoleculeVersionedFile>> {
         Ok(Some(MoleculeVersionedFile {
-            dataset: self.entry.reference.clone().into(),
+            dataset_id: self.entry.reference.clone().into(),
             prefetched_latest: MoleculeVersionedFilePrefetch::new_from_data_room_entry(self),
         }))
     }
@@ -239,7 +241,7 @@ page_based_connection!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeVersionedFile {
-    pub dataset: odf::DatasetID,
+    pub dataset_id: odf::DatasetID,
 
     // Filled from denormalized data stored alongside data room entry
     pub prefetched_latest: MoleculeVersionedFilePrefetch,
@@ -249,17 +251,21 @@ pub struct MoleculeVersionedFile {
 #[Object]
 impl MoleculeVersionedFile {
     async fn latest(&self, ctx: &Context<'_>) -> Result<Option<MoleculeVersionedFileEntry>> {
-        // TODO: PERF: Resolving datasets one by one is inefficient
-        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
-        let dataset = dataset_registry
-            .get_dataset_by_ref(&self.dataset.as_local_ref())
-            .await
-            .int_err()?;
+        let dataset_handle_data_loader = utils::get_dataset_handle_data_loader(ctx);
 
-        Ok(Some(MoleculeVersionedFileEntry::new_from_prefetched(
-            dataset,
-            self.prefetched_latest.clone(),
-        )))
+        let maybe_resolved_dataset = dataset_handle_data_loader
+            .load_one(AccessCheckedDatasetRef::new(self.dataset_id.as_local_ref()))
+            .await
+            .map_err(data_loader_error_mapper)?;
+
+        if let Some(resolved_dataset) = maybe_resolved_dataset {
+            Ok(Some(MoleculeVersionedFileEntry::new_from_prefetched(
+                resolved_dataset,
+                self.prefetched_latest.clone(),
+            )))
+        } else {
+            Ok(None)
+        }
     }
 }
 
