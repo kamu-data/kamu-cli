@@ -13,16 +13,19 @@ use datafusion::logical_expr::{col, lit};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::DatasetRegistryExt;
 use kamu_datasets::{
     CollectionUpdateOperation,
     ContentArgs,
     CreateDatasetUseCaseOptions,
+    DatasetRegistry,
+    DatasetRegistryExt,
     ExtraDataFields,
+    ResolvedDataset,
     UpdateCollectionEntriesResult,
     UpdateCollectionEntriesUseCase,
     UpdateCollectionEntriesUseCaseError,
     UpdateVersionFileUseCase,
+    WriteCheckedDataset,
 };
 use kamu_molecule_domain::MoleculeDatasetSnapshots;
 use odf::utils::data::DataFrameExt;
@@ -101,19 +104,21 @@ impl MoleculeDataRoomMutV2 {
         let alias = self.build_new_file_dataset_alias(ctx, &path).await;
         let versioned_file_snapshot = MoleculeDatasetSnapshots::versioned_file_v2(alias);
 
-        let create_versioned_file_res = create_dataset_from_snapshot_use_case
-            .execute(
-                versioned_file_snapshot,
-                CreateDatasetUseCaseOptions::default(),
-            )
-            .await
-            .int_err()?;
+        let versioned_file_dataset = ResolvedDataset::from_created(
+            &create_dataset_from_snapshot_use_case
+                .execute(
+                    versioned_file_snapshot,
+                    CreateDatasetUseCaseOptions::default(),
+                )
+                .await
+                .int_err()?,
+        );
 
         // 2. Upload the first version to just created dataset.
         // NOTE: Version and content hash get updated to correct values below
         let mut versioned_file_entry = MoleculeVersionedFileEntry {
             entry: VersionedFileEntry {
-                dataset: kamu_core::ResolvedDataset::from_created(&create_versioned_file_res),
+                dataset: versioned_file_dataset.clone(),
                 system_time: now,
                 event_time: now,
                 version: 0,
@@ -143,7 +148,7 @@ impl MoleculeDataRoomMutV2 {
 
         let update_version_result = update_version_file_use_case
             .execute(
-                &create_versioned_file_res.dataset_handle,
+                WriteCheckedDataset(&versioned_file_dataset),
                 Some(content_args),
                 None,
                 Some(versioned_file_entry.to_versioned_file_extra_data()),
@@ -161,16 +166,19 @@ impl MoleculeDataRoomMutV2 {
                 system_time: now,
                 event_time: now,
                 path,
-                reference: create_versioned_file_res.dataset_handle.id.into(),
+                reference: versioned_file_dataset.get_id().clone().into(),
                 extra_data: ExtraData::default(),
             },
             project: self.project.clone(),
             denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
         };
 
+        let data_room_writable_dataset =
+            self.data_room_writable_state.resolved_dataset(ctx).await?;
+
         match update_entries_use_case
             .execute(
-                self.data_room_writable_state.dataset_handle(),
+                WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
                     data_room_entry.entry.path.to_string(),
                     data_room_entry.entry.reference.as_ref().clone(),
@@ -220,7 +228,7 @@ impl MoleculeDataRoomMutV2 {
         let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
             ctx,
             dyn UpdateVersionFileUseCase,
-            dyn kamu_core::DatasetRegistry,
+            dyn DatasetRegistry,
             dyn UpdateCollectionEntriesUseCase
         );
 
@@ -241,7 +249,7 @@ impl MoleculeDataRoomMutV2 {
         // NOTE: Version and content hash get updated to correct values below
         let mut versioned_file_entry = MoleculeVersionedFileEntry {
             entry: VersionedFileEntry {
-                dataset: file_dataset,
+                dataset: file_dataset.clone(),
                 system_time: now,
                 event_time: now,
                 version: 0,
@@ -271,7 +279,7 @@ impl MoleculeDataRoomMutV2 {
 
         let update_version_result = update_version_file_use_case
             .execute(
-                versioned_file_entry.entry.dataset.get_handle(),
+                WriteCheckedDataset(&file_dataset),
                 Some(content_args),
                 None,
                 Some(versioned_file_entry.to_versioned_file_extra_data()),
@@ -290,9 +298,12 @@ impl MoleculeDataRoomMutV2 {
             denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
         };
 
+        let writable_data_room_dataset =
+            self.data_room_writable_state.resolved_dataset(ctx).await?;
+
         match update_entries_use_case
             .execute(
-                self.data_room_writable_state.dataset_handle(),
+                WriteCheckedDataset(writable_data_room_dataset),
                 vec![CollectionUpdateOperation::add(
                     data_room_entry.entry.path.to_string(),
                     data_room_entry.entry.reference.as_ref().clone(),
@@ -325,7 +336,7 @@ impl MoleculeDataRoomMutV2 {
     async fn get_data_room_projection(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<(domain::ResolvedDataset, Option<DataFrameExt>)> {
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>)> {
         let query_service = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let resolved_dataset = self.data_room_writable_state.resolved_dataset(ctx).await?;
@@ -606,9 +617,12 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
+        let data_room_writable_dataset =
+            self.data_room_writable_state.resolved_dataset(ctx).await?;
+
         match update_entries_use_case
             .execute(
-                self.data_room_writable_state.dataset_handle(),
+                WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::r#move(
                     from_path.clone().into(),
                     to_path.into(),
@@ -647,9 +661,12 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
         let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
+        let data_room_writable_dataset =
+            self.data_room_writable_state.resolved_dataset(ctx).await?;
+
         match update_entries_use_case
             .execute(
-                self.data_room_writable_state.dataset_handle(),
+                WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::remove(path.clone().into())],
                 expected_head.map(Into::into),
             )
@@ -694,7 +711,7 @@ impl MoleculeDataRoomMutV2 {
         let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
             ctx,
             dyn UpdateVersionFileUseCase,
-            dyn kamu_core::DatasetRegistry,
+            dyn DatasetRegistry,
             dyn UpdateCollectionEntriesUseCase
         );
 
@@ -745,9 +762,8 @@ impl MoleculeDataRoomMutV2 {
         }
 
         let prefetch = MoleculeVersionedFilePrefetch::new_from_data_room_entry(&data_room_entry);
-        let file_dataset_handle = file_dataset.get_handle().clone();
         let mut file_entry =
-            MoleculeVersionedFileEntry::new_from_prefetched(file_dataset, prefetch);
+            MoleculeVersionedFileEntry::new_from_prefetched(file_dataset.clone(), prefetch);
 
         {
             // Read the current values: content_text & encryption_metadata
@@ -767,7 +783,7 @@ impl MoleculeDataRoomMutV2 {
         // TODO: we need to do a retraction if any errors...
         let new_version = update_version_file_use_case
             .execute(
-                &file_dataset_handle,
+                WriteCheckedDataset(&file_dataset),
                 None,
                 None,
                 Some(file_entry.to_versioned_file_extra_data()),
@@ -779,10 +795,12 @@ impl MoleculeDataRoomMutV2 {
         // 2. Update the file state in the data room.
 
         data_room_entry.denormalized_latest_file_info.version = new_version;
+        let data_room_writable_dataset =
+            self.data_room_writable_state.resolved_dataset(ctx).await?;
 
         match update_entries_use_case
             .execute(
-                self.data_room_writable_state.dataset_handle(),
+                WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
                     data_room_entry.entry.path.to_string(),
                     reference.into(),

@@ -12,15 +12,13 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth::DatasetAction;
-use kamu_core::{
+use kamu_core::{GetDataOptions, QueryError, QueryService};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
     DatasetRegistry,
     DatasetRegistryExt,
-    GetDataOptions,
-    QueryError,
-    QueryService,
     ResolvedDataset,
 };
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use odf::utils::data::DataFrameExt;
 
 use crate::domain::*;
