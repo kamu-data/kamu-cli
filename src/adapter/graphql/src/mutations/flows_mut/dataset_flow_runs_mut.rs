@@ -226,8 +226,11 @@ impl<'a> DatasetFlowRunsMut<'a> {
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
 
-        let (flow_run_service, dataset_registry) =
-            from_catalog_n!(ctx, dyn fs::FlowRunService, dyn kamu_core::DatasetRegistry);
+        let (flow_run_service, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn fs::FlowRunService,
+            dyn kamu_datasets::DatasetRegistry
+        );
 
         let logged_account = utils::get_logged_account(ctx);
         let dataset_handle = self.dataset_request_state.dataset_handle();

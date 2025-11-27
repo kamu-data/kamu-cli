@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
-use kamu_core::DatasetRegistry;
+use kamu_datasets::DatasetRegistry;
 
 use crate::prelude::*;
 use crate::queries::Account;

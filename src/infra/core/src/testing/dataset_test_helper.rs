@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use file_utils::OwnedFile;
-use kamu_core::*;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use odf::dataset::DatasetLayout;
 
 use super::ParquetWriterHelper;

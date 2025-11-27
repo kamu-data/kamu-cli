@@ -25,8 +25,13 @@ use kamu::{
     QueryServiceImpl,
     SessionContextBuilder,
 };
-use kamu_core::{DatasetRegistry, DidGenerator, FileUploadLimitConfig, MockDidGenerator};
-use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
+use kamu_core::{DidGenerator, FileUploadLimitConfig, MockDidGenerator};
+use kamu_datasets::{
+    ContentArgs,
+    DatasetRegistry,
+    UpdateVersionFileUseCase,
+    UpdateVersionFileUseCaseError,
+};
 use kamu_datasets_services::UpdateVersionFileUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;

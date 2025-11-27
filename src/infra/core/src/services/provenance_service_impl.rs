@@ -16,7 +16,7 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
-use kamu_datasets::DependencyGraphService;
+use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

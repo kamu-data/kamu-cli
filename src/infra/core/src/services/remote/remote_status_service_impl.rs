@@ -19,13 +19,13 @@ use kamu_core::utils::metadata_chain_comparator::{
 };
 use kamu_core::{
     DatasetPushStatuses,
-    DatasetRegistry,
     PushStatus,
     RemoteAliasKind,
     RemoteAliasesRegistry,
     RemoteStatusService,
     StatusCheckError,
 };
+use kamu_datasets::DatasetRegistry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

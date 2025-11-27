@@ -19,13 +19,13 @@ use kamu_core::{
     PushIngestDataUseCase,
     PushIngestError,
     QueryService,
-    ResolvedDataset,
     auth,
 };
 use kamu_datasets::{
     ContentArgs,
     ExtraDataFields,
     FileVersion,
+    ResolvedDataset,
     UpdateVersionFileResult,
     UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,

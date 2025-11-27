@@ -22,7 +22,6 @@ use kamu_core::{
     PushIngestError,
     PushIngestPlanningError,
     QueryService,
-    ResolvedDataset,
     auth,
 };
 use kamu_datasets::{
@@ -30,6 +29,7 @@ use kamu_datasets::{
     CollectionEntryUpdate,
     CollectionUpdateOperation,
     ExtraDataFields,
+    ResolvedDataset,
     UpdateCollectionEntriesResult,
     UpdateCollectionEntriesSuccess,
     UpdateCollectionEntriesUseCase,

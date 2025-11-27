@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::component;
 use internal_error::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, LoggedAccount};
-use kamu_core::{ResolvedDataset, TenancyConfig};
+use kamu_core::TenancyConfig;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetFromSnapshotError,
@@ -20,6 +20,7 @@ use kamu_datasets::{
     DatasetReferenceCASError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     NameCollisionError,
+    ResolvedDataset,
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use nutype::nutype;

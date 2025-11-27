@@ -15,9 +15,9 @@ use database_common_macros::transactional_method2;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::DatasetRegistry;
 use kamu_datasets::{
     DatasetKeyBlockRepository,
+    DatasetRegistry,
     JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER,
     JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER,
 };

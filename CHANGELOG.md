@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Refactoring: `ResolvedDataset` and `DatasetRegistry` moved to `kamu-datasets` domain
 ### Fixed
 - Flow events now processed transactionally
 

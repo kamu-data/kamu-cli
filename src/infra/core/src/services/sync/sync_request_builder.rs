@@ -13,8 +13,6 @@ use dill::component;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{
     DatasetAnyRefUnresolvedError,
-    DatasetRegistry,
-    DatasetRegistryExt,
     RemoteAliasResolver,
     RemoteRepositoryRegistry,
     SyncError,
@@ -22,6 +20,7 @@ use kamu_core::{
     SyncRefRemote,
     SyncRequest,
 };
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use url::Url;
 
 use crate::UrlExt;

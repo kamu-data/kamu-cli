@@ -24,6 +24,7 @@ use file_utils::OwnedFile;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

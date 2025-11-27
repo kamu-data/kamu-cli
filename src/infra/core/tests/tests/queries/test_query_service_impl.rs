@@ -19,6 +19,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
+use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::utils::data::DataFrameExt;
 use tempfile::TempDir;

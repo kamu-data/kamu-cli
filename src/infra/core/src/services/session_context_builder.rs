@@ -12,7 +12,8 @@ use std::sync::Arc;
 use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::prelude::SessionContext;
 use internal_error::InternalError;
-use kamu_core::QueryOptions;
+use kamu_core::{ObjectStoreRegistry, QueryOptions};
+use kamu_datasets::DatasetRegistry;
 
 use crate::EngineConfigDatafusionEmbeddedBatchQuery;
 use crate::services::query::{KamuCatalog, KamuSchema};
@@ -22,8 +23,8 @@ use crate::services::query::{KamuCatalog, KamuSchema};
 #[dill::component]
 pub struct SessionContextBuilder {
     datafusion_engine_config: Arc<EngineConfigDatafusionEmbeddedBatchQuery>,
-    object_store_registry: Arc<dyn kamu_core::ObjectStoreRegistry>,
-    dataset_registry: Arc<dyn kamu_core::DatasetRegistry>,
+    object_store_registry: Arc<dyn ObjectStoreRegistry>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 impl SessionContextBuilder {
