@@ -11,6 +11,14 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Molecule-specific]
+### Added
+- GQL: `BigInt` scalar
+### Changed
+- GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
+- Allow `molecule` and `molecule.dev` accounts separation
+- GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
+
 ## [Unreleased]
 ### Added
 - GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows

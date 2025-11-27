@@ -517,6 +517,11 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
+"""
+A big integer scalar type.
+"""
+scalar BigInt
+
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -838,6 +843,25 @@ type CreateAccountSuccess implements CreateAccountResult {
 	message: String!
 }
 
+type CreateAnnouncementErrorInvalidAttachment implements CreateAnnouncementResult {
+	message: String!
+	isSuccess: Boolean!
+}
+
+interface CreateAnnouncementResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateAnnouncementSuccess implements CreateAnnouncementResult {
+	"""
+	ID of the newly-created announcement
+	"""
+	announcementId: String!
+	isSuccess: Boolean!
+	message: String!
+}
+
 interface CreateDatasetFromSnapshotResult {
 	isSuccess: Boolean!
 	message: String!
@@ -868,6 +892,23 @@ type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDat
 
 type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
 	dataset: Dataset!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateProjectErrorConflict implements CreateProjectResult {
+	project: MoleculeProject!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface CreateProjectResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateProjectSuccess implements CreateProjectResult {
+	project: MoleculeProject!
 	isSuccess: Boolean!
 	message: String!
 }
@@ -2787,6 +2828,11 @@ input InitiatorFilterInput @oneOf {
 	accounts: [AccountID!]
 }
 
+"""
+A scalar that can represent any JSON value.
+"""
+scalar JSON
+
 type JdbcDesc {
 	url: String!
 }
@@ -3037,6 +3083,190 @@ type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 	message: String!
 }
 
+type Molecule {
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProject
+	"""
+	List the registered projects
+	"""
+	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+	"""
+	Latest activity events across all projects in reverse chronological
+	order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+}
+
+type MoleculeMut {
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectMut
+}
+
+type MoleculeProject {
+	"""
+	System time when this version was created/updated
+	"""
+	systemTime: DateTime!
+	"""
+	Event time when this version was created/updated
+	"""
+	eventTime: DateTime!
+	"""
+	Symbolic name of the project
+	"""
+	ipnftSymbol: String!
+	"""
+	Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+	"""
+	ipnftUid: String!
+	"""
+	Address of the IPNFT contract
+	"""
+	ipnftAddress: String!
+	"""
+	Token ID withing the IPNFT contract
+	"""
+	ipnftTokenId: BigInt!
+	"""
+	Project's organizational account
+	"""
+	account: Account!
+	"""
+	Project's data room dataset
+	"""
+	dataRoom: Dataset!
+	"""
+	Project's announcements dataset
+	"""
+	announcements: Dataset!
+	"""
+	Project's activity events in reverse chronological order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
+}
+
+type MoleculeProjectConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeProject!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeProjectEdge!]!
+}
+
+type MoleculeProjectEdge {
+	node: MoleculeProject!
+}
+
+interface MoleculeProjectEvent {
+	project: MoleculeProject!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectEventAnnouncement implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
+	"""
+	Announcement record
+	"""
+	announcement: JSON!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectEventConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeProjectEvent!]!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeProjectEventEdge!]!
+}
+
+type MoleculeProjectEventDataRoomEntryAdded implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
+	"""
+	Collection entry
+	"""
+	entry: CollectionEntry!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectEventDataRoomEntryRemoved implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
+	"""
+	Collection entry
+	"""
+	entry: CollectionEntry!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectEventDataRoomEntryUpdated implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
+	"""
+	Collection entry
+	"""
+	newEntry: CollectionEntry!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectEventEdge {
+	node: MoleculeProjectEvent!
+}
+
+type MoleculeProjectEventFileUpdated implements MoleculeProjectEvent {
+	"""
+	Associated project
+	"""
+	project: MoleculeProject!
+	"""
+	Versioned file dataset
+	"""
+	dataset: Dataset!
+	"""
+	New file version entry
+	"""
+	newEntry: VersionedFileEntry!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectMut {
+	"""
+	Creates an announcement record for the project
+	"""
+	createAnnouncement(		headline: String!,		body: String!,
+		"""
+		List of dataset DIDs to link
+		"""
+		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
+	): CreateAnnouncementResult!
+}
+
 """
 MQTT quality of service class.
 
@@ -3087,6 +3317,10 @@ type Mutation {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: AccountsMut!
+	"""
+	Temporary: Molecule-specific functionality group
+	"""
+	molecule: MoleculeMut!
 	"""
 	Collaboration-related functionality group
 	
@@ -3284,6 +3518,10 @@ type Query {
 	Admin-related functionality group
 	"""
 	admin: Admin!
+	"""
+	Temporary: Molecule-specific functionality group
+	"""
+	molecule: Molecule!
 }
 
 enum QueryDialect {
@@ -4168,6 +4406,11 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
 	message: String!
 }
+
+"""
+256-bit unsigned number. Can be constructed from string.
+"""
+scalar U256
 
 scalar URL
 
