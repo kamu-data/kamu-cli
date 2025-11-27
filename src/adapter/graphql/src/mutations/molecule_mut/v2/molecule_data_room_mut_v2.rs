@@ -209,6 +209,7 @@ impl MoleculeDataRoomMutV2 {
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }?;
 
+        // 4. Log the activity.
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
                 system_time: now,
@@ -259,14 +260,22 @@ impl MoleculeDataRoomMutV2 {
         content_text: Option<String>,
         encryption_metadata: Option<EncryptionMetadata>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
+        let molecule_subject = molecule_subject(ctx)?;
+
         // TODO: Align timestamps with ingest
         let now = chrono::Utc::now();
 
-        let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
+        let (
+            update_version_file_use_case,
+            dataset_registry,
+            update_entries_use_case,
+            append_data_room_activity_use_case,
+        ) = from_catalog_n!(
             ctx,
             dyn UpdateVersionFileUseCase,
             dyn kamu_core::DatasetRegistry,
-            dyn UpdateCollectionEntriesUseCase
+            dyn UpdateCollectionEntriesUseCase,
+            dyn MoleculeAppendDataRoomActivityUseCase
         );
 
         // 1. Get the existing versioned dataset entry -- we need to know `path`;
@@ -285,6 +294,10 @@ impl MoleculeDataRoomMutV2 {
             .int_err()?;
 
         // NOTE: Version and content hash get updated to correct values below
+        let file_dataset_id = file_dataset.get_handle().id.clone();
+        let content_type = content_args.content_type.clone();
+        let content_length = content_args.content_length;
+
         let mut versioned_file_entry = MoleculeVersionedFileEntry {
             entry: VersionedFileEntry {
                 dataset: file_dataset,
@@ -301,11 +314,11 @@ impl MoleculeDataRoomMutV2 {
                 extra_data: ExtraData::default(),
             },
             basic_info: MoleculeVersionedFileEntryBasicInfo {
-                access_level,
-                change_by,
+                access_level: access_level.clone(),
+                change_by: change_by.clone(),
                 description,
-                categories: categories.unwrap_or_default(),
-                tags: tags.unwrap_or_default(),
+                categories: categories.clone().unwrap_or_default(),
+                tags: tags.clone().unwrap_or_default(),
             },
             detailed_info: tokio::sync::OnceCell::new_with(Some(
                 MoleculeVersionedFileEntryDetailedInfo {
@@ -330,6 +343,7 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Update the file state in the data room.
 
+        let path = collection_entry.path.clone();
         let data_room_entry = MoleculeDataRoomEntry {
             entry: collection_entry,
             project: self.project.clone(),
@@ -348,12 +362,7 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(_)) => {
-                Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
-                    entry: data_room_entry,
-                }
-                .into())
-            }
+            Ok(UpdateCollectionEntriesResult::Success(_)) => Ok(()),
             Ok(
                 UpdateCollectionEntriesResult::UpToDate
                 | UpdateCollectionEntriesResult::NotFound(_),
@@ -365,7 +374,43 @@ impl MoleculeDataRoomMutV2 {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }?;
+
+        // 4. Log the activity.
+        {
+            let data_room_activity = MoleculeDataRoomActivityEntity {
+                system_time: now,
+                event_time: now,
+                activity_type: MoleculeDataRoomFileActivityType::Added,
+                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                path: path.into(),
+                r#ref: file_dataset_id,
+                version: update_version_result.new_version,
+                change_by,
+                molecule_access_level: access_level,
+                content_type,
+                content_length,
+                categories: categories.unwrap_or_default(),
+                tags: tags.unwrap_or_default(),
+            };
+
+            append_data_room_activity_use_case
+                .execute(&molecule_subject, data_room_activity)
+                .await
+                .map_err(|e| -> GqlError {
+                    use MoleculeAppendDataRoomActivityError as E;
+
+                    match e {
+                        E::Access(e) => e.into(),
+                        e @ E::Internal(_) => e.int_err().into(),
+                    }
+                })?;
         }
+
+        Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
+            entry: data_room_entry,
+        }
+        .into())
     }
 
     async fn get_data_room_projection(
