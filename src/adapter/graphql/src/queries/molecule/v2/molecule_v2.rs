@@ -140,8 +140,8 @@ impl MoleculeV2 {
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
-        // TODO: use filters
-        let _ = filters;
+        // TODO: filters
+        assert!(filters.is_none());
 
         let molecule_subject = molecule_subject(ctx)?;
 

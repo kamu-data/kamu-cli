@@ -53,6 +53,7 @@ impl MoleculeViewDataRoomActivitiesUseCase for MoleculeViewDataRoomActivitiesUse
 
         // Sort the df by offset descending
         use datafusion::logical_expr::col;
+
         let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
 
         // Apply pagination
