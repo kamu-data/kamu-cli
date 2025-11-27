@@ -13,8 +13,8 @@ use chrono::{DateTime, Utc};
 use kamu::domain;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::ResolvedDataset;
 use kamu_core::auth::DatasetAction;
+use kamu_datasets::ResolvedDataset;
 use odf::utils::data::DataFrameExt;
 
 use super::{CollectionEntry, VersionedFileEntry};
@@ -181,7 +181,7 @@ impl Molecule {
         molecule_account_name: &odf::AccountName,
         action: DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<domain::ResolvedDataset> {
+    ) -> Result<ResolvedDataset> {
         let dataset_reg = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
         const PROJECTS_DATASET_NAME: &str = "projects";

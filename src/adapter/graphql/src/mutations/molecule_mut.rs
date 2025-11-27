@@ -9,8 +9,8 @@
 
 use kamu::domain;
 use kamu_accounts::{AccountServiceExt as _, CreateAccountUseCaseOptions, CurrentAccountSubject};
-use kamu_core::DatasetRegistryExt;
 use kamu_core::auth::DatasetAction;
+use kamu_datasets::DatasetRegistryExt;
 
 use crate::prelude::*;
 use crate::queries::{Molecule, MoleculeProject, molecule_subject};
@@ -290,7 +290,7 @@ impl MoleculeProjectMut {
     ) -> Result<CreateAnnouncementResult> {
         let (dataset_reg, push_ingest_use_case) = from_catalog_n!(
             ctx,
-            dyn domain::DatasetRegistry,
+            dyn kamu_datasets::DatasetRegistry,
             dyn domain::PushIngestDataUseCase
         );
 
