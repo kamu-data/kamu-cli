@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use engine::TransformRequestExt;
 use kamu_core::*;
+use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use random_strings::get_random_name;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,7 +11,8 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method1;
 use internal_error::InternalError;
-use kamu_core::{CompactionExecutor, CompactionResult, DatasetRegistry};
+use kamu_core::{CompactionExecutor, CompactionResult};
+use kamu_datasets::DatasetRegistry;
 use kamu_task_system::*;
 
 use crate::{TaskDefinitionDatasetResetToMetadata, TaskResultDatasetResetToMetadata};

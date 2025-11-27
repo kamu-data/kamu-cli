@@ -14,6 +14,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu::domain::*;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 
 use super::{CLIError, Command};
 use crate::OutputConfig;

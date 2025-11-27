@@ -18,7 +18,7 @@ use axum::extract::FromRequestParts;
 use axum::response::Response;
 use database_common::DatabaseTransactionRunner;
 use internal_error::InternalError;
-use kamu_core::{DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;

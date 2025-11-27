@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::{
+use kamu_core::TenancyConfig;
+use kamu_datasets::{
     DatasetHandlesResolution,
     DatasetRegistry,
     GetMultipleDatasetsError,
     ResolvedDataset,
-    TenancyConfig,
 };
 use odf::dataset::ResolveDatasetHandlesByRefsResponse;
 

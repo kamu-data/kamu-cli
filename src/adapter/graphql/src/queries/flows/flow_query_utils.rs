@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 
 use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
-use kamu_core::DatasetRegistry;
+use kamu_datasets::DatasetRegistry;
 use kamu_flow_system as fs;
 
 use crate::prelude::*;

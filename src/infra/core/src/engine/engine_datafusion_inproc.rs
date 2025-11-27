@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use datafusion::prelude::*;
 use internal_error::*;
-use kamu_core::ResolvedDatasetsMap;
 use kamu_core::engine::*;
+use kamu_datasets::ResolvedDatasetsMap;
 
 /// An in-process engine using Apache Arrow Datafusion framework.
 ///

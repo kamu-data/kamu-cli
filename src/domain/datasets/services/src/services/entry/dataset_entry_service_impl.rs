@@ -26,13 +26,7 @@ use kamu_accounts::{
     CurrentAccountSubject,
     GetAccountByNameError,
 };
-use kamu_core::{
-    DatasetHandlesResolution,
-    DatasetRegistry,
-    GetMultipleDatasetsError,
-    ResolvedDataset,
-    TenancyConfig,
-};
+use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use thiserror::Error;
 use time_source::SystemTimeSource;

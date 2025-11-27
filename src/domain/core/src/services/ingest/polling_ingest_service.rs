@@ -15,7 +15,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
 use internal_error::{BoxedError, InternalError};
-use kamu_datasets::{DatasetEnvVar, FindDatasetEnvVarError};
+use kamu_datasets::{DatasetEnvVar, FindDatasetEnvVarError, ResolvedDataset};
 use thiserror::Error;
 
 use crate::engine::{EngineError, ProcessError, normalize_logs};

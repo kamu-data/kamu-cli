@@ -12,7 +12,8 @@ use std::ops::Deref;
 
 use fallible_map::FallibleMapExt as _;
 use kamu_auth_rebac::AuthorizedAccount;
-use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
+use kamu_core::auth;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use odf::dataset::MetadataChainExt as _;
 use tokio::sync::OnceCell;
 

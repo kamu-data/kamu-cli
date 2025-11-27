@@ -12,7 +12,11 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use kamu_datasets::{DatasetExternallyChangedMessage, MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER};
+use kamu_datasets::{
+    DatasetExternallyChangedMessage,
+    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+    ResolvedDataset,
+};
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

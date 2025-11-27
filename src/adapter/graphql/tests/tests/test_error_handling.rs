@@ -19,8 +19,9 @@ use kamu_auth_rebac::{
     RebacDatasetRefUnresolvedError,
     RebacDatasetRegistryFacade,
 };
+use kamu_core::TenancyConfig;
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetAction};
-use kamu_core::{ResolvedDataset, TenancyConfig};
+use kamu_datasets::ResolvedDataset;
 use pretty_assertions::assert_eq;
 use thiserror::Error;
 use time_source::SystemTimeSourceDefault;

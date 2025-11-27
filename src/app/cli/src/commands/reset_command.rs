@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use kamu::domain::*;
+use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
 use crate::Interact;

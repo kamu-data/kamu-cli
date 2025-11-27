@@ -44,7 +44,7 @@ use crate::{
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ],
-    delivery: MessageDeliveryMechanism::Immediate,
+    delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct FlowDatasetsEventBridge {

@@ -21,7 +21,11 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{DatasetReferenceMessage, MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE};
+use kamu_datasets::{
+    DatasetReferenceMessage,
+    DatasetRegistry,
+    MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+};
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetReferenceRepository,

@@ -11,6 +11,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
 use crate::*;

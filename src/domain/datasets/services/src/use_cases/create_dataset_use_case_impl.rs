@@ -12,12 +12,12 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::ResolvedDataset;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
+    ResolvedDataset,
 };
 
 use crate::utils::CreateDatasetUseCaseHelper;

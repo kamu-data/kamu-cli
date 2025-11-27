@@ -17,6 +17,7 @@ use datafusion::error::DataFusionError;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use internal_error::InternalError;
 use kamu_core::*;
+use kamu_datasets::DatasetRegistry;
 
 use super::KamuTable;
 

@@ -22,6 +22,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 
 use crate::EngineConfigDatafusionEmbeddedBatchQueryExt;
 

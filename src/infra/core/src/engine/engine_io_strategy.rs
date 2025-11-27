@@ -13,7 +13,7 @@ use container_runtime::*;
 use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::engine::*;
-use kamu_core::*;
+use kamu_datasets::ResolvedDatasetsMap;
 use odf::storage::lfs::ObjectRepositoryLocalFSSha3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

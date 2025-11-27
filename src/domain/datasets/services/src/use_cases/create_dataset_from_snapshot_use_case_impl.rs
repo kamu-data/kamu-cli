@@ -18,12 +18,14 @@ use kamu_accounts::{
     DidSecretKey,
     DidSecretKeyRepository,
 };
-use kamu_core::{DatasetRegistry, DidGenerator, ResolvedDataset};
+use kamu_core::DidGenerator;
 use kamu_datasets::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
+    DatasetRegistry,
+    ResolvedDataset,
 };
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;

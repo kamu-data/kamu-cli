@@ -30,108 +30,111 @@ async fn test_crud_time_delta_root_dataset() {
     let create_result = harness.create_root_dataset(foo_alias).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = FlowTriggerHarness::query_flow_trigger(&create_result.dataset_handle.id, "INGEST")
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
+    for flow_type in ["INGEST", "HARD_COMPACTION"] {
+        let res =
+            FlowTriggerHarness::query_flow_trigger(&create_result.dataset_handle.id, flow_type)
+                .execute(&schema, &harness.catalog_authorized)
+                .await;
 
-    assert_eq!(
-        res.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "byType": null
+        assert_eq!(
+            res.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "triggers": {
+                                "byType": null
+                            }
                         }
                     }
                 }
-            }
-        })
-    );
+            })
+        );
 
-    let response = harness
-        .set_time_delta_trigger(
-            &create_result.dataset_handle.id,
-            "INGEST",
-            (1, "DAYS"),
-            None,
-        )
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
+        let response = harness
+            .set_time_delta_trigger(
+                &create_result.dataset_handle.id,
+                flow_type,
+                (1, "DAYS"),
+                None,
+            )
+            .execute(&schema, &harness.catalog_authorized)
+            .await;
 
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "setTrigger": {
-                                "__typename": "SetFlowTriggerSuccess",
-                                "message": "Success",
-                                "trigger": {
-                                    "__typename": "FlowTrigger",
-                                    "paused": false,
-                                    "schedule": {
-                                        "__typename": "TimeDelta",
-                                        "every": 1,
-                                        "unit": "DAYS"
-                                    },
-                                    "reactive": null,
-                                    "stopPolicy": {
-                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
-                                        "maxFailures": 1
+        assert_eq!(
+            response.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "triggers": {
+                                "setTrigger": {
+                                    "__typename": "SetFlowTriggerSuccess",
+                                    "message": "Success",
+                                    "trigger": {
+                                        "__typename": "FlowTrigger",
+                                        "paused": false,
+                                        "schedule": {
+                                            "__typename": "TimeDelta",
+                                            "every": 1,
+                                            "unit": "DAYS"
+                                        },
+                                        "reactive": null,
+                                        "stopPolicy": {
+                                            "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                            "maxFailures": 1
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-        })
-    );
+            })
+        );
 
-    let response = harness
-        .set_time_delta_trigger(
-            &create_result.dataset_handle.id,
-            "INGEST",
-            (2, "HOURS"),
-            None,
-        )
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
+        let response = harness
+            .set_time_delta_trigger(
+                &create_result.dataset_handle.id,
+                flow_type,
+                (2, "HOURS"),
+                None,
+            )
+            .execute(&schema, &harness.catalog_authorized)
+            .await;
 
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "setTrigger": {
-                                "__typename": "SetFlowTriggerSuccess",
-                                "message": "Success",
-                                "trigger": {
-                                    "__typename": "FlowTrigger",
-                                    "paused": false,
-                                    "schedule": {
-                                        "__typename": "TimeDelta",
-                                        "every": 2,
-                                        "unit": "HOURS"
-                                    },
-                                    "reactive": null,
-                                    "stopPolicy": {
-                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
-                                        "maxFailures": 1
+        assert_eq!(
+            response.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "triggers": {
+                                "setTrigger": {
+                                    "__typename": "SetFlowTriggerSuccess",
+                                    "message": "Success",
+                                    "trigger": {
+                                        "__typename": "FlowTrigger",
+                                        "paused": false,
+                                        "schedule": {
+                                            "__typename": "TimeDelta",
+                                            "every": 2,
+                                            "unit": "HOURS"
+                                        },
+                                        "reactive": null,
+                                        "stopPolicy": {
+                                            "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                            "maxFailures": 1
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-        })
-    );
+            })
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,106 +207,109 @@ async fn test_crud_cron_root_dataset() {
     let create_result = harness.create_root_dataset(foo_alias).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = FlowTriggerHarness::query_flow_trigger(&create_result.dataset_handle.id, "INGEST")
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
+    for flow_type in ["INGEST", "HARD_COMPACTION"] {
+        let res =
+            FlowTriggerHarness::query_flow_trigger(&create_result.dataset_handle.id, flow_type)
+                .execute(&schema, &harness.catalog_authorized)
+                .await;
 
-    assert_eq!(
-        res.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "byType": null
+        assert_eq!(
+            res.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "triggers": {
+                                "byType": null
+                            }
                         }
                     }
                 }
-            }
-        })
-    );
+            })
+        );
 
-    let response = harness
-        .set_cron_trigger(
-            &create_result.dataset_handle.id,
-            "INGEST",
-            "*/2 * * * *",
-            None,
-        )
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
+        let response = harness
+            .set_cron_trigger(
+                &create_result.dataset_handle.id,
+                flow_type,
+                "*/2 * * * *",
+                None,
+            )
+            .execute(&schema, &harness.catalog_authorized)
+            .await;
 
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "setTrigger": {
-                                "__typename": "SetFlowTriggerSuccess",
-                                "message": "Success",
-                                "trigger": {
-                                    "__typename": "FlowTrigger",
-                                    "paused": false,
-                                    "schedule": {
-                                        "__typename": "Cron5ComponentExpression",
-                                        "cron5ComponentExpression": "*/2 * * * *",
-                                    },
-                                    "reactive": null,
-                                    "stopPolicy": {
-                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
-                                        "maxFailures": 1
+        assert_eq!(
+            response.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "triggers": {
+                                "setTrigger": {
+                                    "__typename": "SetFlowTriggerSuccess",
+                                    "message": "Success",
+                                    "trigger": {
+                                        "__typename": "FlowTrigger",
+                                        "paused": false,
+                                        "schedule": {
+                                            "__typename": "Cron5ComponentExpression",
+                                            "cron5ComponentExpression": "*/2 * * * *",
+                                        },
+                                        "reactive": null,
+                                        "stopPolicy": {
+                                            "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                            "maxFailures": 1
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-        })
-    );
+            })
+        );
 
-    let response = harness
-        .set_cron_trigger(
-            &create_result.dataset_handle.id,
-            "INGEST",
-            "0 */1 * * *",
-            None,
-        )
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
+        let response = harness
+            .set_cron_trigger(
+                &create_result.dataset_handle.id,
+                flow_type,
+                "0 */1 * * *",
+                None,
+            )
+            .execute(&schema, &harness.catalog_authorized)
+            .await;
 
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "triggers": {
-                            "setTrigger": {
-                                "__typename": "SetFlowTriggerSuccess",
-                                "message": "Success",
-                                "trigger": {
-                                    "__typename": "FlowTrigger",
-                                    "paused": false,
-                                    "schedule": {
-                                        "__typename": "Cron5ComponentExpression",
-                                        "cron5ComponentExpression": "0 */1 * * *",
-                                    },
-                                    "reactive": null,
-                                    "stopPolicy": {
-                                        "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
-                                        "maxFailures": 1
+        assert_eq!(
+            response.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "triggers": {
+                                "setTrigger": {
+                                    "__typename": "SetFlowTriggerSuccess",
+                                    "message": "Success",
+                                    "trigger": {
+                                        "__typename": "FlowTrigger",
+                                        "paused": false,
+                                        "schedule": {
+                                            "__typename": "Cron5ComponentExpression",
+                                            "cron5ComponentExpression": "0 */1 * * *",
+                                        },
+                                        "reactive": null,
+                                        "stopPolicy": {
+                                            "__typename": "FlowTriggerStopPolicyAfterConsecutiveFailures",
+                                            "maxFailures": 1
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-        })
-    );
+            })
+        );
+    }
 
     // Try to pass invalid cron expression
     let invalid_cron_expression = "0 0 */1 *";
@@ -654,6 +660,16 @@ async fn test_pause_resume_dataset_flows() {
         .await;
 
     harness
+        .set_time_delta_trigger(
+            &create_root_result.dataset_handle.id,
+            "HARD_COMPACTION",
+            (1, "DAYS"),
+            None,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    harness
         .set_reactive_trigger_buffering(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
@@ -666,6 +682,7 @@ async fn test_pause_resume_dataset_flows() {
 
     let flow_cases = [
         (&create_root_result.dataset_handle.id, "INGEST"),
+        (&create_root_result.dataset_handle.id, "HARD_COMPACTION"),
         (
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
@@ -674,7 +691,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Ensure all flow configs are not paused
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![false, false])
+        flow_cases.iter().zip([false, false, false])
     {
         check_flow_config_status(
             &harness,
@@ -696,7 +713,8 @@ async fn test_pause_resume_dataset_flows() {
 
     // execute transform should be paused
 
-    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        flow_cases.iter().zip([false, false, true])
     {
         check_flow_config_status(
             &harness,
@@ -715,7 +733,8 @@ async fn test_pause_resume_dataset_flows() {
         .await;
 
     // Root flows should be paused
-    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![true, true])
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        flow_cases.iter().zip([true, true, true])
     {
         check_flow_config_status(
             &harness,
@@ -734,7 +753,8 @@ async fn test_pause_resume_dataset_flows() {
         .await;
 
     // Only transform of deriving should be paused
-    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        flow_cases.iter().zip([false, true, true])
     {
         check_flow_config_status(
             &harness,
@@ -756,7 +776,8 @@ async fn test_pause_resume_dataset_flows() {
         .await;
 
     // Observe status change
-    for ((dataset_id, dataset_flow_type), expect_paused) in flow_cases.iter().zip(vec![false, true])
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        flow_cases.iter().zip([false, true, true])
     {
         check_flow_config_status(
             &harness,
@@ -776,7 +797,26 @@ async fn test_pause_resume_dataset_flows() {
 
     // Observe status change
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        flow_cases.iter().zip(vec![false, false])
+        flow_cases.iter().zip([false, true, false])
+    {
+        check_flow_config_status(
+            &harness,
+            &schema,
+            dataset_id,
+            dataset_flow_type,
+            expect_paused,
+        )
+        .await;
+    }
+
+    // Resume root compaction after testing generic resume for derived datasets
+    let _response = harness
+        .resume_flow_trigger(&create_root_result.dataset_handle.id, "HARD_COMPACTION")
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        flow_cases.iter().zip([false, false, false])
     {
         check_flow_config_status(
             &harness,

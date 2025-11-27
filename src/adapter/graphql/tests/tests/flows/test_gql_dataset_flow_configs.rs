@@ -150,7 +150,7 @@ async fn test_crud_compaction_root_dataset() {
     );
 
     let res = harness
-        .set_compaction_config(&create_result.dataset_handle.id, 1_000_000, 10000)
+        .set_compaction_config(&create_result.dataset_handle.id, 1_000_000, 10000, None)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 
@@ -206,6 +206,7 @@ async fn test_compaction_config_validation() {
                 &create_root_result.dataset_handle.id,
                 test_case.0,
                 test_case.1,
+                None,
             )
             .execute(&schema, &harness.catalog_authorized)
             .await;
@@ -274,7 +275,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     ////
 
     let res = harness
-        .set_compaction_config(&create_derived_result.dataset_handle.id, 1000, 1000)
+        .set_compaction_config(&create_derived_result.dataset_handle.id, 1000, 1000, None)
         .execute(&schema, &harness.catalog_authorized)
         .await;
 

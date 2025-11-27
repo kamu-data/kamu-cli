@@ -11,7 +11,8 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
 use internal_error::InternalError;
-use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResetPlanner};
+use kamu_core::ResetPlanner;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
 use crate::{LogicalPlanDatasetReset, TaskDefinitionDatasetReset};

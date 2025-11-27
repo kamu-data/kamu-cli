@@ -15,6 +15,7 @@ use container_runtime::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
+use kamu_datasets::ResolvedDatasetsMap;
 
 use super::engine_odf::*;
 use crate::utils::docker_images;

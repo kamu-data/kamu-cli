@@ -15,6 +15,7 @@ use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::*;
 use odf::utils::data::DataFrameExt;
 use tokio::io::AsyncRead;

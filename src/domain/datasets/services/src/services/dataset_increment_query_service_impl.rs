@@ -10,8 +10,13 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
-use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
+use kamu_datasets::{
+    DatasetIncrementQueryService,
+    DatasetRegistry,
+    DatasetRegistryExt,
+    GetIncrementError,
+    ResolvedDataset,
+};
 use odf::dataset::MetadataChainIncrementInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

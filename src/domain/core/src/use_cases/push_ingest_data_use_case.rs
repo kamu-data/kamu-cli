@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::InternalError;
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
@@ -21,9 +22,7 @@ use crate::{
     PushIngestListener,
     PushIngestPlanningError,
     PushIngestResult,
-    ResolvedDataset,
 };
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]

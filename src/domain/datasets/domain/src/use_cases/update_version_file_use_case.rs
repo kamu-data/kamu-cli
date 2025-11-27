@@ -13,7 +13,7 @@ use odf::dataset::RefCASError;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
-use crate::{ExtraDataFields, FileVersion};
+use crate::{ExtraDataFields, FileVersion, WriteCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ use crate::{ExtraDataFields, FileVersion};
 pub trait UpdateVersionFileUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        file_dataset: WriteCheckedDataset<'_>,
         content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
