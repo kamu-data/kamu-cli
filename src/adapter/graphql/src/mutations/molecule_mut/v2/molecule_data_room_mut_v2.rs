@@ -99,12 +99,14 @@ impl MoleculeDataRoomMutV2 {
             create_dataset_from_snapshot_use_case,
             update_version_file_use_case,
             update_entries_use_case,
+            rebac_service,
             append_data_room_activity_use_case,
         ) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
             dyn UpdateVersionFileUseCase,
             dyn UpdateCollectionEntriesUseCase,
+            dyn kamu_auth_rebac::RebacService,
             dyn MoleculeAppendDataRoomActivityUseCase
         );
 
@@ -116,6 +118,16 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 versioned_file_snapshot,
                 CreateDatasetUseCaseOptions::default(),
+            )
+            .await
+            .int_err()?;
+
+        // Give maintainer permissions to molecule
+        rebac_service
+            .set_account_dataset_relation(
+                &molecule_subject.account_id,
+                kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
+                &create_versioned_file_res.dataset_handle.id,
             )
             .await
             .int_err()?;
