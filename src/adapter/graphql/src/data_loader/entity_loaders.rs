@@ -14,7 +14,7 @@ use async_graphql::dataloader::Loader;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{Account, AccountService};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::{DatasetRegistry, auth};
+use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -120,7 +120,7 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
     type Value = odf::DatasetHandle;
     type Error = Arc<InternalError>;
 
-    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::byDatasetRef::load", skip_all, fields(num_keys = keys.len()))]
+    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::<odf::DatasetRef, odf::DatasetHandle>::load", skip_all, fields(num_keys = keys.len()))]
     async fn load(
         &self,
         keys: &[odf::DatasetRef],
@@ -146,7 +146,7 @@ impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
     type Value = odf::DatasetHandle;
     type Error = Arc<InternalError>;
 
-    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::byDatasetRef::load", skip_all, fields(num_keys = keys.len()))]
+    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::<AccessCheckedDatasetRef, odf::DatasetHandle>::load", skip_all, fields(num_keys = keys.len()))]
     async fn load(
         &self,
         keys: &[AccessCheckedDatasetRef],
@@ -166,6 +166,44 @@ impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
                 (AccessCheckedDatasetRef::new(dataset_ref), dataset_handle)
             })
             .collect())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetHandleLoader: AccessCheckedDatasetRef(odf::DatasetRef)
+//                      -> ResolvedDataset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
+    type Value = ResolvedDataset;
+    type Error = Arc<InternalError>;
+
+    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::byDatasetRef::load", skip_all, fields(num_keys = keys.len()))]
+    async fn load(
+        &self,
+        keys: &[AccessCheckedDatasetRef],
+    ) -> Result<HashMap<AccessCheckedDatasetRef, Self::Value>, Self::Error> {
+        let dataset_refs: Vec<&_> = keys.iter().map(AsRef::as_ref).collect();
+
+        let resolution = self
+            .dataset_registry
+            .resolve_dataset_handles_by_refs(&dataset_refs)
+            .await
+            .int_err()?;
+        let futures_iter = resolution
+            .resolved_handles
+            .into_iter()
+            .map(|(dataset_ref, dataset_handle)| async {
+                let resolved_dataset = self
+                    .dataset_registry
+                    .get_dataset_by_handle(&dataset_handle)
+                    .await;
+                (AccessCheckedDatasetRef::new(dataset_ref), resolved_dataset)
+            })
+            .collect::<Vec<_>>();
+        let resolved_dataset_pairs = futures::future::join_all(futures_iter).await;
+
+        Ok(resolved_dataset_pairs.into_iter().collect())
     }
 }
 
