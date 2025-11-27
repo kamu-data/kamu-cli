@@ -432,6 +432,74 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    // Global activity
+    const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
+        r#"
+        {
+          molecule {
+            v2 {
+              activity {
+                nodes {
+                  ... on MoleculeActivityFileAddedV2 {
+                    __typename
+                    entry {
+                      path
+                      ref
+                      changeBy
+                    }
+                  }
+                  ... on MoleculeActivityFileUpdatedV2 {
+                    __typename
+                    entry {
+                      path
+                      ref
+                      changeBy
+                    }
+                  }
+                  ... on MoleculeActivityFileRemovedV2 {
+                    __typename
+                    entry {
+                      path
+                      ref
+                      changeBy
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::default(),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": [
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/foo.txt",
+                                    "ref": file_1_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                        ]
+                    }
+                }
+            }
+        })
+    );
+
     // Very similar request to create another file, but this time we get back the
     // detailed properties that are not denormalized
     let res = harness
@@ -552,6 +620,42 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::default(),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": [
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/bar.txt",
+                                    "ref": file_2_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/foo.txt",
+                                    "ref": file_1_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                        ]
+                    }
+                }
+            }
+        })
+    );
+
     // Very similar request to create another file, but ensuring that optional
     // fields are indeed optional
     let res = harness
@@ -661,6 +765,50 @@ async fn test_molecule_v2_data_room_operations() {
                         "contentText": null,
                         "encryptionMetadata": null,
                         "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+                    }
+                }
+            }
+        })
+    );
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::default(),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": [
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/baz.txt",
+                                    "ref": file_3_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/bar.txt",
+                                    "ref": file_2_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/foo.txt",
+                                    "ref": file_1_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                        ]
                     }
                 }
             }
@@ -876,6 +1024,58 @@ async fn test_molecule_v2_data_room_operations() {
                         "contentText": "bye",
                         "encryptionMetadata": r#"{"encryption": "lit"}"#,
                         "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
+                    }
+                }
+            }
+        })
+    );
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::default(),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": [
+                            {
+                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "entry": {
+                                    "path": "/foo.txt",
+                                    "ref": file_1_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/baz.txt",
+                                    "ref": file_3_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/bar.txt",
+                                    "ref": file_2_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/foo.txt",
+                                    "ref": file_1_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                }
+                            },
+                        ]
                     }
                 }
             }
@@ -1167,6 +1367,8 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    // TODO: activity check
+
     /////////////////
     // removeEntry //
     /////////////////
@@ -1292,6 +1494,8 @@ async fn test_molecule_v2_data_room_operations() {
             ],
         })
     );
+
+    // TODO: activity check
 
     ////////////////////////
     // updateFileMetadata //
@@ -1479,6 +1683,8 @@ async fn test_molecule_v2_data_room_operations() {
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
         })
     );
+
+    // TODO: activity check
 
     // !!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!
     //

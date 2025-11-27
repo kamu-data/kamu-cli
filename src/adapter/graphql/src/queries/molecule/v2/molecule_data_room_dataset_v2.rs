@@ -281,6 +281,8 @@ pub struct MoleculeVersionedFile {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeVersionedFile {
+    // TODO: For the list of activities, do we need to display the version at the
+    //       time of activity here (specify head)?
     async fn latest(&self, ctx: &Context<'_>) -> Result<Option<MoleculeVersionedFileEntry>> {
         let dataset_handle_data_loader = utils::get_dataset_handle_data_loader(ctx);
 

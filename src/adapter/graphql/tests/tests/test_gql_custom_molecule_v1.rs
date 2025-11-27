@@ -1453,6 +1453,7 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu_molecule_services::MoleculeViewProjectsUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeDatasetServiceImpl>()
             .add::<kamu_molecule_services::MoleculeAppendDataRoomActivityUseCaseImpl>()
+            .add::<kamu_molecule_services::MoleculeViewDataRoomActivitiesUseCaseImpl>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
             .add::<kamu::QueryDatasetDataUseCaseImpl>()

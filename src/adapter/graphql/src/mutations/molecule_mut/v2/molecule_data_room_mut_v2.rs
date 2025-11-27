@@ -710,6 +710,8 @@ impl MoleculeDataRoomMutV2 {
         to_path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
+        // TODO: save update global activity entry
+
         let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         match update_entries_use_case
@@ -751,6 +753,8 @@ impl MoleculeDataRoomMutV2 {
         path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
+        // TODO: save remove global activity entry
+
         let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         match update_entries_use_case
