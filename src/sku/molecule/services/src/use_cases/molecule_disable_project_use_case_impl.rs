@@ -44,31 +44,19 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<MoleculeProjectEntity, MoleculeDisableProjectError> {
-        use datafusion::prelude::*;
-
         let now = chrono::Utc::now();
 
-        let (projects_dataset, df_opt) = self
+        let (projects_dataset, project_opt) = self
             .molecule_dataset_service
-            .get_projects_changelog_data_frame(molecule_subject, DatasetAction::Write, false)
+            .get_project_changelog_entry(molecule_subject, DatasetAction::Write, false, &ipnft_uid)
             .await?;
 
-        let Some(df): Option<odf::utils::data::DataFrameExt> = df_opt else {
-            return self
-                .existing_project_from_ledger(molecule_subject, ipnft_uid)
-                .await;
+        let mut project = if let Some(project) = project_opt {
+            project
+        } else {
+            self.existing_project_from_ledger(molecule_subject, &ipnft_uid)
+                .await?
         };
-
-        let df = df.filter(col("ipnft_uid").eq(lit(&ipnft_uid))).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        let Some(record) = records.into_iter().next() else {
-            return self
-                .existing_project_from_ledger(molecule_subject, ipnft_uid)
-                .await;
-        };
-
-        let mut project = MoleculeProjectEntity::from_json(record).int_err()?;
         project.system_time = now;
         project.event_time = now;
 
@@ -115,7 +103,7 @@ impl MoleculeDisableProjectUseCaseImpl {
     async fn existing_project_from_ledger(
         &self,
         molecule_subject: &LoggedAccount,
-        ipnft_uid: String,
+        ipnft_uid: &str,
     ) -> Result<MoleculeProjectEntity, MoleculeDisableProjectError> {
         use datafusion::prelude::*;
 
@@ -126,12 +114,14 @@ impl MoleculeDisableProjectUseCaseImpl {
 
         let Some(ledger_df) = ledger_opt else {
             return Err(MoleculeDisableProjectError::ProjectNotFound(
-                ProjectNotFoundError { ipnft_uid },
+                ProjectNotFoundError {
+                    ipnft_uid: ipnft_uid.to_owned(),
+                },
             ));
         };
 
         let df = ledger_df
-            .filter(col("ipnft_uid").eq(lit(&ipnft_uid)))
+            .filter(col("ipnft_uid").eq(lit(ipnft_uid)))
             .int_err()?
             .sort(vec![col("system_time").sort(false, false)])
             .int_err()?;
@@ -149,7 +139,9 @@ impl MoleculeDisableProjectUseCaseImpl {
 
         let Some(record) = record else {
             return Err(MoleculeDisableProjectError::ProjectNotFound(
-                ProjectNotFoundError { ipnft_uid },
+                ProjectNotFoundError {
+                    ipnft_uid: ipnft_uid.to_owned(),
+                },
             ));
         };
 

@@ -13,6 +13,8 @@ use kamu_core::auth;
 use kamu_datasets::ResolvedDataset;
 use odf::utils::data::DataFrameExt;
 
+use crate::MoleculeProjectEntity;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -39,6 +41,14 @@ pub trait MoleculeDatasetService: Send + Sync {
         action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
+
+    async fn get_project_changelog_entry(
+        &self,
+        molecule_subject: &LoggedAccount,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+        ipnft_uid: &str,
+    ) -> Result<(ResolvedDataset, Option<MoleculeProjectEntity>), MoleculeGetDatasetError>;
 
     async fn get_global_data_room_activity_dataset(
         &self,

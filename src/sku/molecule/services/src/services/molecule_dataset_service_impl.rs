@@ -159,6 +159,34 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         Ok((projects_dataset, df))
     }
 
+    async fn get_project_changelog_entry(
+        &self,
+        molecule_subject: &LoggedAccount,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+        ipnft_uid: &str,
+    ) -> Result<(ResolvedDataset, Option<MoleculeProjectEntity>), MoleculeGetDatasetError> {
+        use datafusion::prelude::*;
+
+        let (projects_dataset, df_opt) = self
+            .get_projects_changelog_data_frame(molecule_subject, action, create_if_not_exist)
+            .await?;
+
+        let project = if let Some(df) = df_opt {
+            let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
+            let records = df.collect_json_aos().await.int_err()?;
+            if let Some(record) = records.into_iter().next() {
+                Some(MoleculeProjectEntity::from_json(record).int_err()?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok((projects_dataset, project))
+    }
+
     #[tracing::instrument(
         level = "debug",
         name = MoleculeDatasetServiceImpl_get_global_data_room_activity_dataset,

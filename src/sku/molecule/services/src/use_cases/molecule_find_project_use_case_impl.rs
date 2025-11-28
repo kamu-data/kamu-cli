@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth::DatasetAction;
 
@@ -34,29 +33,12 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProjectEntity>, MoleculeFindProjectError> {
-        use datafusion::logical_expr::{col, lit};
-
-        let Some(df) = self
+        let (_, project) = self
             .molecule_dataset_service
-            .get_projects_changelog_data_frame(molecule_subject, DatasetAction::Read, false)
-            .await?
-            .1
-        else {
-            return Ok(None);
-        };
+            .get_project_changelog_entry(molecule_subject, DatasetAction::Read, false, &ipnft_uid)
+            .await?;
 
-        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-        let record = records.into_iter().next().unwrap();
-
-        let entity = MoleculeProjectEntity::from_json(record)?;
-        Ok(Some(entity))
+        Ok(project)
     }
 }
 
