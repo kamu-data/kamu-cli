@@ -30,6 +30,7 @@ pub struct MoleculeDataRoomActivityEntity {
 
     pub activity_type: MoleculeDataRoomFileActivityType,
 
+    // TODO: typing
     pub ipnft_uid: String,
 
     pub path: String,

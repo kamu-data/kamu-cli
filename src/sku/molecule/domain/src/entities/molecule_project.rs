@@ -33,6 +33,7 @@ pub struct MoleculeProjectEntity {
     /// Symbolic name of the project
     pub ipnft_symbol: String,
 
+    // TODO: typing
     /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
     pub ipnft_uid: String,
 
