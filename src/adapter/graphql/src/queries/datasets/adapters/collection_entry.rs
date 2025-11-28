@@ -25,12 +25,6 @@ impl CollectionEntry {
     pub fn new(entity: kamu_datasets::CollectionEntry) -> Self {
         Self { entity }
     }
-
-    // TODO: remove this when all use cases are migrated
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        let entity = kamu_datasets::CollectionEntry::from_json(record)?;
-        Ok(Self::new(entity))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

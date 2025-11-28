@@ -392,7 +392,9 @@ impl MoleculeDataRoomMutV2 {
 
         assert_eq!(records.len(), 1);
 
-        let entry = CollectionEntry::from_json(records.into_iter().next().unwrap())?;
+        let entity =
+            kamu_datasets::CollectionEntry::from_json(records.into_iter().next().unwrap())?;
+        let entry = CollectionEntry::new(entity);
 
         Ok(Some(entry))
     }

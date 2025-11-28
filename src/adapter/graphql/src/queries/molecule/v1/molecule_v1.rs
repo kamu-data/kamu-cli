@@ -382,7 +382,8 @@ impl MoleculeProject {
             })
             .filter(|(op, _)| *op != odf::metadata::OperationType::CorrectFrom)
             .map(|(op, record)| {
-                let entry = CollectionEntry::from_json(record)?;
+                let entity = kamu_datasets::CollectionEntry::from_json(record)?;
+                let entry = CollectionEntry::new(entity);
 
                 let event = match op {
                     odf::metadata::OperationType::Append => {
@@ -489,7 +490,8 @@ impl MoleculeProject {
                 let dataset =
                     Dataset::from_resolved_authorized_dataset(project_account.clone(), &source);
 
-                let entry = VersionedFileEntry::from_json(source.clone(), record)?;
+                let entity = kamu_datasets::VersionedFileEntry::from_json(record)?;
+                let entry = VersionedFileEntry::new(source.clone(), entity);
 
                 events.push(MoleculeProjectEvent::FileUpdated(
                     MoleculeProjectEventFileUpdated {

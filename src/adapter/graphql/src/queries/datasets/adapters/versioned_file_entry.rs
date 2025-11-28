@@ -34,15 +34,6 @@ impl VersionedFileEntry {
             entity,
         }
     }
-
-    pub fn from_json(
-        file_dataset: kamu_datasets::ResolvedDataset,
-        record: serde_json::Value,
-    ) -> Result<Self, InternalError> {
-        let entity = kamu_datasets::VersionedFileEntry::from_json(record)?;
-
-        Ok(Self::new(file_dataset, entity))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
