@@ -13,6 +13,7 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

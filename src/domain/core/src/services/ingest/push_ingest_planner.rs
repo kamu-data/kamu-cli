@@ -12,9 +12,10 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::InternalError;
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
-use crate::{DataWriterMetadataState, ResolvedDataset, SchemaInferenceOpts};
+use crate::{DataWriterMetadataState, SchemaInferenceOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -9,7 +9,8 @@
 
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
-use kamu_core::{ResolvedDataset, auth};
+use kamu_core::auth;
+use kamu_datasets::ResolvedDataset;
 use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,8 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use kamu_core::ResolvedDataset;
-use kamu_datasets::ExtraDataFields;
+use kamu_datasets::{ExtraDataFields, ResolvedDataset};
 use kamu_molecule_domain::MoleculeDataRoomActivityEntity;
 
 use crate::data_loader::AccessCheckedDatasetRef;

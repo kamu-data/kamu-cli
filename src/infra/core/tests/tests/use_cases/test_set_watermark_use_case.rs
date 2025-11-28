@@ -14,7 +14,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetResult;
+use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

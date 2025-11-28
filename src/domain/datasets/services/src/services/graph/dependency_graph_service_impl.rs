@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_core::DatasetRegistry;
 use kamu_datasets::*;
 use messaging_outbox::*;
 use petgraph::Direction;

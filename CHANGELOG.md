@@ -18,6 +18,17 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
+
+## [Unreleased]
+### Added
+- GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows
+### Changed
+- Refactoring: `ResolvedDataset` and `DatasetRegistry` moved to `kamu-datasets` domain
+- Experiment: Introduce `WriteCheckedDataset` and `ReadCheckedDataset` types, 
+    clearly indicating the access check on the resolved dataset was already performed
+### Fixed
+- Flow events now processed transactionally
+
 ## [0.253.1] - 2025-11-24
 ### Changed
 - GQL: `usage` section contains size measure unit

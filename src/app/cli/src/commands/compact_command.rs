@@ -13,12 +13,12 @@ use futures::TryStreamExt as _;
 use kamu::domain::{
     CompactDatasetUseCase,
     CompactionOptions,
-    DatasetRegistry,
     VerificationMultiListener,
     VerificationOptions,
     VerificationRequest,
     VerifyDatasetUseCase,
 };
+use kamu_datasets::DatasetRegistry;
 
 use crate::{
     BatchError,

@@ -14,7 +14,8 @@ use async_graphql::dataloader::Loader;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{Account, AccountService};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
+use kamu_core::auth;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

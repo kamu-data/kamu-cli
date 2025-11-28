@@ -15,6 +15,7 @@ use chrono_humanize::HumanTime;
 use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 
 use super::{CLIError, Command};
 use crate::output::*;

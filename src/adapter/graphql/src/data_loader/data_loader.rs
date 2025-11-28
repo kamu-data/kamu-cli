@@ -14,7 +14,7 @@ use async_graphql::dataloader::DataLoader;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::AccountService;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::DatasetRegistry;
+use kamu_datasets::DatasetRegistry;
 use tracing::Instrument;
 
 use crate::data_loader::{AccountEntityLoader, DatasetHandleLoader};

@@ -15,6 +15,7 @@ use datafusion::prelude::*;
 use indoc::indoc;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets::*;
 use kamu_ingest_datafusion::*;
 use odf::metadata::testing::MetadataFactory;
 use odf::metadata::{DataField, DataSchema};

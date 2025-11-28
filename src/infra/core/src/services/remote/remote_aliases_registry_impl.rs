@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use odf::metadata::serde::yaml::Manifest;
 use thiserror::Error;
 

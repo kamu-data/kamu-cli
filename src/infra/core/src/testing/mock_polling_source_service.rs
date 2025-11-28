@@ -17,8 +17,8 @@ use kamu_core::{
     PollingIngestResponse,
     PollingIngestResult,
     PollingIngestService,
-    ResolvedDataset,
 };
+use kamu_datasets::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

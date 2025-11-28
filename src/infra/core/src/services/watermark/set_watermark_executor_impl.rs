@@ -10,6 +10,7 @@
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

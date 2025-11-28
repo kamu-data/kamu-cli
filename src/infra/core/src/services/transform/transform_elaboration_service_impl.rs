@@ -13,6 +13,7 @@ use dill::*;
 use engine::{TransformRequestExt, TransformRequestInputExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
+use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 

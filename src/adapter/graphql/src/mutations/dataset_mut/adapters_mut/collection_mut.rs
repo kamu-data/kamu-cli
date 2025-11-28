@@ -15,6 +15,7 @@ use kamu_datasets::{
     UpdateCollectionEntriesResult,
     UpdateCollectionEntriesUseCase,
     UpdateCollectionEntriesUseCaseError,
+    WriteCheckedDataset,
 };
 
 use crate::prelude::*;
@@ -59,9 +60,11 @@ impl<'a> CollectionMut<'a> {
             }
         }
 
+        let collection_dataset = self.writable_state.resolved_dataset(ctx).await?;
+
         match update_entries_use_case
             .execute(
-                self.writable_state.dataset_handle(),
+                WriteCheckedDataset(collection_dataset),
                 mapped_ops,
                 expected_head,
             )

@@ -18,6 +18,7 @@ use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
+use kamu_datasets::ResolvedDatasetsMap;
 use odf::metadata::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 
 use super::ODFEngineConfig;

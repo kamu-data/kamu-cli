@@ -12,7 +12,7 @@ use kamu_adapter_flow_dataset::{
     DatasetResourceUpdateDetails,
     DatasetUpdateSource,
 };
-use kamu_core::DatasetRegistry;
+use kamu_datasets::DatasetRegistry;
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;

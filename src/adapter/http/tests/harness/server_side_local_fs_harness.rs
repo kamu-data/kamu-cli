@@ -40,13 +40,7 @@ use kamu_auth_rebac_services::{
     RebacDatasetRegistryFacadeImpl,
     RebacServiceImpl,
 };
-use kamu_core::{
-    CompactionExecutor,
-    CompactionPlanner,
-    DatasetRegistry,
-    DidGeneratorDefault,
-    TenancyConfig,
-};
+use kamu_core::{CompactionExecutor, CompactionPlanner, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDataBlockRepository,

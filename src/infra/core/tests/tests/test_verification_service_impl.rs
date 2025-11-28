@@ -17,6 +17,7 @@ use file_utils::OwnedFile;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, ParquetWriterHelper};
 use kamu::*;
+use kamu_datasets::ResolvedDataset;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

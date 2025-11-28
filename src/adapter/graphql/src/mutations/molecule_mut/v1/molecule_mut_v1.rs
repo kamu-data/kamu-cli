@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain;
-use kamu_core::DatasetRegistryExt;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_molecule_domain::{
     MoleculeCreateProjectError,
     MoleculeCreateProjectUseCase,
@@ -132,11 +132,8 @@ impl MoleculeProjectMut {
         molecule_access_level: String,
         molecule_change_by: String,
     ) -> Result<CreateAnnouncementResult> {
-        let (dataset_reg, push_ingest_use_case) = from_catalog_n!(
-            ctx,
-            dyn domain::DatasetRegistry,
-            dyn domain::PushIngestDataUseCase
-        );
+        let (dataset_reg, push_ingest_use_case) =
+            from_catalog_n!(ctx, dyn DatasetRegistry, dyn domain::PushIngestDataUseCase);
 
         // Validate attachment links
         let attachments = attachments.unwrap_or_default();

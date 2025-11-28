@@ -20,7 +20,6 @@ use kamu::{
 };
 use kamu_core::{
     MetadataQueryService,
-    ResolvedDataset,
     SetWatermarkError,
     SetWatermarkExecutor,
     SetWatermarkPlanner,
@@ -28,6 +27,7 @@ use kamu_core::{
     SetWatermarkResult,
     TenancyConfig,
 };
+use kamu_datasets::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

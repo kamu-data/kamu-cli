@@ -37,7 +37,7 @@ impl Dataset {
 
     pub fn from_resolved_authorized_dataset(
         owner: Account,
-        resolved_dataset: &kamu_core::ResolvedDataset,
+        resolved_dataset: &kamu_datasets::ResolvedDataset,
     ) -> Self {
         Self {
             dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())

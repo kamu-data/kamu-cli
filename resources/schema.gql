@@ -1324,7 +1324,7 @@ type DatasetFlowConfigs {
 
 type DatasetFlowConfigsMut {
 	setIngestConfig(ingestConfigInput: FlowConfigIngestInput!, retryPolicyInput: FlowRetryPolicyInput): SetFlowConfigResult!
-	setCompactionConfig(compactionConfigInput: FlowConfigCompactionInput!): SetFlowConfigResult!
+	setCompactionConfig(compactionConfigInput: FlowConfigCompactionInput!, retryPolicyInput: FlowRetryPolicyInput): SetFlowConfigResult!
 }
 
 input DatasetFlowFilters {

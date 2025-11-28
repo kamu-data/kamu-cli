@@ -21,6 +21,7 @@ use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth;
+use kamu_datasets::*;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;

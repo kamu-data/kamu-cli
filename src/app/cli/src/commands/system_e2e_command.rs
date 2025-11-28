@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu::domain::{DatasetRegistry, DatasetRegistryExt};
 use kamu_accounts::{AccountConfig, CreateAccountUseCase};
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
 use super::{CLIError, Command};
 
