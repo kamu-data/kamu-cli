@@ -115,18 +115,20 @@ impl MoleculeDataRoomMutV2 {
         // NOTE: Version and content hash get updated to correct values below
         let mut versioned_file_entry = MoleculeVersionedFileEntry {
             entry: VersionedFileEntry {
-                dataset: versioned_file_dataset.clone(),
-                system_time: now,
-                event_time: now,
-                version: 0,
-                content_type: content_args
-                    .content_type
-                    .as_ref()
-                    .map(|ct| ct.0.clone())
-                    .unwrap_or_default(),
-                content_length: content_args.content_length,
-                content_hash: odf::Multihash::from_digest_sha3_256(b"").into(),
-                extra_data: ExtraData::default(),
+                file_dataset: versioned_file_dataset.clone(),
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: now,
+                    event_time: now,
+                    version: 0,
+                    content_type: content_args
+                        .content_type
+                        .as_ref()
+                        .map(|ct| ct.0.clone())
+                        .unwrap_or_default(),
+                    content_length: content_args.content_length,
+                    content_hash: odf::Multihash::from_digest_sha3_256(b""),
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
+                },
             },
             basic_info: MoleculeVersionedFileEntryBasicInfo {
                 access_level,
@@ -153,8 +155,8 @@ impl MoleculeDataRoomMutV2 {
             .await
             .int_err()?;
 
-        versioned_file_entry.entry.version = update_version_result.new_version;
-        versioned_file_entry.entry.content_hash = update_version_result.content_hash.into();
+        versioned_file_entry.entry.entity.version = update_version_result.new_version;
+        versioned_file_entry.entry.entity.content_hash = update_version_result.content_hash;
 
         // 3. Add the file to the data room.
 
@@ -248,18 +250,20 @@ impl MoleculeDataRoomMutV2 {
         // NOTE: Version and content hash get updated to correct values below
         let mut versioned_file_entry = MoleculeVersionedFileEntry {
             entry: VersionedFileEntry {
-                dataset: file_dataset.clone(),
-                system_time: now,
-                event_time: now,
-                version: 0,
-                content_type: content_args
-                    .content_type
-                    .as_ref()
-                    .map(|ct| ct.0.clone())
-                    .unwrap_or_default(),
-                content_length: content_args.content_length,
-                content_hash: odf::Multihash::from_digest_sha3_256(b"").into(),
-                extra_data: ExtraData::default(),
+                file_dataset: file_dataset.clone(),
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: now,
+                    event_time: now,
+                    version: 0,
+                    content_type: content_args
+                        .content_type
+                        .as_ref()
+                        .map(|ct| ct.0.clone())
+                        .unwrap_or_default(),
+                    content_length: content_args.content_length,
+                    content_hash: odf::Multihash::from_digest_sha3_256(b""),
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
+                },
             },
             basic_info: MoleculeVersionedFileEntryBasicInfo {
                 access_level,
@@ -286,9 +290,8 @@ impl MoleculeDataRoomMutV2 {
             .await
             .int_err()?;
 
-        versioned_file_entry.entry.version = update_version_result.new_version;
-        versioned_file_entry.entry.content_hash = update_version_result.content_hash.into();
-
+        versioned_file_entry.entry.entity.version = update_version_result.new_version;
+        versioned_file_entry.entry.entity.content_hash = update_version_result.content_hash;
         // 3. Update the file state in the data room.
 
         let data_room_entry = MoleculeDataRoomEntry {

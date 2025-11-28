@@ -346,6 +346,8 @@ impl CollectionEntryState {
     }
 }
 
+// TODO: this is a duplicate code, use domain structures!!!
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct CollectionEntryRecord {
     pub path: CollectionPath,

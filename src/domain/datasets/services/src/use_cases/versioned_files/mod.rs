@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod update_versioned_file_use_case_impl;
+mod view_versioned_file_history_use_case_impl;
 
 pub use update_versioned_file_use_case_impl::*;
+pub use view_versioned_file_history_use_case_impl::*;

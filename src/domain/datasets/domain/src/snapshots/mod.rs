@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod update_version_file_use_case;
-mod view_versioned_file_history_use_case;
+mod dataset_snapshots;
 
-pub use update_version_file_use_case::*;
-pub use view_versioned_file_history_use_case::*;
+pub use dataset_snapshots::*;

@@ -22,6 +22,7 @@ use kamu_core::PushIngestDataUseCase;
 use kamu_core::auth::DatasetAction;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCaseOptions};
 use messaging_outbox::{Outbox, OutboxExt};
+use time_source::SystemTimeSource;
 
 use crate::domain::*;
 
@@ -37,6 +38,7 @@ pub struct MoleculeCreateProjectUseCaseImpl {
     push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     rebac_service: Arc<dyn RebacService>,
     outbox: Arc<dyn Outbox>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,8 +182,9 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .await
             .int_err()?;
 
+        let now = self.time_source.now();
+
         // Add project entry
-        let now = chrono::Utc::now();
         let project = MoleculeProjectEntity {
             account_id: project_account.id.clone(),
             system_time: now,

@@ -273,19 +273,21 @@ pub struct MoleculeVersionedFileEntry {
 
 impl MoleculeVersionedFileEntry {
     pub fn new_from_prefetched(
-        dataset: ResolvedDataset,
+        file_dataset: ResolvedDataset,
         prefetch: MoleculeVersionedFilePrefetch,
     ) -> Self {
         Self {
             entry: VersionedFileEntry {
-                dataset,
-                system_time: prefetch.system_time,
-                event_time: prefetch.event_time,
-                version: prefetch.denorm.version,
-                content_type: prefetch.denorm.content_type,
-                content_length: prefetch.denorm.content_length,
-                content_hash: prefetch.denorm.content_hash.into(),
-                extra_data: ExtraData::default(),
+                file_dataset,
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: prefetch.system_time,
+                    event_time: prefetch.event_time,
+                    version: prefetch.denorm.version,
+                    content_type: prefetch.denorm.content_type,
+                    content_length: prefetch.denorm.content_length,
+                    content_hash: prefetch.denorm.content_hash,
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
+                },
             },
             basic_info: MoleculeVersionedFileEntryBasicInfo {
                 access_level: prefetch.denorm.access_level,
@@ -311,13 +313,13 @@ impl MoleculeVersionedFileEntry {
         &self,
         ctx: &Context<'_>,
     ) -> Result<MoleculeVersionedFileEntryDetailedInfo> {
-        let state = DatasetRequestState::new_resolved(self.entry.dataset.clone());
+        let state = DatasetRequestState::new_resolved(self.entry.file_dataset.clone());
         let versioned_file = VersionedFile::new(&state);
         let entry = versioned_file
-            .get_entry(ctx, Some(self.entry.version), None)
+            .get_entry(ctx, Some(self.entry.entity.version), None)
             .await?
             .expect("Entry must exist");
-        let json = entry.extra_data.into_inner();
+        let json = entry.entity.extra_data.into_inner();
         let detailed_info: MoleculeVersionedFileEntryDetailedInfo =
             serde_json::from_value(json.into()).int_err()?;
         Ok(detailed_info)
@@ -340,10 +342,10 @@ impl MoleculeVersionedFileEntry {
         MoleculeDenormalizeFileToDataRoom {
             access_level: self.basic_info.access_level.clone(),
             change_by: self.basic_info.change_by.clone(),
-            version: self.entry.version,
-            content_type: self.entry.content_type.clone(),
-            content_length: self.entry.content_length,
-            content_hash: self.entry.content_hash.clone().into(),
+            version: self.entry.entity.version,
+            content_type: self.entry.entity.content_type.clone(),
+            content_length: self.entry.entity.content_length,
+            content_hash: self.entry.entity.content_hash.clone(),
             description: self.basic_info.description.clone(),
             categories: self.basic_info.categories.clone(),
             tags: self.basic_info.tags.clone(),
@@ -358,27 +360,27 @@ impl MoleculeVersionedFileEntry {
 #[Object]
 impl MoleculeVersionedFileEntry {
     async fn system_time(&self) -> &DateTime<Utc> {
-        &self.entry.system_time
+        &self.entry.entity.system_time
     }
 
     async fn event_time(&self) -> &DateTime<Utc> {
-        &self.entry.event_time
+        &self.entry.entity.event_time
     }
 
     async fn version(&self) -> u32 {
-        self.entry.version
+        self.entry.entity.version
     }
 
-    async fn content_hash(&self) -> &Multihash<'static> {
-        &self.entry.content_hash
+    async fn content_hash(&self) -> Multihash<'_> {
+        Multihash::from(&self.entry.entity.content_hash)
     }
 
     async fn content_length(&self) -> usize {
-        self.entry.content_length
+        self.entry.entity.content_length
     }
 
     async fn content_type(&self) -> &String {
-        &self.entry.content_type
+        &self.entry.entity.content_type
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {

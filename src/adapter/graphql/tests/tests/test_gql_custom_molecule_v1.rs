@@ -1447,6 +1447,7 @@ impl GraphQLMoleculeV1Harness {
 
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
             .add::<kamu_datasets_services::UpdateVersionedFileUseCaseImpl>()
+            .add::<kamu_datasets_services::ViewVersionedFileHistoryUseCaseImpl>()
             .add::<kamu_datasets_services::FindCollectionEntriesUseCaseImpl>()
             .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
             .add::<kamu_datasets_services::ViewCollectionEntriesUseCaseImpl>()

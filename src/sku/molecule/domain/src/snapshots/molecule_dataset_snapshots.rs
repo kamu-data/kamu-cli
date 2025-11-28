@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{CollectionEntity, DatasetColumn, VersionedFileEntity};
+use kamu_datasets::{DatasetColumn, DatasetSnapshots};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -98,7 +98,7 @@ impl MoleculeDatasetSnapshots {
         const COLUMN_NAME_TAGS: &str = "tags";
         const COLUMN_NAME_VERSION: &str = "version";
 
-        CollectionEntity::dataset_snapshot(
+        DatasetSnapshots::collection(
             alias,
             vec![
                 // Extra columns
@@ -131,7 +131,7 @@ impl MoleculeDatasetSnapshots {
         // E2EE
         const COLUMN_NAME_ENCRYPTION_METADATA: &str = "encryption_metadata";
 
-        VersionedFileEntity::dataset_snapshot(
+        DatasetSnapshots::versioned_file(
             alias,
             vec![
                 // Extra columns

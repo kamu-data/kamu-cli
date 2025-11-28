@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use kamu::domain;
+use kamu_datasets::{
+    ReadCheckedDataset,
+    ViewVersionedFileHistoryError,
+    ViewVersionedFileHistoryUseCase,
+};
 
 use super::{FileVersion, VersionedFileEntry, VersionedFileEntryConnection};
 use crate::prelude::*;
@@ -30,9 +36,9 @@ impl<'a> VersionedFile<'a> {
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
     ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
-        use kamu_datasets::{DatasetColumn, VersionedFileEntity};
+        use kamu_datasets::{DatasetColumn, DatasetSnapshots};
 
-        VersionedFileEntity::dataset_snapshot(
+        DatasetSnapshots::versioned_file(
             alias,
             extra_columns
                 .into_iter()
@@ -123,56 +129,37 @@ impl VersionedFile<'_> {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<VersionedFileEntryConnection> {
-        use datafusion::logical_expr::{col, lit};
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_VERSIONS_PER_PAGE);
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let file_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let query_res = query_svc
-            .get_data(readable_dataset.clone(), domain::GetDataOptions::default())
+        let view_versioned_file_history = from_catalog_n!(ctx, dyn ViewVersionedFileHistoryUseCase);
+        let history_page = view_versioned_file_history
+            .execute(
+                ReadCheckedDataset(file_dataset),
+                max_version,
+                Some(PaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                }),
+            )
             .await
-            .int_err()?;
+            .map_err(|e| match e {
+                ViewVersionedFileHistoryError::Internal(err) => err.int_err(),
+            })?;
 
-        let Some(df) = query_res.df else {
-            return Ok(VersionedFileEntryConnection::new(
-                Vec::new(),
-                page,
-                per_page,
-                0,
-            ));
-        };
-
-        let df = if let Some(max_version) = max_version {
-            df.filter(col("version").lt_eq(lit(max_version)))
-                .int_err()?
-        } else {
-            df
-        };
-
-        let total_count = df.clone().count().await.int_err()?;
-
-        let df = df
-            .sort(vec![col("version").sort(false, false)])
-            .int_err()?
-            .limit(page * per_page, Some(per_page))
-            .int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let dataset = self.readable_state.resolved_dataset(ctx).await?;
-        let nodes = records
+        let nodes = history_page
+            .list
             .into_iter()
-            .map(|r| VersionedFileEntry::from_json(dataset.clone(), r))
-            .collect::<Result<_, _>>()?;
+            .map(|r| VersionedFileEntry::new(file_dataset.clone(), r))
+            .collect();
 
         Ok(VersionedFileEntryConnection::new(
             nodes,
             page,
             per_page,
-            total_count,
+            history_page.total_count,
         ))
     }
 

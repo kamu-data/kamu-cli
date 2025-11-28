@@ -10,16 +10,16 @@
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
-use crate::ExtraDataFields;
+use crate::{CollectionPath, ExtraDataFields};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct CollectionEntry {
-    /// Time when this version was created
+    /// Time when this entry was created
     pub system_time: DateTime<Utc>,
 
-    /// Time when this version was created
+    /// Time when this entry was created
     pub event_time: DateTime<Utc>,
 
     /// File system-like path
@@ -32,44 +32,6 @@ pub struct CollectionEntry {
 
     /// Extra data associated with this entry
     pub extra_data: ExtraDataFields,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: Validate correctness (not empty, valid URL-encodeding)
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct CollectionPath(String);
-
-impl CollectionPath {
-    pub fn new(path: String) -> Self {
-        Self(path)
-    }
-
-    pub fn into_inner(self) -> String {
-        self.0
-    }
-}
-
-impl TryFrom<&str> for CollectionPath {
-    type Error = InternalError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.to_string()))
-    }
-}
-
-impl std::fmt::Display for CollectionPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl std::ops::Deref for CollectionPath {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,18 +64,6 @@ impl CollectionEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Used to serialize/deserialize entry from a dataset
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CollectionEntryRecord {
-    pub path: CollectionPath,
-
-    #[serde(rename = "ref")]
-    pub reference: odf::DatasetID,
-
-    #[serde(flatten)]
-    pub extra_data: ExtraDataFields,
-}
-
 #[derive(serde::Serialize, serde::Deserialize)]
 struct CollectionEntryEvent {
     #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
@@ -124,6 +74,20 @@ struct CollectionEntryEvent {
 
     #[serde(flatten)]
     pub record: CollectionEntryRecord,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Used to serialize/deserialize entry from a dataset
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CollectionEntryRecord {
+    pub path: CollectionPath,
+
+    #[serde(rename = "ref")]
+    pub reference: odf::DatasetID,
+
+    #[serde(flatten)]
+    pub extra_data: ExtraDataFields,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

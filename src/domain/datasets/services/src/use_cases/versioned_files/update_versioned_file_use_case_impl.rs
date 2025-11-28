@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{
@@ -28,17 +27,19 @@ use kamu_datasets::{
     UpdateVersionFileUseCaseError,
     UpdateVersionedFileUseCase,
     VERSION_COLUMN_NAME,
-    VersionedFileEntity,
+    VersionedFileEntry,
     WriteCheckedDataset,
 };
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn UpdateVersionedFileUseCase)]
+#[dill::component]
+#[dill::interface(dyn UpdateVersionedFileUseCase)]
 pub struct UpdateVersionedFileUseCaseImpl {
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
+    system_time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl UpdateVersionedFileUseCaseImpl {
@@ -72,8 +73,7 @@ impl UpdateVersionedFileUseCaseImpl {
     async fn get_versioned_file_entity_from_latest_entry(
         &self,
         file_dataset: ResolvedDataset,
-        extra_data: Option<ExtraDataFields>,
-    ) -> Result<Option<VersionedFileEntity>, InternalError> {
+    ) -> Result<Option<VersionedFileEntry>, InternalError> {
         // TODO: Consider retractions / corrections
         let query_res = self
             .query_svc
@@ -89,10 +89,9 @@ impl UpdateVersionedFileUseCaseImpl {
 
         assert_eq!(records.len(), 1);
 
-        Ok(Some(VersionedFileEntity::from_last_record(
+        Ok(Some(VersionedFileEntry::from_json(
             records.into_iter().next().unwrap(),
-            extra_data,
-        )))
+        )?))
     }
 }
 
@@ -113,7 +112,11 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
             let (latest_version, _) = self.get_latest_version(file_dataset.clone()).await?;
             let new_version = latest_version + 1;
 
-            let result = VersionedFileEntity::new(
+            let now = self.system_time_source.now();
+
+            let result = VersionedFileEntry::new(
+                now,
+                now,
                 new_version,
                 args.content_hash.clone(),
                 args.content_length,
@@ -140,12 +143,13 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
             result
         } else {
             let mut last_entity = self
-                .get_versioned_file_entity_from_latest_entry(file_dataset.clone(), extra_data)
+                .get_versioned_file_entity_from_latest_entry(file_dataset.clone())
                 .await?
                 .unwrap();
 
             // Increment version to match next record value
             last_entity.version += 1;
+            last_entity.extra_data = extra_data.unwrap_or_default();
 
             last_entity
         };

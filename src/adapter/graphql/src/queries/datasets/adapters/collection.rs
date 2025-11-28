@@ -33,9 +33,9 @@ impl Collection<'_> {
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
     ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
-        use kamu_datasets::{CollectionEntity, DatasetColumn};
+        use kamu_datasets::{DatasetColumn, DatasetSnapshots};
 
-        CollectionEntity::dataset_snapshot(
+        DatasetSnapshots::collection(
             alias,
             extra_columns
                 .into_iter()

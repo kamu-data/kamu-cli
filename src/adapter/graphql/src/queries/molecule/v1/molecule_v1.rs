@@ -719,7 +719,7 @@ pub struct MoleculeProjectEventFileUpdated {
 #[ComplexObject]
 impl MoleculeProjectEventFileUpdated {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.new_entry.system_time
+        self.new_entry.entity.system_time
     }
 }
 
