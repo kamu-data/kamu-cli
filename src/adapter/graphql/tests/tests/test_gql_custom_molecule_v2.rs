@@ -316,53 +316,51 @@ async fn test_molecule_v2_disable_enable_project() {
         .await;
 
     // Create initial project
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "VITAFAST",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
-            })),
-        ))
-        .await;
-    assert!(res.is_ok(), "{res:#?}");
+    GraphQLQueryRequest::new(
+        CREATE_PROJECT,
+        async_graphql::Variables::from_json(json!({
+            "ipnftSymbol": "VITAFAST",
+            "ipnftUid": ipnft_uid,
+            "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+            "ipnftTokenId": "9",
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
 
     async fn query_project(
         harness: &GraphQLMoleculeV1Harness,
         uid: &str,
     ) -> async_graphql::Response {
-        harness
-            .execute_authorized_query(
-                async_graphql::Request::new(indoc!(
-                    r#"
-                    query ($ipnftUid: String!) {
-                        molecule {
-                            v2 {
-                                project(ipnftUid: $ipnftUid) {
-                                    ipnftUid
-                                    ipnftSymbol
-                                }
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query ($ipnftUid: String!) {
+                    molecule {
+                        v2 {
+                            project(ipnftUid: $ipnftUid) {
+                                ipnftUid
+                                ipnftSymbol
                             }
                         }
                     }
-                    "#
-                ))
-                .variables(async_graphql::Variables::from_json(
-                    json!({ "ipnftUid": uid }),
-                )),
-            )
-            .await
+                }
+                "#
+            ),
+            async_graphql::Variables::from_json(json!({ "ipnftUid": uid })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
     }
 
     // Disable project multiple times to test idempotence
     for _ in 0..2 {
-        let res = harness
-            .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-                async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
-            ))
-            .await;
-        assert!(res.is_ok(), "{res:#?}");
+        let res = GraphQLQueryRequest::new(
+            DISABLE_PROJECT,
+            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await;
         let disable_res = res.data.into_json().unwrap();
         assert_eq!(
             disable_res["molecule"]["v2"]["disableProject"]["project"],
@@ -371,8 +369,8 @@ async fn test_molecule_v2_disable_enable_project() {
     }
 
     // Project is no longer visible in the listing
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(indoc!(
+    let res = GraphQLQueryRequest::new(
+        indoc!(
             r#"
             query {
                 molecule {
@@ -384,9 +382,11 @@ async fn test_molecule_v2_disable_enable_project() {
                 }
             }
             "#
-        )))
-        .await;
-    assert!(res.is_ok(), "{res:#?}");
+        ),
+        async_graphql::Variables::default(),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
     assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([]),
@@ -402,12 +402,12 @@ async fn test_molecule_v2_disable_enable_project() {
 
     // Enable project multiple times to test idempotence
     for _ in 0..2 {
-        let res = harness
-            .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-                async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
-            ))
-            .await;
-        assert!(res.is_ok(), "{res:#?}");
+        let res = GraphQLQueryRequest::new(
+            ENABLE_PROJECT,
+            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await;
         let enable_res = res.data.into_json().unwrap();
         assert_eq!(
             enable_res["molecule"]["v2"]["enableProject"]["project"],
@@ -415,8 +415,8 @@ async fn test_molecule_v2_disable_enable_project() {
         );
     }
 
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(indoc!(
+    let res = GraphQLQueryRequest::new(
+        indoc!(
             r#"
             query {
                 molecule {
@@ -428,9 +428,11 @@ async fn test_molecule_v2_disable_enable_project() {
                 }
             }
             "#
-        )))
-        .await;
-    assert!(res.is_ok(), "{res:#?}");
+        ),
+        async_graphql::Variables::default(),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
     assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([{
@@ -460,23 +462,27 @@ async fn test_molecule_v2_disable_enable_project_errors() {
 
     harness.create_projects_dataset().await;
 
-    let missing_uid = "0xdeadbeef_1";
+    let missing_uid = "foo";
 
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
-        ))
-        .await;
+    let res = GraphQLQueryRequest::new(
+        DISABLE_PROJECT,
+        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+    )
+    .expect_error()
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
     assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
     assert_eq!(disable_error, format!("Project {missing_uid} not found"));
 
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
-        ))
-        .await;
+    let res = GraphQLQueryRequest::new(
+        ENABLE_PROJECT,
+        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+    )
+    .expect_error()
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
     let enable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
     assert!(res_json["molecule"]["v2"]["enableProject"].is_null());
