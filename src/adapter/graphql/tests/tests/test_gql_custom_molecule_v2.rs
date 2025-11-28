@@ -341,7 +341,14 @@ async fn test_molecule_v2_disable_enable_project() {
         .await
         .unwrap();
 
-    let initial_chain_len = harness.projects_metadata_chain_len().await;
+    let projects_dataset_alias = odf::DatasetAlias::new(
+        Some(odf::AccountName::new_unchecked("molecule")),
+        odf::DatasetName::new_unchecked("projects"),
+    );
+
+    let initial_chain_len = harness
+        .projects_metadata_chain_len(&projects_dataset_alias)
+        .await;
 
     async fn query_project(
         harness: &GraphQLMoleculeV1Harness,
@@ -439,7 +446,9 @@ async fn test_molecule_v2_disable_enable_project() {
         );
     }
 
-    let post_enable_chain_len = harness.projects_metadata_chain_len().await;
+    let post_enable_chain_len = harness
+        .projects_metadata_chain_len(&projects_dataset_alias)
+        .await;
     // it should be two blocks longer than initial (one disable and one enable
     // operations)
     assert_eq!(post_enable_chain_len, initial_chain_len + 2);

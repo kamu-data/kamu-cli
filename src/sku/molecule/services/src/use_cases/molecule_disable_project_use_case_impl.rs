@@ -50,9 +50,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
             .get_project_changelog_entry(molecule_subject, DatasetAction::Write, false, &ipnft_uid)
             .await?;
 
-        let mut project = if let Some(project) = project_opt {
-            project
-        } else {
+        let Some(mut project) = project_opt else {
             return Err(MoleculeDisableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
                     ipnft_uid: ipnft_uid.clone(),

@@ -1535,14 +1535,13 @@ impl GraphQLMoleculeV1Harness {
             .await
     }
 
-    pub async fn projects_metadata_chain_len(&self) -> usize {
+    pub async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
         let dataset_reg = self
             .catalog_authorized
             .get_one::<dyn DatasetRegistry>()
             .unwrap();
-        let alias: odf::DatasetAlias = "molecule/projects".parse().unwrap();
         let projects_dataset = dataset_reg
-            .get_dataset_by_ref(&alias.as_local_ref())
+            .get_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 
