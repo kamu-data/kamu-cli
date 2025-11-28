@@ -168,13 +168,7 @@ impl MoleculeV1 {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
         let listing = self
-            .get_molecule_projects_listing(
-                ctx,
-                Some(PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                }),
-            )
+            .get_molecule_projects_listing(ctx, Some(PaginationOpts::from_page(page, per_page)))
             .await?;
 
         let nodes = listing.list.into_iter().map(MoleculeProject::new).collect();

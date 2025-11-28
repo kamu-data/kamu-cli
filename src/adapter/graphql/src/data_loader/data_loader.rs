@@ -14,6 +14,7 @@ use async_graphql::dataloader::DataLoader;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::AccountService;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_datasets::DatasetRegistry;
 use tracing::Instrument;
 
 use crate::data_loader::{AccountEntityLoader, DatasetHandleLoader};
@@ -46,9 +47,10 @@ pub fn account_entity_data_loader(catalog: &dill::Catalog) -> AccountEntityDataL
 pub fn dataset_handle_data_loader(catalog: &dill::Catalog) -> DatasetHandleDataLoader {
     let rebac_dataset_registry_facade =
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
 
     DataLoader::new(
-        DatasetHandleLoader::new(rebac_dataset_registry_facade),
+        DatasetHandleLoader::new(rebac_dataset_registry_facade, dataset_registry),
         tracing_spawn,
     )
 }

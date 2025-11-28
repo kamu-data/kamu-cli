@@ -11,7 +11,7 @@ use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
+use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,14 +46,14 @@ pub enum MoleculeViewProjectsError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetProjectsError> for MoleculeViewProjectsError {
-    fn from(e: MoleculeGetProjectsError) -> Self {
+impl From<MoleculeGetDatasetError> for MoleculeViewProjectsError {
+    fn from(e: MoleculeGetDatasetError) -> Self {
         match e {
-            MoleculeGetProjectsError::NotFound(err) => {
+            MoleculeGetDatasetError::NotFound(err) => {
                 MoleculeViewProjectsError::NoProjectsDataset(err)
             }
-            MoleculeGetProjectsError::Access(err) => MoleculeViewProjectsError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => MoleculeViewProjectsError::Internal(err),
+            MoleculeGetDatasetError::Access(err) => MoleculeViewProjectsError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeViewProjectsError::Internal(err),
         }
     }
 }

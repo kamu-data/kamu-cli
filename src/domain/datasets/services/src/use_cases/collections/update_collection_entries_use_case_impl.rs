@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use dill::{component, interface};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{
@@ -38,8 +37,8 @@ use tokio::time::{Duration, sleep};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn UpdateCollectionEntriesUseCase)]
+#[dill::component]
+#[dill::interface(dyn UpdateCollectionEntriesUseCase)]
 pub struct UpdateCollectionEntriesUseCaseImpl {
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
@@ -160,6 +159,9 @@ impl UpdateCollectionEntriesUseCaseImpl {
         &self,
         entries: Vec<(Op, CollectionEntryRecord)>,
     ) -> Result<Vec<bytes::Bytes>, UpdateCollectionEntriesUseCaseError> {
+        // TODO: PERF: FIXME: Writing each operation in a different block to work around
+        //       changelog sorting issue.
+        //       See: https://github.com/kamu-data/kamu-cli/issues/1228
         use std::io::Write;
 
         entries
@@ -168,9 +170,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
                 let mut ndjson = Vec::<u8>::new();
                 let mut record = serde_json::to_value(entry).int_err()?;
                 record["op"] = u8::from(op).into();
-                writeln!(&mut ndjson, "{record}")
-                    .int_err()
-                    .map_err(UpdateCollectionEntriesUseCaseError::Internal)?;
+                writeln!(&mut ndjson, "{record}").int_err()?;
                 Ok(bytes::Bytes::from_owner(ndjson))
             })
             .collect()

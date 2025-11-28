@@ -3154,7 +3154,7 @@ type MoleculeActivityAnnouncementV2 {
 	announcement: MoleculeAnnouncementEntry!
 }
 
-union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityAnnouncementV2
+union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityAnnouncementV2
 
 type MoleculeActivityEventV2Connection {
 	"""
@@ -3260,7 +3260,7 @@ input MoleculeDataRoomEntriesFilters {
 
 type MoleculeDataRoomEntry {
 	"""
-	Back link to the project
+	Backlink to the project
 	"""
 	project: MoleculeProjectV2!
 	"""
@@ -3659,7 +3659,7 @@ type MoleculeProjectV2 {
 	"""
 	Token ID withing the IPNFT contract
 	"""
-	ipnftTokenId: BigInt!
+	ipnftTokenId: U256!
 	"""
 	Project's organizational account
 	"""

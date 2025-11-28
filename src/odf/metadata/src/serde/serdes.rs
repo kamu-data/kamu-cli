@@ -10,12 +10,15 @@
 use std::backtrace::Backtrace;
 use std::fmt::Display;
 
+use chrono::{DateTime, Utc};
+use prost::bytes;
 use thiserror::Error;
 
 use super::Buffer;
 use crate::{
     DatasetSnapshot,
     MetadataBlock,
+    OperationType,
     RawQueryRequest,
     RawQueryResponse,
     TransformRequest,
@@ -197,6 +200,70 @@ impl Display for UnsupportedVersionError {
         }
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// OperationType
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl serde::Serialize for OperationType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u8(*self as u8)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for OperationType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = u8::deserialize(deserializer)?;
+
+        OperationType::try_from(value).map_err(|e| {
+            let error_message = e.to_string();
+            serde::de::Error::custom(error_message)
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetDefaultVocabularyRecord
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DatasetDefaultVocabularySystemColumns {
+    pub offset: Option<u64>, // Optional for creation
+
+    pub op: OperationType,
+
+    #[serde(with = "crate::serde::yaml::datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+
+    #[serde(with = "crate::serde::yaml::datetime_rfc3339")]
+    pub event_time: DateTime<Utc>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(bound = "T: serde::Serialize + for<'a> serde::Deserialize<'a>")]
+pub struct DatasetDefaultVocabularyRecord<T> {
+    #[serde(flatten)]
+    pub system_columns: DatasetDefaultVocabularySystemColumns,
+
+    #[serde(flatten)]
+    pub record: T,
+}
+
+impl<T> DatasetDefaultVocabularyRecord<T>
+where
+    T: serde::Serialize + for<'a> serde::Deserialize<'a>,
+{
+    pub fn to_bytes(&self) -> bytes::Bytes {
+        let json = serde_json::to_string(self).unwrap();
+        bytes::Bytes::from_owner(json.into_bytes())
     }
 }
 

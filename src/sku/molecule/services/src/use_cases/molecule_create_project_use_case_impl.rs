@@ -31,7 +31,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeCreateProjectUseCase)]
 pub struct MoleculeCreateProjectUseCaseImpl {
-    project_service: Arc<dyn MoleculeProjectService>,
+    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
     account_service: Arc<dyn AccountService>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
     create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -62,7 +62,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
     ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError> {
         // Resolve projects snapshot with Write privileges
         let (projects_dataset, df) = self
-            .project_service
+            .molecule_dataset_service
             .get_projects_data_frame(molecule_subject, DatasetAction::Write, true)
             .await?;
 
@@ -85,7 +85,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
                 return Err(MoleculeCreateProjectError::Conflict {
-                    project: MoleculeProjectEntity::from_json(record).int_err()?,
+                    project: MoleculeProjectEntity::from_json(record)?,
                 });
             }
         }
@@ -132,10 +132,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         };
 
         // Create `data-room` dataset
-        let snapshot = MoleculeDatasetSnapshots::data_room_v2(odf::DatasetAlias::new(
-            Some(project_account_name.clone()),
-            odf::DatasetName::new_unchecked("data-room"),
-        ));
+        let snapshot = MoleculeDatasetSnapshots::data_room_v2(project_account_name.clone());
         let data_room_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(
@@ -148,10 +145,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = MoleculeDatasetSnapshots::announcements(odf::DatasetAlias::new(
-            Some(project_account_name.clone()),
-            odf::DatasetName::new_unchecked("announcements"),
-        ));
+        let snapshot = MoleculeDatasetSnapshots::announcements(project_account_name);
         let announcements_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(
@@ -198,7 +192,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         };
 
         let changelog_record =
-            project.into_changelog_record(u8::from(odf::metadata::OperationType::Append));
+            project.as_changelog_record(u8::from(odf::metadata::OperationType::Append));
 
         self.push_ingest_use_case
             .execute(

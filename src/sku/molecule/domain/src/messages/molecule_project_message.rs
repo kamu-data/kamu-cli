@@ -22,7 +22,7 @@ pub enum MoleculeProjectMessage {
     /// Message indicating that a project has been created.
     Created(MoleculeProjectMessageCreated),
 
-    /// Message indicating that a project has been  disabled.
+    /// Message indicating that a project has been disabled.
     Disabled(MoleculeProjectMessageDisabled),
 
     /// Message indicating that a project has been re-enabled.
