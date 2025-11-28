@@ -28,10 +28,10 @@ pub const CONTENT_HASH_COLUMN_NAME: &str = "content_hash";
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct VersionedFileEntry {
-    /// Time when this entry was created
+    /// System time when this entry was created
     pub system_time: DateTime<Utc>,
 
-    /// Time when this entry was created
+    /// Event time when this entry was created
     pub event_time: DateTime<Utc>,
 
     /// File version

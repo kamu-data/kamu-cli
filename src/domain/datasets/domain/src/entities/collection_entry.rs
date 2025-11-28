@@ -16,10 +16,10 @@ use crate::{CollectionPath, ExtraDataFields};
 
 #[derive(Debug, Clone)]
 pub struct CollectionEntry {
-    /// Time when this entry was created
+    /// System time when this entry was created
     pub system_time: DateTime<Utc>,
 
-    /// Time when this entry was created
+    /// Event time when this entry was created
     pub event_time: DateTime<Utc>,
 
     /// File system-like path

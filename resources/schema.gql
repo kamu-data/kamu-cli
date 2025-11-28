@@ -634,11 +634,11 @@ type Collection {
 
 type CollectionEntry {
 	"""
-	Time when this entry was created
+	System time when this entry was created
 	"""
 	systemTime: DateTime!
 	"""
-	Time when this entry was created
+	Event time when this entry was created
 	"""
 	eventTime: DateTime!
 	"""
@@ -5087,11 +5087,11 @@ type VersionedFileContentDownload {
 
 type VersionedFileEntry {
 	"""
-	Time when this version was created
+	System time when this version was created
 	"""
 	systemTime: DateTime!
 	"""
-	Time when this version was created
+	Event time when this version was created
 	"""
 	eventTime: DateTime!
 	"""

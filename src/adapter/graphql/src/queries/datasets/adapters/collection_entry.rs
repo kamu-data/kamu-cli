@@ -32,12 +32,12 @@ impl CollectionEntry {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollectionEntry {
-    /// Time when this entry was created
+    /// System time when this entry was created
     pub async fn system_time(&self) -> DateTime<Utc> {
         self.entity.system_time
     }
 
-    /// Time when this entry was created
+    /// Event time when this entry was created
     pub async fn event_time(&self) -> DateTime<Utc> {
         self.entity.event_time
     }
