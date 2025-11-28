@@ -841,7 +841,7 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
-            .add::<FindCollectionEntryUseCaseImpl>()
+            .add::<FindCollectionEntriesUseCaseImpl>()
             .add::<UpdateCollectionEntriesUseCaseImpl>()
             .add::<ViewCollectionEntriesUseCaseImpl>()
             .build();

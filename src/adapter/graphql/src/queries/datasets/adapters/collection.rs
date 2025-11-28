@@ -9,7 +9,7 @@
 
 use database_common::PaginationOpts;
 use kamu_datasets::{
-    FindCollectionEntryUseCase,
+    FindCollectionEntriesUseCase,
     FindCollectionEntryUseCaseError,
     ReadCheckedDataset,
     ViewCollectionEntriesError,
@@ -102,9 +102,9 @@ impl CollectionProjection<'_> {
     ) -> Result<Option<CollectionEntry>> {
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let find_collection_entry = from_catalog_n!(ctx, dyn FindCollectionEntryUseCase);
-        let maybe_entry = find_collection_entry
-            .execute_by_path(
+        let find_collection_entries = from_catalog_n!(ctx, dyn FindCollectionEntriesUseCase);
+        let maybe_entry = find_collection_entries
+            .execute_find_by_path(
                 ReadCheckedDataset(readable_dataset),
                 self.as_of.clone(),
                 &(path.to_string()),
@@ -180,9 +180,9 @@ impl CollectionProjection<'_> {
             .map(|r| r as &odf::DatasetID)
             .collect::<Vec<&odf::DatasetID>>();
 
-        let find_collection_entry = from_catalog_n!(ctx, dyn FindCollectionEntryUseCase);
-        let entries = find_collection_entry
-            .execute_multi_by_refs(
+        let find_collection_entries = from_catalog_n!(ctx, dyn FindCollectionEntriesUseCase);
+        let entries = find_collection_entries
+            .execute_find_multi_by_refs(
                 ReadCheckedDataset(readable_dataset),
                 self.as_of.clone(),
                 &odf_refs,

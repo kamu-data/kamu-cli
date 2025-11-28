@@ -14,15 +14,15 @@ use crate::{CollectionEntry, ReadCheckedDataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FindCollectionEntryUseCase: Send + Sync {
-    async fn execute_by_path(
+pub trait FindCollectionEntriesUseCase: Send + Sync {
+    async fn execute_find_by_path(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         path: &str,
     ) -> Result<Option<CollectionEntry>, FindCollectionEntryUseCaseError>;
 
-    async fn execute_multi_by_refs(
+    async fn execute_find_multi_by_refs(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,

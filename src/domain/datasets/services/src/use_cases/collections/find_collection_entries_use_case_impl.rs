@@ -13,7 +13,7 @@ use internal_error::ResultIntoInternal;
 use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
-    FindCollectionEntryUseCase,
+    FindCollectionEntriesUseCase,
     FindCollectionEntryUseCaseError,
     ReadCheckedDataset,
 };
@@ -21,8 +21,8 @@ use kamu_datasets::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn FindCollectionEntryUseCase)]
-pub struct FindCollectionEntryUseCaseImpl {
+#[dill::interface(dyn FindCollectionEntriesUseCase)]
+pub struct FindCollectionEntriesUseCaseImpl {
     query_svc: Arc<dyn QueryService>,
 }
 
@@ -30,13 +30,13 @@ pub struct FindCollectionEntryUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl FindCollectionEntryUseCase for FindCollectionEntryUseCaseImpl {
+impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
     #[tracing::instrument(
-        name = FindCollectionEntryUseCaseImpl_execute_by_path,
+        name = FindCollectionEntriesUseCaseImpl_execute_find_by_path,
         skip_all,
         fields(as_of = ?as_of, path = path)
     )]
-    async fn execute_by_path(
+    async fn execute_find_by_path(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
@@ -86,11 +86,11 @@ impl FindCollectionEntryUseCase for FindCollectionEntryUseCaseImpl {
     }
 
     #[tracing::instrument(
-        name = FindCollectionEntryUseCaseImpl_execute_multi_by_refs,
+        name = FindCollectionEntriesUseCaseImpl_execute_find_multi_by_refs,
         skip_all,
         fields(as_of = ?as_of, refs = ?refs)
     )]
-    async fn execute_multi_by_refs(
+    async fn execute_find_multi_by_refs(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
