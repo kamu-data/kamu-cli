@@ -15,23 +15,23 @@ use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeRestoreProjectUseCase: Send + Sync {
+pub trait MoleculeEnableProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<MoleculeProjectEntity, MoleculeRestoreProjectError>;
+    ) -> Result<MoleculeProjectEntity, MoleculeEnableProjectError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeRestoreProjectError {
+pub enum MoleculeEnableProjectError {
     #[error("Project with the same IPNFT UID or symbol already exists")]
     Conflict { project: MoleculeProjectEntity },
 
-    #[error("Project with IPNFT UID {ipnft_uid} does not exist")]
-    ProjectDoesNotExist { ipnft_uid: String },
+    #[error(transparent)]
+    ProjectNotFound(#[from] ProjectNotFoundError),
 
     #[error(transparent)]
     NoProjectsDataset(#[from] odf::DatasetNotFoundError),
@@ -51,14 +51,14 @@ pub enum MoleculeRestoreProjectError {
     ),
 }
 
-impl From<MoleculeGetProjectsError> for MoleculeRestoreProjectError {
+impl From<MoleculeGetProjectsError> for MoleculeEnableProjectError {
     fn from(e: MoleculeGetProjectsError) -> Self {
         match e {
             MoleculeGetProjectsError::NotFound(err) => {
-                MoleculeRestoreProjectError::NoProjectsDataset(err)
+                MoleculeEnableProjectError::NoProjectsDataset(err)
             }
-            MoleculeGetProjectsError::Access(err) => MoleculeRestoreProjectError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => MoleculeRestoreProjectError::Internal(err),
+            MoleculeGetProjectsError::Access(err) => MoleculeEnableProjectError::Access(err),
+            MoleculeGetProjectsError::Internal(err) => MoleculeEnableProjectError::Internal(err),
         }
     }
 }
@@ -66,20 +66,20 @@ impl From<MoleculeGetProjectsError> for MoleculeRestoreProjectError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeRemoveProjectUseCase: Send + Sync {
+pub trait MoleculeDisableProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<MoleculeProjectEntity, MoleculeRemoveProjectError>;
+    ) -> Result<MoleculeProjectEntity, MoleculeDisableProjectError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeRemoveProjectError {
-    #[error("Project with IPNFT UID {ipnft_uid} was not found")]
-    ProjectNotFound { ipnft_uid: String },
+pub enum MoleculeDisableProjectError {
+    #[error(transparent)]
+    ProjectNotFound(#[from] ProjectNotFoundError),
 
     #[error(transparent)]
     NoProjectsDataset(#[from] odf::DatasetNotFoundError),
@@ -99,16 +99,22 @@ pub enum MoleculeRemoveProjectError {
     ),
 }
 
-impl From<MoleculeGetProjectsError> for MoleculeRemoveProjectError {
+impl From<MoleculeGetProjectsError> for MoleculeDisableProjectError {
     fn from(e: MoleculeGetProjectsError) -> Self {
         match e {
             MoleculeGetProjectsError::NotFound(err) => {
-                MoleculeRemoveProjectError::NoProjectsDataset(err)
+                MoleculeDisableProjectError::NoProjectsDataset(err)
             }
-            MoleculeGetProjectsError::Access(err) => MoleculeRemoveProjectError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => MoleculeRemoveProjectError::Internal(err),
+            MoleculeGetProjectsError::Access(err) => MoleculeDisableProjectError::Access(err),
+            MoleculeGetProjectsError::Internal(err) => MoleculeDisableProjectError::Internal(err),
         }
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Project with IPNFT UID {ipnft_uid} was not found")]
+pub struct ProjectNotFoundError {
+    pub ipnft_uid: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

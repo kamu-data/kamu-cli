@@ -24,17 +24,16 @@ pub trait MoleculeProjectService: Send + Sync {
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetProjectsError>;
 
-    /// Returns raw ledger data without projection for full history
-    async fn get_projects_ledger_data_frame(
+    /// Returns raw ledger data without projection
+    async fn get_projects_raw_ledger_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetProjectsError>;
 
-    /// Returns the projected changelog (state snapshot) derived from the raw
-    /// ledger
-    async fn get_projects_data_frame(
+    /// Returns the projected changelog
+    async fn get_projects_changelog_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: DatasetAction,

@@ -61,7 +61,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         // Resolve projects snapshot with Write privileges
         let (projects_dataset, df) = self
             .project_service
-            .get_projects_data_frame(molecule_subject, DatasetAction::Write, true)
+            .get_projects_changelog_data_frame(molecule_subject, DatasetAction::Write, true)
             .await?;
 
         use datafusion::prelude::*;

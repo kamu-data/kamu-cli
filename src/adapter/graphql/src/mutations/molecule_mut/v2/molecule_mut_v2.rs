@@ -8,12 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use kamu_molecule_domain::{
+    MoleculeDisableProjectError,
+    MoleculeDisableProjectUseCase,
+    MoleculeEnableProjectError,
+    MoleculeEnableProjectUseCase,
     MoleculeFindProjectError,
     MoleculeFindProjectUseCase,
-    MoleculeRemoveProjectError,
-    MoleculeRemoveProjectUseCase,
-    MoleculeRestoreProjectError,
-    MoleculeRestoreProjectUseCase,
 };
 
 use crate::molecule::molecule_subject;
@@ -60,12 +60,12 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
     ) -> Result<MoleculeProjectMutationResultV2> {
         let molecule_subject = molecule_subject(ctx)?;
-        let use_case = from_catalog_n!(ctx, dyn MoleculeRemoveProjectUseCase);
+        let use_case = from_catalog_n!(ctx, dyn MoleculeDisableProjectUseCase);
 
         let project = use_case
             .execute(&molecule_subject, ipnft_uid.clone())
             .await
-            .map_err(|err| map_remove_error(err, &ipnft_uid))?;
+            .map_err(|err| map_disable_error(err, &ipnft_uid))?;
 
         Ok(MoleculeProjectMutationResultV2::from_entity(project))
     }
@@ -78,12 +78,12 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
     ) -> Result<MoleculeProjectMutationResultV2> {
         let molecule_subject = molecule_subject(ctx)?;
-        let use_case = from_catalog_n!(ctx, dyn MoleculeRestoreProjectUseCase);
+        let use_case = from_catalog_n!(ctx, dyn MoleculeEnableProjectUseCase);
 
         let project = use_case
             .execute(&molecule_subject, ipnft_uid.clone())
             .await
-            .map_err(|err| map_restore_error(err, &ipnft_uid))?;
+            .map_err(|err| map_enable_error(err, &ipnft_uid))?;
 
         Ok(MoleculeProjectMutationResultV2::from_entity(project))
     }
@@ -113,20 +113,20 @@ impl MoleculeMutV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_remove_error(err: MoleculeRemoveProjectError, ipnft_uid: &str) -> GqlError {
+fn map_disable_error(err: MoleculeDisableProjectError, ipnft_uid: &str) -> GqlError {
     match err {
-        MoleculeRemoveProjectError::ProjectNotFound { .. } => {
+        MoleculeDisableProjectError::ProjectNotFound(_) => {
             GqlError::gql(format!("Project {ipnft_uid} not found"))
         }
-        MoleculeRemoveProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
-        MoleculeRemoveProjectError::Access(e) => GqlError::Access(e),
-        MoleculeRemoveProjectError::Internal(e) => e.into(),
+        MoleculeDisableProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+        MoleculeDisableProjectError::Access(e) => GqlError::Access(e),
+        MoleculeDisableProjectError::Internal(e) => e.into(),
     }
 }
 
-fn map_restore_error(err: MoleculeRestoreProjectError, ipnft_uid: &str) -> GqlError {
+fn map_enable_error(err: MoleculeEnableProjectError, ipnft_uid: &str) -> GqlError {
     match err {
-        MoleculeRestoreProjectError::Conflict { project } => {
+        MoleculeEnableProjectError::Conflict { project } => {
             let conflict_uid = project.ipnft_uid.clone();
             let conflict_symbol = project.ipnft_symbol.clone();
             GqlError::gql_extended(
@@ -137,12 +137,12 @@ fn map_restore_error(err: MoleculeRestoreProjectError, ipnft_uid: &str) -> GqlEr
                 },
             )
         }
-        MoleculeRestoreProjectError::ProjectDoesNotExist { .. } => {
+        MoleculeEnableProjectError::ProjectNotFound(_) => {
             GqlError::gql(format!("No historical entries for project {ipnft_uid}"))
         }
-        MoleculeRestoreProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
-        MoleculeRestoreProjectError::Access(e) => GqlError::Access(e),
-        MoleculeRestoreProjectError::Internal(e) => e.into(),
+        MoleculeEnableProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+        MoleculeEnableProjectError::Access(e) => GqlError::Access(e),
+        MoleculeEnableProjectError::Internal(e) => e.into(),
     }
 }
 

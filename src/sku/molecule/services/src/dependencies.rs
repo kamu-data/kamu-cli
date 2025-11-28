@@ -16,10 +16,10 @@ use crate::*;
 pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<MoleculeProjectServiceImpl>();
 
-    b.add::<MoleculeRestoreProjectUseCaseImpl>();
+    b.add::<MoleculeEnableProjectUseCaseImpl>();
     b.add::<MoleculeCreateProjectUseCaseImpl>();
+    b.add::<MoleculeDisableProjectUseCaseImpl>();
     b.add::<MoleculeFindProjectUseCaseImpl>();
-    b.add::<MoleculeRemoveProjectUseCaseImpl>();
     b.add::<MoleculeViewProjectsUseCaseImpl>();
 }
 

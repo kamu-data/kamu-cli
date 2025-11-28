@@ -13,6 +13,7 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
 use kamu_core::PushIngestDataUseCase;
 use kamu_core::auth::DatasetAction;
+use messaging_outbox::{Outbox, OutboxExt};
 use odf::metadata::OperationType;
 
 use crate::domain::*;
@@ -20,20 +21,21 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeRestoreProjectUseCase)]
-pub struct MoleculeRestoreProjectUseCaseImpl {
+#[dill::interface(dyn MoleculeEnableProjectUseCase)]
+pub struct MoleculeEnableProjectUseCaseImpl {
     project_service: Arc<dyn MoleculeProjectService>,
     push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
+impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = MoleculeRestoreProjectUseCaseImpl_execute,
+        name = MoleculeEnableProjectUseCaseImpl_execute,
         skip_all,
         fields(?ipnft_uid)
     )]
@@ -41,18 +43,20 @@ impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<MoleculeProjectEntity, MoleculeRestoreProjectError> {
+    ) -> Result<MoleculeProjectEntity, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
 
-        let (projects_dataset, df) = self
+        let (projects_dataset, df_opt) = self
             .project_service
-            .get_projects_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
+            .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
             .await?;
 
-        let Some(ledger_df) = df else {
-            return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
-                ipnft_uid: ipnft_uid.clone(),
-            });
+        let Some(ledger_df): Option<odf::utils::data::DataFrameExt> = df_opt else {
+            return Err(MoleculeEnableProjectError::ProjectNotFound(
+                ProjectNotFoundError {
+                    ipnft_uid: ipnft_uid.clone(),
+                },
+            ));
         };
 
         // Reconstruct active snapshot to confirm there are no conflicts
@@ -81,9 +85,11 @@ impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
         });
 
         let Some(record) = record else {
-            return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
-                ipnft_uid: ipnft_uid.clone(),
-            });
+            return Err(MoleculeEnableProjectError::ProjectNotFound(
+                ProjectNotFoundError {
+                    ipnft_uid: ipnft_uid.clone(),
+                },
+            ));
         };
 
         let mut project = MoleculeProjectEntity::from_json(record).int_err()?;
@@ -99,9 +105,11 @@ impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
 
         let conflicts = conflict_df.collect_json_aos().await.int_err()?;
         if let Some(record) = conflicts.into_iter().next() {
-            return Err(MoleculeRestoreProjectError::Conflict {
-                project: MoleculeProjectEntity::from_json(record).int_err()?,
-            });
+            let existing = MoleculeProjectEntity::from_json(record).int_err()?;
+            if existing.ipnft_uid == project.ipnft_uid {
+                return Ok(existing);
+            }
+            return Err(MoleculeEnableProjectError::Conflict { project: existing });
         }
 
         let now = chrono::Utc::now();
@@ -122,6 +130,20 @@ impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
                     expected_head: None,
                 },
                 None,
+            )
+            .await
+            .int_err()?;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+                MoleculeProjectMessage::reenabled(
+                    now,
+                    molecule_subject.account_id.clone(),
+                    project.account_id.clone(),
+                    project.ipnft_uid.clone(),
+                    project.ipnft_symbol.clone(),
+                ),
             )
             .await
             .int_err()?;

@@ -94,11 +94,11 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectServiceImpl_get_projects_ledger_data_frame,
+        name = MoleculeProjectServiceImpl_get_projects_raw_ledger_data_frame,
         skip_all,
         fields(molecule_account_name, ?action, create_if_not_exist)
     )]
-    async fn get_projects_ledger_data_frame(
+    async fn get_projects_raw_ledger_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: DatasetAction,
@@ -124,18 +124,18 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectServiceImpl_get_projects_data_frame,
+        name = MoleculeProjectServiceImpl_get_projects_changelog_data_frame,
         skip_all,
         fields(molecule_account_name, ?action, create_if_not_exist)
     )]
-    async fn get_projects_data_frame(
+    async fn get_projects_changelog_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetProjectsError> {
         let (projects_dataset, df) = self
-            .get_projects_ledger_data_frame(molecule_subject, action, create_if_not_exist)
+            .get_projects_raw_ledger_data_frame(molecule_subject, action, create_if_not_exist)
             .await?;
 
         let df = if let Some(df) = df {

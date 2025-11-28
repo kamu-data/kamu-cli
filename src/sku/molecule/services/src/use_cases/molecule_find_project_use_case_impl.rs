@@ -38,7 +38,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
 
         let Some(df) = self
             .project_service
-            .get_projects_data_frame(molecule_subject, DatasetAction::Read, false)
+            .get_projects_changelog_data_frame(molecule_subject, DatasetAction::Read, false)
             .await?
             .1
         else {

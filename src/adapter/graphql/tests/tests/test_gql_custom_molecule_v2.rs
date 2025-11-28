@@ -355,18 +355,20 @@ async fn test_molecule_v2_disable_enable_project() {
             .await
     }
 
-    // Disable project
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
-        ))
-        .await;
-    assert!(res.is_ok(), "{res:#?}");
-    let disable_res = res.data.into_json().unwrap();
-    assert_eq!(
-        disable_res["molecule"]["v2"]["disableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
-    );
+    // Disable project multiple times to test idempotence
+    for _ in 0..2 {
+        let res = harness
+            .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
+                async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+            ))
+            .await;
+        assert!(res.is_ok(), "{res:#?}");
+        let disable_res = res.data.into_json().unwrap();
+        assert_eq!(
+            disable_res["molecule"]["v2"]["disableProject"]["project"],
+            json!({ "__typename": "MoleculeProjectMutV2" }),
+        );
+    }
 
     // Project is no longer visible in the listing
     let res = harness
@@ -398,18 +400,20 @@ async fn test_molecule_v2_disable_enable_project() {
         json!(null),
     );
 
-    // Enable project back
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
-        ))
-        .await;
-    assert!(res.is_ok(), "{res:#?}");
-    let enable_res = res.data.into_json().unwrap();
-    assert_eq!(
-        enable_res["molecule"]["v2"]["enableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
-    );
+    // Enable project multiple times to test idempotence
+    for _ in 0..2 {
+        let res = harness
+            .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
+                async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+            ))
+            .await;
+        assert!(res.is_ok(), "{res:#?}");
+        let enable_res = res.data.into_json().unwrap();
+        assert_eq!(
+            enable_res["molecule"]["v2"]["enableProject"]["project"],
+            json!({ "__typename": "MoleculeProjectMutV2" }),
+        );
+    }
 
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(indoc!(
@@ -442,6 +446,43 @@ async fn test_molecule_v2_disable_enable_project() {
             "ipnftUid": ipnft_uid,
             "ipnftSymbol": "vitafast",
         }),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_disable_enable_project_errors() {
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    harness.create_projects_dataset().await;
+
+    let missing_uid = "0xdeadbeef_1";
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+        ))
+        .await;
+    let disable_error = res.errors[0].message.clone();
+    let res_json = res.data.into_json().unwrap();
+    assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
+    assert_eq!(disable_error, format!("Project {missing_uid} not found"));
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+        ))
+        .await;
+    let enable_error = res.errors[0].message.clone();
+    let res_json = res.data.into_json().unwrap();
+    assert!(res_json["molecule"]["v2"]["enableProject"].is_null());
+    assert_eq!(
+        enable_error,
+        format!("No historical entries for project {missing_uid}")
     );
 }
 
