@@ -160,6 +160,27 @@ pub struct MoleculeDataRoomEntry {
 }
 
 impl MoleculeDataRoomEntry {
+    pub fn new_from_json(
+        mut value: serde_json::Value,
+        project: &Arc<MoleculeProjectV2>,
+        vocab: &odf::metadata::DatasetVocabulary,
+    ) -> Result<(odf::metadata::OperationType, Self)> {
+        let Some(obj) = value.as_object_mut() else {
+            unreachable!()
+        };
+        let Some(raw_op) = obj[&vocab.operation_type_column].as_i64() else {
+            unreachable!()
+        };
+
+        let op = odf::metadata::OperationType::try_from(u8::try_from(raw_op).unwrap()).unwrap();
+
+        let collection_entry = CollectionEntry::from_json(value).int_err()?;
+        let entry =
+            MoleculeDataRoomEntry::new_from_collection_entry(project, collection_entry.clone())?;
+
+        Ok((op, entry))
+    }
+
     pub fn new_from_collection_entry(
         project: &Arc<MoleculeProjectV2>,
         mut entry: CollectionEntry,
@@ -215,6 +236,10 @@ impl MoleculeDataRoomEntry {
         };
 
         ExtraData::new(json_map)
+    }
+
+    pub fn is_same_reference(&self, other: &Self) -> bool {
+        self.entry.reference == other.entry.reference
     }
 }
 

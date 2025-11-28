@@ -22,7 +22,7 @@ use crate::queries::molecule::v2::{
     MoleculeDataRoom,
     MoleculeDataRoomEntry,
 };
-use crate::queries::{Account, CollectionEntry, Dataset};
+use crate::queries::{Account, Dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,12 +80,15 @@ impl MoleculeProjectV2 {
         };
 
         // For any data room update, we always have two entries: -C and +C.
-        // We can ignore all -C entries, thus getting a 1:1 dataset with the expected
-        // one.
+        // We can ignore all -C entries.
         use datafusion::logical_expr::{col, lit};
 
+        let vocab = odf::metadata::DatasetVocabulary::default();
         let mut df = df
-            .filter(col("operation").not_eq(lit(OperationType::CorrectFrom as i32)))
+            .filter(
+                col(vocab.operation_type_column.as_str())
+                    .not_eq(lit(OperationType::CorrectFrom as i32)),
+            )
             .int_err()?;
 
         // Sort the df by offset descending
@@ -96,37 +99,54 @@ impl MoleculeProjectV2 {
 
         let records = df.collect_json_aos().await.int_err()?;
         let self_arc = self.as_arc();
-        let vocab = odf::metadata::DatasetVocabulary::default();
 
-        let nodes = records
-            .into_iter()
-            .map(|mut record| -> Result<MoleculeActivityEventV2> {
-                let Some(obj) = record.as_object_mut() else {
-                    unreachable!()
-                };
-                let Some(raw_op) = obj[&vocab.operation_type_column].as_i64() else {
-                    unreachable!()
-                };
+        let mut nodes = Vec::with_capacity(records.len());
+        let mut record_iter = records.into_iter().peekable();
 
-                use odf::metadata::OperationType;
+        while let Some(current) = record_iter.next() {
+            let (op, entry) = MoleculeDataRoomEntry::new_from_json(current, &self_arc, &vocab)?;
 
-                let op = OperationType::try_from(u8::try_from(raw_op).unwrap()).unwrap();
-                let collection_entry = CollectionEntry::from_json(record).int_err()?;
-                let entry =
-                    MoleculeDataRoomEntry::new_from_collection_entry(&self_arc, collection_entry)?;
+            let event = match op {
+                OperationType::Append => {
+                    // NOTE: Reverse order due to ORDER BY.
+                    //
+                    // If the next entry is equivalent to the current
+                    // one, then it's a file update.
+                    //
+                    // More details: UpdateCollectionEntriesUseCaseImpl
 
-                let event = match op {
-                    OperationType::Append => MoleculeActivityEventV2::file_added(entry),
-                    OperationType::Retract => MoleculeActivityEventV2::file_removed(entry),
-                    OperationType::CorrectTo => MoleculeActivityEventV2::file_updated(entry),
-                    OperationType::CorrectFrom => {
-                        unreachable!()
+                    // TODO: extract use case based on common logic like
+                    //       UpdateCollectionEntriesUseCaseImpl.
+                    let mut maybe_file_updated_event = None;
+                    if let Some(next) = record_iter.peek() {
+                        let (next_op, next_entry) =
+                            MoleculeDataRoomEntry::new_from_json(next.clone(), &self_arc, &vocab)?;
+
+                        if next_op == OperationType::Retract && entry.is_same_reference(&next_entry)
+                        {
+                            maybe_file_updated_event =
+                                Some(MoleculeActivityEventV2::file_updated(next_entry));
+                        }
+                    };
+
+                    if let Some(file_updated) = maybe_file_updated_event {
+                        // Yes, these two records represent the same update event,
+                        // no need to process the next one, so we consume it.
+                        let _ = record_iter.next();
+                        file_updated
+                    } else {
+                        MoleculeActivityEventV2::file_added(entry)
                     }
-                };
+                }
+                OperationType::Retract => MoleculeActivityEventV2::file_removed(entry),
+                OperationType::CorrectTo => MoleculeActivityEventV2::file_updated(entry),
+                OperationType::CorrectFrom => {
+                    unreachable!()
+                }
+            };
 
-                Ok(event)
-            })
-            .collect::<Result<_, _>>()?;
+            nodes.push(event);
+        }
 
         Ok(nodes)
     }
