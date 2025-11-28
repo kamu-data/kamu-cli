@@ -1446,7 +1446,7 @@ impl GraphQLMoleculeV1Harness {
         std::fs::create_dir(&cache_dir).unwrap();
 
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
-            .add::<kamu_datasets_services::UpdateVersionFileUseCaseImpl>()
+            .add::<kamu_datasets_services::UpdateVersionedFileUseCaseImpl>()
             .add::<kamu_datasets_services::FindCollectionEntriesUseCaseImpl>()
             .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
             .add::<kamu_datasets_services::ViewCollectionEntriesUseCaseImpl>()

@@ -13,20 +13,7 @@ use datafusion::logical_expr::{col, lit};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{
-    CollectionUpdateOperation,
-    ContentArgs,
-    CreateDatasetUseCaseOptions,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    ExtraDataFields,
-    ResolvedDataset,
-    UpdateCollectionEntriesResult,
-    UpdateCollectionEntriesUseCase,
-    UpdateCollectionEntriesUseCaseError,
-    UpdateVersionFileUseCase,
-    WriteCheckedDataset,
-};
+use kamu_datasets::*;
 use kamu_molecule_domain::MoleculeDatasetSnapshots;
 use odf::utils::data::DataFrameExt;
 
@@ -89,14 +76,10 @@ impl MoleculeDataRoomMutV2 {
         // TODO: Align timestamps with ingest
         let now = chrono::Utc::now();
 
-        let (
-            create_dataset_from_snapshot_use_case,
-            update_version_file_use_case,
-            update_entries_use_case,
-        ) = from_catalog_n!(
+        let (create_dataset_from_snapshot, update_versioned_file, update_collection_entries) = from_catalog_n!(
             ctx,
-            dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
-            dyn UpdateVersionFileUseCase,
+            dyn CreateDatasetFromSnapshotUseCase,
+            dyn UpdateVersionedFileUseCase,
             dyn UpdateCollectionEntriesUseCase
         );
 
@@ -105,7 +88,7 @@ impl MoleculeDataRoomMutV2 {
         let versioned_file_snapshot = MoleculeDatasetSnapshots::versioned_file_v2(alias);
 
         let versioned_file_dataset = ResolvedDataset::from_created(
-            &create_dataset_from_snapshot_use_case
+            &create_dataset_from_snapshot
                 .execute(
                     versioned_file_snapshot,
                     CreateDatasetUseCaseOptions::default(),
@@ -146,7 +129,7 @@ impl MoleculeDataRoomMutV2 {
             )),
         };
 
-        let update_version_result = update_version_file_use_case
+        let update_version_result = update_versioned_file
             .execute(
                 WriteCheckedDataset(&versioned_file_dataset),
                 Some(content_args),
@@ -178,7 +161,7 @@ impl MoleculeDataRoomMutV2 {
         let data_room_writable_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
@@ -227,9 +210,9 @@ impl MoleculeDataRoomMutV2 {
         // TODO: Align timestamps with ingest
         let now = chrono::Utc::now();
 
-        let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
+        let (update_versioned_file, dataset_registry, update_collection_entries) = from_catalog_n!(
             ctx,
-            dyn UpdateVersionFileUseCase,
+            dyn UpdateVersionedFileUseCase,
             dyn DatasetRegistry,
             dyn UpdateCollectionEntriesUseCase
         );
@@ -279,7 +262,7 @@ impl MoleculeDataRoomMutV2 {
             )),
         };
 
-        let update_version_result = update_version_file_use_case
+        let update_version_result = update_versioned_file
             .execute(
                 WriteCheckedDataset(&file_dataset),
                 Some(content_args),
@@ -303,7 +286,7 @@ impl MoleculeDataRoomMutV2 {
         let writable_data_room_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
                 WriteCheckedDataset(writable_data_room_dataset),
                 vec![CollectionUpdateOperation::add(
@@ -617,12 +600,12 @@ impl MoleculeDataRoomMutV2 {
         to_path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
-        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         let data_room_writable_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::r#move(
@@ -661,12 +644,12 @@ impl MoleculeDataRoomMutV2 {
         path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
-        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         let data_room_writable_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::remove(path.clone().into())],
@@ -710,9 +693,9 @@ impl MoleculeDataRoomMutV2 {
         content_text: Option<String>,
         encryption_metadata: Option<EncryptionMetadata>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
-        let (update_version_file_use_case, dataset_registry, update_entries_use_case) = from_catalog_n!(
+        let (update_versioned_file, dataset_registry, update_collection_entries) = from_catalog_n!(
             ctx,
-            dyn UpdateVersionFileUseCase,
+            dyn UpdateVersionedFileUseCase,
             dyn DatasetRegistry,
             dyn UpdateCollectionEntriesUseCase
         );
@@ -783,7 +766,7 @@ impl MoleculeDataRoomMutV2 {
         }
 
         // TODO: we need to do a retraction if any errors...
-        let new_version = update_version_file_use_case
+        let new_version = update_versioned_file
             .execute(
                 WriteCheckedDataset(&file_dataset),
                 None,
@@ -800,7 +783,7 @@ impl MoleculeDataRoomMutV2 {
         let data_room_writable_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(

@@ -41,7 +41,7 @@ impl<'a> CollectionMut<'a> {
         operations: Vec<CollectionUpdateInput>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<CollectionUpdateResult> {
-        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         let mut mapped_ops = Vec::with_capacity(operations.len());
         for op in operations {
@@ -62,7 +62,7 @@ impl<'a> CollectionMut<'a> {
 
         let collection_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
                 WriteCheckedDataset(collection_dataset),
                 mapped_ops,

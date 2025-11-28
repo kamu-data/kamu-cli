@@ -25,8 +25,8 @@ use kamu_datasets::{
     FileVersion,
     ResolvedDataset,
     UpdateVersionFileResult,
-    UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
+    UpdateVersionedFileUseCase,
     VERSION_COLUMN_NAME,
     VersionedFileEntity,
     WriteCheckedDataset,
@@ -35,13 +35,13 @@ use kamu_datasets::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
-#[interface(dyn UpdateVersionFileUseCase)]
-pub struct UpdateVersionFileUseCaseImpl {
+#[interface(dyn UpdateVersionedFileUseCase)]
+pub struct UpdateVersionedFileUseCaseImpl {
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
 }
 
-impl UpdateVersionFileUseCaseImpl {
+impl UpdateVersionedFileUseCaseImpl {
     async fn get_latest_version(
         &self,
         file_dataset: ResolvedDataset,
@@ -100,8 +100,8 @@ impl UpdateVersionFileUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
-    #[tracing::instrument(level = "info", name = UpdateVersionFileUseCaseImpl_execute, skip_all, fields(id = %file_dataset.get_id()))]
+impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
+    #[tracing::instrument(level = "info", name = UpdateVersionedFileUseCaseImpl_execute, skip_all, fields(id = %file_dataset.get_id()))]
     async fn execute(
         &self,
         file_dataset: WriteCheckedDataset<'_>,
