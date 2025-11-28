@@ -109,7 +109,6 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             if existing.ipnft_uid == project.ipnft_uid {
                 return Ok(existing);
             }
-            return Err(MoleculeEnableProjectError::Conflict { project: existing });
         }
 
         let now = chrono::Utc::now();

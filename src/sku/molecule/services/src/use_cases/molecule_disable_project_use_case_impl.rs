@@ -14,7 +14,6 @@ use kamu_accounts::LoggedAccount;
 use kamu_core::PushIngestDataUseCase;
 use kamu_core::auth::DatasetAction;
 use messaging_outbox::{Outbox, OutboxExt};
-use odf::metadata::OperationType;
 
 use crate::domain::*;
 
@@ -54,8 +53,11 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         let mut project = if let Some(project) = project_opt {
             project
         } else {
-            self.existing_project_from_ledger(molecule_subject, &ipnft_uid)
-                .await?
+            return Err(MoleculeDisableProjectError::ProjectNotFound(
+                ProjectNotFoundError {
+                    ipnft_uid: ipnft_uid.clone(),
+                },
+            ));
         };
         project.system_time = now;
         project.event_time = now;
@@ -94,58 +96,6 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
             .int_err()?;
 
         Ok(project)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MoleculeDisableProjectUseCaseImpl {
-    async fn existing_project_from_ledger(
-        &self,
-        molecule_subject: &LoggedAccount,
-        ipnft_uid: &str,
-    ) -> Result<MoleculeProjectEntity, MoleculeDisableProjectError> {
-        use datafusion::prelude::*;
-
-        let (_, ledger_opt) = self
-            .molecule_dataset_service
-            .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
-            .await?;
-
-        let Some(ledger_df) = ledger_opt else {
-            return Err(MoleculeDisableProjectError::ProjectNotFound(
-                ProjectNotFoundError {
-                    ipnft_uid: ipnft_uid.to_owned(),
-                },
-            ));
-        };
-
-        let df = ledger_df
-            .filter(col("ipnft_uid").eq(lit(ipnft_uid)))
-            .int_err()?
-            .sort(vec![col("system_time").sort(false, false)])
-            .int_err()?;
-
-        let records: Vec<serde_json::Value> = df.collect_json_aos().await.int_err()?;
-        let record = records.into_iter().find(|record| {
-            record
-                .get("op")
-                .and_then(serde_json::Value::as_u64)
-                .and_then(|value| u8::try_from(value).ok())
-                .and_then(|value| OperationType::try_from(value).ok())
-                .map(|op| matches!(op, OperationType::Append | OperationType::CorrectTo))
-                .unwrap_or(false)
-        });
-
-        let Some(record) = record else {
-            return Err(MoleculeDisableProjectError::ProjectNotFound(
-                ProjectNotFoundError {
-                    ipnft_uid: ipnft_uid.to_owned(),
-                },
-            ));
-        };
-
-        Ok(MoleculeProjectEntity::from_json(record).int_err()?)
     }
 }
 

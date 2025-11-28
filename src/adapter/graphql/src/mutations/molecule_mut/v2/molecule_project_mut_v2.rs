@@ -67,13 +67,18 @@ impl MoleculeProjectMutV2 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeProjectMutationResultV2 {
+    message: String,
     project: MoleculeProjectMutV2,
 }
 
 impl MoleculeProjectMutationResultV2 {
-    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn from_entity(
+        entity: kamu_molecule_domain::MoleculeProjectEntity,
+        message: String,
+    ) -> Self {
         Self {
             project: MoleculeProjectMutV2::from_entity(entity),
+            message,
         }
     }
 }
@@ -83,6 +88,10 @@ impl MoleculeProjectMutationResultV2 {
 impl MoleculeProjectMutationResultV2 {
     async fn project(&self) -> &MoleculeProjectMutV2 {
         &self.project
+    }
+
+    async fn message(&self) -> &str {
+        &self.message
     }
 }
 

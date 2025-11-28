@@ -67,7 +67,10 @@ impl MoleculeMutV2 {
             .await
             .map_err(|err| map_disable_error(err, &ipnft_uid))?;
 
-        Ok(MoleculeProjectMutationResultV2::from_entity(project))
+        Ok(MoleculeProjectMutationResultV2::from_entity(
+            project,
+            "Project disabled successfully".to_string(),
+        ))
     }
 
     #[graphql(guard = "LoggedInGuard")]
@@ -85,7 +88,10 @@ impl MoleculeMutV2 {
             .await
             .map_err(|err| map_enable_error(err, &ipnft_uid))?;
 
-        Ok(MoleculeProjectMutationResultV2::from_entity(project))
+        Ok(MoleculeProjectMutationResultV2::from_entity(
+            project,
+            "Project enabled successfully".to_string(),
+        ))
     }
 
     /// Looks up the project
@@ -126,17 +132,6 @@ fn map_disable_error(err: MoleculeDisableProjectError, ipnft_uid: &str) -> GqlEr
 
 fn map_enable_error(err: MoleculeEnableProjectError, ipnft_uid: &str) -> GqlError {
     match err {
-        MoleculeEnableProjectError::Conflict { project } => {
-            let conflict_uid = project.ipnft_uid.clone();
-            let conflict_symbol = project.ipnft_symbol.clone();
-            GqlError::gql_extended(
-                format!("Project {ipnft_uid} conflicts with existing entries"),
-                |ext| {
-                    ext.set("conflict_ipnft_uid", conflict_uid);
-                    ext.set("conflict_ipnft_symbol", conflict_symbol);
-                },
-            )
-        }
         MoleculeEnableProjectError::ProjectNotFound(_) => {
             GqlError::gql(format!("No historical entries for project {ipnft_uid}"))
         }

@@ -27,9 +27,6 @@ pub trait MoleculeEnableProjectUseCase: Send + Sync {
 
 #[derive(thiserror::Error, Debug)]
 pub enum MoleculeEnableProjectError {
-    #[error("Project with the same IPNFT UID or symbol already exists")]
-    Conflict { project: MoleculeProjectEntity },
-
     #[error(transparent)]
     ProjectNotFound(#[from] ProjectNotFoundError),
 
