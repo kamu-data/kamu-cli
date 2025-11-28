@@ -5087,11 +5087,11 @@ type VersionedFileContentDownload {
 
 type VersionedFileEntry {
 	"""
-	System time when this version was created/updated
+	Time when this version was created
 	"""
 	systemTime: DateTime!
 	"""
-	Event time when this version was created/updated
+	Time when this version was created
 	"""
 	eventTime: DateTime!
 	"""

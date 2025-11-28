@@ -8,8 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu::domain;
 use kamu_datasets::{
+    FindVersionedFileVersionError,
+    FindVersionedFileVersionUseCase,
     ReadCheckedDataset,
     ViewVersionedFileHistoryError,
     ViewVersionedFileHistoryUseCase,
@@ -57,61 +58,22 @@ impl<'a> VersionedFile<'a> {
         as_of_version: Option<FileVersion>,
         as_of_block_hash: Option<Multihash<'static>>,
     ) -> Result<Option<VersionedFileEntry>> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
-        let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let readable_file_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let query_res = if let Some(block_hash) = as_of_block_hash {
-            query_svc
-                .tail(
-                    readable_dataset.clone(),
-                    0,
-                    1,
-                    domain::GetDataOptions {
-                        block_hash: Some(block_hash.into()),
-                    },
-                )
-                .await
-        } else if let Some(version) = as_of_version {
-            use datafusion::logical_expr::{col, lit};
+        let find_versioned_file_version = from_catalog_n!(ctx, dyn FindVersionedFileVersionUseCase);
+        let maybe_entry = find_versioned_file_version
+            .execute(
+                ReadCheckedDataset(readable_file_dataset),
+                as_of_version,
+                as_of_block_hash.map(Into::into),
+            )
+            .await
+            .map_err(|e| match e {
+                FindVersionedFileVersionError::Internal(err) => err.int_err(),
+            })?
+            .map(|entry| VersionedFileEntry::new(readable_file_dataset.clone(), entry));
 
-            query_svc
-                .get_data(readable_dataset.clone(), domain::GetDataOptions::default())
-                .await
-                .map(|res| domain::GetDataResponse {
-                    df: res
-                        .df
-                        .map(|df| df.filter(col("version").eq(lit(version))).unwrap()),
-                    source: res.source,
-                    block_hash: res.block_hash,
-                })
-        } else {
-            query_svc
-                .tail(
-                    readable_dataset.clone(),
-                    0,
-                    1,
-                    domain::GetDataOptions::default(),
-                )
-                .await
-        }
-        .int_err()?;
-
-        let Some(df) = query_res.df else {
-            return Ok(None);
-        };
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-
-        let dataset = self.readable_state.resolved_dataset(ctx).await?;
-        let entry =
-            VersionedFileEntry::from_json(dataset.clone(), records.into_iter().next().unwrap())?;
-
-        Ok(Some(entry))
+        Ok(maybe_entry)
     }
 }
 
