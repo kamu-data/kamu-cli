@@ -127,7 +127,7 @@ impl MoleculeProjectV2 {
                             maybe_file_updated_event =
                                 Some(MoleculeActivityEventV2::file_updated(next_entry));
                         }
-                    };
+                    }
 
                     if let Some(file_updated) = maybe_file_updated_event {
                         // Yes, these two records represent the same update event,
