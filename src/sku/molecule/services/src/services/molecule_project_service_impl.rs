@@ -104,7 +104,6 @@ impl MoleculeProjectService for MoleculeProjectServiceImpl {
         action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetProjectsError> {
-        // Resolve projects dataset
         let projects_dataset = self
             .get_projects_dataset(&molecule_subject.account_name, action, create_if_not_exist)
             .await?;
