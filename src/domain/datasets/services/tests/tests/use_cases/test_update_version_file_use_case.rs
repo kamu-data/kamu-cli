@@ -30,11 +30,11 @@ use kamu_datasets::{
     ContentArgs,
     DatasetRegistry,
     ResolvedDataset,
-    UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
+    UpdateVersionedFileUseCase,
     WriteCheckedDataset,
 };
-use kamu_datasets_services::UpdateVersionFileUseCaseImpl;
+use kamu_datasets_services::UpdateVersionedFileUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{MetadataChainExt, TryStreamExtExt};
@@ -140,7 +140,7 @@ async fn test_update_versioned_file_use_case_errors() {
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateVersionFileCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
-    use_case: Arc<dyn UpdateVersionFileUseCase>,
+    use_case: Arc<dyn UpdateVersionedFileUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     did_generator: Arc<dyn DidGenerator>,
@@ -159,7 +159,7 @@ impl UpdateVersionFileCaseHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
 
         let catalog = b
-            .add::<UpdateVersionFileUseCaseImpl>()
+            .add::<UpdateVersionedFileUseCaseImpl>()
             .add::<PushIngestDataUseCaseImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()

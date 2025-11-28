@@ -15,6 +15,7 @@ mod jobs;
 mod messages;
 mod repos;
 mod services;
+mod snapshots;
 mod use_cases;
 
 pub use entities::*;
@@ -22,4 +23,5 @@ pub use jobs::*;
 pub use messages::*;
 pub use repos::*;
 pub use services::*;
+pub use snapshots::*;
 pub use use_cases::*;
