@@ -177,11 +177,7 @@ impl MoleculeV1 {
             )
             .await?;
 
-        let nodes = listing
-            .projects
-            .into_iter()
-            .map(MoleculeProject::new)
-            .collect();
+        let nodes = listing.list.into_iter().map(MoleculeProject::new).collect();
 
         Ok(MoleculeProjectConnection::new(
             nodes,
@@ -220,7 +216,7 @@ impl MoleculeV1 {
             odf::DatasetID,
             Arc<MoleculeProject>,
         > = projects_listing
-            .projects
+            .list
             .into_iter()
             .map(MoleculeProject::new)
             .map(|p| (p.entity.announcements_dataset_id.clone(), Arc::new(p)))

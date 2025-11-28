@@ -98,7 +98,7 @@ impl CollectionProjection<'_> {
     pub async fn entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
     ) -> Result<Option<CollectionEntry>> {
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
@@ -107,7 +107,7 @@ impl CollectionProjection<'_> {
             .execute_find_by_path(
                 ReadCheckedDataset(readable_dataset),
                 self.as_of.clone(),
-                &(path.to_string()),
+                path.into(),
             )
             .await
             .map_err(|e| match e {
@@ -124,7 +124,7 @@ impl CollectionProjection<'_> {
     pub async fn entries(
         &self,
         ctx: &Context<'_>,
-        path_prefix: Option<CollectionPath>,
+        path_prefix: Option<CollectionPath<'static>>,
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -139,7 +139,7 @@ impl CollectionProjection<'_> {
             .execute(
                 ReadCheckedDataset(readable_dataset),
                 self.as_of.clone(),
-                path_prefix.map(|p| p.to_string()),
+                path_prefix.map(Into::into),
                 max_depth,
                 Some(PaginationOpts {
                     offset: page * per_page,
@@ -153,7 +153,7 @@ impl CollectionProjection<'_> {
             })?;
 
         let nodes = entries_listing
-            .entries
+            .list
             .into_iter()
             .map(CollectionEntry::new)
             .collect::<Vec<_>>();

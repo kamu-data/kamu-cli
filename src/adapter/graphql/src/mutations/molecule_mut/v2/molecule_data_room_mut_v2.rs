@@ -13,7 +13,21 @@ use datafusion::logical_expr::{col, lit};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::*;
+use kamu_datasets::{
+    CollectionUpdateOperation,
+    ContentArgs,
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCaseOptions,
+    DatasetRegistry,
+    DatasetRegistryExt,
+    ExtraDataFields,
+    ResolvedDataset,
+    UpdateCollectionEntriesResult,
+    UpdateCollectionEntriesUseCase,
+    UpdateCollectionEntriesUseCaseError,
+    UpdateVersionedFileUseCase,
+    WriteCheckedDataset,
+};
 use kamu_molecule_domain::MoleculeDatasetSnapshots;
 use odf::utils::data::DataFrameExt;
 
@@ -64,7 +78,7 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         content_args: ContentArgs,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
         access_level: MoleculeAccessLevel,
         change_by: String,
         description: Option<String>,
@@ -151,7 +165,7 @@ impl MoleculeDataRoomMutV2 {
                     event_time: now,
                     path: path.into(),
                     reference: versioned_file_dataset.get_id().clone(),
-                    extra_data: serde_json::Map::default(),
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
                 },
             },
             project: self.project.clone(),
@@ -384,7 +398,7 @@ impl MoleculeDataRoomMutV2 {
     async fn build_new_file_dataset_alias(
         &self,
         ctx: &Context<'_>,
-        file_path: &CollectionPath,
+        file_path: &CollectionPath<'static>,
     ) -> odf::DatasetAlias {
         // TODO: PERF: Add AccountRequestState similar to DatasetRequestState and reuse
         //             possibly resolved account?
@@ -427,7 +441,7 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         #[graphql(desc = "Base64-encoded file content (url-safe, no padding)")] content: Base64Usnp,
         #[graphql(name = "ref")] reference: Option<DatasetID<'static>>,
-        path: Option<CollectionPath>,
+        path: Option<CollectionPath<'static>>,
         #[graphql(desc = "Media type of content (e.g. application/pdf)")] content_type: Option<
             String,
         >,
@@ -537,7 +551,7 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         upload_token: String,
         #[graphql(name = "ref")] reference: Option<DatasetID<'static>>,
-        path: Option<CollectionPath>,
+        path: Option<CollectionPath<'static>>,
         access_level: MoleculeAccessLevel,
         change_by: String,
         description: Option<String>,
@@ -596,8 +610,8 @@ impl MoleculeDataRoomMutV2 {
     async fn move_entry(
         &self,
         ctx: &Context<'_>,
-        from_path: CollectionPath,
-        to_path: CollectionPath,
+        from_path: CollectionPath<'static>,
+        to_path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
@@ -641,7 +655,7 @@ impl MoleculeDataRoomMutV2 {
     async fn remove_entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
         let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
@@ -879,7 +893,7 @@ impl MoleculeDataRoomUpdateSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct MoleculeDataRoomUpdateEntryNotFound {
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 }
 #[ComplexObject]
 impl MoleculeDataRoomUpdateEntryNotFound {

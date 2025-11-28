@@ -10,6 +10,8 @@
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
+use crate::ExtraDataFields;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
@@ -23,13 +25,51 @@ pub struct CollectionEntry {
     /// File system-like path
     /// Rooted, separated by forward slashes, with elements URL-encoded
     /// (e.g. `/foo%20bar/baz`)
-    pub path: String,
+    pub path: CollectionPath,
 
     /// DID of the linked dataset
     pub reference: odf::DatasetID,
 
     /// Extra data associated with this entry
-    pub extra_data: serde_json::Map<String, serde_json::Value>,
+    pub extra_data: ExtraDataFields,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Validate correctness (not empty, valid URL-encodeding)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CollectionPath(String);
+
+impl CollectionPath {
+    pub fn new(path: String) -> Self {
+        Self(path)
+    }
+
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+impl TryFrom<&str> for CollectionPath {
+    type Error = InternalError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(Self::new(value.to_string()))
+    }
+}
+
+impl std::fmt::Display for CollectionPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::ops::Deref for CollectionPath {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +79,16 @@ impl CollectionEntry {
         let mut event: CollectionEntryEvent = serde_json::from_value(record).int_err()?;
 
         let vocab = odf::metadata::DatasetVocabulary::default();
-        event.record.extra_data.remove(&vocab.offset_column);
-        event.record.extra_data.remove(&vocab.operation_type_column);
+        event
+            .record
+            .extra_data
+            .as_mut_map()
+            .remove(&vocab.offset_column);
+        event
+            .record
+            .extra_data
+            .as_mut_map()
+            .remove(&vocab.operation_type_column);
 
         Ok(Self {
             system_time: event.system_time,
@@ -57,13 +105,13 @@ impl CollectionEntry {
 /// Used to serialize/deserialize entry from a dataset
 #[derive(serde::Serialize, serde::Deserialize)]
 struct CollectionEntryRecord {
-    pub path: String,
+    pub path: CollectionPath,
 
     #[serde(rename = "ref")]
     pub reference: odf::DatasetID,
 
     #[serde(flatten)]
-    pub extra_data: serde_json::Map<String, serde_json::Value>,
+    pub extra_data: ExtraDataFields,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

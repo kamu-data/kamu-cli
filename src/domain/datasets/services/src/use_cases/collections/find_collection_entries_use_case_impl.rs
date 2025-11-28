@@ -13,6 +13,7 @@ use internal_error::ResultIntoInternal;
 use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
+    CollectionPath,
     FindCollectionEntriesUseCase,
     FindCollectionEntryUseCaseError,
     ReadCheckedDataset,
@@ -34,13 +35,13 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
     #[tracing::instrument(
         name = FindCollectionEntriesUseCaseImpl_execute_find_by_path,
         skip_all,
-        fields(as_of = ?as_of, path = path)
+        fields(as_of = ?as_of, path = %path)
     )]
     async fn execute_find_by_path(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
-        path: &str,
+        path: CollectionPath,
     ) -> Result<Option<CollectionEntry>, FindCollectionEntryUseCaseError> {
         use datafusion::logical_expr::{col, lit};
 

@@ -38,9 +38,9 @@ impl CollectionEntry {
             entity: kamu_datasets::CollectionEntry {
                 system_time: event.system_time,
                 event_time: event.event_time,
-                path: event.record.path,
+                path: kamu_datasets::CollectionPath::new(event.record.path),
                 reference: event.record.reference,
-                extra_data: event.record.extra_data,
+                extra_data: kamu_datasets::ExtraDataFields::new(event.record.extra_data),
             },
         })
     }
@@ -64,22 +64,20 @@ impl CollectionEntry {
     /// File system-like path
     /// Rooted, separated by forward slashes, with elements URL-encoded
     /// (e.g. `/foo%20bar/baz`)
-    pub async fn path(&self) -> CollectionPath {
-        // TODO: avoid clone
-        CollectionPath::from(self.entity.path.clone())
+    pub async fn path(&self) -> CollectionPath<'_> {
+        CollectionPath::from(&self.entity.path)
     }
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
-    pub async fn reference(&self) -> DatasetID<'static> {
-        // TODO: avoid clone
-        DatasetID::from(self.entity.reference.clone())
+    pub async fn reference(&self) -> DatasetID<'_> {
+        DatasetID::from(&self.entity.reference)
     }
 
     /// Extra data associated with this entry
     pub async fn extra_data(&self) -> ExtraData {
         // TODO: avoid clone
-        ExtraData::new(self.entity.extra_data.clone())
+        ExtraData::new(self.entity.extra_data.as_map().clone())
     }
 
     /// Resolves the reference to linked dataset

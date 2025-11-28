@@ -11,7 +11,7 @@ use internal_error::InternalError;
 use odf::dataset::RefCASError;
 use thiserror::Error;
 
-use crate::{ExtraDataFields, WriteCheckedDataset};
+use crate::{CollectionPath, ExtraDataFields, WriteCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +35,11 @@ pub enum CollectionUpdateOperation {
 }
 
 impl CollectionUpdateOperation {
-    pub fn add(path: String, reference: odf::DatasetID, extra_data: ExtraDataFields) -> Self {
+    pub fn add(
+        path: CollectionPath,
+        reference: odf::DatasetID,
+        extra_data: ExtraDataFields,
+    ) -> Self {
         Self::Add(CollectionEntryUpdate {
             path,
             reference,
@@ -43,7 +47,11 @@ impl CollectionUpdateOperation {
         })
     }
 
-    pub fn r#move(path_from: String, path_to: String, extra_data: Option<ExtraDataFields>) -> Self {
+    pub fn r#move(
+        path_from: CollectionPath,
+        path_to: CollectionPath,
+        extra_data: Option<ExtraDataFields>,
+    ) -> Self {
         Self::Move(CollectionEntryMove {
             path_from,
             path_to,
@@ -51,27 +59,27 @@ impl CollectionUpdateOperation {
         })
     }
 
-    pub fn remove(path: String) -> Self {
+    pub fn remove(path: CollectionPath) -> Self {
         Self::Remove(CollectionEntryRemove { path })
     }
 }
 
 #[derive(Clone)]
 pub struct CollectionEntryUpdate {
-    pub path: String,
+    pub path: CollectionPath,
     pub reference: odf::DatasetID,
     pub extra_data: ExtraDataFields,
 }
 
 #[derive(Clone)]
 pub struct CollectionEntryRemove {
-    pub path: String,
+    pub path: CollectionPath,
 }
 
 #[derive(Clone)]
 pub struct CollectionEntryMove {
-    pub path_from: String,
-    pub path_to: String,
+    pub path_from: CollectionPath,
+    pub path_to: CollectionPath,
     pub extra_data: Option<ExtraDataFields>,
 }
 
@@ -92,7 +100,7 @@ pub struct UpdateCollectionEntriesSuccess {
 
 #[derive(Debug)]
 pub struct CollectionEntryNotFound {
-    pub path: String,
+    pub path: CollectionPath,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

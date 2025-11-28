@@ -91,7 +91,7 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entries(
         &self,
         ctx: &Context<'_>,
-        path_prefix: Option<CollectionPath>,
+        path_prefix: Option<CollectionPath<'static>>,
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -124,7 +124,7 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
     ) -> Result<Option<MoleculeDataRoomEntry>> {
         let Some(entry) = self.projection.entry(ctx, path).await? else {
             return Ok(None);
@@ -161,11 +161,11 @@ impl MoleculeDataRoomEntry {
         project: &Arc<MoleculeProjectV2>,
         mut entry: CollectionEntry,
     ) -> Result<Self> {
-        let mut extra_data = serde_json::Map::default();
+        let mut extra_data = kamu_datasets::ExtraDataFields::default();
         std::mem::swap(&mut entry.entity.extra_data, &mut extra_data);
 
         let denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom =
-            serde_json::from_value(extra_data.into()).int_err()?;
+            serde_json::from_value(extra_data.into_inner().into()).int_err()?;
 
         Ok(Self {
             entry,
@@ -206,13 +206,13 @@ impl MoleculeDataRoomEntry {
         &self.entry.entity.event_time
     }
 
-    async fn path(&self) -> CollectionPath {
-        CollectionPath::from(self.entry.entity.path.clone())
+    async fn path(&self) -> CollectionPath<'_> {
+        CollectionPath::from(&self.entry.entity.path)
     }
 
     #[graphql(name = "ref")]
-    async fn reference(&self) -> DatasetID<'static> {
-        self.entry.entity.reference.clone().into()
+    async fn reference(&self) -> DatasetID<'_> {
+        DatasetID::from(&self.entry.entity.reference)
     }
 
     async fn change_by(&self) -> &MoleculeChangeBy {

@@ -7,13 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::prelude::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Collection entry paths are similar to HTTP path components. They are rooted
-// (start with `/`), separated by forward slashes, with elements URL-encoded
-// (e.g. `/foo%20bar/baz`)
-simple_string_scalar!(CollectionPath, kamu_datasets::CollectionPath);
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct ExtraDataFields(serde_json::Map<String, serde_json::Value>);
+
+impl ExtraDataFields {
+    pub fn new(value: serde_json::Map<String, serde_json::Value>) -> Self {
+        Self(value)
+    }
+
+    pub fn into_inner(self) -> serde_json::Map<String, serde_json::Value> {
+        self.0
+    }
+
+    pub fn as_map(&self) -> &serde_json::Map<String, serde_json::Value> {
+        &self.0
+    }
+
+    pub fn as_mut_map(&mut self) -> &mut serde_json::Map<String, serde_json::Value> {
+        &mut self.0
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

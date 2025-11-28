@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{CollectionEntry, ReadCheckedDataset};
+use crate::{CollectionEntry, CollectionPath, ReadCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +19,7 @@ pub trait FindCollectionEntriesUseCase: Send + Sync {
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
-        path: &str,
+        path: CollectionPath,
     ) -> Result<Option<CollectionEntry>, FindCollectionEntryUseCaseError>;
 
     async fn execute_find_multi_by_refs(

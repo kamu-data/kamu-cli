@@ -15,6 +15,7 @@ use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
     CollectionEntryListing,
+    CollectionPath,
     ReadCheckedDataset,
     ViewCollectionEntriesError,
     ViewCollectionEntriesUseCase,
@@ -41,7 +42,7 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
-        path_prefix: Option<String>,
+        path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, ViewCollectionEntriesError> {
@@ -69,7 +70,7 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
             Some(path_prefix) => df
                 .filter(
                     datafusion::functions::string::starts_with()
-                        .call(vec![col("path"), lit(path_prefix)]),
+                        .call(vec![col("path"), lit(path_prefix.as_str())]),
                 )
                 .int_err()?,
         };
@@ -105,7 +106,7 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
             .collect::<Result<_, _>>()?;
 
         Ok(CollectionEntryListing {
-            entries,
+            list: entries,
             total_count,
         })
     }

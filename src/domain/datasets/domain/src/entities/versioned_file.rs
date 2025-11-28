@@ -9,7 +9,7 @@
 
 use file_utils::{MediaType, MediaTypeRef};
 
-use crate::DatasetColumn;
+use crate::{DatasetColumn, ExtraDataFields};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,31 +21,6 @@ pub const VERSION_COLUMN_NAME: &str = "version";
 pub const CONTENT_TYPE_COLUMN_NAME: &str = "content_type";
 pub const CONTENT_LENGTH_COLUMN_NAME: &str = "content_length";
 pub const CONTENT_HASH_COLUMN_NAME: &str = "content_hash";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct ExtraDataFields(serde_json::Map<String, serde_json::Value>);
-
-impl ExtraDataFields {
-    pub fn new(value: serde_json::Map<String, serde_json::Value>) -> Self {
-        Self(value)
-    }
-
-    pub fn into_inner(self) -> serde_json::Map<String, serde_json::Value> {
-        self.0
-    }
-
-    pub fn as_map(&self) -> &serde_json::Map<String, serde_json::Value> {
-        &self.0
-    }
-}
-
-impl Default for ExtraDataFields {
-    fn default() -> Self {
-        Self::new(Default::default())
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

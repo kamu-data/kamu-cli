@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
+use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 
-use crate::{CollectionEntry, ReadCheckedDataset};
+use crate::{CollectionEntry, CollectionPath, ReadCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub trait ViewCollectionEntriesUseCase: Send + Sync {
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
-        path_prefix: Option<String>,
+        path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, ViewCollectionEntriesError>;
@@ -28,11 +28,7 @@ pub trait ViewCollectionEntriesUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
-pub struct CollectionEntryListing {
-    pub entries: Vec<CollectionEntry>,
-    pub total_count: usize,
-}
+pub type CollectionEntryListing = EntityPageListing<CollectionEntry>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

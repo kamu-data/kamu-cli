@@ -25,6 +25,7 @@ use kamu_core::{
 use kamu_datasets::{
     CollectionEntryNotFound,
     CollectionEntryUpdate,
+    CollectionPath,
     CollectionUpdateOperation,
     ExtraDataFields,
     UpdateCollectionEntriesResult,
@@ -49,7 +50,13 @@ impl UpdateCollectionEntriesUseCaseImpl {
     async fn load_current_entries(
         &self,
         collection_dataset: &WriteCheckedDataset<'_>,
-    ) -> Result<(BTreeMap<String, CollectionEntryState>, odf::Multihash), InternalError> {
+    ) -> Result<
+        (
+            BTreeMap<CollectionPath, CollectionEntryState>,
+            odf::Multihash,
+        ),
+        InternalError,
+    > {
         // TODO: PERF: Filter paths relevant to operations
         let query_res = self
             .query_svc
@@ -84,7 +91,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
 
     fn apply_operations(
         &self,
-        mut current_entries: BTreeMap<String, CollectionEntryState>,
+        mut current_entries: BTreeMap<CollectionPath, CollectionEntryState>,
         operations: Vec<CollectionUpdateOperation>,
     ) -> Result<Vec<(Op, CollectionEntryState)>, CollectionEntryNotFound> {
         let mut diff = Vec::new();
@@ -296,7 +303,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
 
 #[derive(Clone, Debug)]
 struct CollectionEntryState {
-    path: String,
+    path: CollectionPath,
     reference: odf::DatasetID,
     extra_data: ExtraDataFields,
 }
@@ -341,7 +348,7 @@ impl CollectionEntryState {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct CollectionEntryRecord {
-    pub path: String,
+    pub path: CollectionPath,
     #[serde(rename = "ref")]
     pub reference: odf::DatasetID,
     #[serde(flatten)]

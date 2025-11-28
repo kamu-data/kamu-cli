@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
+use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
@@ -26,11 +26,7 @@ pub trait MoleculeViewProjectsUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
-pub struct MoleculeProjectListing {
-    pub projects: Vec<MoleculeProjectEntity>,
-    pub total_count: usize,
-}
+pub type MoleculeProjectListing = EntityPageListing<MoleculeProjectEntity>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

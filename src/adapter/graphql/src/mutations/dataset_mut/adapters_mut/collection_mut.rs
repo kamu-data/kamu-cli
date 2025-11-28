@@ -125,8 +125,8 @@ impl CollectionMut<'_> {
     pub async fn move_entry(
         &self,
         ctx: &Context<'_>,
-        path_from: CollectionPath,
-        path_to: CollectionPath,
+        path_from: CollectionPath<'static>,
+        path_to: CollectionPath<'static>,
         extra_data: Option<ExtraData>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
@@ -150,7 +150,7 @@ impl CollectionMut<'_> {
     pub async fn remove_entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
         self.update_entries_impl(
@@ -182,7 +182,7 @@ impl CollectionMut<'_> {
 #[derive(InputObject, Debug)]
 pub struct CollectionEntryInput {
     /// Entry path
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
@@ -227,8 +227,8 @@ pub struct CollectionUpdateInputAdd {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputMove {
-    pub path_from: CollectionPath,
-    pub path_to: CollectionPath,
+    pub path_from: CollectionPath<'static>,
+    pub path_to: CollectionPath<'static>,
 
     /// Optionally update the extra data
     pub extra_data: Option<ExtraData>,
@@ -236,7 +236,7 @@ pub struct CollectionUpdateInputMove {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputRemove {
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,7 +299,7 @@ impl CollectionUpdateErrorCasFailed {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateErrorNotFound {
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 }
 
 #[ComplexObject]

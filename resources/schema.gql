@@ -715,9 +715,6 @@ type CollectionMut {
 	updateEntries(operations: [CollectionUpdateInput!]!, expectedHead: Multihash): CollectionUpdateResult!
 }
 
-"""
-Collection entry paths are similar to HTTP path components. They are rooted (start with `/`), separated by forward slashes, with elements URL-encoded (e.g. `/foo%20bar/baz`)
-"""
 scalar CollectionPath
 
 type CollectionProjection {
