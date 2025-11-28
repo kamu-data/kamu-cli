@@ -223,16 +223,10 @@ impl<'de> serde::Deserialize<'de> for OperationType {
     {
         let value = u8::deserialize(deserializer)?;
 
-        match value {
-            0 => Ok(OperationType::Append),
-            1 => Ok(OperationType::Retract),
-            2 => Ok(OperationType::CorrectFrom),
-            3 => Ok(OperationType::CorrectTo),
-            _ => Err(serde::de::Error::invalid_value(
-                serde::de::Unexpected::Unsigned(value.into()),
-                &"OperationType: a value between 0 and 3",
-            )),
-        }
+        OperationType::try_from(value).map_err(|e| {
+            let error_message = e.to_string();
+            serde::de::Error::custom(error_message)
+        })
     }
 }
 
