@@ -1,0 +1,149 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use chrono::{DateTime, Utc};
+use file_utils::MediaType;
+use internal_error::{InternalError, ResultIntoInternal};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MoleculeDataRoomFileActivityType {
+    Added,
+    Updated,
+    Removed,
+}
+
+// TODO: revisit after IPNFT-less projects changes.
+#[derive(Debug)]
+pub struct MoleculeDataRoomActivityEntity {
+    pub system_time: DateTime<Utc>,
+
+    pub event_time: DateTime<Utc>,
+
+    pub activity_type: MoleculeDataRoomFileActivityType,
+
+    // TODO: typing
+    pub ipnft_uid: String,
+
+    pub path: String,
+
+    pub r#ref: odf::DatasetID,
+
+    pub version: u32,
+
+    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    pub change_by: String,
+
+    // TODO: Communicate: we need to agree on its values
+    pub access_level: String,
+
+    pub content_type: Option<MediaType>,
+
+    pub content_length: usize,
+
+    pub content_hash: odf::Multihash,
+
+    pub description: Option<String>,
+
+    pub categories: Vec<String>,
+
+    pub tags: Vec<String>,
+}
+
+impl MoleculeDataRoomActivityEntity {
+    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        let r: MoleculeDataRoomActivityRecord = serde_json::from_value(record).int_err()?;
+
+        Ok(Self {
+            system_time: r.system_columns.system_time,
+            event_time: r.system_columns.event_time,
+            activity_type: r.record.activity_type,
+            ipnft_uid: r.record.ipnft_uid,
+            path: r.record.path,
+            r#ref: r.record.r#ref,
+            version: r.record.version,
+            change_by: r.record.change_by,
+            access_level: r.record.access_level,
+            content_type: r.record.content_type,
+            content_length: r.record.content_length,
+            content_hash: r.record.content_hash,
+            description: r.record.description,
+            categories: r.record.categories,
+            tags: r.record.tags,
+        })
+    }
+
+    pub fn into_insert_record(self) -> MoleculeDataRoomActivityRecord {
+        MoleculeDataRoomActivityRecord {
+            system_columns: odf::serde::DatasetDefaultVocabularySystemColumns {
+                offset: None,
+                op: odf::metadata::OperationType::Append,
+                system_time: self.system_time,
+                event_time: self.event_time,
+            },
+            record: MoleculeDataRoomActivityDataRecord {
+                activity_type: self.activity_type,
+                ipnft_uid: self.ipnft_uid,
+                path: self.path,
+                r#ref: self.r#ref,
+                version: self.version,
+                change_by: self.change_by,
+                access_level: self.access_level,
+                content_type: self.content_type,
+                content_length: self.content_length,
+                content_hash: self.content_hash,
+                description: self.description,
+                categories: self.categories,
+                tags: self.tags,
+            },
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct MoleculeDataRoomActivityDataRecord {
+    pub activity_type: MoleculeDataRoomFileActivityType,
+
+    pub ipnft_uid: String,
+
+    pub path: String,
+
+    pub r#ref: odf::DatasetID,
+
+    pub version: u32,
+
+    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    #[serde(rename = "molecule_change_by")]
+    pub change_by: String,
+
+    // TODO: enum?
+    #[serde(rename = "molecule_access_level")]
+    pub access_level: String,
+
+    pub content_type: Option<MediaType>,
+
+    pub content_length: usize,
+
+    pub content_hash: odf::Multihash,
+
+    pub description: Option<String>,
+
+    pub categories: Vec<String>,
+
+    pub tags: Vec<String>,
+}
+
+pub type MoleculeDataRoomActivityRecord =
+    odf::serde::DatasetDefaultVocabularyRecord<MoleculeDataRoomActivityDataRecord>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

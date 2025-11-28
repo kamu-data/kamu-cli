@@ -20,7 +20,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeFindProjectUseCase)]
 pub struct MoleculeFindProjectUseCaseImpl {
-    project_service: Arc<dyn MoleculeProjectService>,
+    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self
-            .project_service
+            .molecule_dataset_service
             .get_projects_data_frame(molecule_subject, DatasetAction::Read, false)
             .await?
             .1
@@ -55,7 +55,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         assert_eq!(records.len(), 1);
         let record = records.into_iter().next().unwrap();
 
-        let entity = MoleculeProjectEntity::from_json(record).int_err()?;
+        let entity = MoleculeProjectEntity::from_json(record)?;
         Ok(Some(entity))
     }
 }

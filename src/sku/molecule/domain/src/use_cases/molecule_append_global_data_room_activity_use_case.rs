@@ -8,28 +8,24 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
+use crate::MoleculeDataRoomActivityEntity;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeFindProjectUseCase: Send + Sync {
+pub trait MoleculeAppendGlobalDataRoomActivityUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: &LoggedAccount,
-        ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectEntity>, MoleculeFindProjectError>;
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        activity: MoleculeDataRoomActivityEntity,
+    ) -> Result<(), MoleculeAppendDataRoomActivityError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeFindProjectError {
-    #[error(transparent)]
-    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
-
+pub enum MoleculeAppendDataRoomActivityError {
     #[error(transparent)]
     Access(
         #[from]
@@ -39,18 +35,6 @@ pub enum MoleculeFindProjectError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<MoleculeGetDatasetError> for MoleculeFindProjectError {
-    fn from(e: MoleculeGetDatasetError) -> Self {
-        match e {
-            MoleculeGetDatasetError::NotFound(err) => {
-                MoleculeFindProjectError::NoProjectsDataset(err)
-            }
-            MoleculeGetDatasetError::Access(err) => MoleculeFindProjectError::Access(err),
-            MoleculeGetDatasetError::Internal(err) => MoleculeFindProjectError::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
