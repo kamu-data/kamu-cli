@@ -44,19 +44,15 @@ impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
     ) -> Result<MoleculeProjectEntity, MoleculeRestoreProjectError> {
         use datafusion::prelude::*;
 
-        // Resolve projects dataset with Write privileges and access raw ledger
         let (projects_dataset, df) = self
             .project_service
             .get_projects_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
             .await?;
 
-        let ledger_df = match df {
-            Some(df) => df,
-            None => {
-                return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
-                    ipnft_uid: ipnft_uid.clone(),
-                });
-            }
+        let Some(ledger_df) = df else {
+            return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
+                ipnft_uid: ipnft_uid.clone(),
+            });
         };
 
         // Reconstruct active snapshot to confirm there are no conflicts
@@ -67,7 +63,6 @@ impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
         )
         .int_err()?;
 
-        // Find the latest non-retract record for the provided IPNFT UID
         let df = ledger_df
             .filter(col("ipnft_uid").eq(lit(&ipnft_uid)))
             .int_err()?
@@ -78,26 +73,22 @@ impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
         let record = records.into_iter().find(|record: &serde_json::Value| {
             record
                 .get("op")
-                .and_then(|value| value.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .and_then(|value| u8::try_from(value).ok())
                 .and_then(|value| OperationType::try_from(value).ok())
                 .map(|op| matches!(op, OperationType::Append | OperationType::CorrectTo))
                 .unwrap_or(false)
         });
 
-        let record = match record {
-            Some(record) => record,
-            None => {
-                return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
-                    ipnft_uid: ipnft_uid.clone(),
-                });
-            }
+        let Some(record) = record else {
+            return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
+                ipnft_uid: ipnft_uid.clone(),
+            });
         };
 
         let mut project = MoleculeProjectEntity::from_json(record).int_err()?;
         project.ipnft_symbol.make_ascii_lowercase();
 
-        // Check for conflicts against active snapshot by UID or symbol
         let conflict_df = snapshot_df
             .filter(
                 col("ipnft_uid")

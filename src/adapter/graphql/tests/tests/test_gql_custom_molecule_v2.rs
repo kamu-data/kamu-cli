@@ -411,7 +411,6 @@ async fn test_molecule_v2_disable_enable_project() {
         json!({ "__typename": "MoleculeProjectMutV2" }),
     );
 
-    // Project is visible again
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(indoc!(
             r#"
@@ -435,7 +434,6 @@ async fn test_molecule_v2_disable_enable_project() {
         }]),
     );
 
-    // Query by UID returns restored project
     let res = query_project(&harness, ipnft_uid).await;
     assert!(res.is_ok(), "{res:#?}");
     assert_eq!(

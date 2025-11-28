@@ -41,7 +41,6 @@ impl MoleculeRemoveProjectUseCase for MoleculeRemoveProjectUseCaseImpl {
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<MoleculeProjectEntity, MoleculeRemoveProjectError> {
-        // Access the projects dataset snapshot
         let (projects_dataset, df) = self
             .project_service
             .get_projects_data_frame(molecule_subject, DatasetAction::Write, false)
