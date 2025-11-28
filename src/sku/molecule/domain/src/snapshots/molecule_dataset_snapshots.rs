@@ -110,6 +110,7 @@ impl MoleculeDatasetSnapshots {
     }
 
     pub fn data_room_v2(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+        const DATASET_NAME: &str = "data-room";
         // Extra columns
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
         // Denormalized values from the latest file state
@@ -124,7 +125,7 @@ impl MoleculeDatasetSnapshots {
 
         let alias = odf::DatasetAlias::new(
             Some(molecule_account_name),
-            odf::DatasetName::new_unchecked("data-room"),
+            odf::DatasetName::new_unchecked(DATASET_NAME),
         );
 
         CollectionEntity::dataset_snapshot(
@@ -181,9 +182,11 @@ impl MoleculeDatasetSnapshots {
     }
 
     pub fn announcements(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+        const DATASET_NAME: &str = "announcements";
+
         let alias = odf::DatasetAlias::new(
             Some(molecule_account_name),
-            odf::DatasetName::new_unchecked("announcements"),
+            odf::DatasetName::new_unchecked(DATASET_NAME),
         );
 
         odf::DatasetSnapshot {
