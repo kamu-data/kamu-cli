@@ -11,7 +11,7 @@ use internal_error::InternalError;
 use odf::dataset::RefCASError;
 use thiserror::Error;
 
-use crate::{CollectionPath, ExtraDataFields, WriteCheckedDataset};
+use crate::{CollectionEntryRecord, CollectionPath, ExtraDataFields, WriteCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +29,7 @@ pub trait UpdateCollectionEntriesUseCase: Send + Sync {
 
 #[derive(Clone)]
 pub enum CollectionUpdateOperation {
-    Add(CollectionEntryUpdate),
+    Add(CollectionEntryAdd),
     Move(CollectionEntryMove),
     Remove(CollectionEntryRemove),
 }
@@ -40,10 +40,12 @@ impl CollectionUpdateOperation {
         reference: odf::DatasetID,
         extra_data: ExtraDataFields,
     ) -> Self {
-        Self::Add(CollectionEntryUpdate {
-            path,
-            reference,
-            extra_data,
+        Self::Add(CollectionEntryAdd {
+            record: CollectionEntryRecord {
+                path,
+                reference,
+                extra_data,
+            },
         })
     }
 
@@ -65,10 +67,8 @@ impl CollectionUpdateOperation {
 }
 
 #[derive(Clone)]
-pub struct CollectionEntryUpdate {
-    pub path: CollectionPath,
-    pub reference: odf::DatasetID,
-    pub extra_data: ExtraDataFields,
+pub struct CollectionEntryAdd {
+    pub record: CollectionEntryRecord,
 }
 
 #[derive(Clone)]

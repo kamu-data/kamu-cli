@@ -65,7 +65,7 @@ impl CollectionEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct CollectionEntryEvent {
+pub struct CollectionEntryEvent {
     #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
 
@@ -79,8 +79,8 @@ struct CollectionEntryEvent {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Used to serialize/deserialize entry from a dataset
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CollectionEntryRecord {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct CollectionEntryRecord {
     pub path: CollectionPath,
 
     #[serde(rename = "ref")]
@@ -88,6 +88,16 @@ struct CollectionEntryRecord {
 
     #[serde(flatten)]
     pub extra_data: ExtraDataFields,
+}
+
+impl From<CollectionEntry> for CollectionEntryRecord {
+    fn from(value: CollectionEntry) -> Self {
+        Self {
+            path: value.path,
+            reference: value.reference,
+            extra_data: value.extra_data,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

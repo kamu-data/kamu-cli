@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ExtraDataFields(serde_json::Map<String, serde_json::Value>);
 
 impl ExtraDataFields {

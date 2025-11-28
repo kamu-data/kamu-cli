@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use kamu_datasets::{
+    CollectionEntryAdd,
     CollectionEntryMove,
     CollectionEntryRemove,
-    CollectionEntryUpdate,
     CollectionUpdateOperation,
     UpdateCollectionEntriesResult,
     UpdateCollectionEntriesUseCase,
@@ -46,7 +46,9 @@ impl<'a> CollectionMut<'a> {
         let mut mapped_ops = Vec::with_capacity(operations.len());
         for op in operations {
             if let Some(add) = op.add {
-                mapped_ops.push(CollectionUpdateOperation::Add(add.entry.into()));
+                mapped_ops.push(CollectionUpdateOperation::Add(CollectionEntryAdd {
+                    record: add.entry.into(),
+                }));
             } else if let Some(remove) = op.remove {
                 mapped_ops.push(CollectionUpdateOperation::Remove(CollectionEntryRemove {
                     path: remove.path.into(),
@@ -192,7 +194,7 @@ pub struct CollectionEntryInput {
     pub extra_data: Option<ExtraData>,
 }
 
-impl From<CollectionEntryInput> for CollectionEntryUpdate {
+impl From<CollectionEntryInput> for kamu_datasets::CollectionEntryRecord {
     fn from(value: CollectionEntryInput) -> Self {
         Self {
             path: value.path.into(),
