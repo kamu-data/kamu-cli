@@ -33,6 +33,7 @@ pub struct MoleculeProjectEntity {
     /// Symbolic name of the project
     pub ipnft_symbol: String,
 
+    // TODO: typing
     /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
     pub ipnft_uid: String,
 
@@ -68,7 +69,7 @@ impl MoleculeProjectEntity {
         })
     }
 
-    pub fn into_changelog_record(&self, op: u8) -> MoleculeProjectChangelogRecord {
+    pub fn as_changelog_record(&self, op: u8) -> MoleculeProjectChangelogRecord {
         MoleculeProjectChangelogRecord {
             offset: None,
             op,

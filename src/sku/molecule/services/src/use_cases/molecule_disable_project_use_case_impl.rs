@@ -23,7 +23,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeDisableProjectUseCase)]
 pub struct MoleculeDisableProjectUseCaseImpl {
-    project_service: Arc<dyn MoleculeProjectService>,
+    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
     push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     outbox: Arc<dyn Outbox>,
 }
@@ -49,7 +49,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         let now = chrono::Utc::now();
 
         let (projects_dataset, df_opt) = self
-            .project_service
+            .molecule_dataset_service
             .get_projects_changelog_data_frame(molecule_subject, DatasetAction::Write, false)
             .await?;
 
@@ -73,7 +73,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         project.event_time = now;
 
         let changelog_record =
-            project.into_changelog_record(u8::from(odf::metadata::OperationType::Retract));
+            project.as_changelog_record(u8::from(odf::metadata::OperationType::Retract));
 
         self.push_ingest_use_case
             .execute(
@@ -120,7 +120,7 @@ impl MoleculeDisableProjectUseCaseImpl {
         use datafusion::prelude::*;
 
         let (_, ledger_opt) = self
-            .project_service
+            .molecule_dataset_service
             .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
             .await?;
 

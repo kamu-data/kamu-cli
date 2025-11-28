@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetProjectsError, MoleculeProjectEntity};
+use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,14 +51,14 @@ pub enum MoleculeEnableProjectError {
     ),
 }
 
-impl From<MoleculeGetProjectsError> for MoleculeEnableProjectError {
-    fn from(e: MoleculeGetProjectsError) -> Self {
+impl From<MoleculeGetDatasetError> for MoleculeEnableProjectError {
+    fn from(e: MoleculeGetDatasetError) -> Self {
         match e {
-            MoleculeGetProjectsError::NotFound(err) => {
+            MoleculeGetDatasetError::NotFound(err) => {
                 MoleculeEnableProjectError::NoProjectsDataset(err)
             }
-            MoleculeGetProjectsError::Access(err) => MoleculeEnableProjectError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => MoleculeEnableProjectError::Internal(err),
+            MoleculeGetDatasetError::Access(err) => MoleculeEnableProjectError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeEnableProjectError::Internal(err),
         }
     }
 }
@@ -99,14 +99,14 @@ pub enum MoleculeDisableProjectError {
     ),
 }
 
-impl From<MoleculeGetProjectsError> for MoleculeDisableProjectError {
-    fn from(e: MoleculeGetProjectsError) -> Self {
+impl From<MoleculeGetDatasetError> for MoleculeDisableProjectError {
+    fn from(e: MoleculeGetDatasetError) -> Self {
         match e {
-            MoleculeGetProjectsError::NotFound(err) => {
+            MoleculeGetDatasetError::NotFound(err) => {
                 MoleculeDisableProjectError::NoProjectsDataset(err)
             }
-            MoleculeGetProjectsError::Access(err) => MoleculeDisableProjectError::Access(err),
-            MoleculeGetProjectsError::Internal(err) => MoleculeDisableProjectError::Internal(err),
+            MoleculeGetDatasetError::Access(err) => MoleculeDisableProjectError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeDisableProjectError::Internal(err),
         }
     }
 }

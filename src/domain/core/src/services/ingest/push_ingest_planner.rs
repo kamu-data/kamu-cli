@@ -43,7 +43,7 @@ pub struct PushIngestOpts {
     pub auto_create_push_source: bool,
     /// Schema inference configuration
     pub schema_inference: SchemaInferenceOpts,
-    /// Extected head block to prevent concurrent updates
+    /// Expected head block to prevent concurrent updates
     pub expected_head: Option<odf::Multihash>,
 }
 
