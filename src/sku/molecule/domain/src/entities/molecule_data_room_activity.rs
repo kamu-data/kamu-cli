@@ -41,7 +41,7 @@ pub struct MoleculeDataRoomActivityEntity {
     // NOTE: This should be odf::AccountID, but kept as String for safety.
     pub change_by: String,
 
-    // TODO: enum?
+    // TODO: Communicate: we need to agree on its values
     pub access_level: String,
 
     pub content_type: Option<MediaType>,
