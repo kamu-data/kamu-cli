@@ -66,6 +66,26 @@ impl MoleculeProjectMutV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct MoleculeProjectMutationResultV2 {
+    project: MoleculeProjectMutV2,
+}
+
+impl MoleculeProjectMutationResultV2 {
+    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+        Self {
+            project: MoleculeProjectMutV2::from_entity(entity),
+        }
+    }
+}
+
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
+#[Object]
+impl MoleculeProjectMutationResultV2 {
+    async fn project(&self) -> &MoleculeProjectMutV2 {
+        &self.project
+    }
+}
+
 impl MoleculeProjectMutV2 {
     pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
         Self {

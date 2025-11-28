@@ -1450,6 +1450,8 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeCreateProjectUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeFindProjectUseCaseImpl>()
+            .add::<kamu_molecule_services::MoleculeRemoveProjectUseCaseImpl>()
+            .add::<kamu_molecule_services::MoleculeRestoreProjectUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeViewProjectsUseCaseImpl>()
             .add::<kamu_molecule_services::MoleculeProjectServiceImpl>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())

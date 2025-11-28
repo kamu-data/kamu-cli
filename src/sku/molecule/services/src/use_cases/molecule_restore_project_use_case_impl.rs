@@ -1,0 +1,142 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use internal_error::ResultIntoInternal;
+use kamu_accounts::LoggedAccount;
+use kamu_core::PushIngestDataUseCase;
+use kamu_core::auth::DatasetAction;
+use odf::metadata::OperationType;
+
+use crate::domain::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn MoleculeRestoreProjectUseCase)]
+pub struct MoleculeRestoreProjectUseCaseImpl {
+    project_service: Arc<dyn MoleculeProjectService>,
+    push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl MoleculeRestoreProjectUseCase for MoleculeRestoreProjectUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = MoleculeRestoreProjectUseCaseImpl_execute,
+        skip_all,
+        fields(?ipnft_uid)
+    )]
+    async fn execute(
+        &self,
+        molecule_subject: &LoggedAccount,
+        ipnft_uid: String,
+    ) -> Result<MoleculeProjectEntity, MoleculeRestoreProjectError> {
+        use datafusion::prelude::*;
+
+        // Resolve projects dataset with Write privileges and access raw ledger
+        let (projects_dataset, df) = self
+            .project_service
+            .get_projects_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
+            .await?;
+
+        let ledger_df = match df {
+            Some(df) => df,
+            None => {
+                return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
+                    ipnft_uid: ipnft_uid.clone(),
+                });
+            }
+        };
+
+        // Reconstruct active snapshot to confirm there are no conflicts
+        let snapshot_df = odf::utils::data::changelog::project(
+            ledger_df.clone(),
+            &["account_id".to_string()],
+            &odf::metadata::DatasetVocabulary::default(),
+        )
+        .int_err()?;
+
+        // Find the latest non-retract record for the provided IPNFT UID
+        let df = ledger_df
+            .filter(col("ipnft_uid").eq(lit(&ipnft_uid)))
+            .int_err()?
+            .sort(vec![col("system_time").sort(false, false)])
+            .int_err()?;
+
+        let records: Vec<serde_json::Value> = df.collect_json_aos().await.int_err()?;
+        let record = records.into_iter().find(|record: &serde_json::Value| {
+            record
+                .get("op")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u8::try_from(value).ok())
+                .and_then(|value| OperationType::try_from(value).ok())
+                .map(|op| matches!(op, OperationType::Append | OperationType::CorrectTo))
+                .unwrap_or(false)
+        });
+
+        let record = match record {
+            Some(record) => record,
+            None => {
+                return Err(MoleculeRestoreProjectError::ProjectDoesNotExist {
+                    ipnft_uid: ipnft_uid.clone(),
+                });
+            }
+        };
+
+        let mut project = MoleculeProjectEntity::from_json(record).int_err()?;
+        project.ipnft_symbol.make_ascii_lowercase();
+
+        // Check for conflicts against active snapshot by UID or symbol
+        let conflict_df = snapshot_df
+            .filter(
+                col("ipnft_uid")
+                    .eq(lit(&project.ipnft_uid))
+                    .or(lower(col("ipnft_symbol")).eq(lit(&project.ipnft_symbol))),
+            )
+            .int_err()?;
+
+        let conflicts = conflict_df.collect_json_aos().await.int_err()?;
+        if let Some(record) = conflicts.into_iter().next() {
+            return Err(MoleculeRestoreProjectError::Conflict {
+                project: MoleculeProjectEntity::from_json(record).int_err()?,
+            });
+        }
+
+        let now = chrono::Utc::now();
+        project.system_time = now;
+        project.event_time = now;
+
+        let changelog_record = project.into_changelog_record(u8::from(OperationType::Append));
+
+        self.push_ingest_use_case
+            .execute(
+                projects_dataset,
+                kamu_core::DataSource::Buffer(changelog_record.to_bytes()),
+                kamu_core::PushIngestDataUseCaseOptions {
+                    source_name: None,
+                    source_event_time: None,
+                    is_ingest_from_upload: false,
+                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
+                    expected_head: None,
+                },
+                None,
+            )
+            .await
+            .int_err()?;
+
+        Ok(project)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,11 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_molecule_domain::{MoleculeFindProjectError, MoleculeFindProjectUseCase};
+use kamu_molecule_domain::{
+    MoleculeFindProjectError,
+    MoleculeFindProjectUseCase,
+    MoleculeRemoveProjectError,
+    MoleculeRemoveProjectUseCase,
+    MoleculeRestoreProjectError,
+    MoleculeRestoreProjectUseCase,
+};
 
 use crate::molecule::molecule_subject;
 use crate::mutations::molecule_mut::v1;
-use crate::mutations::molecule_mut::v2::MoleculeProjectMutV2;
+use crate::mutations::molecule_mut::v2::{MoleculeProjectMutV2, MoleculeProjectMutationResultV2};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,24 +52,40 @@ impl MoleculeMutV2 {
     /// History of this project existing will be preserved,
     /// its symbol will remain reserved, data will remain intact,
     /// but the project will no longer appear in the listing.
+    #[graphql(guard = "LoggedInGuard")]
     #[tracing::instrument(level = "info", name = MoleculeMutV2_disable_project, skip_all, fields(?ipnft_uid))]
     async fn disable_project(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeDisableProjectResultV2> {
-        let _ = ipnft_uid;
-        todo!()
+    ) -> Result<MoleculeProjectMutationResultV2> {
+        let molecule_subject = molecule_subject(ctx)?;
+        let use_case = from_catalog_n!(ctx, dyn MoleculeRemoveProjectUseCase);
+
+        let project = use_case
+            .execute(&molecule_subject, ipnft_uid.clone())
+            .await
+            .map_err(|err| map_remove_error(err, &ipnft_uid))?;
+
+        Ok(MoleculeProjectMutationResultV2::from_entity(project))
     }
 
+    #[graphql(guard = "LoggedInGuard")]
     #[tracing::instrument(level = "info", name = MoleculeMutV2_enable_project, skip_all, fields(?ipnft_uid))]
     async fn enable_project(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeEnableProjectResultV2> {
-        let _ = ipnft_uid;
-        todo!()
+    ) -> Result<MoleculeProjectMutationResultV2> {
+        let molecule_subject = molecule_subject(ctx)?;
+        let use_case = from_catalog_n!(ctx, dyn MoleculeRestoreProjectUseCase);
+
+        let project = use_case
+            .execute(&molecule_subject, ipnft_uid.clone())
+            .await
+            .map_err(|err| map_restore_error(err, &ipnft_uid))?;
+
+        Ok(MoleculeProjectMutationResultV2::from_entity(project))
     }
 
     /// Looks up the project
@@ -90,14 +113,37 @@ impl MoleculeMutV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject)]
-pub struct MoleculeDisableProjectResultV2 {
-    pub dummy: String,
+fn map_remove_error(err: MoleculeRemoveProjectError, ipnft_uid: &str) -> GqlError {
+    match err {
+        MoleculeRemoveProjectError::ProjectNotFound { .. } => {
+            GqlError::gql(format!("Project {ipnft_uid} not found"))
+        }
+        MoleculeRemoveProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+        MoleculeRemoveProjectError::Access(e) => GqlError::Access(e),
+        MoleculeRemoveProjectError::Internal(e) => e.into(),
+    }
 }
 
-#[derive(SimpleObject)]
-pub struct MoleculeEnableProjectResultV2 {
-    pub dummy: String,
+fn map_restore_error(err: MoleculeRestoreProjectError, ipnft_uid: &str) -> GqlError {
+    match err {
+        MoleculeRestoreProjectError::Conflict { project } => {
+            let conflict_uid = project.ipnft_uid.clone();
+            let conflict_symbol = project.ipnft_symbol.clone();
+            GqlError::gql_extended(
+                format!("Project {ipnft_uid} conflicts with existing entries"),
+                |ext| {
+                    ext.set("conflict_ipnft_uid", conflict_uid);
+                    ext.set("conflict_ipnft_symbol", conflict_symbol);
+                },
+            )
+        }
+        MoleculeRestoreProjectError::ProjectDoesNotExist { .. } => {
+            GqlError::gql(format!("No historical entries for project {ipnft_uid}"))
+        }
+        MoleculeRestoreProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+        MoleculeRestoreProjectError::Access(e) => GqlError::Access(e),
+        MoleculeRestoreProjectError::Internal(e) => e.into(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

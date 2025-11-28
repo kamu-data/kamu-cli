@@ -24,6 +24,13 @@ pub trait MoleculeProjectService: Send + Sync {
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetProjectsError>;
 
+    async fn get_projects_ledger_data_frame(
+        &self,
+        molecule_subject: &LoggedAccount,
+        action: DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetProjectsError>;
+
     async fn get_projects_data_frame(
         &self,
         molecule_subject: &LoggedAccount,

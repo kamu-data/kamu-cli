@@ -9,8 +9,12 @@
 
 mod molecule_create_project_use_case_impl;
 mod molecule_find_project_use_case_impl;
+mod molecule_remove_project_use_case_impl;
+mod molecule_restore_project_use_case_impl;
 mod molecule_view_projects_use_case_impl;
 
 pub use molecule_create_project_use_case_impl::*;
 pub use molecule_find_project_use_case_impl::*;
+pub use molecule_remove_project_use_case_impl::*;
+pub use molecule_restore_project_use_case_impl::*;
 pub use molecule_view_projects_use_case_impl::*;
