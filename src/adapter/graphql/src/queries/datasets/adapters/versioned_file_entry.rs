@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_datasets::{ResolvedDataset, VersionedFileEntity};
 
 use crate::prelude::*;
 
@@ -17,83 +16,87 @@ use crate::prelude::*;
 // TODO: scalar?
 pub type FileVersion = u32;
 
-#[derive(SimpleObject)]
-#[graphql(complex)]
+#[derive(Clone)]
 pub struct VersionedFileEntry {
-    #[graphql(skip)]
-    pub dataset: ResolvedDataset,
-
-    /// System time when this version was created/updated
-    pub system_time: DateTime<Utc>,
-
-    /// Event time when this version was created/updated
-    pub event_time: DateTime<Utc>,
-
-    /// File version
-    pub version: FileVersion,
-
-    /// Media type of the file content
-    pub content_type: String,
-
-    /// Size of the content in bytes
-    pub content_length: usize,
-
-    /// Multihash of the file content
-    pub content_hash: Multihash<'static>,
-
-    /// Extra data associated with this file version
-    pub extra_data: ExtraData,
+    pub(crate) file_dataset: kamu_datasets::ResolvedDataset,
+    pub(crate) entity: kamu_datasets::VersionedFileEntry,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl VersionedFileEntry {
-    pub fn from_json(
-        dataset: ResolvedDataset,
-        record: serde_json::Value,
-    ) -> Result<Self, InternalError> {
-        let event: VersionedFileEvent = serde_json::from_value(record).int_err()?;
-
-        let vocab = odf::metadata::DatasetVocabulary::default();
-        let mut extra_data = event.record.extra_data.into_inner();
-        extra_data.remove(&vocab.offset_column);
-        extra_data.remove(&vocab.operation_type_column);
-
-        Ok(Self {
-            dataset,
-            system_time: event.system_time,
-            event_time: event.event_time,
-            version: event.record.version,
-            content_length: event.record.content_length,
-            content_type: event.record.content_type,
-            content_hash: event.record.content_hash.into(),
-            extra_data: ExtraData::new(extra_data),
-        })
+    pub fn new(
+        file_dataset: kamu_datasets::ResolvedDataset,
+        entity: kamu_datasets::VersionedFileEntry,
+    ) -> Self {
+        Self {
+            file_dataset,
+            entity,
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[ComplexObject]
+#[Object]
 impl VersionedFileEntry {
+    /// System time when this version was created
+    pub async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_time
+    }
+
+    /// Event time when this version was created
+    pub async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.event_time
+    }
+
+    /// File version
+    pub async fn version(&self) -> FileVersion {
+        self.entity.version
+    }
+
+    /// Media type of the file content
+    pub async fn content_type(&self) -> &str {
+        &self.entity.content_type
+    }
+
+    /// Size of the content in bytes
+    pub async fn content_length(&self) -> usize {
+        self.entity.content_length
+    }
+
+    /// Multihash of the file content
+    pub async fn content_hash(&self) -> Multihash<'_> {
+        Multihash::from(&self.entity.content_hash)
+    }
+
+    /// Extra data associated with this file version
+    pub async fn extra_data(&self) -> ExtraData {
+        // TODO: avoid clone
+        ExtraData::new(self.entity.extra_data.as_map().clone())
+    }
+
     /// Returns encoded content in-band. Should be used for small files only and
     /// will return an error if called on large data.
     #[tracing::instrument(level = "info", name = VersionedFileEntry_content, skip_all)]
     pub async fn content(&self) -> Result<Base64Usnp> {
         // TODO: Restrict by content size
-        let data_repo = self.dataset.as_data_repo();
-        let data = data_repo.get_bytes(&self.content_hash).await.int_err()?;
+        let data_repo = self.file_dataset.as_data_repo();
+        let data = data_repo
+            .get_bytes(&self.entity.content_hash)
+            .await
+            .int_err()?;
         Ok(Base64Usnp(data))
     }
 
     /// Returns a direct download URL
     #[tracing::instrument(level = "info", name = VersionedFileEntry_content_url, skip_all)]
     pub async fn content_url(&self) -> Result<VersionedFileContentDownload> {
-        let data_repo = self.dataset.as_data_repo();
+        let data_repo = self.file_dataset.as_data_repo();
         let download = match data_repo
             .get_external_download_url(
-                self.content_hash.as_ref(),
+                &self.entity.content_hash,
                 odf::storage::ExternalTransferOpts::default(),
             )
             .await
@@ -140,20 +143,6 @@ pub struct VersionedFileContentDownload {
 
     /// Download URL expiration timestamp
     pub expires_at: Option<DateTime<Utc>>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct VersionedFileEvent {
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub system_time: DateTime<Utc>,
-
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub event_time: DateTime<Utc>,
-
-    #[serde(flatten)]
-    pub record: VersionedFileEntity,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

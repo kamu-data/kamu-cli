@@ -14,57 +14,57 @@ use crate::queries::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone)]
-#[graphql(complex)]
+#[derive(Clone)]
 pub struct CollectionEntry {
-    /// Time when this version was created
-    pub system_time: DateTime<Utc>,
-
-    /// Time when this version was created
-    pub event_time: DateTime<Utc>,
-
-    /// File system-like path
-    /// Rooted, separated by forward slashes, with elements URL-encoded
-    /// (e.g. `/foo%20bar/baz`)
-    pub path: CollectionPath,
-
-    /// DID of the linked dataset
-    #[graphql(name = "ref")]
-    pub reference: DatasetID<'static>,
-
-    /// Extra data associated with this entry
-    pub extra_data: ExtraData,
+    pub(crate) entity: kamu_datasets::CollectionEntry,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CollectionEntry {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        let mut event: CollectionEntryEvent = serde_json::from_value(record).int_err()?;
-
-        let vocab = odf::metadata::DatasetVocabulary::default();
-        event.record.extra_data.remove(&vocab.offset_column);
-        event.record.extra_data.remove(&vocab.operation_type_column);
-
-        Ok(Self {
-            system_time: event.system_time,
-            event_time: event.event_time,
-            path: event.record.path.into(),
-            reference: event.record.reference.into(),
-            extra_data: ExtraData::new(event.record.extra_data),
-        })
+    pub fn new(entity: kamu_datasets::CollectionEntry) -> Self {
+        Self { entity }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
-#[ComplexObject]
+#[Object]
 impl CollectionEntry {
+    /// System time when this entry was created
+    pub async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_time
+    }
+
+    /// Event time when this entry was created
+    pub async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.event_time
+    }
+
+    /// File system-like path
+    /// Rooted, separated by forward slashes, with elements URL-encoded
+    /// (e.g. `/foo%20bar/baz`)
+    pub async fn path(&self) -> CollectionPath<'_> {
+        CollectionPath::from(&self.entity.path)
+    }
+
+    /// DID of the linked dataset
+    #[graphql(name = "ref")]
+    pub async fn reference(&self) -> DatasetID<'_> {
+        DatasetID::from(&self.entity.reference)
+    }
+
+    /// Extra data associated with this entry
+    pub async fn extra_data(&self) -> ExtraData {
+        // TODO: avoid clone
+        ExtraData::new(self.entity.extra_data.as_map().clone())
+    }
+
     /// Resolves the reference to linked dataset
     #[tracing::instrument(level = "info", name = CollectionEntry_as_dataset, skip_all)]
     pub async fn as_dataset(&self, ctx: &Context<'_>) -> Result<Option<Dataset>> {
-        Dataset::try_from_ref(ctx, &self.reference.as_local_ref()).await
+        Dataset::try_from_ref(ctx, &self.entity.reference.as_local_ref()).await
     }
 }
 
@@ -75,31 +75,5 @@ page_based_connection!(
     CollectionEntryConnection,
     CollectionEntryEdge
 );
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Used to serialize/deserialize entry from a dataset
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CollectionEntryRecord {
-    pub path: String,
-
-    #[serde(rename = "ref")]
-    pub reference: odf::DatasetID,
-
-    #[serde(flatten)]
-    pub extra_data: serde_json::Map<String, serde_json::Value>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CollectionEntryEvent {
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub system_time: DateTime<Utc>,
-
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub event_time: DateTime<Utc>,
-
-    #[serde(flatten)]
-    pub record: CollectionEntryRecord,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -634,11 +634,11 @@ type Collection {
 
 type CollectionEntry {
 	"""
-	Time when this version was created
+	System time when this entry was created
 	"""
 	systemTime: DateTime!
 	"""
-	Time when this version was created
+	Event time when this entry was created
 	"""
 	eventTime: DateTime!
 	"""
@@ -715,9 +715,6 @@ type CollectionMut {
 	updateEntries(operations: [CollectionUpdateInput!]!, expectedHead: Multihash): CollectionUpdateResult!
 }
 
-"""
-Collection entry paths are similar to HTTP path components. They are rooted (start with `/`), separated by forward slashes, with elements URL-encoded (e.g. `/foo%20bar/baz`)
-"""
 scalar CollectionPath
 
 type CollectionProjection {
@@ -5090,11 +5087,11 @@ type VersionedFileContentDownload {
 
 type VersionedFileEntry {
 	"""
-	System time when this version was created/updated
+	System time when this version was created
 	"""
 	systemTime: DateTime!
 	"""
-	Event time when this version was created/updated
+	Event time when this version was created
 	"""
 	eventTime: DateTime!
 	"""

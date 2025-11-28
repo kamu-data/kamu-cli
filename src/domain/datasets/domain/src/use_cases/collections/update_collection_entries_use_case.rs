@@ -11,7 +11,7 @@ use internal_error::InternalError;
 use odf::dataset::RefCASError;
 use thiserror::Error;
 
-use crate::{ExtraDataFields, WriteCheckedDataset};
+use crate::{CollectionEntryRecord, CollectionPath, ExtraDataFields, WriteCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,21 +29,31 @@ pub trait UpdateCollectionEntriesUseCase: Send + Sync {
 
 #[derive(Clone)]
 pub enum CollectionUpdateOperation {
-    Add(CollectionEntryUpdate),
+    Add(CollectionEntryAdd),
     Move(CollectionEntryMove),
     Remove(CollectionEntryRemove),
 }
 
 impl CollectionUpdateOperation {
-    pub fn add(path: String, reference: odf::DatasetID, extra_data: ExtraDataFields) -> Self {
-        Self::Add(CollectionEntryUpdate {
-            path,
-            reference,
-            extra_data,
+    pub fn add(
+        path: CollectionPath,
+        reference: odf::DatasetID,
+        extra_data: ExtraDataFields,
+    ) -> Self {
+        Self::Add(CollectionEntryAdd {
+            record: CollectionEntryRecord {
+                path,
+                reference,
+                extra_data,
+            },
         })
     }
 
-    pub fn r#move(path_from: String, path_to: String, extra_data: Option<ExtraDataFields>) -> Self {
+    pub fn r#move(
+        path_from: CollectionPath,
+        path_to: CollectionPath,
+        extra_data: Option<ExtraDataFields>,
+    ) -> Self {
         Self::Move(CollectionEntryMove {
             path_from,
             path_to,
@@ -51,27 +61,25 @@ impl CollectionUpdateOperation {
         })
     }
 
-    pub fn remove(path: String) -> Self {
+    pub fn remove(path: CollectionPath) -> Self {
         Self::Remove(CollectionEntryRemove { path })
     }
 }
 
 #[derive(Clone)]
-pub struct CollectionEntryUpdate {
-    pub path: String,
-    pub reference: odf::DatasetID,
-    pub extra_data: ExtraDataFields,
+pub struct CollectionEntryAdd {
+    pub record: CollectionEntryRecord,
 }
 
 #[derive(Clone)]
 pub struct CollectionEntryRemove {
-    pub path: String,
+    pub path: CollectionPath,
 }
 
 #[derive(Clone)]
 pub struct CollectionEntryMove {
-    pub path_from: String,
-    pub path_to: String,
+    pub path_from: CollectionPath,
+    pub path_to: CollectionPath,
     pub extra_data: Option<ExtraDataFields>,
 }
 
@@ -92,7 +100,7 @@ pub struct UpdateCollectionEntriesSuccess {
 
 #[derive(Debug)]
 pub struct CollectionEntryNotFound {
-    pub path: String,
+    pub path: CollectionPath,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

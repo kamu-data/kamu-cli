@@ -7,10 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod collections;
-mod datasets;
-mod versioned_files;
+mod dataset_snapshots;
 
-pub use collections::*;
-pub use datasets::*;
-pub use versioned_files::*;
+pub use dataset_snapshots::*;

@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod collections;
-mod datasets;
-mod versioned_files;
+mod find_collection_entries_use_case_impl;
+mod update_collection_entries_use_case_impl;
+mod view_collection_entries_use_case_impl;
 
-pub use collections::*;
-pub use datasets::*;
-pub use versioned_files::*;
+pub use find_collection_entries_use_case_impl::*;
+pub use update_collection_entries_use_case_impl::*;
+pub use view_collection_entries_use_case_impl::*;

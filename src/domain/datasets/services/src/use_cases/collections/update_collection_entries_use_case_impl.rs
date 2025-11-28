@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{
@@ -22,10 +21,11 @@ use kamu_core::{
     QueryService,
 };
 use kamu_datasets::{
+    CollectionEntry,
     CollectionEntryNotFound,
-    CollectionEntryUpdate,
+    CollectionEntryRecord,
+    CollectionPath,
     CollectionUpdateOperation,
-    ExtraDataFields,
     UpdateCollectionEntriesResult,
     UpdateCollectionEntriesSuccess,
     UpdateCollectionEntriesUseCase,
@@ -48,7 +48,13 @@ impl UpdateCollectionEntriesUseCaseImpl {
     async fn load_current_entries(
         &self,
         collection_dataset: &WriteCheckedDataset<'_>,
-    ) -> Result<(BTreeMap<String, CollectionEntryState>, odf::Multihash), InternalError> {
+    ) -> Result<
+        (
+            BTreeMap<CollectionPath, CollectionEntryRecord>,
+            odf::Multihash,
+        ),
+        InternalError,
+    > {
         // TODO: PERF: Filter paths relevant to operations
         let query_res = self
             .query_svc
@@ -70,9 +76,10 @@ impl UpdateCollectionEntriesUseCaseImpl {
                     .await
                     .int_err()?
                     .into_iter()
-                    .map(|record| {
-                        CollectionEntryState::from_json(record)
-                            .map(|entry| (entry.path.clone(), entry))
+                    .map(|event_json| {
+                        let entry = CollectionEntry::from_json(event_json).int_err()?;
+                        let record: CollectionEntryRecord = entry.into();
+                        Ok((record.path.clone(), record))
                     })
                     .collect::<Result<_, _>>()?
             }
@@ -83,26 +90,26 @@ impl UpdateCollectionEntriesUseCaseImpl {
 
     fn apply_operations(
         &self,
-        mut current_entries: BTreeMap<String, CollectionEntryState>,
+        mut current_entries: BTreeMap<CollectionPath, CollectionEntryRecord>,
         operations: Vec<CollectionUpdateOperation>,
-    ) -> Result<Vec<(Op, CollectionEntryState)>, CollectionEntryNotFound> {
+    ) -> Result<Vec<(Op, CollectionEntryRecord)>, CollectionEntryNotFound> {
         let mut diff = Vec::new();
 
         for op in operations {
             match op {
                 CollectionUpdateOperation::Add(add) => {
-                    let new_entry = CollectionEntryState::from_new_entry(add);
+                    let new_record = add.record;
 
-                    if let Some(existing) = current_entries.remove(&new_entry.path) {
-                        if existing.is_equivalent_record(&new_entry) {
-                            current_entries.insert(new_entry.path.clone(), existing);
+                    if let Some(existing) = current_entries.remove(&new_record.path) {
+                        if existing == new_record {
+                            current_entries.insert(new_record.path.clone(), existing);
                             continue;
                         }
                         diff.push((Op::Retract, existing));
                     }
 
-                    current_entries.insert(new_entry.path.clone(), new_entry.clone());
-                    diff.push((Op::Append, new_entry));
+                    current_entries.insert(new_record.path.clone(), new_record.clone());
+                    diff.push((Op::Append, new_record));
                 }
                 CollectionUpdateOperation::Remove(remove) => {
                     if let Some(existing) = current_entries.remove(&remove.path) {
@@ -123,7 +130,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
                         new_entry.extra_data = extra_data;
                     }
 
-                    if old_entry.is_equivalent_record(&new_entry) {
+                    if old_entry == new_entry {
                         current_entries.insert(new_entry.path.clone(), old_entry);
                         continue;
                     }
@@ -150,7 +157,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
 
     fn build_data_batches(
         &self,
-        entries: Vec<(Op, CollectionEntryState)>,
+        entries: Vec<(Op, CollectionEntryRecord)>,
     ) -> Result<Vec<bytes::Bytes>, UpdateCollectionEntriesUseCaseError> {
         // TODO: PERF: FIXME: Writing each operation in a different block to work around
         //       changelog sorting issue.
@@ -161,7 +168,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
             .into_iter()
             .map(|(op, entry)| {
                 let mut ndjson = Vec::<u8>::new();
-                let mut record = entry.into_record_data();
+                let mut record = serde_json::to_value(entry).int_err()?;
                 record["op"] = u8::from(op).into();
                 writeln!(&mut ndjson, "{record}").int_err()?;
                 Ok(bytes::Bytes::from_owner(ndjson))
@@ -288,74 +295,6 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
             }
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug)]
-struct CollectionEntryState {
-    path: String,
-    reference: odf::DatasetID,
-    extra_data: ExtraDataFields,
-}
-
-impl CollectionEntryState {
-    fn from_new_entry(entry: CollectionEntryUpdate) -> Self {
-        Self {
-            path: entry.path,
-            reference: entry.reference,
-            extra_data: entry.extra_data,
-        }
-    }
-
-    fn is_equivalent_record(&self, other: &Self) -> bool {
-        self.path == other.path
-            && self.reference == other.reference
-            && self.extra_data == other.extra_data
-    }
-
-    fn into_record_data(self) -> serde_json::Value {
-        serde_json::to_value(CollectionEntryRecord {
-            path: self.path,
-            reference: self.reference,
-            extra_data: self.extra_data.into_inner(),
-        })
-        .unwrap()
-    }
-
-    fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        let mut event: CollectionEntryEvent = serde_json::from_value(record).int_err()?;
-        let vocab = odf::metadata::DatasetVocabulary::default();
-        event.record.extra_data.remove(&vocab.offset_column);
-        event.record.extra_data.remove(&vocab.operation_type_column);
-
-        Ok(Self {
-            path: event.record.path,
-            reference: event.record.reference,
-            extra_data: ExtraDataFields::new(event.record.extra_data),
-        })
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CollectionEntryRecord {
-    pub path: String,
-    #[serde(rename = "ref")]
-    pub reference: odf::DatasetID,
-    #[serde(flatten)]
-    pub extra_data: serde_json::Map<String, serde_json::Value>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CollectionEntryEvent {
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub system_time: DateTime<Utc>,
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub event_time: DateTime<Utc>,
-    #[serde(flatten)]
-    pub record: CollectionEntryRecord,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
