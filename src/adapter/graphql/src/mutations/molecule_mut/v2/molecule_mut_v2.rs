@@ -7,11 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_molecule_domain::{MoleculeFindProjectError, MoleculeFindProjectUseCase};
+use kamu_molecule_domain::{
+    MoleculeDisableProjectError,
+    MoleculeDisableProjectUseCase,
+    MoleculeEnableProjectError,
+    MoleculeEnableProjectUseCase,
+    MoleculeFindProjectError,
+    MoleculeFindProjectUseCase,
+};
 
 use crate::molecule::molecule_subject;
 use crate::mutations::molecule_mut::v1;
-use crate::mutations::molecule_mut::v2::MoleculeProjectMutV2;
+use crate::mutations::molecule_mut::v2::{MoleculeProjectMutV2, MoleculeProjectMutationResultV2};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,24 +52,46 @@ impl MoleculeMutV2 {
     /// History of this project existing will be preserved,
     /// its symbol will remain reserved, data will remain intact,
     /// but the project will no longer appear in the listing.
+    #[graphql(guard = "LoggedInGuard")]
     #[tracing::instrument(level = "info", name = MoleculeMutV2_disable_project, skip_all, fields(?ipnft_uid))]
     async fn disable_project(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeDisableProjectResultV2> {
-        let _ = ipnft_uid;
-        todo!()
+    ) -> Result<MoleculeProjectMutationResultV2> {
+        let molecule_subject = molecule_subject(ctx)?;
+        let use_case = from_catalog_n!(ctx, dyn MoleculeDisableProjectUseCase);
+
+        let project = use_case
+            .execute(&molecule_subject, ipnft_uid.clone())
+            .await
+            .map_err(|err| map_disable_error(err, &ipnft_uid))?;
+
+        Ok(MoleculeProjectMutationResultV2::from_entity(
+            project,
+            "Project disabled successfully".to_string(),
+        ))
     }
 
+    #[graphql(guard = "LoggedInGuard")]
     #[tracing::instrument(level = "info", name = MoleculeMutV2_enable_project, skip_all, fields(?ipnft_uid))]
     async fn enable_project(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeEnableProjectResultV2> {
-        let _ = ipnft_uid;
-        todo!()
+    ) -> Result<MoleculeProjectMutationResultV2> {
+        let molecule_subject = molecule_subject(ctx)?;
+        let use_case = from_catalog_n!(ctx, dyn MoleculeEnableProjectUseCase);
+
+        let project = use_case
+            .execute(&molecule_subject, ipnft_uid.clone())
+            .await
+            .map_err(|err| map_enable_error(err, &ipnft_uid))?;
+
+        Ok(MoleculeProjectMutationResultV2::from_entity(
+            project,
+            "Project enabled successfully".to_string(),
+        ))
     }
 
     /// Looks up the project
@@ -90,14 +119,26 @@ impl MoleculeMutV2 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject)]
-pub struct MoleculeDisableProjectResultV2 {
-    pub dummy: String,
+fn map_disable_error(err: MoleculeDisableProjectError, ipnft_uid: &str) -> GqlError {
+    match err {
+        MoleculeDisableProjectError::ProjectNotFound(_) => {
+            GqlError::gql(format!("Project {ipnft_uid} not found"))
+        }
+        MoleculeDisableProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+        MoleculeDisableProjectError::Access(e) => GqlError::Access(e),
+        MoleculeDisableProjectError::Internal(e) => e.into(),
+    }
 }
 
-#[derive(SimpleObject)]
-pub struct MoleculeEnableProjectResultV2 {
-    pub dummy: String,
+fn map_enable_error(err: MoleculeEnableProjectError, ipnft_uid: &str) -> GqlError {
+    match err {
+        MoleculeEnableProjectError::ProjectNotFound(_) => {
+            GqlError::gql(format!("No historical entries for project {ipnft_uid}"))
+        }
+        MoleculeEnableProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
+        MoleculeEnableProjectError::Access(e) => GqlError::Access(e),
+        MoleculeEnableProjectError::Internal(e) => e.into(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
