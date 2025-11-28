@@ -17,7 +17,7 @@ use kamu_molecule_domain::{
     MoleculeFindProjectUseCase,
     MoleculeProjectListing,
     MoleculeViewDataRoomActivitiesError,
-    MoleculeViewDataRoomActivitiesUseCase,
+    MoleculeViewGlobalDataRoomActivitiesUseCase,
     MoleculeViewProjectsError,
     MoleculeViewProjectsUseCase,
 };
@@ -145,9 +145,9 @@ impl MoleculeV2 {
 
         let molecule_subject = molecule_subject(ctx)?;
 
-        let (view_data_room_activities_use_case, molecule_view_projects_use_case) = from_catalog_n!(
+        let (view_global_data_room_activities_use_case, molecule_view_projects_use_case) = from_catalog_n!(
             ctx,
-            dyn MoleculeViewDataRoomActivitiesUseCase,
+            dyn MoleculeViewGlobalDataRoomActivitiesUseCase,
             dyn MoleculeViewProjectsUseCase
         );
 
@@ -156,7 +156,7 @@ impl MoleculeV2 {
 
         // TODO: announcements
 
-        let listing = view_data_room_activities_use_case
+        let listing = view_global_data_room_activities_use_case
             .execute(
                 &molecule_subject,
                 Some(PaginationOpts::from_page(page, per_page)),

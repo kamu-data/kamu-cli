@@ -19,8 +19,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeViewDataRoomActivitiesUseCase)]
-pub struct MoleculeViewDataRoomActivitiesUseCaseImpl {
+#[dill::interface(dyn MoleculeViewGlobalDataRoomActivitiesUseCase)]
+pub struct MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
     molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
 }
 
@@ -28,8 +28,10 @@ pub struct MoleculeViewDataRoomActivitiesUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeViewDataRoomActivitiesUseCase for MoleculeViewDataRoomActivitiesUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = MoleculeViewDataRoomActivitiesUseCaseImpl_execute, skip_all, fields(?pagination))]
+impl MoleculeViewGlobalDataRoomActivitiesUseCase
+    for MoleculeViewGlobalDataRoomActivitiesUseCaseImpl
+{
+    #[tracing::instrument(level = "debug", name = MoleculeViewGlobalDataRoomActivitiesUseCaseImpl_execute, skip_all, fields(?pagination))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,

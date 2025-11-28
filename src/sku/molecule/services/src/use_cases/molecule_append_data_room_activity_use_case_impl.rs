@@ -17,8 +17,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeAppendDataRoomActivityUseCase)]
-pub struct MoleculeAppendDataRoomActivityUseCaseImpl {
+#[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
+pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
     molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
     push_ingest_use_case: Arc<dyn kamu_core::PushIngestDataUseCase>,
 }
@@ -27,10 +27,12 @@ pub struct MoleculeAppendDataRoomActivityUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeAppendDataRoomActivityUseCase for MoleculeAppendDataRoomActivityUseCaseImpl {
+impl MoleculeAppendGlobalDataRoomActivityUseCase
+    for MoleculeAppendGlobalDataRoomActivityUseCaseImpl
+{
     #[tracing::instrument(
         level = "info",
-        name = MoleculeAppendDataRoomActivityUseCaseImpl_execute,
+        name = MoleculeAppendGlobalDataRoomActivityUseCaseImpl_execute,
         skip_all,
     )]
     async fn execute(

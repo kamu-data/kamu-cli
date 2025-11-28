@@ -7,25 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use database_common::{EntityPageListing, PaginationOpts};
+use internal_error::{ErrorIntoInternal, InternalError};
 
-use crate::MoleculeDataRoomActivityEntity;
+use crate::{MoleculeDataRoomActivityEntity, MoleculeGetDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeAppendDataRoomActivityUseCase: Send + Sync {
+pub trait MoleculeViewGlobalDataRoomActivitiesUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
-        activity: MoleculeDataRoomActivityEntity,
-    ) -> Result<(), MoleculeAppendDataRoomActivityError>;
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeDataRoomActivityEntity>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeAppendDataRoomActivityError {
+pub enum MoleculeViewDataRoomActivitiesError {
     #[error(transparent)]
     Access(
         #[from]
@@ -35,6 +40,16 @@ pub enum MoleculeAppendDataRoomActivityError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<MoleculeGetDatasetError> for MoleculeViewDataRoomActivitiesError {
+    fn from(e: MoleculeGetDatasetError) -> Self {
+        use MoleculeGetDatasetError as E;
+        match e {
+            E::Access(e) => e.into(),
+            E::NotFound(_) | E::Internal(_) => e.int_err().into(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

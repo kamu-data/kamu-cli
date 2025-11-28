@@ -26,7 +26,7 @@ use kamu_datasets::{
 };
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
-    MoleculeAppendDataRoomActivityUseCase,
+    MoleculeAppendGlobalDataRoomActivityUseCase,
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
@@ -100,14 +100,14 @@ impl MoleculeDataRoomMutV2 {
             update_version_file_use_case,
             update_entries_use_case,
             rebac_service,
-            append_data_room_activity_use_case,
+            append_global_data_room_activity_use_case,
         ) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
             dyn UpdateVersionFileUseCase,
             dyn UpdateCollectionEntriesUseCase,
             dyn kamu_auth_rebac::RebacService,
-            dyn MoleculeAppendDataRoomActivityUseCase
+            dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
         // 1. Create an empty versioned dataset.
@@ -242,7 +242,7 @@ impl MoleculeDataRoomMutV2 {
                 tags: tags.unwrap_or_default(),
             };
 
-            append_data_room_activity_use_case
+            append_global_data_room_activity_use_case
                 .execute(&molecule_subject, data_room_activity)
                 .await
                 .map_err(|e| -> GqlError {
@@ -284,13 +284,13 @@ impl MoleculeDataRoomMutV2 {
             update_version_file_use_case,
             dataset_registry,
             update_entries_use_case,
-            append_data_room_activity_use_case,
+            append_global_data_room_activity_use_case,
         ) = from_catalog_n!(
             ctx,
             dyn UpdateVersionFileUseCase,
             dyn kamu_core::DatasetRegistry,
             dyn UpdateCollectionEntriesUseCase,
-            dyn MoleculeAppendDataRoomActivityUseCase
+            dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
         // 1. Get the existing versioned dataset entry -- we need to know `path`;
@@ -411,7 +411,7 @@ impl MoleculeDataRoomMutV2 {
                 tags: tags.unwrap_or_default(),
             };
 
-            append_data_room_activity_use_case
+            append_global_data_room_activity_use_case
                 .execute(&molecule_subject, data_room_activity)
                 .await
                 .map_err(|e| -> GqlError {
