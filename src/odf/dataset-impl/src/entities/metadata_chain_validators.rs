@@ -940,6 +940,7 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
             DataSchemaCmpOptions {
                 ignore_attributes: true,
                 ignore_optionality: false,
+                ignore_order: true,
             },
         ) {
             let new_yaml = odf_data_utils::schema::format::format_schema_odf_yaml(new_schema);
@@ -973,6 +974,7 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                 DataSchemaCmpOptions {
                     ignore_attributes: true,
                     ignore_optionality,
+                    ignore_order: true,
                 },
             ) {
                 DataSchemaCmp::Identical => {
@@ -981,8 +983,8 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                         "New schema is identical to the current",
                     )))
                 }
-                DataSchemaCmp::Equivalent => Ok(()),
-                DataSchemaCmp::Incompatible => {
+                DataSchemaCmp::Equivalent(_) => Ok(()),
+                DataSchemaCmp::NonEquivalent(_) => {
                     let prev_yaml =
                         odf_data_utils::schema::format::format_schema_odf_yaml(&prev_schema);
                     let new_yaml =
@@ -991,8 +993,8 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                     invalid_event!(
                         self.new_schema.unwrap().clone(),
                         format!(
-                            "Schema evolution is not yet supported and schemas are \
-                             incompatible.\nCurrent schema:\n{prev_yaml}\nNew schema:\n{new_yaml}"
+                            "New schema is not compatible with the current schema.\nCurrent \
+                             schema:\n{prev_yaml}\nNew schema:\n{new_yaml}"
                         )
                     )
                 }
