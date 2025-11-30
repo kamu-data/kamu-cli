@@ -48,6 +48,9 @@ pub struct SystemTimeSourceStub {
     t: Arc<Mutex<Option<DateTime<Utc>>>>,
 }
 
+#[dill::component(pub)]
+#[dill::scope(dill::Singleton)]
+#[dill::interface(dyn SystemTimeSource)]
 impl SystemTimeSourceStub {
     pub fn new() -> Self {
         Self {
