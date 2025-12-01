@@ -57,7 +57,7 @@ use crate::queries::molecule::v2::{
     MoleculeVersionedFileEntryDetailedInfo,
     MoleculeVersionedFilePrefetch,
 };
-use crate::queries::{Account, CollectionEntry, DatasetRequestState, VersionedFileEntry};
+use crate::queries::{Account, DatasetRequestState, VersionedFileEntry};
 use crate::utils::{ContentSource, get_content_args};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,19 +194,15 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Add the file to the data room.
 
-        // TODO: extract to domain layer
         let data_room_entry = MoleculeDataRoomEntry {
-            entry: CollectionEntry {
-                entity: kamu_datasets::CollectionEntry {
-                    system_time: now,
-                    event_time: now,
-                    path: path.clone().into(),
-                    reference: versioned_file_dataset.get_id().clone(),
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
+            entity: kamu_molecule_domain::MoleculeDataRoomEntry {
+                system_time: now,
+                event_time: now,
+                path: path.clone().into(),
+                reference: versioned_file_dataset.get_id().clone(),
+                denormalized_latest_file_info: versioned_file_entry.to_denormalized().into(),
             },
             project: self.project.clone(),
-            denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
         };
 
         let data_room_writable_dataset =
@@ -216,8 +212,8 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.entity.path.clone(),
-                    data_room_entry.entry.entity.reference.clone(),
+                    data_room_entry.entity.path.clone(),
+                    data_room_entry.entity.reference.clone(),
                     ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
                 )],
                 None,
@@ -310,8 +306,7 @@ impl MoleculeDataRoomMutV2 {
         );
 
         // 1. Get the existing versioned dataset entry -- we need to know `path`;
-        let Some(existing_data_room_entry) =
-            self.get_data_room_entry(ctx, reference.as_ref()).await?
+        let Some(mut data_room_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
         else {
             todo!();
         };
@@ -376,11 +371,13 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Update the file state in the data room.
 
-        let path = existing_data_room_entry.entry.path.clone();
-        let data_room_entry = MoleculeDataRoomEntry {
-            entry: CollectionEntry::new(existing_data_room_entry.entry),
+        data_room_entry.denormalized_latest_file_info =
+            versioned_file_entry.to_denormalized().into();
+
+        let path = data_room_entry.path.clone();
+        let gql_data_room_entry = MoleculeDataRoomEntry {
+            entity: data_room_entry,
             project: self.project.clone(),
-            denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
         };
 
         let writable_data_room_dataset =
@@ -390,9 +387,9 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 WriteCheckedDataset(writable_data_room_dataset),
                 vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.entity.path.clone(),
-                    data_room_entry.entry.entity.reference.clone(),
-                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
+                    gql_data_room_entry.entity.path.clone(),
+                    gql_data_room_entry.entity.reference.clone(),
+                    ExtraDataFields::new(gql_data_room_entry.to_collection_extra_data().into()),
                 )],
                 None,
             )
@@ -446,7 +443,7 @@ impl MoleculeDataRoomMutV2 {
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
-            entry: data_room_entry,
+            entry: gql_data_room_entry,
         }
         .into())
     }
@@ -877,7 +874,10 @@ impl MoleculeDataRoomMutV2 {
 
         // 2. Update the file state in the data room.
 
-        gql_data_room_entry.denormalized_latest_file_info.version = new_version;
+        gql_data_room_entry
+            .entity
+            .denormalized_latest_file_info
+            .version = new_version;
 
         let data_room_writable_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
@@ -886,7 +886,7 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
-                    gql_data_room_entry.entry.entity.path.clone(),
+                    gql_data_room_entry.entity.path.clone(),
                     reference.into(),
                     ExtraDataFields::new(gql_data_room_entry.to_collection_extra_data().into()),
                 )],
