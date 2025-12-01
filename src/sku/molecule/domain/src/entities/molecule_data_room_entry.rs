@@ -12,18 +12,16 @@ use kamu_datasets::{CollectionEntry, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct MoleculeDataRoomEntry {
     pub entry: CollectionEntry,
     pub denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
 }
 
 impl MoleculeDataRoomEntry {
-    pub fn try_from_collection_entry(mut entry: CollectionEntry) -> Result<Self, InternalError> {
-        let mut extra_data = kamu_datasets::ExtraDataFields::default();
-        std::mem::swap(&mut entry.extra_data, &mut extra_data);
-
+    pub fn try_from_collection_entry(entry: CollectionEntry) -> Result<Self, InternalError> {
         let denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom =
-            serde_json::from_value(extra_data.into_inner().into()).int_err()?;
+            serde_json::from_value(entry.extra_data.clone().into_inner().into()).int_err()?;
 
         Ok(Self {
             entry,

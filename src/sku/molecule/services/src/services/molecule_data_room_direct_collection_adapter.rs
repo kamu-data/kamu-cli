@@ -104,13 +104,31 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomDirectCollectionAdapt
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-        // TODO: extra data filters
     ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionServiceError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
 
         let maybe_entry = self
             .find_collection_entries
             .execute_find_by_path(ReadCheckedDataset(&readable_data_room), as_of, path)
+            .await
+            .map_err(|e| match e {
+                e @ FindCollectionEntriesError::Internal(_) => e.int_err(),
+            })?;
+
+        Ok(maybe_entry)
+    }
+
+    async fn get_data_room_collection_entry_by_ref(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        as_of: Option<odf::Multihash>,
+        r#ref: &odf::DatasetID,
+    ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionServiceError> {
+        let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
+
+        let maybe_entry = self
+            .find_collection_entries
+            .execute_find_by_ref(ReadCheckedDataset(&readable_data_room), as_of, &[r#ref])
             .await
             .map_err(|e| match e {
                 e @ FindCollectionEntriesError::Internal(_) => e.int_err(),

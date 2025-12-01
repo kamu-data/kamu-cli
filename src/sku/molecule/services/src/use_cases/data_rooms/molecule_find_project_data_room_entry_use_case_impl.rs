@@ -29,11 +29,11 @@ pub struct MoleculeFindProjectDataRoomEntryUseCaseImpl {
 impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntryUseCaseImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeFindProjectDataRoomEntryUseCaseImpl_execute,
+        name = MoleculeFindProjectDataRoomEntryUseCaseImpl_execute_find_by_path,
         skip_all,
         fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, path = %path)
     )]
-    async fn execute(
+    async fn execute_find_by_path(
         &self,
         molecule_project: &MoleculeProject,
         as_of: Option<odf::Multihash>,
@@ -42,6 +42,43 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
         let maybe_entry = self
             .data_room_collection_service
             .get_data_room_collection_entry(&molecule_project.data_room_dataset_id, as_of, path)
+            .await
+            .map_err(|e| match e {
+                MoleculeDataRoomCollectionServiceError::NotFound(e) => e.int_err().into(),
+                MoleculeDataRoomCollectionServiceError::Access(e) => {
+                    MoleculeFindProjectDataRoomEntryError::Access(e)
+                }
+                MoleculeDataRoomCollectionServiceError::Internal(e) => {
+                    MoleculeFindProjectDataRoomEntryError::Internal(e)
+                }
+            })?;
+
+        let maybe_molecule_entry = maybe_entry
+            .map(MoleculeDataRoomEntry::try_from_collection_entry)
+            .transpose()?;
+
+        Ok(maybe_molecule_entry)
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeFindProjectDataRoomEntryUseCaseImpl_execute_find_by_ref,
+        skip_all,
+        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, r#ref = ?r#ref)
+    )]
+    async fn execute_find_by_ref(
+        &self,
+        molecule_project: &MoleculeProject,
+        as_of: Option<odf::Multihash>,
+        r#ref: &odf::DatasetID,
+    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError> {
+        let maybe_entry = self
+            .data_room_collection_service
+            .get_data_room_collection_entry_by_ref(
+                &molecule_project.data_room_dataset_id,
+                as_of,
+                r#ref,
+            )
             .await
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionServiceError::NotFound(e) => e.int_err().into(),

@@ -147,7 +147,7 @@ impl MoleculeDataRoomProjection<'_> {
             from_catalog_n!(ctx, dyn MoleculeFindProjectDataRoomEntryUseCase);
 
         let maybe_entry = molecule_find_data_room_entry
-            .execute(&self.project.entity, self.as_of.clone(), path.into())
+            .execute_find_by_path(&self.project.entity, self.as_of.clone(), path.into())
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectDataRoomEntryError::Access(e) => GqlError::Access(e),
@@ -196,6 +196,7 @@ impl MoleculeDataRoomEntry {
         let op = odf::metadata::OperationType::try_from(u8::try_from(raw_op).unwrap()).unwrap();
 
         let entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
+
         let collection_entry = CollectionEntry::new(entity);
         let dataroom_entry =
             MoleculeDataRoomEntry::new_from_collection_entry(project, collection_entry)?;

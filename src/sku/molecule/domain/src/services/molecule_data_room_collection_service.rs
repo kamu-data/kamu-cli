@@ -30,7 +30,13 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-        // TODO: extra data filters
+    ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionServiceError>;
+
+    async fn get_data_room_collection_entry_by_ref(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        as_of: Option<odf::Multihash>,
+        r#ref: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionServiceError>;
 }
 

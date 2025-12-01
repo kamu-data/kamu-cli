@@ -16,11 +16,18 @@ use crate::{MoleculeDataRoomEntry, MoleculeProject};
 
 #[async_trait::async_trait]
 pub trait MoleculeFindProjectDataRoomEntryUseCase: Send + Sync {
-    async fn execute(
+    async fn execute_find_by_path(
         &self,
         molecule_project: &MoleculeProject,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
+    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError>;
+
+    async fn execute_find_by_ref(
+        &self,
+        molecule_project: &MoleculeProject,
+        as_of: Option<odf::Multihash>,
+        r#ref: &odf::DatasetID,
     ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError>;
 }
 

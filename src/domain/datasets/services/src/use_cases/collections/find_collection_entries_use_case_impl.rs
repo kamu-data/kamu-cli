@@ -87,6 +87,23 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
     }
 
     #[tracing::instrument(
+        name = FindCollectionEntriesUseCaseImpl_execute_find_by_ref,
+        skip_all,
+        fields(as_of = ?as_of, r#ref = ?r#ref)
+    )]
+    async fn execute_find_by_ref(
+        &self,
+        collection_dataset: ReadCheckedDataset<'_>,
+        as_of: Option<odf::Multihash>,
+        r#ref: &[&odf::DatasetID],
+    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError> {
+        let mut results = self
+            .execute_find_multi_by_refs(collection_dataset, as_of, r#ref)
+            .await?;
+        Ok(results.pop())
+    }
+
+    #[tracing::instrument(
         name = FindCollectionEntriesUseCaseImpl_execute_find_multi_by_refs,
         skip_all,
         fields(as_of = ?as_of, refs = ?refs)

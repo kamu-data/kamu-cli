@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use datafusion::logical_expr::{col, lit};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
@@ -35,7 +34,6 @@ use kamu_molecule_domain::{
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
 };
-use odf::utils::data::DataFrameExt;
 
 use crate::molecule::molecule_subject;
 use crate::mutations::{
@@ -312,7 +310,8 @@ impl MoleculeDataRoomMutV2 {
         );
 
         // 1. Get the existing versioned dataset entry -- we need to know `path`;
-        let Some(collection_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
+        let Some(existing_data_room_entry) =
+            self.get_data_room_entry(ctx, reference.as_ref()).await?
         else {
             todo!();
         };
@@ -377,9 +376,9 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Update the file state in the data room.
 
-        let path = collection_entry.entity.path.clone();
+        let path = existing_data_room_entry.entry.path.clone();
         let data_room_entry = MoleculeDataRoomEntry {
-            entry: collection_entry,
+            entry: CollectionEntry::new(existing_data_room_entry.entry),
             project: self.project.clone(),
             denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
         };
@@ -452,68 +451,28 @@ impl MoleculeDataRoomMutV2 {
         .into())
     }
 
-    async fn get_data_room_projection(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<(ResolvedDataset, Option<DataFrameExt>)> {
-        let query_service = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        let resolved_dataset = self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        let res = query_service
-            .get_changelog_projection(
-                resolved_dataset.clone(),
-                domain::GetChangelogProjectionOptions {
-                    block_hash: None,
-                    // TODO: Maybe we don't need hints here. Added for performance reasons.
-                    hints: domain::ChangelogProjectionHints {
-                        // TODO: Extract "path" to constant
-                        primary_key: Some(vec!["path".to_string()]),
-                        dataset_vocabulary: Some(odf::metadata::DatasetVocabulary::default()),
-                    },
-                },
-            )
-            .await
-            .map_err(|e| -> GqlError {
-                use domain::QueryError as E;
-                match e {
-                    E::Access(e) => e.into(),
-                    _ => e.int_err().into(),
-                }
-            })?;
-
-        Ok((res.source, res.df))
-    }
-
-    // TODO: return typed collection entry
     async fn get_data_room_entry(
         &self,
         ctx: &Context<'_>,
         reference: &odf::DatasetID,
-    ) -> Result<Option<CollectionEntry>> {
-        // ) -> Result<Option<MoleculeDataRoomEntry>> {
-        let (_, maybe_projection_df) = self.get_data_room_projection(ctx).await?;
+    ) -> Result<Option<kamu_molecule_domain::MoleculeDataRoomEntry>> {
+        let find_data_room_entry = from_catalog_n!(
+            ctx,
+            dyn kamu_molecule_domain::MoleculeFindProjectDataRoomEntryUseCase
+        );
 
-        let Some(df) = maybe_projection_df else {
-            return Ok(None);
-        };
+        let maybe_data_room_entry = find_data_room_entry
+            .execute_find_by_ref(&self.project.entity, None, reference)
+            .await
+            .map_err(|e| -> GqlError {
+                use kamu_molecule_domain::MoleculeFindProjectDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    e @ E::Internal(_) => e.int_err().into(),
+                }
+            })?;
 
-        let df = df
-            .filter(col("ref").eq(lit(reference.to_string())))
-            .int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-
-        let entity =
-            kamu_datasets::CollectionEntry::from_json(records.into_iter().next().unwrap())?;
-        let entry = CollectionEntry::new(entity);
-
-        Ok(Some(entry))
+        Ok(maybe_data_room_entry)
     }
 
     // TODO: Test with different paths
@@ -856,7 +815,7 @@ impl MoleculeDataRoomMutV2 {
             }
         };
 
-        let Some(collection_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
+        let Some(mut data_room_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
         else {
             // TODO: Should we differentiate between 'file not found'
             //       and 'file not linked to data room'?
@@ -866,9 +825,6 @@ impl MoleculeDataRoomMutV2 {
         };
 
         // 1. Update the versioned dataset.
-
-        let mut data_room_entry =
-            MoleculeDataRoomEntry::new_from_collection_entry(&self.project, collection_entry)?;
 
         data_room_entry.denormalized_latest_file_info.access_level = access_level;
 
@@ -884,7 +840,11 @@ impl MoleculeDataRoomMutV2 {
             data_room_entry.denormalized_latest_file_info.tags = tags;
         }
 
-        let prefetch = MoleculeVersionedFilePrefetch::new_from_data_room_entry(&data_room_entry);
+        let mut gql_data_room_entry =
+            MoleculeDataRoomEntry::new_from_data_room_entry(&self.project, data_room_entry);
+
+        let prefetch =
+            MoleculeVersionedFilePrefetch::new_from_data_room_entry(&gql_data_room_entry);
         let mut file_entry =
             MoleculeVersionedFileEntry::new_from_prefetched(file_dataset.clone(), prefetch);
 
@@ -917,7 +877,8 @@ impl MoleculeDataRoomMutV2 {
 
         // 2. Update the file state in the data room.
 
-        data_room_entry.denormalized_latest_file_info.version = new_version;
+        gql_data_room_entry.denormalized_latest_file_info.version = new_version;
+
         let data_room_writable_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
 
@@ -925,9 +886,9 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.entity.path.clone(),
+                    gql_data_room_entry.entry.entity.path.clone(),
                     reference.into(),
-                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
+                    ExtraDataFields::new(gql_data_room_entry.to_collection_extra_data().into()),
                 )],
                 None,
             )
@@ -935,7 +896,7 @@ impl MoleculeDataRoomMutV2 {
         {
             Ok(UpdateCollectionEntriesResult::Success(_)) => {
                 Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {
-                    entry: data_room_entry,
+                    entry: gql_data_room_entry,
                 }
                 .into())
             }
