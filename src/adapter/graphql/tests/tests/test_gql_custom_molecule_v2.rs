@@ -1184,25 +1184,24 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    // TODO: project reactivation
-    // assert_eq!(
-    //     GraphQLQueryRequest::new(
-    //         LIST_PROJECT_ACTIVITY_QUERY,
-    //         async_graphql::Variables::from_json(json!({
-    //             "ipnftUid": ipnft_uid,
-    //         })),
-    //     )
-    //     .execute(&harness.schema, &harness.catalog_authorized)
-    //     .await
-    //     .data,
-    //     value!({
-    //         "molecule": {
-    //             "v2": {
-    //                 "project": expected_activity_node
-    //             }
-    //         }
-    //     })
-    // );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
 
     // Get specific entry
     let res = harness
@@ -1549,25 +1548,24 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    // TODO: project reactivation
-    // assert_eq!(
-    //     GraphQLQueryRequest::new(
-    //         LIST_PROJECT_ACTIVITY_QUERY,
-    //         async_graphql::Variables::from_json(json!({
-    //             "ipnftUid": ipnft_uid,
-    //         })),
-    //     )
-    //     .execute(&harness.schema, &harness.catalog_authorized)
-    //     .await
-    //     .data,
-    //     value!({
-    //         "molecule": {
-    //             "v2": {
-    //                 "project": expected_activity_node
-    //             }
-    //         }
-    //     })
-    // );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
 
     /////////////////
     // removeEntry //
@@ -1763,25 +1761,24 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    // TODO: project reactivation
-    // assert_eq!(
-    //     GraphQLQueryRequest::new(
-    //         LIST_PROJECT_ACTIVITY_QUERY,
-    //         async_graphql::Variables::from_json(json!({
-    //             "ipnftUid": ipnft_uid,
-    //         })),
-    //     )
-    //     .execute(&harness.schema, &harness.catalog_authorized)
-    //     .await
-    //     .data,
-    //     value!({
-    //         "molecule": {
-    //             "v2": {
-    //                 "project": expected_activity_node
-    //             }
-    //         }
-    //     })
-    // );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
 
     ////////////////////////
     // updateFileMetadata //
@@ -2046,25 +2043,24 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    // TODO: project reactivation
-    // assert_eq!(
-    //     GraphQLQueryRequest::new(
-    //         LIST_PROJECT_ACTIVITY_QUERY,
-    //         async_graphql::Variables::from_json(json!({
-    //             "ipnftUid": ipnft_uid,
-    //         })),
-    //     )
-    //     .execute(&harness.schema, &harness.catalog_authorized)
-    //     .await
-    //     .data,
-    //     value!({
-    //         "molecule": {
-    //             "v2": {
-    //                 "project": expected_activity_node
-    //             }
-    //         }
-    //     })
-    // );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
 
     // !!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!
     //

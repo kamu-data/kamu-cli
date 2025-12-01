@@ -532,7 +532,7 @@ impl MoleculeVersionedFilePrefetch {
 }
 
 /// These fields are stored as extra columns in data room collection
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
     pub version: FileVersion,
     pub content_type: String,
