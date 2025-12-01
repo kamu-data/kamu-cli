@@ -8,32 +8,29 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_datasets::CollectionPath;
 
-use crate::{CollectionEntry, CollectionPath, ReadCheckedDataset};
+use crate::{MoleculeDataRoomEntry, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FindCollectionEntriesUseCase: Send + Sync {
-    async fn execute_find_by_path(
+pub trait MoleculeFindProjectDataRoomEntryUseCase: Send + Sync {
+    async fn execute(
         &self,
-        collection_dataset: ReadCheckedDataset<'_>,
+        molecule_project: &MoleculeProject,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError>;
-
-    async fn execute_find_multi_by_refs(
-        &self,
-        collection_dataset: ReadCheckedDataset<'_>,
-        as_of: Option<odf::Multihash>,
-        refs: &[&odf::DatasetID],
-    ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError>;
+    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum FindCollectionEntriesError {
+pub enum MoleculeFindProjectDataRoomEntryError {
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

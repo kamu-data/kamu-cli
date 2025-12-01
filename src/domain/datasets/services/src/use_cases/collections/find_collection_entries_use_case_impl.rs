@@ -14,8 +14,8 @@ use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
     CollectionPath,
+    FindCollectionEntriesError,
     FindCollectionEntriesUseCase,
-    FindCollectionEntryUseCaseError,
     ReadCheckedDataset,
 };
 
@@ -42,7 +42,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-    ) -> Result<Option<CollectionEntry>, FindCollectionEntryUseCaseError> {
+    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError> {
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self
@@ -96,7 +96,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
-    ) -> Result<Vec<CollectionEntry>, FindCollectionEntryUseCaseError> {
+    ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError> {
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self

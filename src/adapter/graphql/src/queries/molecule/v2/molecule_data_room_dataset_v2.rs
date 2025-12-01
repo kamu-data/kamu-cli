@@ -10,8 +10,15 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use kamu_datasets::{ExtraDataFields, ResolvedDataset};
-use kamu_molecule_domain::MoleculeDataRoomActivityEntity;
+use kamu_molecule_domain::{
+    MoleculeDataRoomActivityEntity,
+    MoleculeFindProjectDataRoomEntryError,
+    MoleculeFindProjectDataRoomEntryUseCase,
+    MoleculeViewProjectDataRoomEntriesUseCase,
+    MoleculeViewProjectDataRoomError,
+};
 
 use crate::data_loader::AccessCheckedDatasetRef;
 use crate::prelude::*;
@@ -25,7 +32,6 @@ use crate::queries::molecule::v2::{
 };
 use crate::queries::{
     CollectionEntry,
-    CollectionProjection,
     Dataset,
     DatasetRequestState,
     FileVersion,
@@ -52,29 +58,22 @@ impl MoleculeDataRoom {
         &self.dataset
     }
 
-    async fn latest(&self, ctx: &Context<'_>) -> Result<MoleculeDataRoomProjection<'_>> {
-        let projection = self.dataset.as_collection_unchecked().latest(ctx).await?;
-
+    #[expect(clippy::unused_async)]
+    async fn latest(&self) -> Result<MoleculeDataRoomProjection<'_>> {
         Ok(MoleculeDataRoomProjection {
-            projection,
             project: &self.project,
+            as_of: None,
         })
     }
 
+    #[expect(clippy::unused_async)]
     async fn as_of(
         &self,
-        ctx: &Context<'_>,
         block_hash: Multihash<'static>,
     ) -> Result<MoleculeDataRoomProjection<'_>> {
-        let projection = self
-            .dataset
-            .as_collection_unchecked()
-            .as_of(ctx, block_hash)
-            .await?;
-
         Ok(MoleculeDataRoomProjection {
-            projection,
             project: &self.project,
+            as_of: Some(block_hash.into()),
         })
     }
 }
@@ -82,8 +81,8 @@ impl MoleculeDataRoom {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeDataRoomProjection<'a> {
-    projection: CollectionProjection<'a>,
     project: &'a Arc<MoleculeProjectV2>,
+    as_of: Option<odf::Multihash>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -103,23 +102,39 @@ impl MoleculeDataRoomProjection<'_> {
         assert!(filters.is_none());
 
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
+        let page = page.unwrap_or(0);
 
-        let entries = self
-            .projection
-            .entries(ctx, path_prefix, max_depth, page, Some(per_page))
-            .await?;
+        let molecule_view_data_room_entries =
+            from_catalog_n!(ctx, dyn MoleculeViewProjectDataRoomEntriesUseCase);
 
-        let molecule_entries = entries
-            .nodes
+        let molecule_entries_listing = molecule_view_data_room_entries
+            .execute(
+                &self.project.entity,
+                self.as_of.clone(),
+                path_prefix.map(Into::into),
+                max_depth,
+                Some(PaginationOpts {
+                    limit: per_page,
+                    offset: page * per_page,
+                }),
+            )
+            .await
+            .map_err(|e| match e {
+                MoleculeViewProjectDataRoomError::Access(e) => GqlError::Access(e),
+                MoleculeViewProjectDataRoomError::Internal(e) => e.int_err().into(),
+            })?;
+
+        let api_entry_nodes = molecule_entries_listing
+            .list
             .into_iter()
-            .map(|e| MoleculeDataRoomEntry::new_from_collection_entry(self.project, e))
-            .collect::<Result<Vec<_>>>()?;
+            .map(|e| MoleculeDataRoomEntry::new_from_data_room_entry(self.project, e))
+            .collect::<Vec<_>>();
 
         Ok(MoleculeDataRoomEntryConnection::new(
-            molecule_entries,
-            entries.page_info.current_page,
+            api_entry_nodes,
+            page,
             per_page,
-            entries.total_count,
+            molecule_entries_listing.total_count,
         ))
     }
 
@@ -128,14 +143,21 @@ impl MoleculeDataRoomProjection<'_> {
         ctx: &Context<'_>,
         path: CollectionPath<'static>,
     ) -> Result<Option<MoleculeDataRoomEntry>> {
-        let Some(entry) = self.projection.entry(ctx, path).await? else {
-            return Ok(None);
-        };
+        let molecule_find_data_room_entry =
+            from_catalog_n!(ctx, dyn MoleculeFindProjectDataRoomEntryUseCase);
 
-        Ok(Some(MoleculeDataRoomEntry::new_from_collection_entry(
-            self.project,
-            entry,
-        )?))
+        let maybe_entry = molecule_find_data_room_entry
+            .execute(&self.project.entity, self.as_of.clone(), path.into())
+            .await
+            .map_err(|e| match e {
+                MoleculeFindProjectDataRoomEntryError::Access(e) => GqlError::Access(e),
+                MoleculeFindProjectDataRoomEntryError::Internal(e) => e.int_err().into(),
+            })?;
+
+        let maybe_api_entry =
+            maybe_entry.map(|e| MoleculeDataRoomEntry::new_from_data_room_entry(self.project, e));
+
+        Ok(maybe_api_entry)
     }
 }
 
@@ -176,7 +198,7 @@ impl MoleculeDataRoomEntry {
         let entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
         let collection_entry = CollectionEntry::new(entity);
         let dataroom_entry =
-            MoleculeDataRoomEntry::new_from_collection_entry(project, collection_entry.clone())?;
+            MoleculeDataRoomEntry::new_from_collection_entry(project, collection_entry)?;
 
         Ok((op, dataroom_entry))
     }
@@ -196,6 +218,27 @@ impl MoleculeDataRoomEntry {
             project: project.clone(),
             denormalized_latest_file_info,
         })
+    }
+
+    pub fn new_from_data_room_entry(
+        project: &Arc<MoleculeProjectV2>,
+        data_room_entry: kamu_molecule_domain::MoleculeDataRoomEntry,
+    ) -> Self {
+        Self {
+            entry: CollectionEntry::new(data_room_entry.entry),
+            project: project.clone(),
+            denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom {
+                version: data_room_entry.denormalized_latest_file_info.version,
+                content_type: data_room_entry.denormalized_latest_file_info.content_type,
+                content_length: data_room_entry.denormalized_latest_file_info.content_length,
+                content_hash: data_room_entry.denormalized_latest_file_info.content_hash,
+                access_level: data_room_entry.denormalized_latest_file_info.access_level,
+                change_by: data_room_entry.denormalized_latest_file_info.change_by,
+                description: data_room_entry.denormalized_latest_file_info.description,
+                categories: data_room_entry.denormalized_latest_file_info.categories,
+                tags: data_room_entry.denormalized_latest_file_info.tags,
+            },
+        }
     }
 
     pub fn new_from_data_room_activity_entity(

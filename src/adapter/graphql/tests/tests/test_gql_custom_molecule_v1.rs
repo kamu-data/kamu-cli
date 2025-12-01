@@ -1442,22 +1442,19 @@ impl GraphQLMoleculeV1Harness {
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 
+        let base_gql_catalog = base_gql_harness.catalog();
+
         let cache_dir = base_gql_harness.temp_dir().join("cache");
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
+        let mut base_builder = dill::CatalogBuilder::new_chained(base_gql_catalog);
+        base_builder
             .add::<kamu_datasets_services::FindVersionedFileVersionUseCaseImpl>()
             .add::<kamu_datasets_services::UpdateVersionedFileUseCaseImpl>()
             .add::<kamu_datasets_services::ViewVersionedFileHistoryUseCaseImpl>()
             .add::<kamu_datasets_services::FindCollectionEntriesUseCaseImpl>()
             .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
             .add::<kamu_datasets_services::ViewCollectionEntriesUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeCreateProjectUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeFindProjectUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeViewProjectsUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeDatasetServiceImpl>()
-            .add::<kamu_molecule_services::MoleculeAppendGlobalDataRoomActivityUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeViewGlobalDataRoomActivitiesUseCaseImpl>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
             .add::<kamu::QueryDatasetDataUseCaseImpl>()
@@ -1473,8 +1470,12 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
-            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
-            .build();
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
+
+        kamu_molecule_services::register_dependencies(&mut base_builder);
+        base_builder.add::<kamu_molecule_services::MoleculeDataRoomDirectCollectionAdapter>();
+
+        let base_catalog = base_builder.build();
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
 

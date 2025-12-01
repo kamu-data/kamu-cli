@@ -7,33 +7,43 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use internal_error::InternalError;
-
-use crate::{CollectionEntry, CollectionPath, ReadCheckedDataset};
+use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FindCollectionEntriesUseCase: Send + Sync {
-    async fn execute_find_by_path(
+pub trait MoleculeDataRoomCollectionService: Send + Sync {
+    async fn get_data_room_collection_entries(
         &self,
-        collection_dataset: ReadCheckedDataset<'_>,
+        data_room_dataset_id: &odf::DatasetID,
+        as_of: Option<odf::Multihash>,
+        path_prefix: Option<CollectionPath>,
+        max_depth: Option<usize>,
+        // TODO: extra data filters
+        pagination: Option<PaginationOpts>,
+    ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionServiceError>;
+
+    async fn get_data_room_collection_entry(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError>;
-
-    async fn execute_find_multi_by_refs(
-        &self,
-        collection_dataset: ReadCheckedDataset<'_>,
-        as_of: Option<odf::Multihash>,
-        refs: &[&odf::DatasetID],
-    ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError>;
+        // TODO: extra data filters
+    ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionServiceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum FindCollectionEntriesError {
+pub enum MoleculeDataRoomCollectionServiceError {
+    #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

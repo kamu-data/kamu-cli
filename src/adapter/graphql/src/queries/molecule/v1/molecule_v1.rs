@@ -286,11 +286,11 @@ impl MoleculeV1 {
 
 #[derive(Clone)]
 pub struct MoleculeProject {
-    pub(crate) entity: kamu_molecule_domain::MoleculeProjectEntity,
+    pub(crate) entity: kamu_molecule_domain::MoleculeProject,
 }
 
 impl MoleculeProject {
-    pub fn new(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn new(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self { entity }
     }
 

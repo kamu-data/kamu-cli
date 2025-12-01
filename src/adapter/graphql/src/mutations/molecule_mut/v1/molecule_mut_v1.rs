@@ -109,7 +109,7 @@ pub struct MoleculeProjectMut {
 }
 
 impl MoleculeProjectMut {
-    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self {
             account_id: entity.account_id,
             data_room_dataset_id: entity.data_room_dataset_id,

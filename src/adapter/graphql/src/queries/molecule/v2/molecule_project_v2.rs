@@ -29,11 +29,11 @@ use crate::queries::{Account, Dataset};
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Clone)]
 pub struct MoleculeProjectV2 {
-    pub(crate) entity: kamu_molecule_domain::MoleculeProjectEntity,
+    pub(crate) entity: kamu_molecule_domain::MoleculeProject,
 }
 
 impl MoleculeProjectV2 {
-    pub fn new(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn new(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self { entity }
     }
 

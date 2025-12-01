@@ -67,7 +67,7 @@ impl MoleculeProjectMutV2 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MoleculeProjectMutV2 {
-    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self {
             project: Arc::new(MoleculeProjectV2::new(entity)),
         }

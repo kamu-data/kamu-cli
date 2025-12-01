@@ -9,53 +9,38 @@
 
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
-use kamu_accounts::LoggedAccount;
+use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
+use crate::{MoleculeDataRoomEntry, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeViewProjectsUseCase: Send + Sync {
+pub trait MoleculeViewProjectDataRoomEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: &LoggedAccount,
+        molecule_project: &MoleculeProject,
+        as_of: Option<odf::Multihash>,
+        path_prefix: Option<CollectionPath>,
+        max_depth: Option<usize>,
+        // TODO: filters
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError>;
+    ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewProjectDataRoomError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeProjectListing = EntityPageListing<MoleculeProjectEntity>;
+pub type MoleculeDataRoomEntriesListing = EntityPageListing<MoleculeDataRoomEntry>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeViewProjectsError {
+pub enum MoleculeViewProjectDataRoomError {
     #[error(transparent)]
-    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
-
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
+    Access(#[from] odf::AccessError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<MoleculeGetDatasetError> for MoleculeViewProjectsError {
-    fn from(e: MoleculeGetDatasetError) -> Self {
-        match e {
-            MoleculeGetDatasetError::NotFound(err) => {
-                MoleculeViewProjectsError::NoProjectsDataset(err)
-            }
-            MoleculeGetDatasetError::Access(err) => MoleculeViewProjectsError::Access(err),
-            MoleculeGetDatasetError::Internal(err) => MoleculeViewProjectsError::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

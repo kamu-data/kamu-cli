@@ -657,6 +657,7 @@ pub fn configure_server_catalog(
     }
 
     kamu_molecule_services::register_dependencies(&mut b);
+    b.add::<kamu_molecule_services::MoleculeDataRoomDirectCollectionAdapter>(); // connect domains directly
 
     b.add::<UploadServiceLocal>();
 
