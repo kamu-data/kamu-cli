@@ -11,7 +11,7 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Validate correctness (not empty, valid URL-encodeding)
+// TODO: Validate correctness (not empty, valid URL-encoding)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CollectionPath(String);
 

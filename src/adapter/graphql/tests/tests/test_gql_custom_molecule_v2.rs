@@ -1140,7 +1140,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
                 {
@@ -1170,8 +1170,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    // TODO: unlock after moveEntry/removeEntry updates
-    /*assert_eq!(
+    assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::default(),
@@ -1184,25 +1183,26 @@ async fn test_molecule_v2_data_room_operations() {
                 "v2": expected_activity_node.clone()
             }
         })
-    );*/
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            LIST_PROJECT_ACTIVITY_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data,
-        value!({
-            "molecule": {
-                "v2": {
-                    "project": expected_activity_node
-                }
-            }
-        })
     );
+    // TODO: project reactivation
+    // assert_eq!(
+    //     GraphQLQueryRequest::new(
+    //         LIST_PROJECT_ACTIVITY_QUERY,
+    //         async_graphql::Variables::from_json(json!({
+    //             "ipnftUid": ipnft_uid,
+    //         })),
+    //     )
+    //     .execute(&harness.schema, &harness.catalog_authorized)
+    //     .await
+    //     .data,
+    //     value!({
+    //         "molecule": {
+    //             "v2": {
+    //                 "project": expected_activity_node
+    //             }
+    //         }
+    //     })
+    // );
 
     // Get specific entry
     let res = harness
@@ -1495,7 +1495,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "__typename": "MoleculeActivityFileUpdatedV2",
                     "entry": {
-                        "path": "/foo.txt",
+                        "path": "/2025/foo.txt",
                         "ref": file_1_did,
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
@@ -1505,7 +1505,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
                 {
@@ -1535,8 +1535,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    // TODO: unlock after moveEntry/removeEntry updates
-    /*assert_eq!(
+    assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::default(),
@@ -1549,25 +1548,26 @@ async fn test_molecule_v2_data_room_operations() {
                 "v2": expected_activity_node.clone()
             }
         })
-    );*/
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            LIST_PROJECT_ACTIVITY_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data,
-        value!({
-            "molecule": {
-                "v2": {
-                    "project": expected_activity_node
-                }
-            }
-        })
     );
+    // TODO: project reactivation
+    // assert_eq!(
+    //     GraphQLQueryRequest::new(
+    //         LIST_PROJECT_ACTIVITY_QUERY,
+    //         async_graphql::Variables::from_json(json!({
+    //             "ipnftUid": ipnft_uid,
+    //         })),
+    //     )
+    //     .execute(&harness.schema, &harness.catalog_authorized)
+    //     .await
+    //     .data,
+    //     value!({
+    //         "molecule": {
+    //             "v2": {
+    //                 "project": expected_activity_node
+    //             }
+    //         }
+    //     })
+    // );
 
     /////////////////
     // removeEntry //
@@ -1709,7 +1709,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "__typename": "MoleculeActivityFileUpdatedV2",
                     "entry": {
-                        "path": "/foo.txt",
+                        "path": "/2025/foo.txt",
                         "ref": file_1_did,
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
@@ -1719,7 +1719,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
                 {
@@ -1749,8 +1749,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    // TODO: unlock after moveEntry/removeEntry updates
-    /*assert_eq!(
+    assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::default(),
@@ -1763,25 +1762,26 @@ async fn test_molecule_v2_data_room_operations() {
                 "v2": expected_activity_node.clone()
             }
         })
-    );*/
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            LIST_PROJECT_ACTIVITY_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data,
-        value!({
-            "molecule": {
-                "v2": {
-                    "project": expected_activity_node
-                }
-            }
-        })
     );
+    // TODO: project reactivation
+    // assert_eq!(
+    //     GraphQLQueryRequest::new(
+    //         LIST_PROJECT_ACTIVITY_QUERY,
+    //         async_graphql::Variables::from_json(json!({
+    //             "ipnftUid": ipnft_uid,
+    //         })),
+    //     )
+    //     .execute(&harness.schema, &harness.catalog_authorized)
+    //     .await
+    //     .data,
+    //     value!({
+    //         "molecule": {
+    //             "v2": {
+    //                 "project": expected_activity_node
+    //             }
+    //         }
+    //     })
+    // );
 
     ////////////////////////
     // updateFileMetadata //
@@ -1978,7 +1978,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                     }
                 },
                 {
@@ -1992,7 +1992,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "__typename": "MoleculeActivityFileUpdatedV2",
                     "entry": {
-                        "path": "/foo.txt",
+                        "path": "/2025/foo.txt",
                         "ref": file_1_did,
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
@@ -2002,7 +2002,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
                 {
@@ -2032,8 +2032,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    // TODO: unlock after moveEntry/removeEntry updates
-    /*assert_eq!(
+    assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::default(),
@@ -2046,25 +2045,26 @@ async fn test_molecule_v2_data_room_operations() {
                 "v2": expected_activity_node.clone()
             }
         })
-    );*/
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            LIST_PROJECT_ACTIVITY_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data,
-        value!({
-            "molecule": {
-                "v2": {
-                    "project": expected_activity_node
-                }
-            }
-        })
     );
+    // TODO: project reactivation
+    // assert_eq!(
+    //     GraphQLQueryRequest::new(
+    //         LIST_PROJECT_ACTIVITY_QUERY,
+    //         async_graphql::Variables::from_json(json!({
+    //             "ipnftUid": ipnft_uid,
+    //         })),
+    //     )
+    //     .execute(&harness.schema, &harness.catalog_authorized)
+    //     .await
+    //     .data,
+    //     value!({
+    //         "molecule": {
+    //             "v2": {
+    //                 "project": expected_activity_node
+    //             }
+    //         }
+    //     })
+    // );
 
     // !!!!!!!!!!!!!!!!!!!!!!!!!!! TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!
     //

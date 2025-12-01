@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
 use datafusion::logical_expr::{col, lit};
 use file_utils::MediaType;
 use kamu::domain;
@@ -491,7 +492,6 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         reference: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>> {
-        // ) -> Result<Option<MoleculeDataRoomEntry>> {
         let (_, maybe_projection_df) = self.get_data_room_projection(ctx).await?;
 
         let Some(df) = maybe_projection_df else {
@@ -545,6 +545,81 @@ impl MoleculeDataRoomMutV2 {
         };
 
         odf::DatasetAlias::new(Some(project_account_name), new_file_name)
+    }
+
+    async fn append_global_data_room_activity(
+        &self,
+        ctx: &Context<'_>,
+        inserted_records: Vec<(
+            odf::metadata::OperationType,
+            kamu_datasets::CollectionEntryRecord,
+        )>,
+        activity_type: MoleculeDataRoomFileActivityType,
+    ) -> Result<()> {
+        // TODO: Align timestamps with ingest
+        let now = Utc::now();
+
+        match activity_type {
+            // Update happens in two records
+            MoleculeDataRoomFileActivityType::Updated if inserted_records.len() == 2 => {}
+            MoleculeDataRoomFileActivityType::Removed if inserted_records.len() == 1 => {}
+            _ => unreachable!(),
+        }
+
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let append_global_data_room_activity =
+            from_catalog_n!(ctx, dyn MoleculeAppendGlobalDataRoomActivityUseCase);
+
+        let (_op, collection_entry_record) = inserted_records.into_iter().next_back().unwrap();
+
+        // TODO: Revisit after Molecule data room domain/adapter breakdown -->
+        let data_room_entry = MoleculeDataRoomEntry::new_from_collection_entry(
+            &self.project,
+            CollectionEntry {
+                entity: kamu_datasets::CollectionEntry {
+                    system_time: now,
+                    event_time: now,
+                    path: collection_entry_record.path,
+                    reference: collection_entry_record.reference,
+                    extra_data: collection_entry_record.extra_data,
+                },
+            },
+        )?;
+        let data_room_activity = MoleculeDataRoomActivityEntity {
+            system_time: now,
+            event_time: now,
+            activity_type,
+            ipnft_uid: self.project.entity.ipnft_uid.clone(),
+            path: data_room_entry.entry.entity.path,
+            r#ref: data_room_entry.entry.entity.reference,
+            version: data_room_entry.denormalized_latest_file_info.version,
+            change_by: data_room_entry.denormalized_latest_file_info.change_by,
+            access_level: data_room_entry.denormalized_latest_file_info.access_level,
+            content_type: {
+                let s = data_room_entry.denormalized_latest_file_info.content_type;
+                if !s.is_empty() { Some(s.into()) } else { None }
+            },
+            content_length: data_room_entry.denormalized_latest_file_info.content_length,
+            content_hash: data_room_entry.denormalized_latest_file_info.content_hash,
+            description: data_room_entry.denormalized_latest_file_info.description,
+            categories: data_room_entry.denormalized_latest_file_info.categories,
+            tags: data_room_entry.denormalized_latest_file_info.tags,
+        };
+
+        append_global_data_room_activity
+            .execute(&molecule_subject, data_room_activity)
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeAppendDataRoomActivityError as E;
+
+                match e {
+                    E::Access(e) => e.into(),
+                    e @ E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        Ok(())
     }
 }
 
@@ -753,11 +828,20 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => Ok(MoleculeDataRoomUpdateSuccess {
-                old_head: r.old_head.into(),
-                new_head: r.new_head.into(),
+            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+                self.append_global_data_room_activity(
+                    ctx,
+                    r.inserted_records,
+                    MoleculeDataRoomFileActivityType::Updated,
+                )
+                .await?;
+
+                Ok(MoleculeDataRoomUpdateSuccess {
+                    old_head: r.old_head.into(),
+                    new_head: r.new_head.into(),
+                }
+                .into())
             }
-            .into()),
             Ok(UpdateCollectionEntriesResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
@@ -780,8 +864,6 @@ impl MoleculeDataRoomMutV2 {
         path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
-        // TODO: save remove global activity entry
-
         let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         let data_room_writable_dataset =
@@ -795,17 +877,26 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => Ok(MoleculeDataRoomUpdateSuccess {
-                old_head: r.old_head.into(),
-                new_head: r.new_head.into(),
+            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+                self.append_global_data_room_activity(
+                    ctx,
+                    r.inserted_records,
+                    MoleculeDataRoomFileActivityType::Removed,
+                )
+                .await?;
+
+                Ok(MoleculeDataRoomUpdateSuccess {
+                    old_head: r.old_head.into(),
+                    new_head: r.new_head.into(),
+                }
+                .into())
             }
-            .into()),
             Ok(UpdateCollectionEntriesResult::UpToDate) => {
                 // No action was performed - there was nothing to act upon
                 Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
             }
             Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
-                // For moving operation
+                // This error for moving operation
                 unreachable!()
             }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
@@ -933,7 +1024,14 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(_)) => {
+            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+                self.append_global_data_room_activity(
+                    ctx,
+                    r.inserted_records,
+                    MoleculeDataRoomFileActivityType::Updated,
+                )
+                .await?;
+
                 Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {
                     entry: data_room_entry,
                 }
