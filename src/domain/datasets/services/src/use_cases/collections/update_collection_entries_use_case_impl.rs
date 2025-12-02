@@ -253,12 +253,14 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                     old_head,
                     new_head,
                     num_blocks: _,
+                    system_time,
                 }) => {
                     return Ok(UpdateCollectionEntriesResult::Success(
                         UpdateCollectionEntriesSuccess {
                             old_head,
                             new_head,
                             inserted_records: diff,
+                            system_time,
                         },
                     ));
                 }

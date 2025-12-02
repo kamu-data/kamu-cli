@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
@@ -25,14 +26,14 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError>;
 
-    async fn get_data_room_collection_entry(
+    async fn find_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
     ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionReadError>;
 
-    async fn get_data_room_collection_entry_by_ref(
+    async fn find_data_room_collection_entry_by_ref(
         &self,
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
@@ -42,10 +43,11 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
     async fn upsert_data_room_collection_entry(
         &self,
         data_room_dataset_id: &odf::DatasetID,
+        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         r#ref: odf::DatasetID,
         extra_data: kamu_datasets::ExtraDataFields,
-    ) -> Result<(), MoleculeDataRoomCollectionWriteError>;
+    ) -> Result<CollectionEntry, MoleculeDataRoomCollectionWriteError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

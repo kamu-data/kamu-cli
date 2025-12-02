@@ -41,7 +41,11 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
     ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError> {
         let maybe_entry = self
             .data_room_collection_service
-            .get_data_room_collection_entry(&molecule_project.data_room_dataset_id, as_of, path)
+            .find_data_room_collection_entry_by_path(
+                &molecule_project.data_room_dataset_id,
+                as_of,
+                path,
+            )
             .await
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionReadError::NotFound(e) => e.int_err().into(),
@@ -74,7 +78,7 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
     ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError> {
         let maybe_entry = self
             .data_room_collection_service
-            .get_data_room_collection_entry_by_ref(
+            .find_data_room_collection_entry_by_ref(
                 &molecule_project.data_room_dataset_id,
                 as_of,
                 r#ref,

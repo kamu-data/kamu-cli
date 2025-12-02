@@ -9,7 +9,9 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::ErrorIntoInternal;
+use kamu_datasets::CollectionPath;
 
 use crate::domain::*;
 
@@ -30,21 +32,24 @@ impl MoleculeUpsertProjectDataRoomEntryUseCase for MoleculeUpsertProjectDataRoom
         level = "debug",
         name = MoleculeUpsertProjectDataRoomEntryUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, path = %molecule_data_room_entry.path)
+        fields(ipnft_uid = %molecule_project.ipnft_uid, %path, %reference)
     )]
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        molecule_data_room_entry: &MoleculeDataRoomEntry,
-    ) -> Result<(), MoleculeUpsertProjectDataRoomEntryError> {
-        self.data_room_collection_service
+        source_event_time: Option<DateTime<Utc>>,
+        path: CollectionPath,
+        reference: odf::DatasetID,
+        denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
+    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertProjectDataRoomEntryError> {
+        let entry = self
+            .data_room_collection_service
             .upsert_data_room_collection_entry(
                 &molecule_project.data_room_dataset_id,
-                molecule_data_room_entry.path.clone(),
-                molecule_data_room_entry.reference.clone(),
-                molecule_data_room_entry
-                    .denormalized_latest_file_info
-                    .to_collection_extra_data_fields(),
+                source_event_time,
+                path,
+                reference,
+                denormalized_latest_file_info.to_collection_extra_data_fields(),
             )
             .await
             .map_err(|e| match e {
@@ -60,7 +65,15 @@ impl MoleculeUpsertProjectDataRoomEntryUseCase for MoleculeUpsertProjectDataRoom
                 e @ MoleculeDataRoomCollectionWriteError::Internal(_) => {
                     MoleculeUpsertProjectDataRoomEntryError::Internal(e.int_err())
                 }
-            })
+            })?;
+
+        Ok(MoleculeDataRoomEntry {
+            system_time: entry.system_time,
+            event_time: entry.event_time,
+            path: entry.path,
+            reference: entry.reference,
+            denormalized_latest_file_info,
+        })
     }
 }
 

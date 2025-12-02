@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
@@ -131,7 +132,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         Ok(entries_listing)
     }
 
-    async fn get_data_room_collection_entry(
+    async fn find_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
@@ -150,7 +151,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         Ok(maybe_entry)
     }
 
-    async fn get_data_room_collection_entry_by_ref(
+    async fn find_data_room_collection_entry_by_ref(
         &self,
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
@@ -172,10 +173,11 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
     async fn upsert_data_room_collection_entry(
         &self,
         data_room_dataset_id: &odf::DatasetID,
+        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         r#ref: odf::DatasetID,
         extra_data: kamu_datasets::ExtraDataFields,
-    ) -> Result<(), MoleculeDataRoomCollectionWriteError> {
+    ) -> Result<CollectionEntry, MoleculeDataRoomCollectionWriteError> {
         let writable_data_room = self.writable_data_room(data_room_dataset_id).await?;
 
         match self
@@ -187,7 +189,20 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(_)) => Ok(()),
+            Ok(UpdateCollectionEntriesResult::Success(mut success)) => {
+                assert!(!success.inserted_records.is_empty());
+
+                let (op, last_inserted_record) = success.inserted_records.pop().unwrap();
+                assert_eq!(op, odf::metadata::OperationType::Append);
+
+                Ok(CollectionEntry {
+                    system_time: success.system_time,
+                    event_time: source_event_time.unwrap_or(success.system_time),
+                    path: last_inserted_record.path,
+                    reference: last_inserted_record.reference,
+                    extra_data: last_inserted_record.extra_data,
+                })
+            }
             Ok(
                 UpdateCollectionEntriesResult::UpToDate
                 | UpdateCollectionEntriesResult::NotFound(_),

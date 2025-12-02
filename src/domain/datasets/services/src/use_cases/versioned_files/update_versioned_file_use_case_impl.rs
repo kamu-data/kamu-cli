@@ -186,6 +186,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                 old_head,
                 new_head,
                 num_blocks: _,
+                system_time: _,
             } => Ok(UpdateVersionFileResult {
                 new_version: version,
                 old_head,

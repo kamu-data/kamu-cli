@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeDataRoomEntry, MoleculeProject};
+use crate::{MoleculeDataRoomEntry, MoleculeDenormalizeFileToDataRoom, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,8 +20,11 @@ pub trait MoleculeUpsertProjectDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        molecule_data_room_entry: &MoleculeDataRoomEntry,
-    ) -> Result<(), MoleculeUpsertProjectDataRoomEntryError>;
+        source_event_time: Option<DateTime<Utc>>,
+        path: CollectionPath,
+        reference: odf::DatasetID,
+        denormalized_file_info: MoleculeDenormalizeFileToDataRoom,
+    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertProjectDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
