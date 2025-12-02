@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use kamu_datasets::{ExtraDataFields, ResolvedDataset};
+use kamu_datasets::ResolvedDataset;
 use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
     MoleculeFindProjectDataRoomEntryError,
@@ -199,10 +199,10 @@ impl MoleculeDataRoomEntry {
                 collection_entity,
             )?;
 
-        let dataroom_entry =
+        let data_room_entry =
             MoleculeDataRoomEntry::new_from_data_room_entry(project, data_room_entity);
 
-        Ok((op, dataroom_entry))
+        Ok((op, data_room_entry))
     }
 
     pub fn new_from_data_room_entry(
@@ -405,7 +405,7 @@ impl MoleculeVersionedFileEntry {
         Ok(detailed_info)
     }
 
-    pub fn to_versioned_file_extra_data(&self) -> ExtraDataFields {
+    pub fn to_versioned_file_extra_data(&self) -> kamu_datasets::ExtraDataFields {
         let extra_data = MoleculeVersionedFileExtraData {
             basic_info: &self.basic_info,
             detailed_info: self.detailed_info.get().unwrap(),
@@ -415,7 +415,7 @@ impl MoleculeVersionedFileEntry {
             unreachable!()
         };
 
-        ExtraDataFields::new(json)
+        kamu_datasets::ExtraDataFields::new(json)
     }
 
     pub fn to_denormalized(&self) -> MoleculeDenormalizeFileToDataRoom {
@@ -550,7 +550,7 @@ impl MoleculeVersionedFilePrefetch {
 }
 
 /// These fields are stored as extra columns in data room collection
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
     pub version: FileVersion,
     pub content_type: String,

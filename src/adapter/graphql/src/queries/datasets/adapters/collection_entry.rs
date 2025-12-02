@@ -14,7 +14,7 @@ use crate::queries::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CollectionEntry {
     pub(crate) entity: kamu_datasets::CollectionEntry,
 }

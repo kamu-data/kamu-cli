@@ -37,6 +37,16 @@ impl MoleculeActivityEventV2 {
     pub fn announcement(announcement: MoleculeAnnouncementEntry) -> Self {
         Self::Announcement(MoleculeActivityAnnouncementV2 { announcement })
     }
+
+    #[expect(dead_code)]
+    pub fn data_room_entry(&self) -> Option<&MoleculeDataRoomEntry> {
+        match self {
+            Self::FileAdded(event) => Some(&event.entry),
+            Self::FileUpdated(event) => Some(&event.entry),
+            Self::FileRemoved(event) => Some(&event.entry),
+            Self::Announcement(_) => None,
+        }
+    }
 }
 
 #[derive(SimpleObject)]

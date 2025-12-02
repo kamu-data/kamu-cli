@@ -228,7 +228,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
             let expected_head_value = expected_head.clone().unwrap_or_else(|| chain_head.clone());
 
             let data_sources: Vec<_> = self
-                .build_data_batches(diff)?
+                .build_data_batches(diff.clone())?
                 .into_iter()
                 .map(kamu_core::DataSource::Buffer)
                 .collect();
@@ -255,7 +255,11 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                     num_blocks: _,
                 }) => {
                     return Ok(UpdateCollectionEntriesResult::Success(
-                        UpdateCollectionEntriesSuccess { old_head, new_head },
+                        UpdateCollectionEntriesSuccess {
+                            old_head,
+                            new_head,
+                            inserted_records: diff,
+                        },
                     ));
                 }
                 Ok(kamu_core::PushIngestResult::UpToDate) => unreachable!(),
