@@ -60,10 +60,10 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         ipnft_address: String,
         ipnft_token_id: num_bigint::BigInt,
     ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError> {
-        // Resolve projects snapshot with Write privileges
-        let (projects_dataset, df) = self
+        // Resolve projects ledger with Write privileges
+        let (projects_dataset, df_opt) = self
             .molecule_dataset_service
-            .get_projects_data_frame(molecule_subject, DatasetAction::Write, true)
+            .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, true)
             .await?;
 
         use datafusion::prelude::*;
@@ -73,13 +73,17 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         let lowercase_ipnft_symbol = ipnft_symbol;
 
         // Check for conflicts
-        if let Some(df) = df {
+        if let Some(df) = df_opt {
             let df = df
                 .filter(
                     col("ipnft_uid")
                         .eq(lit(&ipnft_uid))
                         .or(lower(col("ipnft_symbol")).eq(lit(&lowercase_ipnft_symbol))),
                 )
+                .int_err()?
+                .sort(vec![col("offset").sort(false, false)])
+                .int_err()?
+                .limit(0, Some(1))
                 .int_err()?;
 
             let records = df.collect_json_aos().await.int_err()?;

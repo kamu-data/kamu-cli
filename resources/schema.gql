@@ -3404,14 +3404,6 @@ type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
 	message: String!
 }
 
-type MoleculeDisableProjectResultV2 {
-	dummy: String!
-}
-
-type MoleculeEnableProjectResultV2 {
-	dummy: String!
-}
-
 type MoleculeMut {
 	"""
 	Shortcut for `v1 { create_project() }`.
@@ -3449,8 +3441,8 @@ type MoleculeMutV2 {
 	its symbol will remain reserved, data will remain intact,
 	but the project will no longer appear in the listing.
 	"""
-	disableProject(ipnftUid: String!): MoleculeDisableProjectResultV2!
-	enableProject(ipnftUid: String!): MoleculeEnableProjectResultV2!
+	disableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
+	enableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
 	"""
 	Looks up the project
 	"""
@@ -3633,6 +3625,11 @@ type MoleculeProjectMutV2 {
 	Strongly typed announcements mutator
 	"""
 	announcements: MoleculeAnnouncementsDatasetMutV2!
+}
+
+type MoleculeProjectMutationResultV2 {
+	project: MoleculeProjectMutV2!
+	message: String!
 }
 
 type MoleculeProjectV2 {
