@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use internal_error::ErrorIntoInternal;
 use kamu_datasets::CollectionPath;
 
@@ -18,8 +17,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeUpsertProjectDataRoomEntryUseCase)]
-pub struct MoleculeUpsertProjectDataRoomEntryUseCaseImpl {
+#[dill::interface(dyn MoleculeRemoveProjectDataRoomEntryUseCase)]
+pub struct MoleculeRemoveProjectDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
 }
 
@@ -27,55 +26,44 @@ pub struct MoleculeUpsertProjectDataRoomEntryUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeUpsertProjectDataRoomEntryUseCase for MoleculeUpsertProjectDataRoomEntryUseCaseImpl {
+impl MoleculeRemoveProjectDataRoomEntryUseCase for MoleculeRemoveProjectDataRoomEntryUseCaseImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeUpsertProjectDataRoomEntryUseCaseImpl_execute,
+        name = MoleculeRemoveProjectDataRoomEntryUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, %path, %reference)
+        fields(ipnft_uid = %molecule_project.ipnft_uid, path = %path, ?expected_head)
     )]
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
-        reference: odf::DatasetID,
-        denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
-    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertProjectDataRoomEntryError> {
-        let entry = self
+        expected_head: Option<odf::Multihash>,
+    ) -> Result<MoleculeRemoveProjectDataRoomEntryResult, MoleculeRemoveProjectDataRoomEntryError>
+    {
+        let result = self
             .data_room_collection_service
-            .upsert_data_room_collection_entry(
+            .remove_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
-                source_event_time,
                 path,
-                reference,
-                denormalized_latest_file_info.to_collection_extra_data_fields(),
+                expected_head,
             )
             .await
             .map_err(|e| match e {
-                MoleculeDataRoomCollectionWriteError::NotFound(e) => {
-                    MoleculeUpsertProjectDataRoomEntryError::Internal(e.int_err())
-                }
+                MoleculeDataRoomCollectionWriteError::NotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionWriteError::RefCASFailed(e) => {
-                    MoleculeUpsertProjectDataRoomEntryError::RefCASFailed(e)
+                    MoleculeRemoveProjectDataRoomEntryError::RefCASFailed(e)
                 }
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
-                    MoleculeUpsertProjectDataRoomEntryError::Access(e)
+                    MoleculeRemoveProjectDataRoomEntryError::Access(e)
                 }
-                e @ MoleculeDataRoomCollectionWriteError::Internal(_) => {
-                    MoleculeUpsertProjectDataRoomEntryError::Internal(e.int_err())
+                MoleculeDataRoomCollectionWriteError::Internal(e) => {
+                    MoleculeRemoveProjectDataRoomEntryError::Internal(e)
                 }
             })?;
 
         // TODO: outbox event
 
-        Ok(MoleculeDataRoomEntry {
-            system_time: entry.system_time,
-            event_time: entry.event_time,
-            path: entry.path,
-            reference: entry.reference,
-            denormalized_latest_file_info,
-        })
+        Ok(result)
     }
 }
 

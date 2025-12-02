@@ -48,6 +48,31 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         r#ref: odf::DatasetID,
         extra_data: kamu_datasets::ExtraDataFields,
     ) -> Result<CollectionEntry, MoleculeDataRoomCollectionWriteError>;
+
+    async fn remove_data_room_collection_entry_by_path(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        path: CollectionPath,
+        expected_head: Option<odf::Multihash>,
+    ) -> Result<MoleculeRemoveProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum MoleculeRemoveProjectDataRoomEntryResult {
+    Success(MoleculeRemoveProjectDataRoomEntrySuccess),
+    UpToDate,
+}
+
+#[derive(Debug)]
+pub struct MoleculeRemoveProjectDataRoomEntrySuccess {
+    pub old_head: odf::Multihash,
+    pub new_head: odf::Multihash,
+    pub inserted_records: Vec<(
+        odf::metadata::OperationType,
+        kamu_datasets::CollectionEntryRecord,
+    )>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -230,7 +230,6 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
                     .await
                     .int_err()?;
 
-                // TODO: Use case should return ResolvedDataset directly
                 Ok(ResolvedDataset::new(
                     create_res.dataset,
                     create_res.dataset_handle,

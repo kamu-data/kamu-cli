@@ -33,6 +33,8 @@ use kamu_molecule_domain::{
     MoleculeDataRoomCollectionReadError,
     MoleculeDataRoomCollectionService,
     MoleculeDataRoomCollectionWriteError,
+    MoleculeRemoveProjectDataRoomEntryResult,
+    MoleculeRemoveProjectDataRoomEntrySuccess,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,6 +209,47 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 UpdateCollectionEntriesResult::UpToDate
                 | UpdateCollectionEntriesResult::NotFound(_),
             ) => {
+                unreachable!()
+            }
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e)) => Err(e.into()),
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }
+    }
+
+    async fn remove_data_room_collection_entry_by_path(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        path: CollectionPath,
+        expected_head: Option<odf::Multihash>,
+    ) -> Result<MoleculeRemoveProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
+    {
+        let writable_data_room = self.writable_data_room(data_room_dataset_id).await?;
+
+        match self
+            .update_collection_entries
+            .execute(
+                WriteCheckedDataset(&writable_data_room),
+                vec![CollectionUpdateOperation::remove(path)],
+                expected_head,
+            )
+            .await
+        {
+            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+                Ok(MoleculeRemoveProjectDataRoomEntryResult::Success(
+                    MoleculeRemoveProjectDataRoomEntrySuccess {
+                        old_head: r.old_head,
+                        new_head: r.new_head,
+                        inserted_records: r.inserted_records,
+                    },
+                ))
+            }
+            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+                // No action was performed - there was nothing to act upon
+                Ok(MoleculeRemoveProjectDataRoomEntryResult::UpToDate)
+            }
+            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
+                // This error for moving operation
                 unreachable!()
             }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),

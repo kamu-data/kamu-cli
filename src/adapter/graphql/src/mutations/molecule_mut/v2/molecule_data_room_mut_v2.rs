@@ -34,6 +34,9 @@ use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
+    MoleculeRemoveProjectDataRoomEntryError,
+    MoleculeRemoveProjectDataRoomEntryResult,
+    MoleculeRemoveProjectDataRoomEntryUseCase,
     MoleculeUpsertProjectDataRoomEntryError,
     MoleculeUpsertProjectDataRoomEntryUseCase,
 };
@@ -215,6 +218,7 @@ impl MoleculeDataRoomMutV2 {
             })?;
 
         // 4. Log the activity.
+        // TODO: asynchronous write of activity log
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
                 system_time: now,
@@ -371,6 +375,7 @@ impl MoleculeDataRoomMutV2 {
             })?;
 
         // 4. Log the activity.
+        // TODO: asynchronous write of activity log
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
                 system_time: now,
@@ -548,6 +553,7 @@ impl MoleculeDataRoomMutV2 {
             tags: data_room_entry.entity.denormalized_latest_file_info.tags,
         };
 
+        // TODO: asynchronous write of activity log
         append_global_data_room_activity
             .execute(&molecule_subject, data_room_activity)
             .await
@@ -770,6 +776,7 @@ impl MoleculeDataRoomMutV2 {
             .await
         {
             Ok(UpdateCollectionEntriesResult::Success(r)) => {
+                // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
                     r.inserted_records,
@@ -805,20 +812,19 @@ impl MoleculeDataRoomMutV2 {
         path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
-        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let remove_data_frame_entry_uc =
+            from_catalog_n!(ctx, dyn MoleculeRemoveProjectDataRoomEntryUseCase);
 
-        let data_room_writable_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        match update_collection_entries
+        match remove_data_frame_entry_uc
             .execute(
-                WriteCheckedDataset(data_room_writable_dataset),
-                vec![CollectionUpdateOperation::remove(path.clone().into())],
+                &self.project.entity,
+                path.clone().into(),
                 expected_head.map(Into::into),
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+            Ok(MoleculeRemoveProjectDataRoomEntryResult::Success(r)) => {
+                // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
                     r.inserted_records,
@@ -832,19 +838,16 @@ impl MoleculeDataRoomMutV2 {
                 }
                 .into())
             }
-            Ok(UpdateCollectionEntriesResult::UpToDate) => {
-                // No action was performed - there was nothing to act upon
+            Ok(MoleculeRemoveProjectDataRoomEntryResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
             }
-            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
-                // This error for moving operation
-                unreachable!()
-            }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+            Err(MoleculeRemoveProjectDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeRemoveProjectDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ MoleculeRemoveProjectDataRoomEntryError::Internal(_)) => {
+                Err(e.int_err().into())
+            }
         }
     }
 
@@ -973,6 +976,7 @@ impl MoleculeDataRoomMutV2 {
             .await
         {
             Ok(UpdateCollectionEntriesResult::Success(r)) => {
+                // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
                     r.inserted_records,
