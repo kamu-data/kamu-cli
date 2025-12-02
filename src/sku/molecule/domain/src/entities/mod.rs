@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod molecule_announcement;
 mod molecule_data_room_activity;
 mod molecule_data_room_entry;
 mod molecule_project;
 
+pub use molecule_announcement::*;
 pub use molecule_data_room_activity::*;
 pub use molecule_data_room_entry::*;
 pub use molecule_project::*;
