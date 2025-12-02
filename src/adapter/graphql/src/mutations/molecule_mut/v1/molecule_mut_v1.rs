@@ -282,7 +282,7 @@ impl CreateAnnouncementSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateAnnouncementErrorInvalidAttachment {
-    message: String,
+    pub(crate) message: String,
 }
 #[ComplexObject]
 impl CreateAnnouncementErrorInvalidAttachment {

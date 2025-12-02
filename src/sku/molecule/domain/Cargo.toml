@@ -28,6 +28,7 @@ default = []
 [dependencies]
 database-common = { workspace = true }
 file-utils = { workspace = true }
+format-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
@@ -43,6 +44,7 @@ num-bigint = { version = "0.4", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false }
 thiserror = { version = "2", default-features = false }
+uuid = { version = "1", default-features = false, features = ["v4"] }
 
 
 [dev-dependencies]
