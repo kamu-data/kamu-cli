@@ -33,9 +33,31 @@ impl MoleculeProjectMutV2 {
     }
 
     /// Strongly typed announcements mutator
-    #[expect(clippy::unused_async)]
-    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetMutV2> {
-        todo!()
+    async fn announcements(&self, ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetMutV2> {
+        // TODO: !!!: update
+        // TODO: PERF: GQL: DataLoader
+        let rebac_dataset_registry_facade =
+            from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacDatasetRegistryFacade);
+
+        let announcements_handle = rebac_dataset_registry_facade
+            .resolve_dataset_handle_by_ref(
+                &self.project.entity.announcements_dataset_id.as_local_ref(),
+                auth::DatasetAction::Write,
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use RebacDatasetRefUnresolvedError as E;
+
+                match e {
+                    E::Access(e) => e.into(),
+                    E::NotFound(_) | E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+        let data_room_writable_state = DatasetRequestState::new(announcements_handle);
+
+        Ok(MoleculeAnnouncementsDatasetMutV2::new(
+            data_room_writable_state,
+        ))
     }
 }
 
