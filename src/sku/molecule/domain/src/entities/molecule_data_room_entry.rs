@@ -35,8 +35,8 @@ pub struct MoleculeDataRoomEntry {
 
 impl MoleculeDataRoomEntry {
     pub fn try_from_collection_entry(entry: CollectionEntry) -> Result<Self, InternalError> {
-        let denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom =
-            serde_json::from_value(entry.extra_data.into_inner().into()).int_err()?;
+        let denormalized_latest_file_info =
+            MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(entry.extra_data)?;
 
         Ok(Self {
             system_time: entry.system_time,
@@ -65,6 +65,22 @@ pub struct MoleculeDenormalizeFileToDataRoom {
     pub description: Option<String>,
     pub categories: Vec<String>,
     pub tags: Vec<String>,
+}
+
+impl MoleculeDenormalizeFileToDataRoom {
+    pub fn try_from_extra_data_fields(
+        extra_data: kamu_datasets::ExtraDataFields,
+    ) -> Result<Self, InternalError> {
+        serde_json::from_value(extra_data.into_inner().into()).int_err()
+    }
+
+    pub fn to_collection_extra_data_fields(&self) -> kamu_datasets::ExtraDataFields {
+        let serde_json::Value::Object(json_map) = serde_json::to_value(self).unwrap() else {
+            unreachable!()
+        };
+
+        kamu_datasets::ExtraDataFields::new(json_map)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
