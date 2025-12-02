@@ -3629,6 +3629,7 @@ type MoleculeProjectMutV2 {
 
 type MoleculeProjectMutationResultV2 {
 	project: MoleculeProjectMutV2!
+	message: String!
 }
 
 type MoleculeProjectV2 {
