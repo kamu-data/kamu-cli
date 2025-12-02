@@ -96,6 +96,7 @@ pub enum UpdateCollectionEntriesResult {
 pub struct UpdateCollectionEntriesSuccess {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
+    pub inserted_records: Vec<(odf::metadata::OperationType, CollectionEntryRecord)>,
 }
 
 #[derive(Debug)]

@@ -117,23 +117,20 @@ impl MoleculeProjectV2 {
 
                     // TODO: extract use case based on common logic like
                     //       UpdateCollectionEntriesUseCaseImpl.
-                    let mut maybe_file_updated_event = None;
-                    if let Some(next) = record_iter.peek() {
+                    let is_file_updated_event = if let Some(next) = record_iter.peek() {
                         let (next_op, next_entry) =
                             MoleculeDataRoomEntry::new_from_json(next.clone(), &self_arc, &vocab)?;
 
-                        if next_op == OperationType::Retract && entry.is_same_reference(&next_entry)
-                        {
-                            maybe_file_updated_event =
-                                Some(MoleculeActivityEventV2::file_updated(next_entry));
-                        }
-                    }
+                        next_op == OperationType::Retract && entry.is_same_reference(&next_entry)
+                    } else {
+                        false
+                    };
 
-                    if let Some(file_updated) = maybe_file_updated_event {
+                    if is_file_updated_event {
                         // Yes, these two records represent the same update event,
                         // no need to process the next one, so we consume it.
                         let _ = record_iter.next();
-                        file_updated
+                        MoleculeActivityEventV2::file_updated(entry)
                     } else {
                         MoleculeActivityEventV2::file_added(entry)
                     }
