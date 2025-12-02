@@ -244,16 +244,6 @@ impl MoleculeDataRoomEntry {
         }
     }
 
-    pub fn to_collection_extra_data(&self) -> ExtraData {
-        let serde_json::Value::Object(json_map) =
-            serde_json::to_value(&self.entity.denormalized_latest_file_info).unwrap()
-        else {
-            unreachable!()
-        };
-
-        ExtraData::new(json_map)
-    }
-
     pub fn is_same_reference(&self, other: &Self) -> bool {
         self.entity.reference == other.entity.reference
     }
@@ -297,7 +287,11 @@ impl MoleculeDataRoomEntry {
     async fn as_versioned_file(&self) -> Result<Option<MoleculeVersionedFile>> {
         Ok(Some(MoleculeVersionedFile {
             dataset_id: self.entity.reference.clone(),
-            prefetched_latest: MoleculeVersionedFilePrefetch::new_from_data_room_entry(self),
+            prefetched_latest: MoleculeVersionedFilePrefetch {
+                system_time: self.entity.system_time,
+                event_time: self.entity.event_time,
+                denorm: self.entity.denormalized_latest_file_info.clone().into(),
+            },
         }))
     }
 }
@@ -533,20 +527,6 @@ pub struct MoleculeVersionedFilePrefetch {
     pub system_time: DateTime<Utc>,
     pub event_time: DateTime<Utc>,
     pub denorm: MoleculeDenormalizeFileToDataRoom,
-}
-
-impl MoleculeVersionedFilePrefetch {
-    pub fn new_from_data_room_entry(data_room_entry: &MoleculeDataRoomEntry) -> Self {
-        Self {
-            system_time: data_room_entry.entity.system_time,
-            event_time: data_room_entry.entity.event_time,
-            denorm: data_room_entry
-                .entity
-                .denormalized_latest_file_info
-                .clone()
-                .into(),
-        }
-    }
 }
 
 /// These fields are stored as extra columns in data room collection
