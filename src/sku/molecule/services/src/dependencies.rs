@@ -15,15 +15,14 @@ use crate::*;
 
 pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<MoleculeDatasetServiceImpl>();
-    // Note: don't register MoleculeDataRoomDirectCollectionAdapter,
-    // it is registered explicitly by application depending on the needs
-    // (local direct access vs remote access within GQL federation)
+    b.add::<MoleculeDataRoomCollectionServiceImpl>();
 
     b.add::<MoleculeCreateProjectUseCaseImpl>();
     b.add::<MoleculeFindProjectUseCaseImpl>();
     b.add::<MoleculeViewProjectsUseCaseImpl>();
 
     b.add::<MoleculeFindProjectDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeUpsertProjectDataRoomEntryUseCaseImpl>();
     b.add::<MoleculeViewProjectDataRoomEntriesUseCaseImpl>();
 
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();

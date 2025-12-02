@@ -44,11 +44,11 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
             .get_data_room_collection_entry(&molecule_project.data_room_dataset_id, as_of, path)
             .await
             .map_err(|e| match e {
-                MoleculeDataRoomCollectionServiceError::NotFound(e) => e.int_err().into(),
-                MoleculeDataRoomCollectionServiceError::Access(e) => {
+                MoleculeDataRoomCollectionReadError::NotFound(e) => e.int_err().into(),
+                MoleculeDataRoomCollectionReadError::Access(e) => {
                     MoleculeFindProjectDataRoomEntryError::Access(e)
                 }
-                MoleculeDataRoomCollectionServiceError::Internal(e) => {
+                MoleculeDataRoomCollectionReadError::Internal(e) => {
                     MoleculeFindProjectDataRoomEntryError::Internal(e)
                 }
             })?;
@@ -81,11 +81,11 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
             )
             .await
             .map_err(|e| match e {
-                MoleculeDataRoomCollectionServiceError::NotFound(e) => e.int_err().into(),
-                MoleculeDataRoomCollectionServiceError::Access(e) => {
+                MoleculeDataRoomCollectionReadError::NotFound(e) => e.int_err().into(),
+                MoleculeDataRoomCollectionReadError::Access(e) => {
                     MoleculeFindProjectDataRoomEntryError::Access(e)
                 }
-                MoleculeDataRoomCollectionServiceError::Internal(e) => {
+                MoleculeDataRoomCollectionReadError::Internal(e) => {
                     MoleculeFindProjectDataRoomEntryError::Internal(e)
                 }
             })?;

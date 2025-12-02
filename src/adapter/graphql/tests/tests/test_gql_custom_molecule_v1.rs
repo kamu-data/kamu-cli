@@ -1473,7 +1473,6 @@ impl GraphQLMoleculeV1Harness {
             .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
 
         kamu_molecule_services::register_dependencies(&mut base_builder);
-        base_builder.add::<kamu_molecule_services::MoleculeDataRoomDirectCollectionAdapter>();
 
         let base_catalog = base_builder.build();
 

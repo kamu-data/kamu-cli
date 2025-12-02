@@ -34,6 +34,8 @@ use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
+    MoleculeUpsertProjectDataRoomEntryError,
+    MoleculeUpsertProjectDataRoomEntryUseCase,
 };
 
 use crate::molecule::molecule_subject;
@@ -99,17 +101,17 @@ impl MoleculeDataRoomMutV2 {
         let now = chrono::Utc::now();
 
         let (
+            rebac_service,
             create_dataset_from_snapshot,
             update_versioned_file,
-            update_collection_entries,
-            rebac_service,
+            upsert_data_room_entry,
             append_global_data_room_activity,
         ) = from_catalog_n!(
             ctx,
+            dyn kamu_auth_rebac::RebacService,
             dyn CreateDatasetFromSnapshotUseCase,
             dyn UpdateVersionedFileUseCase,
-            dyn UpdateCollectionEntriesUseCase,
-            dyn kamu_auth_rebac::RebacService,
+            dyn MoleculeUpsertProjectDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -203,35 +205,18 @@ impl MoleculeDataRoomMutV2 {
             denormalized_latest_file_info: versioned_file_entry.to_denormalized().into(),
         };
 
-        let data_room_writable_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        match update_collection_entries
-            .execute(
-                WriteCheckedDataset(data_room_writable_dataset),
-                vec![CollectionUpdateOperation::add(
-                    data_room_entry.path.clone(),
-                    data_room_entry.reference.clone(),
-                    data_room_entry
-                        .denormalized_latest_file_info
-                        .to_collection_extra_data_fields(),
-                )],
-                None,
-            )
+        match upsert_data_room_entry
+            .execute(&self.project.entity, &data_room_entry)
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(_)) => Ok(()),
-            Ok(
-                UpdateCollectionEntriesResult::UpToDate
-                | UpdateCollectionEntriesResult::NotFound(_),
-            ) => {
-                unreachable!()
-            }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+            Ok(_) => Ok(()),
+            Err(MoleculeUpsertProjectDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeUpsertProjectDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ MoleculeUpsertProjectDataRoomEntryError::Internal(_)) => {
+                Err(e.int_err().into())
+            }
         }?;
 
         // 4. Log the activity.
@@ -295,13 +280,13 @@ impl MoleculeDataRoomMutV2 {
         let (
             update_versioned_file,
             dataset_registry,
-            update_collection_entries,
+            update_data_room_entry,
             append_global_data_room_activity,
         ) = from_catalog_n!(
             ctx,
             dyn UpdateVersionedFileUseCase,
             dyn DatasetRegistry,
-            dyn UpdateCollectionEntriesUseCase,
+            dyn MoleculeUpsertProjectDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -378,35 +363,18 @@ impl MoleculeDataRoomMutV2 {
 
         let path = data_room_entry.path.clone();
 
-        let writable_data_room_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        match update_collection_entries
-            .execute(
-                WriteCheckedDataset(writable_data_room_dataset),
-                vec![CollectionUpdateOperation::add(
-                    data_room_entry.path.clone(),
-                    data_room_entry.reference.clone(),
-                    data_room_entry
-                        .denormalized_latest_file_info
-                        .to_collection_extra_data_fields(),
-                )],
-                None,
-            )
+        match update_data_room_entry
+            .execute(&self.project.entity, &data_room_entry)
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(_)) => Ok(()),
-            Ok(
-                UpdateCollectionEntriesResult::UpToDate
-                | UpdateCollectionEntriesResult::NotFound(_),
-            ) => {
-                unreachable!()
-            }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+            Ok(_) => Ok(()),
+            Err(MoleculeUpsertProjectDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeUpsertProjectDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ MoleculeUpsertProjectDataRoomEntryError::Internal(_)) => {
+                Err(e.int_err().into())
+            }
         }?;
 
         // 4. Log the activity.

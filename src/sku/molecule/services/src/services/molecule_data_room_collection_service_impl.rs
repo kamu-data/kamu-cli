@@ -16,33 +16,41 @@ use kamu_datasets::{
     CollectionEntry,
     CollectionEntryListing,
     CollectionPath,
+    CollectionUpdateOperation,
     FindCollectionEntriesError,
     FindCollectionEntriesUseCase,
     ReadCheckedDataset,
     ResolvedDataset,
+    UpdateCollectionEntriesResult,
+    UpdateCollectionEntriesUseCase,
+    UpdateCollectionEntriesUseCaseError,
     ViewCollectionEntriesError,
     ViewCollectionEntriesUseCase,
+    WriteCheckedDataset,
 };
 use kamu_molecule_domain::{
+    MoleculeDataRoomCollectionReadError,
     MoleculeDataRoomCollectionService,
-    MoleculeDataRoomCollectionServiceError,
+    MoleculeDataRoomCollectionWriteError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeDataRoomCollectionService)]
-pub struct MoleculeDataRoomDirectCollectionAdapter {
+pub struct MoleculeDataRoomCollectionServiceImpl {
     view_collection_entries: Arc<dyn ViewCollectionEntriesUseCase>,
     find_collection_entries: Arc<dyn FindCollectionEntriesUseCase>,
+    update_collection_entries: Arc<dyn UpdateCollectionEntriesUseCase>,
+
     rebac_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
-impl MoleculeDataRoomDirectCollectionAdapter {
+impl MoleculeDataRoomCollectionServiceImpl {
     async fn readable_data_room(
         &self,
         data_room_dataset_id: &odf::DatasetID,
-    ) -> Result<ResolvedDataset, MoleculeDataRoomCollectionServiceError> {
+    ) -> Result<ResolvedDataset, MoleculeDataRoomCollectionReadError> {
         let readable_dataset = self
             .rebac_registry_facade
             .resolve_dataset_by_ref(
@@ -52,22 +60,46 @@ impl MoleculeDataRoomDirectCollectionAdapter {
             .await
             .map_err(|e| match e {
                 RebacDatasetRefUnresolvedError::NotFound(e) => {
-                    MoleculeDataRoomCollectionServiceError::NotFound(e)
+                    MoleculeDataRoomCollectionReadError::NotFound(e)
                 }
                 RebacDatasetRefUnresolvedError::Access(e) => {
-                    MoleculeDataRoomCollectionServiceError::Access(e)
+                    MoleculeDataRoomCollectionReadError::Access(e)
                 }
                 e @ RebacDatasetRefUnresolvedError::Internal(_) => e.int_err().into(),
             })?;
 
         Ok(readable_dataset)
     }
+
+    async fn writable_data_room(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+    ) -> Result<ResolvedDataset, MoleculeDataRoomCollectionWriteError> {
+        let writable_dataset = self
+            .rebac_registry_facade
+            .resolve_dataset_by_ref(
+                &data_room_dataset_id.as_local_ref(),
+                kamu_core::auth::DatasetAction::Write,
+            )
+            .await
+            .map_err(|e| match e {
+                RebacDatasetRefUnresolvedError::NotFound(e) => {
+                    MoleculeDataRoomCollectionWriteError::NotFound(e)
+                }
+                RebacDatasetRefUnresolvedError::Access(e) => {
+                    MoleculeDataRoomCollectionWriteError::Access(e)
+                }
+                e @ RebacDatasetRefUnresolvedError::Internal(_) => e.int_err().into(),
+            })?;
+
+        Ok(writable_dataset)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MoleculeDataRoomCollectionService for MoleculeDataRoomDirectCollectionAdapter {
+impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl {
     async fn get_data_room_collection_entries(
         &self,
         data_room_dataset_id: &odf::DatasetID,
@@ -76,7 +108,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomDirectCollectionAdapt
         max_depth: Option<usize>,
         // TODO: extra data filters
         pagination: Option<PaginationOpts>,
-    ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionServiceError> {
+    ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
 
         let entries_listing = self
@@ -91,7 +123,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomDirectCollectionAdapt
             .await
             .map_err(|e| match e {
                 ViewCollectionEntriesError::Access(e) => {
-                    MoleculeDataRoomCollectionServiceError::Access(e)
+                    MoleculeDataRoomCollectionReadError::Access(e)
                 }
                 e @ ViewCollectionEntriesError::Internal(_) => e.int_err().into(),
             })?;
@@ -104,7 +136,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomDirectCollectionAdapt
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-    ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionServiceError> {
+    ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionReadError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
 
         let maybe_entry = self
@@ -123,7 +155,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomDirectCollectionAdapt
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         r#ref: &odf::DatasetID,
-    ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionServiceError> {
+    ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionReadError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
 
         let maybe_entry = self
@@ -135,6 +167,37 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomDirectCollectionAdapt
             })?;
 
         Ok(maybe_entry)
+    }
+
+    async fn upsert_data_room_collection_entry(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        path: CollectionPath,
+        r#ref: odf::DatasetID,
+        extra_data: kamu_datasets::ExtraDataFields,
+    ) -> Result<(), MoleculeDataRoomCollectionWriteError> {
+        let writable_data_room = self.writable_data_room(data_room_dataset_id).await?;
+
+        match self
+            .update_collection_entries
+            .execute(
+                WriteCheckedDataset(&writable_data_room),
+                vec![CollectionUpdateOperation::add(path, r#ref, extra_data)],
+                None,
+            )
+            .await
+        {
+            Ok(UpdateCollectionEntriesResult::Success(_)) => Ok(()),
+            Ok(
+                UpdateCollectionEntriesResult::UpToDate
+                | UpdateCollectionEntriesResult::NotFound(_),
+            ) => {
+                unreachable!()
+            }
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e)) => Err(e.into()),
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 }
 
