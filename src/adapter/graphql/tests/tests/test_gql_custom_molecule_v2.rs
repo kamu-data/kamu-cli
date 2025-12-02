@@ -93,8 +93,6 @@ async fn test_molecule_v2_provision_project() {
         .build()
         .await;
 
-    harness.create_projects_dataset().await;
-
     // Setup `projects` dataset
     harness.create_projects_dataset().await;
 
