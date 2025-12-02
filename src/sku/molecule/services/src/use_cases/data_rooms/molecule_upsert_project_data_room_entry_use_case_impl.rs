@@ -53,7 +53,7 @@ impl MoleculeUpsertProjectDataRoomEntryUseCase for MoleculeUpsertProjectDataRoom
             )
             .await
             .map_err(|e| match e {
-                MoleculeDataRoomCollectionWriteError::NotFound(e) => {
+                MoleculeDataRoomCollectionWriteError::DataRoomNotFound(e) => {
                     MoleculeUpsertProjectDataRoomEntryError::Internal(e.int_err())
                 }
                 MoleculeDataRoomCollectionWriteError::RefCASFailed(e) => {

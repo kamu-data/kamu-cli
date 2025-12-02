@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod molecule_find_project_data_room_entry_use_case_impl;
+mod molecule_move_project_data_room_entry_use_case_impl;
 mod molecule_remove_project_data_room_entry_use_case_impl;
 mod molecule_upsert_project_data_room_entry_use_case_impl;
 mod molecule_view_project_data_room_entries_use_case_impl;
 
 pub use molecule_find_project_data_room_entry_use_case_impl::*;
+pub use molecule_move_project_data_room_entry_use_case_impl::*;
 pub use molecule_remove_project_data_room_entry_use_case_impl::*;
 pub use molecule_upsert_project_data_room_entry_use_case_impl::*;
 pub use molecule_view_project_data_room_entries_use_case_impl::*;

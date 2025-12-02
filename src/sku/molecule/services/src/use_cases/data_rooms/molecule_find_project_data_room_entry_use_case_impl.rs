@@ -48,7 +48,7 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
             )
             .await
             .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::NotFound(e) => e.int_err().into(),
+                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionReadError::Access(e) => {
                     MoleculeFindProjectDataRoomEntryError::Access(e)
                 }
@@ -85,7 +85,7 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
             )
             .await
             .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::NotFound(e) => e.int_err().into(),
+                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionReadError::Access(e) => {
                     MoleculeFindProjectDataRoomEntryError::Access(e)
                 }

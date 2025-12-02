@@ -54,7 +54,7 @@ impl MoleculeViewProjectDataRoomEntriesUseCase for MoleculeViewProjectDataRoomEn
             )
             .await
             .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::NotFound(e) => e.int_err().into(),
+                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionReadError::Access(e) => {
                     MoleculeViewProjectDataRoomError::Access(e)
                 }

@@ -15,19 +15,20 @@ use crate::{MoleculeProject, MoleculeUpdateProjectDataRoomEntryResult};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeRemoveProjectDataRoomEntryUseCase: Send + Sync {
+pub trait MoleculeMoveProjectDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        path: CollectionPath,
+        path_from: CollectionPath,
+        path_to: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeRemoveProjectDataRoomEntryError>;
+    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeMoveProjectDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeRemoveProjectDataRoomEntryError {
+pub enum MoleculeMoveProjectDataRoomEntryError {
     #[error(transparent)]
     RefCASFailed(#[from] odf::dataset::RefCASError),
 

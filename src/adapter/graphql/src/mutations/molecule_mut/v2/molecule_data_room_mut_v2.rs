@@ -34,9 +34,11 @@ use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
+    MoleculeMoveProjectDataRoomEntryError,
+    MoleculeMoveProjectDataRoomEntryUseCase,
     MoleculeRemoveProjectDataRoomEntryError,
-    MoleculeRemoveProjectDataRoomEntryResult,
     MoleculeRemoveProjectDataRoomEntryUseCase,
+    MoleculeUpdateProjectDataRoomEntryResult,
     MoleculeUpsertProjectDataRoomEntryError,
     MoleculeUpsertProjectDataRoomEntryUseCase,
 };
@@ -422,12 +424,12 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         reference: &odf::DatasetID,
     ) -> Result<Option<kamu_molecule_domain::MoleculeDataRoomEntry>> {
-        let find_data_room_entry = from_catalog_n!(
+        let find_data_room_entry_uc = from_catalog_n!(
             ctx,
             dyn kamu_molecule_domain::MoleculeFindProjectDataRoomEntryUseCase
         );
 
-        let maybe_data_room_entry = find_data_room_entry
+        let maybe_data_room_entry = find_data_room_entry_uc
             .execute_find_by_ref(&self.project.entity, None /* latest */, reference)
             .await
             .map_err(|e| -> GqlError {
@@ -493,7 +495,7 @@ impl MoleculeDataRoomMutV2 {
 
         let molecule_subject = molecule_subject(ctx)?;
 
-        let append_global_data_room_activity =
+        let append_global_data_room_activity_uc =
             from_catalog_n!(ctx, dyn MoleculeAppendGlobalDataRoomActivityUseCase);
 
         let (_op, collection_entry_record) = inserted_records.into_iter().next_back().unwrap();
@@ -554,7 +556,7 @@ impl MoleculeDataRoomMutV2 {
         };
 
         // TODO: asynchronous write of activity log
-        append_global_data_room_activity
+        append_global_data_room_activity_uc
             .execute(&molecule_subject, data_room_activity)
             .await
             .map_err(|e| -> GqlError {
@@ -756,26 +758,19 @@ impl MoleculeDataRoomMutV2 {
         to_path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
-        // TODO: save update global activity entry
+        let move_data_room_entry_uc =
+            from_catalog_n!(ctx, dyn MoleculeMoveProjectDataRoomEntryUseCase);
 
-        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
-
-        let data_room_writable_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        match update_collection_entries
+        match move_data_room_entry_uc
             .execute(
-                WriteCheckedDataset(data_room_writable_dataset),
-                vec![CollectionUpdateOperation::r#move(
-                    from_path.clone().into(),
-                    to_path.into(),
-                    None,
-                )],
+                &self.project.entity,
+                from_path.clone().into(),
+                to_path.into(),
                 expected_head.map(Into::into),
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+            Ok(MoleculeUpdateProjectDataRoomEntryResult::Success(r)) => {
                 // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
@@ -790,17 +785,17 @@ impl MoleculeDataRoomMutV2 {
                 }
                 .into())
             }
-            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+            Ok(MoleculeUpdateProjectDataRoomEntryResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
-            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound { path: from_path }.into())
+            Ok(MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(path)) => {
+                Ok(MoleculeDataRoomUpdateEntryNotFound { path: path.into() }.into())
             }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+            Err(MoleculeMoveProjectDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeMoveProjectDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ MoleculeMoveProjectDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
@@ -823,7 +818,7 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
         {
-            Ok(MoleculeRemoveProjectDataRoomEntryResult::Success(r)) => {
+            Ok(MoleculeUpdateProjectDataRoomEntryResult::Success(r)) => {
                 // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
@@ -838,8 +833,13 @@ impl MoleculeDataRoomMutV2 {
                 }
                 .into())
             }
-            Ok(MoleculeRemoveProjectDataRoomEntryResult::UpToDate) => {
+            Ok(MoleculeUpdateProjectDataRoomEntryResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
+            }
+            Ok(MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(_)) => {
+                unreachable!(
+                    "Removals are idempotent, so UpToDate is returned instead of EntryNotFound"
+                )
             }
             Err(MoleculeRemoveProjectDataRoomEntryError::Access(e)) => Err(e.into()),
             Err(MoleculeRemoveProjectDataRoomEntryError::RefCASFailed(_)) => {
@@ -866,10 +866,10 @@ impl MoleculeDataRoomMutV2 {
         content_text: Option<String>,
         encryption_metadata: Option<EncryptionMetadata>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
-        let (update_versioned_file, dataset_registry, update_collection_entries) = from_catalog_n!(
+        let (dataset_registry, update_versioned_file_uc, update_collection_entries_uc) = from_catalog_n!(
             ctx,
-            dyn UpdateVersionedFileUseCase,
             dyn DatasetRegistry,
+            dyn UpdateVersionedFileUseCase,
             dyn UpdateCollectionEntriesUseCase
         );
 
@@ -942,7 +942,7 @@ impl MoleculeDataRoomMutV2 {
         }
 
         // TODO: we need to do a retraction if any errors...
-        let new_version = update_versioned_file
+        let new_version = update_versioned_file_uc
             .execute(
                 WriteCheckedDataset(&file_dataset),
                 None,
@@ -963,7 +963,7 @@ impl MoleculeDataRoomMutV2 {
         let data_room_writable_dataset =
             self.data_room_writable_state.resolved_dataset(ctx).await?;
 
-        match update_collection_entries
+        match update_collection_entries_uc
             .execute(
                 WriteCheckedDataset(data_room_writable_dataset),
                 vec![CollectionUpdateOperation::add(

@@ -13,29 +13,8 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{
-    CollectionEntry,
-    CollectionEntryListing,
-    CollectionPath,
-    CollectionUpdateOperation,
-    FindCollectionEntriesError,
-    FindCollectionEntriesUseCase,
-    ReadCheckedDataset,
-    ResolvedDataset,
-    UpdateCollectionEntriesResult,
-    UpdateCollectionEntriesUseCase,
-    UpdateCollectionEntriesUseCaseError,
-    ViewCollectionEntriesError,
-    ViewCollectionEntriesUseCase,
-    WriteCheckedDataset,
-};
-use kamu_molecule_domain::{
-    MoleculeDataRoomCollectionReadError,
-    MoleculeDataRoomCollectionService,
-    MoleculeDataRoomCollectionWriteError,
-    MoleculeRemoveProjectDataRoomEntryResult,
-    MoleculeRemoveProjectDataRoomEntrySuccess,
-};
+use kamu_datasets::*;
+use kamu_molecule_domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +42,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
             .await
             .map_err(|e| match e {
                 RebacDatasetRefUnresolvedError::NotFound(e) => {
-                    MoleculeDataRoomCollectionReadError::NotFound(e)
+                    MoleculeDataRoomCollectionReadError::DataRoomNotFound(e)
                 }
                 RebacDatasetRefUnresolvedError::Access(e) => {
                     MoleculeDataRoomCollectionReadError::Access(e)
@@ -87,7 +66,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
             .await
             .map_err(|e| match e {
                 RebacDatasetRefUnresolvedError::NotFound(e) => {
-                    MoleculeDataRoomCollectionWriteError::NotFound(e)
+                    MoleculeDataRoomCollectionWriteError::DataRoomNotFound(e)
                 }
                 RebacDatasetRefUnresolvedError::Access(e) => {
                     MoleculeDataRoomCollectionWriteError::Access(e)
@@ -96,6 +75,46 @@ impl MoleculeDataRoomCollectionServiceImpl {
             })?;
 
         Ok(writable_dataset)
+    }
+
+    async fn execute_collection_update(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        operations: Vec<CollectionUpdateOperation>,
+        expected_head: Option<odf::Multihash>,
+    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
+    {
+        let writable_data_room = self.writable_data_room(data_room_dataset_id).await?;
+
+        match self
+            .update_collection_entries
+            .execute(
+                WriteCheckedDataset(&writable_data_room),
+                operations,
+                expected_head,
+            )
+            .await
+        {
+            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+                Ok(MoleculeUpdateProjectDataRoomEntryResult::Success(
+                    MoleculeUpdateProjectDataRoomEntrySuccess {
+                        old_head: r.old_head,
+                        new_head: r.new_head,
+                        inserted_records: r.inserted_records,
+                        system_time: r.system_time,
+                    },
+                ))
+            }
+            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+                Ok(MoleculeUpdateProjectDataRoomEntryResult::UpToDate)
+            }
+            Ok(UpdateCollectionEntriesResult::NotFound(e)) => Ok(
+                MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(e.path),
+            ),
+            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e)) => Err(e.into()),
+            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 }
 
@@ -180,18 +199,16 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         r#ref: odf::DatasetID,
         extra_data: kamu_datasets::ExtraDataFields,
     ) -> Result<CollectionEntry, MoleculeDataRoomCollectionWriteError> {
-        let writable_data_room = self.writable_data_room(data_room_dataset_id).await?;
-
-        match self
-            .update_collection_entries
-            .execute(
-                WriteCheckedDataset(&writable_data_room),
+        let result = self
+            .execute_collection_update(
+                data_room_dataset_id,
                 vec![CollectionUpdateOperation::add(path, r#ref, extra_data)],
                 None,
             )
-            .await
-        {
-            Ok(UpdateCollectionEntriesResult::Success(mut success)) => {
+            .await?;
+
+        match result {
+            MoleculeUpdateProjectDataRoomEntryResult::Success(mut success) => {
                 assert!(!success.inserted_records.is_empty());
 
                 let (op, last_inserted_record) = success.inserted_records.pop().unwrap();
@@ -205,16 +222,27 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                     extra_data: last_inserted_record.extra_data,
                 })
             }
-            Ok(
-                UpdateCollectionEntriesResult::UpToDate
-                | UpdateCollectionEntriesResult::NotFound(_),
-            ) => {
+            MoleculeUpdateProjectDataRoomEntryResult::UpToDate
+            | MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(_) => {
                 unreachable!()
             }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e)) => Err(e.into()),
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }
+    }
+
+    async fn move_data_room_collection_entry_by_path(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        path_from: CollectionPath,
+        path_to: CollectionPath,
+        expected_head: Option<odf::Multihash>,
+    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
+    {
+        self.execute_collection_update(
+            data_room_dataset_id,
+            vec![CollectionUpdateOperation::r#move(path_from, path_to, None)],
+            expected_head,
+        )
+        .await
     }
 
     async fn remove_data_room_collection_entry_by_path(
@@ -222,40 +250,14 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         data_room_dataset_id: &odf::DatasetID,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeRemoveProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
+    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
     {
-        let writable_data_room = self.writable_data_room(data_room_dataset_id).await?;
-
-        match self
-            .update_collection_entries
-            .execute(
-                WriteCheckedDataset(&writable_data_room),
-                vec![CollectionUpdateOperation::remove(path)],
-                expected_head,
-            )
-            .await
-        {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => {
-                Ok(MoleculeRemoveProjectDataRoomEntryResult::Success(
-                    MoleculeRemoveProjectDataRoomEntrySuccess {
-                        old_head: r.old_head,
-                        new_head: r.new_head,
-                        inserted_records: r.inserted_records,
-                    },
-                ))
-            }
-            Ok(UpdateCollectionEntriesResult::UpToDate) => {
-                // No action was performed - there was nothing to act upon
-                Ok(MoleculeRemoveProjectDataRoomEntryResult::UpToDate)
-            }
-            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
-                // This error for moving operation
-                unreachable!()
-            }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e)) => Err(e.into()),
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
-        }
+        self.execute_collection_update(
+            data_room_dataset_id,
+            vec![CollectionUpdateOperation::remove(path)],
+            expected_head,
+        )
+        .await
     }
 }
 
