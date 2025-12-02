@@ -10,7 +10,10 @@
 use async_graphql::value;
 use base64::Engine as _;
 use indoc::indoc;
+use kamu_accounts::LoggedAccount;
 use kamu_core::*;
+use kamu_molecule_domain::MoleculeCreateProjectUseCase;
+use num_bigint::BigInt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -46,6 +49,34 @@ const CREATE_PROJECT: &str = indoc!(
                             announcements { id alias }
                         }
                     }
+                }
+            }
+        }
+    }
+    "#
+);
+
+const DISABLE_PROJECT: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!) {
+        molecule {
+            v2 {
+                disableProject(ipnftUid: $ipnftUid) {
+                    project { __typename }
+                }
+            }
+        }
+    }
+    "#
+);
+
+const ENABLE_PROJECT: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!) {
+        molecule {
+            v2 {
+                enableProject(ipnftUid: $ipnftUid) {
+                    project { __typename }
                 }
             }
         }
@@ -273,6 +304,288 @@ async fn test_molecule_v2_provision_project() {
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912",
             }
         ]),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_disable_enable_project() {
+    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let molecule_subject = LoggedAccount {
+        account_id: harness.molecule_account_id.clone(),
+        account_name: "molecule".parse().unwrap(),
+    };
+
+    let create_project_uc = harness
+        .catalog_authorized
+        .get_one::<dyn MoleculeCreateProjectUseCase>()
+        .unwrap();
+
+    create_project_uc
+        .execute(
+            &molecule_subject,
+            "VITAFAST".to_string(),
+            ipnft_uid.to_string(),
+            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1".to_string(),
+            BigInt::from(9u32),
+        )
+        .await
+        .unwrap();
+
+    let projects_dataset_alias = odf::DatasetAlias::new(
+        Some(odf::AccountName::new_unchecked("molecule")),
+        odf::DatasetName::new_unchecked("projects"),
+    );
+
+    let initial_chain_len = harness
+        .projects_metadata_chain_len(&projects_dataset_alias)
+        .await;
+
+    async fn query_project(
+        harness: &GraphQLMoleculeV1Harness,
+        uid: &str,
+    ) -> async_graphql::Response {
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query ($ipnftUid: String!) {
+                    molecule {
+                        v2 {
+                            project(ipnftUid: $ipnftUid) {
+                                ipnftUid
+                                ipnftSymbol
+                            }
+                        }
+                    }
+                }
+                "#
+            ),
+            async_graphql::Variables::from_json(json!({ "ipnftUid": uid })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+    }
+
+    // Disable project multiple times to test idempotence
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+    let disable_res = res.data.into_json().unwrap();
+    assert_eq!(
+        disable_res["molecule"]["v2"]["disableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMutV2" }),
+    );
+
+    // Trying to disable disabled account will return error
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+        ))
+        .await;
+    let disable_error = res.errors[0].message.clone();
+    let res_json = res.data.into_json().unwrap();
+    assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
+    assert_eq!(disable_error, format!("Project {ipnft_uid} not found"));
+
+    // Project is no longer visible in the listing
+    let res = GraphQLQueryRequest::new(
+        indoc!(
+            r#"
+            query {
+                molecule {
+                    v2 {
+                        projects(page: 0, perPage: 100) {
+                            nodes { ipnftUid }
+                        }
+                    }
+                }
+            }
+            "#
+        ),
+        async_graphql::Variables::default(),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        json!([]),
+    );
+
+    // Querying by UID returns None
+    let res = query_project(&harness, ipnft_uid).await;
+    assert!(res.is_ok(), "{res:#?}");
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        json!(null),
+    );
+
+    // Enable project multiple times to test idempotence
+    for _ in 0..2 {
+        let res = harness
+            .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
+                async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+            ))
+            .await;
+        assert!(res.is_ok(), "{res:#?}");
+        let enable_res = res.data.into_json().unwrap();
+        assert_eq!(
+            enable_res["molecule"]["v2"]["enableProject"]["project"],
+            json!({ "__typename": "MoleculeProjectMutV2" }),
+        );
+    }
+
+    let post_enable_chain_len = harness
+        .projects_metadata_chain_len(&projects_dataset_alias)
+        .await;
+    // it should be two blocks longer than initial (one disable and one enable
+    // operations)
+    assert_eq!(post_enable_chain_len, initial_chain_len + 2);
+
+    let res = GraphQLQueryRequest::new(
+        indoc!(
+            r#"
+            query {
+                molecule {
+                    v2 {
+                        projects(page: 0, perPage: 100) {
+                            nodes { ipnftUid }
+                        }
+                    }
+                }
+            }
+            "#
+        ),
+        async_graphql::Variables::default(),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        json!([{
+            "ipnftUid": ipnft_uid,
+        }]),
+    );
+
+    let res = query_project(&harness, ipnft_uid).await;
+    assert!(res.is_ok(), "{res:#?}");
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        json!({
+            "ipnftUid": ipnft_uid,
+            "ipnftSymbol": "vitafast",
+        }),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_disable_enable_project_errors() {
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    harness.create_projects_dataset().await;
+
+    let missing_uid = "foo";
+
+    let res = GraphQLQueryRequest::new(
+        DISABLE_PROJECT,
+        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+    )
+    .expect_error()
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+    let disable_error = res.errors[0].message.clone();
+    let res_json = res.data.into_json().unwrap();
+    assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
+    assert_eq!(disable_error, format!("Project {missing_uid} not found"));
+
+    let res = GraphQLQueryRequest::new(
+        ENABLE_PROJECT,
+        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+    )
+    .expect_error()
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+    let enable_error = res.errors[0].message.clone();
+    let res_json = res.data.into_json().unwrap();
+    assert!(res_json["molecule"]["v2"]["enableProject"].is_null());
+    assert_eq!(
+        enable_error,
+        format!("No historical entries for project {missing_uid}")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    harness.create_projects_dataset().await;
+
+    let original_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+
+    // Create project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": original_uid,
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "9",
+            })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        json!(true),
+    );
+
+    // Disable project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": original_uid })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+
+    // Attempt to create another project with the same symbol should error
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "10",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        json!({
+            "isSuccess": false,
+            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "__typename": "CreateProjectErrorConflict",
+        }),
     );
 }
 

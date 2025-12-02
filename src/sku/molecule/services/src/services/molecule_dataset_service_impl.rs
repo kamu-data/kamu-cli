@@ -86,11 +86,41 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeDatasetServiceImpl_get_projects_data_frame,
+        name = MoleculeDatasetServiceImpl_get_projects_raw_ledger_data_frame,
         skip_all,
         fields(molecule_account_name, ?action, create_if_not_exist)
     )]
-    async fn get_projects_data_frame(
+    async fn get_projects_raw_ledger_data_frame(
+        &self,
+        molecule_subject: &LoggedAccount,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
+        let projects_dataset = self
+            .get_projects_dataset(&molecule_subject.account_name, action, create_if_not_exist)
+            .await?;
+
+        // Query full data
+        let df = match self
+            .query_service
+            .get_data(projects_dataset.clone(), GetDataOptions::default())
+            .await
+        {
+            Ok(res) => Ok(res.df),
+            Err(QueryError::Access(err)) => Err(MoleculeGetDatasetError::Access(err)),
+            Err(err) => Err(MoleculeGetDatasetError::Internal(err.int_err())),
+        }?;
+
+        Ok((projects_dataset, df))
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDatasetServiceImpl_get_projects_changelog_projection_data_frame,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist)
+    )]
+    async fn get_projects_changelog_projection_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: auth::DatasetAction,
@@ -127,6 +157,38 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         };
 
         Ok((projects_dataset, df))
+    }
+
+    async fn get_project_changelog_entry(
+        &self,
+        molecule_subject: &LoggedAccount,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+        ipnft_uid: &str,
+    ) -> Result<(ResolvedDataset, Option<MoleculeProject>), MoleculeGetDatasetError> {
+        use datafusion::prelude::*;
+
+        let (projects_dataset, df_opt) = self
+            .get_projects_changelog_projection_data_frame(
+                molecule_subject,
+                action,
+                create_if_not_exist,
+            )
+            .await?;
+
+        let Some(df) = df_opt else {
+            return Ok((projects_dataset, None));
+        };
+
+        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
+        let records = df.collect_json_aos().await.int_err()?;
+        let project = records
+            .into_iter()
+            .next()
+            .map(|record| MoleculeProject::from_json(record).int_err())
+            .transpose()?;
+
+        Ok((projects_dataset, project))
     }
 
     #[tracing::instrument(
