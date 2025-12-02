@@ -7,7 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain;
+use database_common::PaginationOpts;
+use kamu_datasets::{
+    FindCollectionEntriesUseCase,
+    FindCollectionEntryUseCaseError,
+    ReadCheckedDataset,
+    ViewCollectionEntriesError,
+    ViewCollectionEntriesUseCase,
+};
 
 use super::{CollectionEntry, CollectionEntryConnection};
 use crate::prelude::*;
@@ -26,9 +33,9 @@ impl Collection<'_> {
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
     ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
-        use kamu_datasets::{CollectionEntity, DatasetColumn};
+        use kamu_datasets::{DatasetColumn, DatasetSnapshots};
 
-        CollectionEntity::dataset_snapshot(
+        DatasetSnapshots::collection(
             alias,
             extra_columns
                 .into_iter()
@@ -91,51 +98,24 @@ impl CollectionProjection<'_> {
     pub async fn entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
     ) -> Result<Option<CollectionEntry>> {
-        use datafusion::logical_expr::{col, lit};
-
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let Some(df) = query_svc
-            .get_data(
-                readable_dataset.clone(),
-                domain::GetDataOptions {
-                    block_hash: self.as_of.clone(),
-                },
+        let find_collection_entries = from_catalog_n!(ctx, dyn FindCollectionEntriesUseCase);
+        let maybe_entry = find_collection_entries
+            .execute_find_by_path(
+                ReadCheckedDataset(readable_dataset),
+                self.as_of.clone(),
+                path.into(),
             )
             .await
-            .int_err()?
-            .df
-        else {
-            return Ok(None);
-        };
+            .map_err(|e| match e {
+                e @ FindCollectionEntryUseCaseError::Internal(_) => e.int_err(),
+            })?
+            .map(CollectionEntry::new);
 
-        // Apply filters
-        // Note: we are still working with a changelog here in hope to narrow down the
-        // record set before projecting
-        let df = df.filter(col("path").eq(lit(path.to_string()))).int_err()?;
-
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-        let record = records.into_iter().next().unwrap();
-        let entry = CollectionEntry::from_json(record)?;
-
-        Ok(Some(entry))
+        Ok(maybe_entry)
     }
 
     /// Returns the state of entries as they existed at a specified point in
@@ -144,79 +124,45 @@ impl CollectionProjection<'_> {
     pub async fn entries(
         &self,
         ctx: &Context<'_>,
-        path_prefix: Option<CollectionPath>,
+        path_prefix: Option<CollectionPath<'static>>,
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<CollectionEntryConnection> {
-        use datafusion::logical_expr::{col, lit};
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
 
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let df = query_svc
-            .get_data(
-                readable_dataset.clone(),
-                domain::GetDataOptions {
-                    block_hash: self.as_of.clone(),
-                },
+        let view_collection_entries = from_catalog_n!(ctx, dyn ViewCollectionEntriesUseCase);
+        let entries_listing = view_collection_entries
+            .execute(
+                ReadCheckedDataset(readable_dataset),
+                self.as_of.clone(),
+                path_prefix.map(Into::into),
+                max_depth,
+                Some(PaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                }),
             )
             .await
-            .int_err()?
-            .df;
+            .map_err(|e| match e {
+                ViewCollectionEntriesError::Access(e) => GqlError::Access(e),
+                e @ ViewCollectionEntriesError::Internal(_) => e.int_err().into(),
+            })?;
 
-        let Some(df) = df else {
-            return Ok(CollectionEntryConnection::new(Vec::new(), 0, 0, 0));
-        };
-
-        // Apply filters
-        // Note: we are still working with a changelog here in the hope to narrow down
-        // the record set before projecting
-        let df = match path_prefix {
-            None => df,
-            Some(path_prefix) => df
-                .filter(
-                    datafusion::functions::string::starts_with()
-                        .call(vec![col("path"), lit(path_prefix.to_string())]),
-                )
-                .int_err()?,
-        };
-
-        let df = match max_depth {
-            None => df,
-            Some(_) => unimplemented!(),
-        };
-
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
-
-        let total_count = df.clone().count().await.int_err()?;
-        let df = df
-            .sort(vec![col("path").sort(true, false)])
-            .int_err()?
-            .limit(page * per_page, Some(per_page))
-            .int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let nodes = records
+        let nodes = entries_listing
+            .list
             .into_iter()
-            .map(CollectionEntry::from_json)
-            .collect::<Result<_, _>>()?;
+            .map(CollectionEntry::new)
+            .collect::<Vec<_>>();
 
         Ok(CollectionEntryConnection::new(
             nodes,
             page,
             per_page,
-            total_count,
+            entries_listing.total_count,
         ))
     }
 
@@ -227,51 +173,29 @@ impl CollectionProjection<'_> {
         ctx: &Context<'_>,
         refs: Vec<DatasetID<'_>>,
     ) -> Result<Vec<CollectionEntry>> {
-        use datafusion::logical_expr::{col, lit};
-
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let Some(df) = query_svc
-            .get_data(
-                readable_dataset.clone(),
-                domain::GetDataOptions {
-                    block_hash: self.as_of.clone(),
-                },
+        let odf_refs = refs
+            .iter()
+            .map(|r| r as &odf::DatasetID)
+            .collect::<Vec<&odf::DatasetID>>();
+
+        let find_collection_entries = from_catalog_n!(ctx, dyn FindCollectionEntriesUseCase);
+        let entries = find_collection_entries
+            .execute_find_multi_by_refs(
+                ReadCheckedDataset(readable_dataset),
+                self.as_of.clone(),
+                &odf_refs,
             )
             .await
-            .int_err()?
-            .df
-        else {
-            return Ok(Vec::new());
-        };
+            .map_err(|e| match e {
+                e @ FindCollectionEntryUseCaseError::Internal(_) => e.int_err(),
+            })?;
 
-        // Apply filters
-        // Note: we are still working with a changelog here in hope to narrow down the
-        // record set before projecting
-        let df = df
-            .filter(col("ref").in_list(
-                refs.into_iter().map(|r| lit(r.to_string())).collect(),
-                false,
-            ))
-            .int_err()?;
-
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
-
-        let df = df.sort(vec![col("path").sort(true, false)]).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let nodes = records
+        let nodes = entries
             .into_iter()
-            .map(CollectionEntry::from_json)
-            .collect::<Result<_, _>>()?;
+            .map(CollectionEntry::new)
+            .collect::<Vec<_>>();
 
         Ok(nodes)
     }

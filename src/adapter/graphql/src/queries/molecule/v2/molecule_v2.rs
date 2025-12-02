@@ -117,7 +117,7 @@ impl MoleculeV2 {
             .await?;
 
         let nodes = listing
-            .projects
+            .list
             .into_iter()
             .map(MoleculeProjectV2::new)
             .collect();
@@ -183,7 +183,7 @@ impl MoleculeV2 {
                 })?;
 
             listing
-                .projects
+                .list
                 .into_iter()
                 .map(|project| {
                     (

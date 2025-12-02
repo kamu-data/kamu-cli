@@ -78,7 +78,7 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
 
         // Return listing
         Ok(MoleculeProjectListing {
-            projects,
+            list: projects,
             total_count,
         })
     }

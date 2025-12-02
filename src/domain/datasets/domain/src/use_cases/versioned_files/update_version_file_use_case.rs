@@ -18,7 +18,7 @@ use crate::{ExtraDataFields, FileVersion, WriteCheckedDataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait UpdateVersionFileUseCase: Send + Sync {
+pub trait UpdateVersionedFileUseCase: Send + Sync {
     async fn execute(
         &self,
         file_dataset: WriteCheckedDataset<'_>,

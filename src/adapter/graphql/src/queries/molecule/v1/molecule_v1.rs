@@ -171,11 +171,7 @@ impl MoleculeV1 {
             .get_molecule_projects_listing(ctx, Some(PaginationOpts::from_page(page, per_page)))
             .await?;
 
-        let nodes = listing
-            .projects
-            .into_iter()
-            .map(MoleculeProject::new)
-            .collect();
+        let nodes = listing.list.into_iter().map(MoleculeProject::new).collect();
 
         Ok(MoleculeProjectConnection::new(
             nodes,
@@ -214,7 +210,7 @@ impl MoleculeV1 {
             odf::DatasetID,
             Arc<MoleculeProject>,
         > = projects_listing
-            .projects
+            .list
             .into_iter()
             .map(MoleculeProject::new)
             .map(|p| (p.entity.announcements_dataset_id.clone(), Arc::new(p)))
@@ -380,7 +376,8 @@ impl MoleculeProject {
             })
             .filter(|(op, _)| *op != odf::metadata::OperationType::CorrectFrom)
             .map(|(op, record)| {
-                let entry = CollectionEntry::from_json(record)?;
+                let entity = kamu_datasets::CollectionEntry::from_json(record)?;
+                let entry = CollectionEntry::new(entity);
 
                 let event = match op {
                     odf::metadata::OperationType::Append => {
@@ -487,7 +484,8 @@ impl MoleculeProject {
                 let dataset =
                     Dataset::from_resolved_authorized_dataset(project_account.clone(), &source);
 
-                let entry = VersionedFileEntry::from_json(source.clone(), record)?;
+                let entity = kamu_datasets::VersionedFileEntry::from_json(record)?;
+                let entry = VersionedFileEntry::new(source.clone(), entity);
 
                 events.push(MoleculeProjectEvent::FileUpdated(
                     MoleculeProjectEventFileUpdated {
@@ -645,7 +643,7 @@ pub struct MoleculeProjectEventDataRoomEntryAdded {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryAdded {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.entry.system_time
+        self.entry.entity.system_time
     }
 }
 
@@ -660,7 +658,7 @@ pub struct MoleculeProjectEventDataRoomEntryRemoved {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryRemoved {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.entry.system_time
+        self.entry.entity.system_time
     }
 }
 
@@ -675,7 +673,7 @@ pub struct MoleculeProjectEventDataRoomEntryUpdated {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryUpdated {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.new_entry.system_time
+        self.new_entry.entity.system_time
     }
 }
 
@@ -717,7 +715,7 @@ pub struct MoleculeProjectEventFileUpdated {
 #[ComplexObject]
 impl MoleculeProjectEventFileUpdated {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.new_entry.system_time
+        self.new_entry.entity.system_time
     }
 }
 

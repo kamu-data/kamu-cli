@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use kamu_datasets::{ExtraDataFields, ResolvedDataset};
+use kamu_datasets::ResolvedDataset;
 use kamu_molecule_domain::MoleculeDataRoomActivityEntity;
 
 use crate::data_loader::AccessCheckedDatasetRef;
@@ -94,7 +94,7 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entries(
         &self,
         ctx: &Context<'_>,
-        path_prefix: Option<CollectionPath>,
+        path_prefix: Option<CollectionPath<'static>>,
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -126,7 +126,7 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
     ) -> Result<Option<MoleculeDataRoomEntry>> {
         let Some(entry) = self.projection.entry(ctx, path).await? else {
             return Ok(None);
@@ -173,19 +173,20 @@ impl MoleculeDataRoomEntry {
 
         let op = odf::metadata::OperationType::try_from(u8::try_from(raw_op).unwrap()).unwrap();
 
-        let collection_entry = CollectionEntry::from_json(value).int_err()?;
-        let entry =
+        let entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
+        let collection_entry = CollectionEntry::new(entity);
+        let data_room_entry =
             MoleculeDataRoomEntry::new_from_collection_entry(project, collection_entry.clone())?;
 
-        Ok((op, entry))
+        Ok((op, data_room_entry))
     }
 
     pub fn new_from_collection_entry(
         project: &Arc<MoleculeProjectV2>,
         mut entry: CollectionEntry,
     ) -> Result<Self> {
-        let mut extra_data = ExtraData::default();
-        std::mem::swap(&mut entry.extra_data, &mut extra_data);
+        let mut extra_data = kamu_datasets::ExtraDataFields::default();
+        std::mem::swap(&mut entry.entity.extra_data, &mut extra_data);
 
         let denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom =
             serde_json::from_value(extra_data.into_inner().into()).int_err()?;
@@ -202,11 +203,13 @@ impl MoleculeDataRoomEntry {
         activity_entity: MoleculeDataRoomActivityEntity,
     ) -> Self {
         let entry = CollectionEntry {
-            system_time: activity_entity.system_time,
-            event_time: activity_entity.event_time,
-            path: activity_entity.path.into(),
-            reference: activity_entity.r#ref.into(),
-            extra_data: Default::default(),
+            entity: kamu_datasets::CollectionEntry {
+                system_time: activity_entity.system_time,
+                event_time: activity_entity.event_time,
+                path: activity_entity.path,
+                reference: activity_entity.r#ref,
+                extra_data: Default::default(),
+            },
         };
         let denormalized_latest_file_info = MoleculeDenormalizeFileToDataRoom {
             version: activity_entity.version,
@@ -238,7 +241,7 @@ impl MoleculeDataRoomEntry {
     }
 
     pub fn is_same_reference(&self, other: &Self) -> bool {
-        self.entry.reference == other.entry.reference
+        self.entry.entity.reference == other.entry.entity.reference
     }
 }
 
@@ -256,20 +259,20 @@ impl MoleculeDataRoomEntry {
     }
 
     async fn system_time(&self) -> &DateTime<Utc> {
-        &self.entry.system_time
+        &self.entry.entity.system_time
     }
 
     async fn event_time(&self) -> &DateTime<Utc> {
-        &self.entry.event_time
+        &self.entry.entity.event_time
     }
 
-    async fn path(&self) -> &CollectionPath {
-        &self.entry.path
+    async fn path(&self) -> CollectionPath<'_> {
+        CollectionPath::from(&self.entry.entity.path)
     }
 
     #[graphql(name = "ref")]
-    async fn reference(&self) -> &DatasetID<'static> {
-        &self.entry.reference
+    async fn reference(&self) -> DatasetID<'_> {
+        DatasetID::from(&self.entry.entity.reference)
     }
 
     async fn change_by(&self) -> &MoleculeChangeBy {
@@ -279,7 +282,7 @@ impl MoleculeDataRoomEntry {
     #[expect(clippy::unused_async)]
     async fn as_versioned_file(&self) -> Result<Option<MoleculeVersionedFile>> {
         Ok(Some(MoleculeVersionedFile {
-            dataset_id: self.entry.reference.clone().into(),
+            dataset_id: self.entry.entity.reference.clone(),
             prefetched_latest: MoleculeVersionedFilePrefetch::new_from_data_room_entry(self),
         }))
     }
@@ -336,19 +339,21 @@ pub struct MoleculeVersionedFileEntry {
 
 impl MoleculeVersionedFileEntry {
     pub fn new_from_prefetched(
-        dataset: ResolvedDataset,
+        file_dataset: ResolvedDataset,
         prefetch: MoleculeVersionedFilePrefetch,
     ) -> Self {
         Self {
             entry: VersionedFileEntry {
-                dataset,
-                system_time: prefetch.system_time,
-                event_time: prefetch.event_time,
-                version: prefetch.denorm.version,
-                content_type: prefetch.denorm.content_type,
-                content_length: prefetch.denorm.content_length,
-                content_hash: prefetch.denorm.content_hash.into(),
-                extra_data: ExtraData::default(),
+                file_dataset,
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: prefetch.system_time,
+                    event_time: prefetch.event_time,
+                    version: prefetch.denorm.version,
+                    content_type: prefetch.denorm.content_type,
+                    content_length: prefetch.denorm.content_length,
+                    content_hash: prefetch.denorm.content_hash,
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
+                },
             },
             basic_info: MoleculeVersionedFileEntryBasicInfo {
                 access_level: prefetch.denorm.access_level,
@@ -374,19 +379,19 @@ impl MoleculeVersionedFileEntry {
         &self,
         ctx: &Context<'_>,
     ) -> Result<MoleculeVersionedFileEntryDetailedInfo> {
-        let state = DatasetRequestState::new_resolved(self.entry.dataset.clone());
+        let state = DatasetRequestState::new_resolved(self.entry.file_dataset.clone());
         let versioned_file = VersionedFile::new(&state);
         let entry = versioned_file
-            .get_entry(ctx, Some(self.entry.version), None)
+            .get_entry(ctx, Some(self.entry.entity.version), None)
             .await?
             .expect("Entry must exist");
-        let json = entry.extra_data.into_inner();
+        let json = entry.entity.extra_data.into_inner();
         let detailed_info: MoleculeVersionedFileEntryDetailedInfo =
             serde_json::from_value(json.into()).int_err()?;
         Ok(detailed_info)
     }
 
-    pub fn to_versioned_file_extra_data(&self) -> ExtraDataFields {
+    pub fn to_versioned_file_extra_data(&self) -> kamu_datasets::ExtraDataFields {
         let extra_data = MoleculeVersionedFileExtraData {
             basic_info: &self.basic_info,
             detailed_info: self.detailed_info.get().unwrap(),
@@ -396,17 +401,17 @@ impl MoleculeVersionedFileEntry {
             unreachable!()
         };
 
-        ExtraDataFields::new(json)
+        kamu_datasets::ExtraDataFields::new(json)
     }
 
     pub fn to_denormalized(&self) -> MoleculeDenormalizeFileToDataRoom {
         MoleculeDenormalizeFileToDataRoom {
             access_level: self.basic_info.access_level.clone(),
             change_by: self.basic_info.change_by.clone(),
-            version: self.entry.version,
-            content_type: self.entry.content_type.clone(),
-            content_length: self.entry.content_length,
-            content_hash: self.entry.content_hash.clone().into(),
+            version: self.entry.entity.version,
+            content_type: self.entry.entity.content_type.clone(),
+            content_length: self.entry.entity.content_length,
+            content_hash: self.entry.entity.content_hash.clone(),
             description: self.basic_info.description.clone(),
             categories: self.basic_info.categories.clone(),
             tags: self.basic_info.tags.clone(),
@@ -418,27 +423,27 @@ impl MoleculeVersionedFileEntry {
 #[Object]
 impl MoleculeVersionedFileEntry {
     async fn system_time(&self) -> &DateTime<Utc> {
-        &self.entry.system_time
+        &self.entry.entity.system_time
     }
 
     async fn event_time(&self) -> &DateTime<Utc> {
-        &self.entry.event_time
+        &self.entry.entity.event_time
     }
 
     async fn version(&self) -> u32 {
-        self.entry.version
+        self.entry.entity.version
     }
 
-    async fn content_hash(&self) -> &Multihash<'static> {
-        &self.entry.content_hash
+    async fn content_hash(&self) -> Multihash<'_> {
+        Multihash::from(&self.entry.entity.content_hash)
     }
 
     async fn content_length(&self) -> usize {
-        self.entry.content_length
+        self.entry.entity.content_length
     }
 
     async fn content_type(&self) -> &String {
-        &self.entry.content_type
+        &self.entry.entity.content_type
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {
@@ -519,15 +524,15 @@ pub struct MoleculeVersionedFilePrefetch {
 impl MoleculeVersionedFilePrefetch {
     pub fn new_from_data_room_entry(data_room_entry: &MoleculeDataRoomEntry) -> Self {
         Self {
-            system_time: data_room_entry.entry.system_time,
-            event_time: data_room_entry.entry.event_time,
+            system_time: data_room_entry.entry.entity.system_time,
+            event_time: data_room_entry.entry.entity.event_time,
             denorm: data_room_entry.denormalized_latest_file_info.clone(),
         }
     }
 }
 
 /// These fields are stored as extra columns in data room collection
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
     pub version: FileVersion,
     pub content_type: String,
