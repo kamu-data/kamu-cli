@@ -63,6 +63,20 @@ pub trait MoleculeDatasetService: Send + Sync {
         action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
+
+    async fn get_global_announcements_dataset(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
+
+    async fn get_global_announcements_data_frame(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

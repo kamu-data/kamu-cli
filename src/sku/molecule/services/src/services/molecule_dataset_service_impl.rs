@@ -28,6 +28,45 @@ pub struct MoleculeDatasetServiceImpl {
     query_service: Arc<dyn QueryService>,
 }
 
+impl MoleculeDatasetServiceImpl {
+    async fn get_or_create_dataset(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+        snapshot_getter: impl FnOnce() -> odf::DatasetSnapshot,
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError> {
+        match self
+            .rebac_dataset_registry
+            .resolve_dataset_by_ref(dataset_ref, action)
+            .await
+        {
+            Ok(ds) => Ok(ds),
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
+                let snapshot = snapshot_getter();
+
+                let create_res = self
+                    .create_dataset_use_case
+                    .execute(snapshot, Default::default())
+                    .await
+                    .int_err()?;
+
+                Ok(ResolvedDataset::new(
+                    create_res.dataset,
+                    create_res.dataset_handle,
+                ))
+            }
+            Err(RebacDatasetRefUnresolvedError::NotFound(e)) => {
+                Err(MoleculeGetDatasetError::NotFound(e))
+            }
+            Err(RebacDatasetRefUnresolvedError::Access(e)) => {
+                Err(MoleculeGetDatasetError::Access(e))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts]
@@ -48,40 +87,13 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         let projects_dataset_alias =
             MoleculeDatasetSnapshots::projects_alias(molecule_account_name.clone());
 
-        match self
-            .rebac_dataset_registry
-            .resolve_dataset_by_ref(&projects_dataset_alias.as_local_ref(), action)
-            .await
-        {
-            Ok(ds) => Ok(ds),
-            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
-                let snapshot = MoleculeDatasetSnapshots::projects(molecule_account_name.clone());
-
-                let create_res = self
-                    .create_dataset_use_case
-                    .execute(
-                        snapshot,
-                        kamu_datasets::CreateDatasetUseCaseOptions {
-                            dataset_visibility: odf::DatasetVisibility::Private,
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                // TODO: Use case should return ResolvedDataset directly
-                Ok(ResolvedDataset::new(
-                    create_res.dataset,
-                    create_res.dataset_handle,
-                ))
-            }
-            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => {
-                Err(MoleculeGetDatasetError::NotFound(err))
-            }
-            Err(RebacDatasetRefUnresolvedError::Access(err)) => {
-                Err(MoleculeGetDatasetError::Access(err))
-            }
-            Err(err) => Err(err.int_err().into()),
-        }
+        self.get_or_create_dataset(
+            &projects_dataset_alias.as_local_ref(),
+            action,
+            create_if_not_exist,
+            || MoleculeDatasetSnapshots::projects(molecule_account_name.clone()),
+        )
+        .await
     }
 
     #[tracing::instrument(
@@ -214,41 +226,13 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
                 molecule_account_name.clone(),
             );
 
-        match self
-            .rebac_dataset_registry
-            .resolve_dataset_by_ref(&data_room_activity_dataset_alias.as_local_ref(), action)
-            .await
-        {
-            Ok(ds) => Ok(ds),
-            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
-                let snapshot = MoleculeDatasetSnapshots::global_data_room_activity(
-                    molecule_account_name.clone(),
-                );
-
-                let create_res = self
-                    .create_dataset_use_case
-                    .execute(
-                        snapshot,
-                        kamu_datasets::CreateDatasetUseCaseOptions {
-                            dataset_visibility: odf::DatasetVisibility::Private,
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                Ok(ResolvedDataset::new(
-                    create_res.dataset,
-                    create_res.dataset_handle,
-                ))
-            }
-            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => {
-                Err(MoleculeGetDatasetError::NotFound(err))
-            }
-            Err(RebacDatasetRefUnresolvedError::Access(err)) => {
-                Err(MoleculeGetDatasetError::Access(err))
-            }
-            Err(err) => Err(err.int_err().into()),
-        }
+        self.get_or_create_dataset(
+            &data_room_activity_dataset_alias.as_local_ref(),
+            action,
+            create_if_not_exist,
+            || MoleculeDatasetSnapshots::global_data_room_activity(molecule_account_name.clone()),
+        )
+        .await
     }
 
     #[tracing::instrument(
@@ -285,6 +269,48 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         }?;
 
         Ok((data_room_activity_dataset, df))
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDatasetServiceImpl_get_global_announcements_dataset,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist)
+    )]
+    async fn get_global_announcements_dataset(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError> {
+        let announcements_dataset_alias =
+            MoleculeDatasetSnapshots::global_announcements_alias(molecule_account_name.clone());
+
+        self.get_or_create_dataset(
+            &announcements_dataset_alias.as_local_ref(),
+            action,
+            create_if_not_exist,
+            || MoleculeDatasetSnapshots::global_announcements(molecule_account_name.clone()),
+        )
+        .await
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDatasetServiceImpl_get_global_announcements_data_frame,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist)
+    )]
+    async fn get_global_announcements_data_frame(
+        &self,
+        molecule_account_name: &odf::AccountName,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
+        let _ = molecule_account_name;
+        let _ = action;
+        let _ = create_if_not_exist;
+        todo!()
     }
 }
 
