@@ -38,7 +38,11 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
         // Access projects dataset snapshot
         let Some(df) = self
             .molecule_dataset_service
-            .get_projects_changelog_data_frame(molecule_subject, DatasetAction::Read, false)
+            .get_projects_changelog_projection_data_frame(
+                molecule_subject,
+                DatasetAction::Read,
+                false,
+            )
             .await?
             .1
         else {

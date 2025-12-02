@@ -533,6 +533,67 @@ async fn test_molecule_v2_disable_enable_project_errors() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    harness.create_projects_dataset().await;
+
+    let original_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+
+    // Create project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": original_uid,
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "9",
+            })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        json!(true),
+    );
+
+    // Disable project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": original_uid })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+
+    // Attempt to create another project with the same symbol should error
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "10",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        json!({
+            "isSuccess": false,
+            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "__typename": "CreateProjectErrorConflict",
+        }),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_molecule_v2_data_room_operations() {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 

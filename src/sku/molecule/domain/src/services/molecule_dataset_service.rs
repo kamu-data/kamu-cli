@@ -35,7 +35,7 @@ pub trait MoleculeDatasetService: Send + Sync {
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
 
     /// Returns the projected changelog
-    async fn get_projects_changelog_data_frame(
+    async fn get_projects_changelog_projection_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: auth::DatasetAction,

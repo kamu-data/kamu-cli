@@ -59,32 +59,30 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
-        // Reconstruct active snapshot to confirm there are no conflicts
-        let snapshot_df = odf::utils::data::changelog::project(
-            ledger_df.clone(),
-            &["account_id".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
-
         let df = ledger_df
             .filter(col("ipnft_uid").eq(lit(&ipnft_uid)))
             .int_err()?
-            .sort(vec![col("system_time").sort(false, false)])
+            .sort(vec![col("offset").sort(false, false)])
+            .int_err()?
+            .limit(0, Some(1))
             .int_err()?;
 
         let records: Vec<serde_json::Value> = df.collect_json_aos().await.int_err()?;
-        let record = records.into_iter().find(|record: &serde_json::Value| {
-            record
-                .get("op")
-                .and_then(serde_json::Value::as_u64)
-                .and_then(|value| u8::try_from(value).ok())
-                .and_then(|value| OperationType::try_from(value).ok())
-                .map(|op| matches!(op, OperationType::Append | OperationType::CorrectTo))
-                .unwrap_or(false)
-        });
+        let Some(record) = records.into_iter().next() else {
+            return Err(MoleculeEnableProjectError::ProjectNotFound(
+                ProjectNotFoundError {
+                    ipnft_uid: ipnft_uid.clone(),
+                },
+            ));
+        };
 
-        let Some(record) = record else {
+        let op = record
+            .get("op")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|value| u8::try_from(value).ok())
+            .and_then(|value| OperationType::try_from(value).ok());
+
+        let Some(op) = op else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
                     ipnft_uid: ipnft_uid.clone(),
@@ -95,20 +93,8 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         let mut project = MoleculeProjectEntity::from_json(record).int_err()?;
         project.ipnft_symbol.make_ascii_lowercase();
 
-        let conflict_df = snapshot_df
-            .filter(
-                col("ipnft_uid")
-                    .eq(lit(&project.ipnft_uid))
-                    .or(lower(col("ipnft_symbol")).eq(lit(&project.ipnft_symbol))),
-            )
-            .int_err()?;
-
-        let conflicts = conflict_df.collect_json_aos().await.int_err()?;
-        if let Some(record) = conflicts.into_iter().next() {
-            let existing = MoleculeProjectEntity::from_json(record).int_err()?;
-            if existing.ipnft_uid == project.ipnft_uid {
-                return Ok(existing);
-            }
+        if !matches!(op, OperationType::Retract) {
+            return Ok(project);
         }
 
         let now = chrono::Utc::now();

@@ -116,11 +116,11 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeDatasetServiceImpl_get_projects_changelog_data_frame,
+        name = MoleculeDatasetServiceImpl_get_projects_changelog_projection_data_frame,
         skip_all,
         fields(molecule_account_name, ?action, create_if_not_exist)
     )]
-    async fn get_projects_changelog_data_frame(
+    async fn get_projects_changelog_projection_data_frame(
         &self,
         molecule_subject: &LoggedAccount,
         action: auth::DatasetAction,
@@ -169,20 +169,24 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         use datafusion::prelude::*;
 
         let (projects_dataset, df_opt) = self
-            .get_projects_changelog_data_frame(molecule_subject, action, create_if_not_exist)
+            .get_projects_changelog_projection_data_frame(
+                molecule_subject,
+                action,
+                create_if_not_exist,
+            )
             .await?;
 
-        let project = if let Some(df) = df_opt {
-            let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
-            let records = df.collect_json_aos().await.int_err()?;
-            if let Some(record) = records.into_iter().next() {
-                Some(MoleculeProjectEntity::from_json(record).int_err()?)
-            } else {
-                None
-            }
-        } else {
-            None
+        let Some(df) = df_opt else {
+            return Ok((projects_dataset, None));
         };
+
+        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
+        let records = df.collect_json_aos().await.int_err()?;
+        let project = records
+            .into_iter()
+            .next()
+            .map(|record| MoleculeProjectEntity::from_json(record).int_err())
+            .transpose()?;
 
         Ok((projects_dataset, project))
     }
