@@ -210,7 +210,7 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         let project = records
             .into_iter()
             .next()
-            .map(|record| MoleculeProject::from_json(record).int_err())
+            .map(MoleculeProject::from_json)
             .transpose()?;
 
         Ok((projects_dataset, project))
@@ -314,6 +314,36 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
             .await?;
 
         Ok((announcements_dataset, maybe_df))
+    }
+
+    async fn get_project_announcements_dataset(
+        &self,
+        project_announcements_dataset_id: &odf::DatasetID,
+        action: auth::DatasetAction,
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError> {
+        self.get_or_create_dataset(
+            &project_announcements_dataset_id.as_local_ref(),
+            action,
+            false, // already created
+            || unreachable!(),
+        )
+        .await
+    }
+
+    async fn get_project_announcements_data_frame(
+        &self,
+        project_announcements_dataset_id: &odf::DatasetID,
+        action: auth::DatasetAction,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
+        let project_announcements_dataset = self
+            .get_project_announcements_dataset(project_announcements_dataset_id, action)
+            .await?;
+
+        let maybe_df = self
+            .try_get_data_frame(project_announcements_dataset.clone())
+            .await?;
+
+        Ok((project_announcements_dataset, maybe_df))
     }
 }
 

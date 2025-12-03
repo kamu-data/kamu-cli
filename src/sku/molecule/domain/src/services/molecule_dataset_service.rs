@@ -77,6 +77,18 @@ pub trait MoleculeDatasetService: Send + Sync {
         action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
+
+    async fn get_project_announcements_dataset(
+        &self,
+        project_announcements_dataset_id: &odf::DatasetID,
+        action: auth::DatasetAction,
+    ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
+
+    async fn get_project_announcements_data_frame(
+        &self,
+        project_announcements_dataset_id: &odf::DatasetID,
+        action: auth::DatasetAction,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

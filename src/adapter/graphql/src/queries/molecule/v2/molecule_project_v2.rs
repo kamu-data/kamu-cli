@@ -48,6 +48,8 @@ impl MoleculeProjectV2 {
         per_page: usize,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<Vec<MoleculeActivityEventV2>> {
+        // TODO: extract use case
+
         // TODO: filters
         assert!(filters.is_none());
 
