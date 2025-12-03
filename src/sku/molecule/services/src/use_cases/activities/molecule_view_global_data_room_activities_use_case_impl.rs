@@ -34,7 +34,8 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
             .get_global_data_room_activity_data_frame(
                 &molecule_subject.account_name,
                 auth::DatasetAction::Read,
-                false,
+                // TODO: try to create once as start-up job?
+                true,
             )
             .await?;
 
@@ -66,7 +67,8 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
             .get_global_announcements_data_frame(
                 &molecule_subject.account_name,
                 auth::DatasetAction::Read,
-                false,
+                // TODO: try to create once as start-up job?
+                true,
             )
             .await?;
 

@@ -29,8 +29,10 @@ pub struct MoleculeProjectAnnouncementDataRecord {
     #[serde(rename = "molecule_access_level")]
     pub access_level: String,
 
+    #[serde(default)]
     pub categories: Vec<String>,
 
+    #[serde(default)]
     pub tags: Vec<String>,
 }
 
