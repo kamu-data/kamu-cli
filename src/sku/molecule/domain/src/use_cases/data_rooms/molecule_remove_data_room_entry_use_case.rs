@@ -10,25 +10,24 @@
 use internal_error::InternalError;
 use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeProject, MoleculeUpdateProjectDataRoomEntryResult};
+use crate::{MoleculeProject, MoleculeUpdateDataRoomEntryResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeMoveProjectDataRoomEntryUseCase: Send + Sync {
+pub trait MoleculeRemoveDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        path_from: CollectionPath,
-        path_to: CollectionPath,
+        path: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeMoveProjectDataRoomEntryError>;
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeRemoveDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeMoveProjectDataRoomEntryError {
+pub enum MoleculeRemoveDataRoomEntryError {
     #[error(transparent)]
     RefCASFailed(#[from] odf::dataset::RefCASError),
 

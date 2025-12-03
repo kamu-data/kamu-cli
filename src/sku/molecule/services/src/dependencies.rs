@@ -23,11 +23,11 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<MoleculeFindProjectUseCaseImpl>();
     b.add::<MoleculeViewProjectsUseCaseImpl>();
 
-    b.add::<MoleculeFindProjectDataRoomEntryUseCaseImpl>();
-    b.add::<MoleculeMoveProjectDataRoomEntryUseCaseImpl>();
-    b.add::<MoleculeRemoveProjectDataRoomEntryUseCaseImpl>();
-    b.add::<MoleculeUpsertProjectDataRoomEntryUseCaseImpl>();
-    b.add::<MoleculeViewProjectDataRoomEntriesUseCaseImpl>();
+    b.add::<MoleculeFindDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeMoveDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeRemoveDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeUpsertDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeViewDataRoomEntriesUseCaseImpl>();
 
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
     b.add::<MoleculeViewGlobalDataRoomActivitiesUseCaseImpl>();

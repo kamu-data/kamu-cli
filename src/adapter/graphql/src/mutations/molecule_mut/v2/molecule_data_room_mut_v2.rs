@@ -29,13 +29,13 @@ use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
-    MoleculeMoveProjectDataRoomEntryError,
-    MoleculeMoveProjectDataRoomEntryUseCase,
-    MoleculeRemoveProjectDataRoomEntryError,
-    MoleculeRemoveProjectDataRoomEntryUseCase,
-    MoleculeUpdateProjectDataRoomEntryResult,
-    MoleculeUpsertProjectDataRoomEntryError,
-    MoleculeUpsertProjectDataRoomEntryUseCase,
+    MoleculeMoveDataRoomEntryError,
+    MoleculeMoveDataRoomEntryUseCase,
+    MoleculeRemoveDataRoomEntryError,
+    MoleculeRemoveDataRoomEntryUseCase,
+    MoleculeUpdateDataRoomEntryResult,
+    MoleculeUpsertDataRoomEntryError,
+    MoleculeUpsertDataRoomEntryUseCase,
 };
 
 use crate::molecule::molecule_subject;
@@ -112,7 +112,7 @@ impl MoleculeDataRoomMutV2 {
             dyn kamu_auth_rebac::RebacService,
             dyn CreateDatasetFromSnapshotUseCase,
             dyn UpdateVersionedFileUseCase,
-            dyn MoleculeUpsertProjectDataRoomEntryUseCase,
+            dyn MoleculeUpsertDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -208,11 +208,11 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
             .map_err(|e| match e {
-                MoleculeUpsertProjectDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpsertProjectDataRoomEntryError::RefCASFailed(_) => {
+                MoleculeUpsertDataRoomEntryError::Access(e) => e.into(),
+                MoleculeUpsertDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
                 }
-                e @ MoleculeUpsertProjectDataRoomEntryError::Internal(_) => e.int_err().into(),
+                e @ MoleculeUpsertDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
 
         // 4. Log the activity.
@@ -283,7 +283,7 @@ impl MoleculeDataRoomMutV2 {
             ctx,
             dyn DatasetRegistry,
             dyn UpdateVersionedFileUseCase,
-            dyn MoleculeUpsertProjectDataRoomEntryUseCase,
+            dyn MoleculeUpsertDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -365,11 +365,11 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
             .map_err(|e| match e {
-                MoleculeUpsertProjectDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpsertProjectDataRoomEntryError::RefCASFailed(_) => {
+                MoleculeUpsertDataRoomEntryError::Access(e) => e.into(),
+                MoleculeUpsertDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
                 }
-                e @ MoleculeUpsertProjectDataRoomEntryError::Internal(_) => e.int_err().into(),
+                e @ MoleculeUpsertDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
 
         // 4. Log the activity.
@@ -422,14 +422,14 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<Option<kamu_molecule_domain::MoleculeDataRoomEntry>> {
         let find_data_room_entry_uc = from_catalog_n!(
             ctx,
-            dyn kamu_molecule_domain::MoleculeFindProjectDataRoomEntryUseCase
+            dyn kamu_molecule_domain::MoleculeFindDataRoomEntryUseCase
         );
 
         let maybe_data_room_entry = find_data_room_entry_uc
             .execute_find_by_ref(&self.project.entity, None /* latest */, reference)
             .await
             .map_err(|e| -> GqlError {
-                use kamu_molecule_domain::MoleculeFindProjectDataRoomEntryError as E;
+                use kamu_molecule_domain::MoleculeFindDataRoomEntryError as E;
                 match e {
                     E::Access(e) => e.into(),
                     e @ E::Internal(_) => e.int_err().into(),
@@ -754,8 +754,7 @@ impl MoleculeDataRoomMutV2 {
         to_path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
-        let move_data_room_entry_uc =
-            from_catalog_n!(ctx, dyn MoleculeMoveProjectDataRoomEntryUseCase);
+        let move_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeMoveDataRoomEntryUseCase);
 
         match move_data_room_entry_uc
             .execute(
@@ -766,7 +765,7 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
         {
-            Ok(MoleculeUpdateProjectDataRoomEntryResult::Success(r)) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
                 // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
@@ -781,17 +780,17 @@ impl MoleculeDataRoomMutV2 {
                 }
                 .into())
             }
-            Ok(MoleculeUpdateProjectDataRoomEntryResult::UpToDate) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
-            Ok(MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(path)) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(path)) => {
                 Ok(MoleculeDataRoomUpdateEntryNotFound { path: path.into() }.into())
             }
-            Err(MoleculeMoveProjectDataRoomEntryError::Access(e)) => Err(e.into()),
-            Err(MoleculeMoveProjectDataRoomEntryError::RefCASFailed(_)) => {
+            Err(MoleculeMoveDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeMoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(e @ MoleculeMoveProjectDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ MoleculeMoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
@@ -803,10 +802,10 @@ impl MoleculeDataRoomMutV2 {
         path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
-        let remove_data_frame_entry_uc =
-            from_catalog_n!(ctx, dyn MoleculeRemoveProjectDataRoomEntryUseCase);
+        let remove_data_room_entry_uc =
+            from_catalog_n!(ctx, dyn MoleculeRemoveDataRoomEntryUseCase);
 
-        match remove_data_frame_entry_uc
+        match remove_data_room_entry_uc
             .execute(
                 &self.project.entity,
                 path.clone().into(),
@@ -814,7 +813,7 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
         {
-            Ok(MoleculeUpdateProjectDataRoomEntryResult::Success(r)) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
                 // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
@@ -829,21 +828,19 @@ impl MoleculeDataRoomMutV2 {
                 }
                 .into())
             }
-            Ok(MoleculeUpdateProjectDataRoomEntryResult::UpToDate) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
             }
-            Ok(MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(_)) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(_)) => {
                 unreachable!(
                     "Removals are idempotent, so UpToDate is returned instead of EntryNotFound"
                 )
             }
-            Err(MoleculeRemoveProjectDataRoomEntryError::Access(e)) => Err(e.into()),
-            Err(MoleculeRemoveProjectDataRoomEntryError::RefCASFailed(_)) => {
+            Err(MoleculeRemoveDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeRemoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(e @ MoleculeRemoveProjectDataRoomEntryError::Internal(_)) => {
-                Err(e.int_err().into())
-            }
+            Err(e @ MoleculeRemoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
@@ -876,7 +873,7 @@ impl MoleculeDataRoomMutV2 {
             ctx,
             dyn DatasetRegistry,
             dyn UpdateVersionedFileUseCase,
-            dyn MoleculeUpsertProjectDataRoomEntryUseCase,
+            dyn MoleculeUpsertDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -976,11 +973,11 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
             .map_err(|e| match e {
-                MoleculeUpsertProjectDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpsertProjectDataRoomEntryError::RefCASFailed(_) => {
+                MoleculeUpsertDataRoomEntryError::Access(e) => e.into(),
+                MoleculeUpsertDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
                 }
-                e @ MoleculeUpsertProjectDataRoomEntryError::Internal(_) => e.int_err().into(),
+                e @ MoleculeUpsertDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
 
         // 3. Log the activity.

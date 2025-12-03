@@ -18,8 +18,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeViewProjectDataRoomEntriesUseCase)]
-pub struct MoleculeViewProjectDataRoomEntriesUseCaseImpl {
+#[dill::interface(dyn MoleculeViewDataRoomEntriesUseCase)]
+pub struct MoleculeViewDataRoomEntriesUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
 }
 
@@ -27,10 +27,10 @@ pub struct MoleculeViewProjectDataRoomEntriesUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeViewProjectDataRoomEntriesUseCase for MoleculeViewProjectDataRoomEntriesUseCaseImpl {
+impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeViewProjectDataRoomEntriesUseCaseImpl_execute,
+        name = MoleculeViewDataRoomEntriesUseCaseImpl_execute,
         skip_all,
         fields(
             ipnft_uid = %molecule_project.ipnft_uid,
@@ -48,7 +48,7 @@ impl MoleculeViewProjectDataRoomEntriesUseCase for MoleculeViewProjectDataRoomEn
         max_depth: Option<usize>,
         // TODO: filters
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewProjectDataRoomError> {
+    ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
         let entries_listing = self
             .data_room_collection_service
             .get_data_room_collection_entries(
@@ -62,10 +62,10 @@ impl MoleculeViewProjectDataRoomEntriesUseCase for MoleculeViewProjectDataRoomEn
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeViewProjectDataRoomError::Access(e)
+                    MoleculeViewDataRoomEntriesError::Access(e)
                 }
                 MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeViewProjectDataRoomError::Internal(e)
+                    MoleculeViewDataRoomEntriesError::Internal(e)
                 }
             })?;
 

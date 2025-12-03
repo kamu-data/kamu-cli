@@ -18,8 +18,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeUpsertProjectDataRoomEntryUseCase)]
-pub struct MoleculeUpsertProjectDataRoomEntryUseCaseImpl {
+#[dill::interface(dyn MoleculeUpsertDataRoomEntryUseCase)]
+pub struct MoleculeUpsertDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
 }
 
@@ -27,10 +27,10 @@ pub struct MoleculeUpsertProjectDataRoomEntryUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeUpsertProjectDataRoomEntryUseCase for MoleculeUpsertProjectDataRoomEntryUseCaseImpl {
+impl MoleculeUpsertDataRoomEntryUseCase for MoleculeUpsertDataRoomEntryUseCaseImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeUpsertProjectDataRoomEntryUseCaseImpl_execute,
+        name = MoleculeUpsertDataRoomEntryUseCaseImpl_execute,
         skip_all,
         fields(ipnft_uid = %molecule_project.ipnft_uid, %path, %reference)
     )]
@@ -41,7 +41,7 @@ impl MoleculeUpsertProjectDataRoomEntryUseCase for MoleculeUpsertProjectDataRoom
         path: CollectionPath,
         reference: odf::DatasetID,
         denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
-    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertProjectDataRoomEntryError> {
+    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertDataRoomEntryError> {
         let entry = self
             .data_room_collection_service
             .upsert_data_room_collection_entry(
@@ -54,16 +54,16 @@ impl MoleculeUpsertProjectDataRoomEntryUseCase for MoleculeUpsertProjectDataRoom
             .await
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionWriteError::DataRoomNotFound(e) => {
-                    MoleculeUpsertProjectDataRoomEntryError::Internal(e.int_err())
+                    MoleculeUpsertDataRoomEntryError::Internal(e.int_err())
                 }
                 MoleculeDataRoomCollectionWriteError::RefCASFailed(e) => {
-                    MoleculeUpsertProjectDataRoomEntryError::RefCASFailed(e)
+                    MoleculeUpsertDataRoomEntryError::RefCASFailed(e)
                 }
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
-                    MoleculeUpsertProjectDataRoomEntryError::Access(e)
+                    MoleculeUpsertDataRoomEntryError::Access(e)
                 }
                 e @ MoleculeDataRoomCollectionWriteError::Internal(_) => {
-                    MoleculeUpsertProjectDataRoomEntryError::Internal(e.int_err())
+                    MoleculeUpsertDataRoomEntryError::Internal(e.int_err())
                 }
             })?;
 

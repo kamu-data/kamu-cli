@@ -7,33 +7,35 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
+use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeDataRoomEntry, MoleculeDenormalizeFileToDataRoom, MoleculeProject};
+use crate::{MoleculeDataRoomEntry, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeUpsertProjectDataRoomEntryUseCase: Send + Sync {
+pub trait MoleculeViewDataRoomEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        source_event_time: Option<DateTime<Utc>>,
-        path: CollectionPath,
-        reference: odf::DatasetID,
-        denormalized_file_info: MoleculeDenormalizeFileToDataRoom,
-    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertProjectDataRoomEntryError>;
+        as_of: Option<odf::Multihash>,
+        path_prefix: Option<CollectionPath>,
+        max_depth: Option<usize>,
+        // TODO: filters
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
-pub enum MoleculeUpsertProjectDataRoomEntryError {
-    #[error(transparent)]
-    RefCASFailed(#[from] odf::dataset::RefCASError),
+pub type MoleculeDataRoomEntriesListing = EntityPageListing<MoleculeDataRoomEntry>;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum MoleculeViewDataRoomEntriesError {
     #[error(transparent)]
     Access(#[from] odf::AccessError),
 

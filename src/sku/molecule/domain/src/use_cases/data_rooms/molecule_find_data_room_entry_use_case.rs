@@ -10,27 +10,31 @@
 use internal_error::InternalError;
 use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeProject, MoleculeUpdateProjectDataRoomEntryResult};
+use crate::{MoleculeDataRoomEntry, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeRemoveProjectDataRoomEntryUseCase: Send + Sync {
-    async fn execute(
+pub trait MoleculeFindDataRoomEntryUseCase: Send + Sync {
+    async fn execute_find_by_path(
         &self,
         molecule_project: &MoleculeProject,
+        as_of: Option<odf::Multihash>,
         path: CollectionPath,
-        expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeRemoveProjectDataRoomEntryError>;
+    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindDataRoomEntryError>;
+
+    async fn execute_find_by_ref(
+        &self,
+        molecule_project: &MoleculeProject,
+        as_of: Option<odf::Multihash>,
+        r#ref: &odf::DatasetID,
+    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeRemoveProjectDataRoomEntryError {
-    #[error(transparent)]
-    RefCASFailed(#[from] odf::dataset::RefCASError),
-
+pub enum MoleculeFindDataRoomEntryError {
     #[error(transparent)]
     Access(#[from] odf::AccessError),
 

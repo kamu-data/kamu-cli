@@ -14,10 +14,10 @@ use database_common::PaginationOpts;
 use kamu_datasets::ResolvedDataset;
 use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
-    MoleculeFindProjectDataRoomEntryError,
-    MoleculeFindProjectDataRoomEntryUseCase,
-    MoleculeViewProjectDataRoomEntriesUseCase,
-    MoleculeViewProjectDataRoomError,
+    MoleculeFindDataRoomEntryError,
+    MoleculeFindDataRoomEntryUseCase,
+    MoleculeViewDataRoomEntriesError,
+    MoleculeViewDataRoomEntriesUseCase,
 };
 
 use crate::data_loader::AccessCheckedDatasetRef;
@@ -103,10 +103,10 @@ impl MoleculeDataRoomProjection<'_> {
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
         let page = page.unwrap_or(0);
 
-        let molecule_view_data_room_entries =
-            from_catalog_n!(ctx, dyn MoleculeViewProjectDataRoomEntriesUseCase);
+        let view_data_room_entries_uc =
+            from_catalog_n!(ctx, dyn MoleculeViewDataRoomEntriesUseCase);
 
-        let molecule_entries_listing = molecule_view_data_room_entries
+        let molecule_entries_listing = view_data_room_entries_uc
             .execute(
                 &self.project.entity,
                 self.as_of.clone(),
@@ -119,8 +119,8 @@ impl MoleculeDataRoomProjection<'_> {
             )
             .await
             .map_err(|e| match e {
-                MoleculeViewProjectDataRoomError::Access(e) => GqlError::Access(e),
-                MoleculeViewProjectDataRoomError::Internal(e) => e.int_err().into(),
+                MoleculeViewDataRoomEntriesError::Access(e) => GqlError::Access(e),
+                MoleculeViewDataRoomEntriesError::Internal(e) => e.int_err().into(),
             })?;
 
         let api_entry_nodes = molecule_entries_listing
@@ -142,15 +142,14 @@ impl MoleculeDataRoomProjection<'_> {
         ctx: &Context<'_>,
         path: CollectionPath<'static>,
     ) -> Result<Option<MoleculeDataRoomEntry>> {
-        let molecule_find_data_room_entry =
-            from_catalog_n!(ctx, dyn MoleculeFindProjectDataRoomEntryUseCase);
+        let find_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeFindDataRoomEntryUseCase);
 
-        let maybe_entry = molecule_find_data_room_entry
+        let maybe_entry = find_data_room_entry_uc
             .execute_find_by_path(&self.project.entity, self.as_of.clone(), path.into())
             .await
             .map_err(|e| match e {
-                MoleculeFindProjectDataRoomEntryError::Access(e) => GqlError::Access(e),
-                MoleculeFindProjectDataRoomEntryError::Internal(e) => e.int_err().into(),
+                MoleculeFindDataRoomEntryError::Access(e) => GqlError::Access(e),
+                MoleculeFindDataRoomEntryError::Internal(e) => e.int_err().into(),
             })?;
 
         let maybe_api_entry =

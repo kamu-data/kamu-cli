@@ -82,8 +82,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
         data_room_dataset_id: &odf::DatasetID,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
-    {
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
         let writable_data_room = self.writable_data_room(data_room_dataset_id).await?;
 
         match self
@@ -95,22 +94,20 @@ impl MoleculeDataRoomCollectionServiceImpl {
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => {
-                Ok(MoleculeUpdateProjectDataRoomEntryResult::Success(
-                    MoleculeUpdateProjectDataRoomEntrySuccess {
-                        old_head: r.old_head,
-                        new_head: r.new_head,
-                        inserted_records: r.inserted_records,
-                        system_time: r.system_time,
-                    },
-                ))
-            }
-            Ok(UpdateCollectionEntriesResult::UpToDate) => {
-                Ok(MoleculeUpdateProjectDataRoomEntryResult::UpToDate)
-            }
-            Ok(UpdateCollectionEntriesResult::NotFound(e)) => Ok(
-                MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(e.path),
+            Ok(UpdateCollectionEntriesResult::Success(r)) => Ok(
+                MoleculeUpdateDataRoomEntryResult::Success(MoleculeUpdateDataRoomEntrySuccess {
+                    old_head: r.old_head,
+                    new_head: r.new_head,
+                    inserted_records: r.inserted_records,
+                    system_time: r.system_time,
+                }),
             ),
+            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+                Ok(MoleculeUpdateDataRoomEntryResult::UpToDate)
+            }
+            Ok(UpdateCollectionEntriesResult::NotFound(e)) => {
+                Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(e.path))
+            }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e)) => Err(e.into()),
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
@@ -233,7 +230,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
             .await?;
 
         match result {
-            MoleculeUpdateProjectDataRoomEntryResult::Success(mut success) => {
+            MoleculeUpdateDataRoomEntryResult::Success(mut success) => {
                 assert!(!success.inserted_records.is_empty());
 
                 let (op, last_inserted_record) = success.inserted_records.pop().unwrap();
@@ -247,8 +244,8 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                     extra_data: last_inserted_record.extra_data,
                 })
             }
-            MoleculeUpdateProjectDataRoomEntryResult::UpToDate
-            | MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(_) => {
+            MoleculeUpdateDataRoomEntryResult::UpToDate
+            | MoleculeUpdateDataRoomEntryResult::EntryNotFound(_) => {
                 unreachable!()
             }
         }
@@ -266,8 +263,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         path_from: CollectionPath,
         path_to: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
-    {
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
         self.execute_collection_update(
             data_room_dataset_id,
             vec![CollectionUpdateOperation::r#move(path_from, path_to, None)],
@@ -287,8 +283,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         data_room_dataset_id: &odf::DatasetID,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>
-    {
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
         self.execute_collection_update(
             data_room_dataset_id,
             vec![CollectionUpdateOperation::remove(path)],

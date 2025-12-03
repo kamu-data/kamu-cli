@@ -7,34 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeDataRoomEntry, MoleculeProject};
+use crate::{MoleculeDataRoomEntry, MoleculeDenormalizeFileToDataRoom, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeFindProjectDataRoomEntryUseCase: Send + Sync {
-    async fn execute_find_by_path(
+pub trait MoleculeUpsertDataRoomEntryUseCase: Send + Sync {
+    async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        as_of: Option<odf::Multihash>,
+        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
-    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError>;
-
-    async fn execute_find_by_ref(
-        &self,
-        molecule_project: &MoleculeProject,
-        as_of: Option<odf::Multihash>,
-        r#ref: &odf::DatasetID,
-    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError>;
+        reference: odf::DatasetID,
+        denormalized_file_info: MoleculeDenormalizeFileToDataRoom,
+    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeFindProjectDataRoomEntryError {
+pub enum MoleculeUpsertDataRoomEntryError {
+    #[error(transparent)]
+    RefCASFailed(#[from] odf::dataset::RefCASError),
+
     #[error(transparent)]
     Access(#[from] odf::AccessError),
 

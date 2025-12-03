@@ -17,8 +17,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeRemoveProjectDataRoomEntryUseCase)]
-pub struct MoleculeRemoveProjectDataRoomEntryUseCaseImpl {
+#[dill::interface(dyn MoleculeMoveDataRoomEntryUseCase)]
+pub struct MoleculeMoveDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
 }
 
@@ -26,50 +26,45 @@ pub struct MoleculeRemoveProjectDataRoomEntryUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeRemoveProjectDataRoomEntryUseCase for MoleculeRemoveProjectDataRoomEntryUseCaseImpl {
+impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeRemoveProjectDataRoomEntryUseCaseImpl_execute,
+        name = MoleculeMoveDataRoomEntryUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, path = %path, ?expected_head)
+        fields(ipnft_uid = %molecule_project.ipnft_uid, path_from = %path_from, path_to = %path_to, ?expected_head)
     )]
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        path: CollectionPath,
+        path_from: CollectionPath,
+        path_to: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeRemoveProjectDataRoomEntryError>
-    {
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeMoveDataRoomEntryError> {
         let result = self
             .data_room_collection_service
-            .remove_data_room_collection_entry_by_path(
+            .move_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
-                path,
+                path_from,
+                path_to,
                 expected_head,
             )
             .await
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionWriteError::DataRoomNotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionWriteError::RefCASFailed(e) => {
-                    MoleculeRemoveProjectDataRoomEntryError::RefCASFailed(e)
+                    MoleculeMoveDataRoomEntryError::RefCASFailed(e)
                 }
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
-                    MoleculeRemoveProjectDataRoomEntryError::Access(e)
+                    MoleculeMoveDataRoomEntryError::Access(e)
                 }
                 MoleculeDataRoomCollectionWriteError::Internal(e) => {
-                    MoleculeRemoveProjectDataRoomEntryError::Internal(e)
+                    MoleculeMoveDataRoomEntryError::Internal(e)
                 }
             })?;
 
         // TODO: outbox event
 
-        match result {
-            MoleculeUpdateProjectDataRoomEntryResult::EntryNotFound(_) => {
-                // Deletes are idempotent
-                Ok(MoleculeUpdateProjectDataRoomEntryResult::UpToDate)
-            }
-            _ => Ok(result),
-        }
+        Ok(result)
     }
 }
 

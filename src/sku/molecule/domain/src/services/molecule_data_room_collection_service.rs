@@ -55,27 +55,27 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         path_from: CollectionPath,
         path_to: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
 
     async fn remove_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
-    ) -> Result<MoleculeUpdateProjectDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum MoleculeUpdateProjectDataRoomEntryResult {
-    Success(MoleculeUpdateProjectDataRoomEntrySuccess),
+pub enum MoleculeUpdateDataRoomEntryResult {
+    Success(MoleculeUpdateDataRoomEntrySuccess),
     UpToDate,
     EntryNotFound(CollectionPath),
 }
 
 #[derive(Debug)]
-pub struct MoleculeUpdateProjectDataRoomEntrySuccess {
+pub struct MoleculeUpdateDataRoomEntrySuccess {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
     pub inserted_records: Vec<(

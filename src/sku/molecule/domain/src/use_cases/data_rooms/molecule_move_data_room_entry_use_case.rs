@@ -7,35 +7,31 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeDataRoomEntry, MoleculeProject};
+use crate::{MoleculeProject, MoleculeUpdateDataRoomEntryResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeViewProjectDataRoomEntriesUseCase: Send + Sync {
+pub trait MoleculeMoveDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        as_of: Option<odf::Multihash>,
-        path_prefix: Option<CollectionPath>,
-        max_depth: Option<usize>,
-        // TODO: filters
-        pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewProjectDataRoomError>;
+        path_from: CollectionPath,
+        path_to: CollectionPath,
+        expected_head: Option<odf::Multihash>,
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeMoveDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeDataRoomEntriesListing = EntityPageListing<MoleculeDataRoomEntry>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeViewProjectDataRoomError {
+pub enum MoleculeMoveDataRoomEntryError {
+    #[error(transparent)]
+    RefCASFailed(#[from] odf::dataset::RefCASError),
+
     #[error(transparent)]
     Access(#[from] odf::AccessError),
 

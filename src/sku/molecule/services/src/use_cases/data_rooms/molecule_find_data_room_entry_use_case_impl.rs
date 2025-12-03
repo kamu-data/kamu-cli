@@ -17,8 +17,8 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeFindProjectDataRoomEntryUseCase)]
-pub struct MoleculeFindProjectDataRoomEntryUseCaseImpl {
+#[dill::interface(dyn MoleculeFindDataRoomEntryUseCase)]
+pub struct MoleculeFindDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
 }
 
@@ -26,10 +26,10 @@ pub struct MoleculeFindProjectDataRoomEntryUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntryUseCaseImpl {
+impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeFindProjectDataRoomEntryUseCaseImpl_execute_find_by_path,
+        name = MoleculeFindDataRoomEntryUseCaseImpl_execute_find_by_path,
         skip_all,
         fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, path = %path)
     )]
@@ -38,7 +38,7 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
         molecule_project: &MoleculeProject,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError> {
+    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindDataRoomEntryError> {
         let maybe_entry = self
             .data_room_collection_service
             .find_data_room_collection_entry_by_path(
@@ -50,10 +50,10 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeFindProjectDataRoomEntryError::Access(e)
+                    MoleculeFindDataRoomEntryError::Access(e)
                 }
                 MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeFindProjectDataRoomEntryError::Internal(e)
+                    MoleculeFindDataRoomEntryError::Internal(e)
                 }
             })?;
 
@@ -66,7 +66,7 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeFindProjectDataRoomEntryUseCaseImpl_execute_find_by_ref,
+        name = MoleculeFindDataRoomEntryUseCaseImpl_execute_find_by_ref,
         skip_all,
         fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, r#ref = ?r#ref)
     )]
@@ -75,7 +75,7 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
         molecule_project: &MoleculeProject,
         as_of: Option<odf::Multihash>,
         r#ref: &odf::DatasetID,
-    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindProjectDataRoomEntryError> {
+    ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindDataRoomEntryError> {
         let maybe_entry = self
             .data_room_collection_service
             .find_data_room_collection_entry_by_ref(
@@ -87,10 +87,10 @@ impl MoleculeFindProjectDataRoomEntryUseCase for MoleculeFindProjectDataRoomEntr
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
                 MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeFindProjectDataRoomEntryError::Access(e)
+                    MoleculeFindDataRoomEntryError::Access(e)
                 }
                 MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeFindProjectDataRoomEntryError::Internal(e)
+                    MoleculeFindDataRoomEntryError::Internal(e)
                 }
             })?;
 

@@ -60,9 +60,9 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
     ) -> Result<MoleculeProjectMutationResultV2> {
         let molecule_subject = molecule_subject(ctx)?;
-        let use_case = from_catalog_n!(ctx, dyn MoleculeDisableProjectUseCase);
+        let disable_project_uc = from_catalog_n!(ctx, dyn MoleculeDisableProjectUseCase);
 
-        let project = use_case
+        let project = disable_project_uc
             .execute(&molecule_subject, ipnft_uid.clone())
             .await
             .map_err(|err| map_disable_error(err, &ipnft_uid))?;
@@ -81,9 +81,9 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
     ) -> Result<MoleculeProjectMutationResultV2> {
         let molecule_subject = molecule_subject(ctx)?;
-        let use_case = from_catalog_n!(ctx, dyn MoleculeEnableProjectUseCase);
+        let enable_project_uc = from_catalog_n!(ctx, dyn MoleculeEnableProjectUseCase);
 
-        let project = use_case
+        let project = enable_project_uc
             .execute(&molecule_subject, ipnft_uid.clone())
             .await
             .map_err(|err| map_enable_error(err, &ipnft_uid))?;
@@ -103,8 +103,9 @@ impl MoleculeMutV2 {
     ) -> Result<Option<MoleculeProjectMutV2>> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let molecule_find_project = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
-        let maybe_project_entity = molecule_find_project
+        let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
+
+        let maybe_project_entity = find_project_uc
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
