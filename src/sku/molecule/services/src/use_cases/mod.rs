@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod activities;
+mod announcements;
 mod data_rooms;
 mod projects;
 
 pub use activities::*;
+pub use announcements::*;
 pub use data_rooms::*;
 pub use projects::*;

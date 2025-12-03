@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::auth;
+use kamu_datasets::ResolvedDataset;
 use odf::serde::DatasetDefaultVocabularySystemColumns;
 
 use crate::domain::*;
@@ -65,6 +66,25 @@ impl MoleculeCreateAnnouncementUseCaseImpl {
 
         Ok(())
     }
+
+    async fn get_project_announcements_dataset(
+        &self,
+        molecule_project: &MoleculeProject,
+    ) -> Result<ResolvedDataset, MoleculeCreateAnnouncementError> {
+        self.rebac_dataset_registry_facade
+            .resolve_dataset_by_ref(
+                &molecule_project.announcements_dataset_id.as_local_ref(),
+                auth::DatasetAction::Write,
+            )
+            .await
+            .map_err(|e| {
+                use RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::NotFound(_) | E::Internal(_) => e.int_err().into(),
+                }
+            })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,7 +100,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
-        project_announcements_file_dataset: kamu_datasets::WriteCheckedDataset<'_>,
+        molecule_project: &MoleculeProject,
         mut global_announcement: MoleculeGlobalAnnouncementDataRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError> {
         // TODO: Align timestamps with ingest
@@ -148,10 +168,13 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .int_err()?;
 
         // 4. Store project announcements
+        let project_announcements_dataset = self
+            .get_project_announcements_dataset(molecule_project)
+            .await?;
 
         self.push_ingest_use_case
             .execute(
-                project_announcements_file_dataset.clone(),
+                project_announcements_dataset,
                 kamu_core::DataSource::Buffer(project_announcement_record.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,

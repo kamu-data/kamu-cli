@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::WriteCheckedDataset;
+use std::sync::Arc;
+
 use kamu_molecule_domain::{
     MoleculeCreateAnnouncementUseCase,
     MoleculeGlobalAnnouncementDataRecord,
@@ -16,31 +17,23 @@ use kamu_molecule_domain::{
 use crate::molecule::molecule_subject;
 use crate::mutations::molecule_mut::v1;
 use crate::prelude::*;
-use crate::queries::DatasetRequestState;
 use crate::queries::molecule::v2::{MoleculeAccessLevel, MoleculeProjectV2};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeAnnouncementsDatasetMutV2<'a> {
-    data_room_writable_state: DatasetRequestState,
-    project: &'a MoleculeProjectV2,
+pub struct MoleculeAnnouncementsDatasetMutV2 {
+    project: Arc<MoleculeProjectV2>,
 }
 
-impl<'a> MoleculeAnnouncementsDatasetMutV2<'a> {
-    pub fn new(
-        data_room_writable_state: DatasetRequestState,
-        project: &'a MoleculeProjectV2,
-    ) -> Self {
-        Self {
-            data_room_writable_state,
-            project,
-        }
+impl MoleculeAnnouncementsDatasetMutV2 {
+    pub fn new(project: Arc<MoleculeProjectV2>) -> Self {
+        Self { project }
     }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeAnnouncementsDatasetMutV2<'_> {
+impl MoleculeAnnouncementsDatasetMutV2 {
     /// Creates an announcement record for the project.
     #[tracing::instrument(level = "info", name = MoleculeAnnouncementsDatasetMutV2_create, skip_all)]
     async fn create(
@@ -59,8 +52,6 @@ impl MoleculeAnnouncementsDatasetMutV2<'_> {
         let molecule_create_announcement_use_case =
             from_catalog_n!(ctx, dyn MoleculeCreateAnnouncementUseCase);
 
-        let project_announcement_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
         let global_announcement = MoleculeGlobalAnnouncementDataRecord {
             announcement_id: None,
             ipnft_uid: self.project.entity.ipnft_uid.clone(),
@@ -80,11 +71,7 @@ impl MoleculeAnnouncementsDatasetMutV2<'_> {
         use kamu_molecule_domain::MoleculeCreateAnnouncementError as E;
 
         match molecule_create_announcement_use_case
-            .execute(
-                &molecule_subject,
-                WriteCheckedDataset(project_announcement_dataset),
-                global_announcement,
-            )
+            .execute(&molecule_subject, &self.project.entity, global_announcement)
             .await
         {
             Ok(create_res) => Ok(v1::CreateAnnouncementResult::Success(

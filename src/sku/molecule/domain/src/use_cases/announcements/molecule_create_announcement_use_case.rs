@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::MoleculeGlobalAnnouncementDataRecord;
+use crate::{MoleculeGlobalAnnouncementDataRecord, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ pub trait MoleculeCreateAnnouncementUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
-        project_announcements_file_dataset: kamu_datasets::WriteCheckedDataset<'_>,
+        molecule_project: &MoleculeProject,
         global_announcement: MoleculeGlobalAnnouncementDataRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError>;
 }
