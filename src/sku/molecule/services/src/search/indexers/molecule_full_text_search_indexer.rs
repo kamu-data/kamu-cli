@@ -33,6 +33,8 @@ pub(crate) struct MoleculeFullTextSearchIndexer {
 }
 
 impl MoleculeFullTextSearchIndexer {
+    const BULK_SIZE: usize = 500;
+
     fn organization_account(&self) -> &LoggedAccount {
         match self.current_account {
             CurrentAccountSubject::Logged(ref account) => account,
@@ -52,6 +54,9 @@ impl MoleculeFullTextSearchIndexer {
             "Indexing projects for Molecule organization account",
         );
 
+        let mut total_documents_count = 0;
+        let mut documents_by_id = Vec::new();
+
         // Load all projects for the organization account
         let projects_listing = self
             .molecule_view_projects_uc
@@ -60,7 +65,6 @@ impl MoleculeFullTextSearchIndexer {
             .int_err()?;
 
         // Index each project
-        let mut documents_by_id = Vec::new();
         for project in projects_listing.list {
             // Serialize project into search document
             let document = helpers::index_project_from_entity(&project);
@@ -68,21 +72,40 @@ impl MoleculeFullTextSearchIndexer {
             // Note: for now, use IPNFT UID as document ID
             // This should be revised after implementing non-tokenized projects
             documents_by_id.push((project.ipnft_uid.clone(), document));
+
+            // Bulk index when we reach BULK_SIZE
+            if documents_by_id.len() >= Self::BULK_SIZE {
+                tracing::debug!(
+                    documents_count = documents_by_id.len(),
+                    "Bulk indexing projects batch",
+                );
+                repo.index_bulk(project_schema::SCHEMA_NAME, documents_by_id)
+                    .await?;
+                total_documents_count += Self::BULK_SIZE;
+                documents_by_id = Vec::new();
+            }
         }
 
-        // Write documents to the index
-        let documents_count = documents_by_id.len();
-        repo.index_bulk(project_schema::SCHEMA_NAME, documents_by_id)
-            .await?;
+        // Index remaining documents
+        if !documents_by_id.is_empty() {
+            let remaining_count = documents_by_id.len();
+            tracing::debug!(
+                documents_count = remaining_count,
+                "Bulk indexing final projects batch",
+            );
+            repo.index_bulk(project_schema::SCHEMA_NAME, documents_by_id)
+                .await?;
+            total_documents_count += remaining_count;
+        }
 
         tracing::info!(
             organization_account_name = organization_account.account_name.as_str(),
             organization_account_id = organization_account.account_id.to_string(),
-            indexed_documents_count = documents_count,
+            indexed_documents_count = total_documents_count,
             "Indexed projects for Molecule organization account",
         );
 
-        Ok(documents_count)
+        Ok(total_documents_count)
     }
 
     pub(crate) async fn index_data_room_entries(
@@ -98,6 +121,7 @@ impl MoleculeFullTextSearchIndexer {
         );
 
         let mut total_documents_count = 0;
+        let mut documents_by_id = Vec::new();
 
         // Load all projects for the organization account
         let projects_listing = self
@@ -118,9 +142,10 @@ impl MoleculeFullTextSearchIndexer {
                 )
                 .await
                 .map_err(|e| {
-                    println!(
-                        "Failed to load data room entries for project {}: {:?}",
-                        project.ipnft_uid, e
+                    tracing::warn!(
+                        project_ipnft_uid = project.ipnft_uid.as_str(),
+                        error = ?e,
+                        "Failed to load data room entries for project",
                     );
                     e
                 })
@@ -132,27 +157,37 @@ impl MoleculeFullTextSearchIndexer {
             }
 
             // Prepare documents for indexing
-            let mut documents_by_id = Vec::new();
             for entry in data_room_entries.list {
                 let document = helpers::index_data_room_entry_from_entity(&project, &entry);
 
                 // Synthesize document ID as "<ipnft_uid>:<entry_path>"
                 let entry_document_id = format!("{}:{}", project.ipnft_uid, entry.path);
                 documents_by_id.push((entry_document_id, document));
+
+                // Bulk index when we reach BULK_SIZE
+                if documents_by_id.len() >= Self::BULK_SIZE {
+                    tracing::debug!(
+                        documents_count = documents_by_id.len(),
+                        "Bulk indexing data room entries batch",
+                    );
+                    repo.index_bulk(data_room_entry_schema::SCHEMA_NAME, documents_by_id)
+                        .await?;
+                    total_documents_count += Self::BULK_SIZE;
+                    documents_by_id = Vec::new();
+                }
             }
+        }
 
-            // Write documents of this project to the index
-            let documents_count = documents_by_id.len();
-
+        // Index remaining documents
+        if !documents_by_id.is_empty() {
+            let remaining_count = documents_by_id.len();
             tracing::debug!(
-                project_ipnft_uid = project.ipnft_uid.as_str(),
-                indexed_documents_count = documents_count,
-                "Indexing data room entries for Molecule project",
+                documents_count = remaining_count,
+                "Bulk indexing final data room entries batch",
             );
             repo.index_bulk(data_room_entry_schema::SCHEMA_NAME, documents_by_id)
                 .await?;
-
-            total_documents_count += documents_count;
+            total_documents_count += remaining_count;
         }
 
         tracing::info!(
