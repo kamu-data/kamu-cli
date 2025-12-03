@@ -11,7 +11,7 @@ use std::path::Path;
 
 use database_common::{DatabaseConnectionSettings, SqlitePoolOptions, TransactionRef};
 use dill::CatalogBuilder;
-use kamu::domain::{ServerUrlConfig, TenancyConfig};
+use kamu::domain::{KamuBackgroundCatalog, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
 use kamu_adapter_http::AccessToken;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
@@ -139,13 +139,21 @@ fn test_di_server_graph_validates(
     .unwrap();
     let base_catalog = base_catalog_builder.build();
 
-    let mut cli_catalog_builder = kamu_cli::configure_server_catalog(&base_catalog, tenancy_config);
+    let mut server_catalog_builder =
+        kamu_cli::configure_server_catalog(&base_catalog, tenancy_config);
+    server_catalog_builder.add_value(JwtAuthenticationConfig::default());
+    server_catalog_builder.add_value(GithubAuthenticationConfig::default());
+    server_catalog_builder.add_value(ServerUrlConfig::new_test(None));
+    server_catalog_builder.add_value(AccessToken::new("some-test-token"));
+    server_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
+    let server_catalog = server_catalog_builder.build();
+
+    let wrapped_catalog = dill::CatalogBuilder::new_chained(&server_catalog)
+        .add_value(KamuBackgroundCatalog::new(server_catalog.clone()))
+        .build();
+
+    let mut cli_catalog_builder = dill::CatalogBuilder::new_chained(&wrapped_catalog);
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
-    cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
-    cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
-    cli_catalog_builder.add_value(ServerUrlConfig::new_test(None));
-    cli_catalog_builder.add_value(AccessToken::new("some-test-token"));
-    cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed

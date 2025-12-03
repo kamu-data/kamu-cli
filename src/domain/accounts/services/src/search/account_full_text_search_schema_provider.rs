@@ -37,7 +37,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: &dyn FullTextSearchRepository,
+        repo: Arc<dyn FullTextSearchRepository>,
         schema: &FullTextSearchEntitySchema,
     ) -> Result<usize, InternalError> {
         assert!(schema.schema_name == account_schema::SCHEMA_NAME);

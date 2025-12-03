@@ -7,11 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod metadata_chain_comparator;
-pub mod paths;
+mod molecule_full_text_search_indexer;
 
-mod tenancy_config;
-pub use tenancy_config::*;
-
-mod kamu_background_catalog;
-pub use kamu_background_catalog::*;
+pub(crate) use molecule_full_text_search_indexer::*;

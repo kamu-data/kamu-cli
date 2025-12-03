@@ -85,7 +85,7 @@ impl FullTextSearchIndexer {
                         "No existing documents found, running full reindexing",
                     );
                     match provider
-                        .run_schema_initial_indexing(self.full_text_repo.as_ref(), schema)
+                        .run_schema_initial_indexing(self.full_text_repo.clone(), schema)
                         .await
                     {
                         Ok(num_indexed) => {

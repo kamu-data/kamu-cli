@@ -24,14 +24,13 @@ const SCHEMA_VERSION: u32 = 1;
 pub const FIELD_CREATED_AT: &str = "created_at";
 pub const FIELD_UPDATED_AT: &str = "updated_at";
 pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
-pub const FIELD_ENTRY_DATASET_ID: &str = "entry_dataset_id";
+pub const FIELD_REFERENCE: &str = "reference";
 pub const FIELD_PATH: &str = "path";
 pub const FIELD_VERSION: &str = "version";
 pub const FIELD_ACCESS_LEVEL: &str = "access_level";
 pub const FIELD_DESCRIPTION: &str = "description";
 pub const FIELD_CATEGORIES: &str = "categories";
 pub const FIELD_TAGS: &str = "tags";
-pub const FIELD_CONTENT_TEXT: &str = "content_text";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,7 +48,7 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
-        path: FIELD_ENTRY_DATASET_ID,
+        path: FIELD_REFERENCE,
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
@@ -70,12 +69,6 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_DESCRIPTION,
-        role: FullTextSchemaFieldRole::Prose {
-            enable_positions: true,
-        },
-    },
-    FullTextSchemaField {
-        path: FIELD_CONTENT_TEXT,
         role: FullTextSchemaFieldRole::Prose {
             enable_positions: true,
         },

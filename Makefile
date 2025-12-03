@@ -209,7 +209,7 @@ elasticsearch-setup:
   		-e "xpack.ml.enabled=false" \
 		-e "discovery.type=single-node" \
 		-e ELASTIC_PASSWORD=root \
-		-e "cluster.routing.allocation.disk.threshold_enabled=false"
+		-e "cluster.routing.allocation.disk.threshold_enabled=false" \
 		-v kamu-elastic-data:/usr/share/elasticsearch/data \
 		-d \
 		docker.io/library/elasticsearch:9.2.1

@@ -10,7 +10,9 @@
 mod molecule_full_text_search_schema_helpers;
 mod molecule_full_text_search_schema_provider;
 
+mod indexers;
 mod updaters;
 
+pub(crate) use indexers::*;
 pub use molecule_full_text_search_schema_provider::*;
 pub use updaters::*;

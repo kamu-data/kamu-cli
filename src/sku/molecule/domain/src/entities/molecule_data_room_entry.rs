@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{CollectionEntry, CollectionPath, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,17 +33,19 @@ pub struct MoleculeDataRoomEntry {
 }
 
 impl MoleculeDataRoomEntry {
-    pub fn try_from_collection_entry(entry: CollectionEntry) -> Result<Self, InternalError> {
+    pub fn from_collection_entry(entry: CollectionEntry) -> Self {
         let denormalized_latest_file_info =
-            MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(entry.extra_data)?;
+            MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(entry.extra_data)
+                .ok()
+                .unwrap_or_default();
 
-        Ok(Self {
+        Self {
             system_time: entry.system_time,
             event_time: entry.event_time,
             path: entry.path,
             reference: entry.reference,
             denormalized_latest_file_info,
-        })
+        }
     }
 }
 
@@ -67,11 +68,27 @@ pub struct MoleculeDenormalizeFileToDataRoom {
     pub tags: Vec<String>,
 }
 
+impl Default for MoleculeDenormalizeFileToDataRoom {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            content_type: String::new(),
+            content_length: 0,
+            content_hash: odf::Multihash::from_digest_sha3_256(b""),
+            access_level: String::new(),
+            change_by: String::new(),
+            description: None,
+            categories: Vec::new(),
+            tags: Vec::new(),
+        }
+    }
+}
+
 impl MoleculeDenormalizeFileToDataRoom {
     pub fn try_from_extra_data_fields(
         extra_data: kamu_datasets::ExtraDataFields,
-    ) -> Result<Self, InternalError> {
-        serde_json::from_value(extra_data.into_inner().into()).int_err()
+    ) -> Result<Self, serde_json::Error> {
+        serde_json::from_value(extra_data.into_inner().into())
     }
 
     pub fn to_collection_extra_data_fields(&self) -> kamu_datasets::ExtraDataFields {

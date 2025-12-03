@@ -72,8 +72,8 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
         let molecule_entries = entries_listing
             .list
             .into_iter()
-            .map(MoleculeDataRoomEntry::try_from_collection_entry)
-            .try_collect()?;
+            .map(MoleculeDataRoomEntry::from_collection_entry)
+            .collect();
 
         Ok(MoleculeDataRoomEntriesListing {
             total_count: entries_listing.total_count,
