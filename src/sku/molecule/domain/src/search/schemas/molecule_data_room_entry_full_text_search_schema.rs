@@ -73,6 +73,14 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
             enable_positions: true,
         },
     },
+    FullTextSchemaField {
+        path: FIELD_CATEGORIES,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_TAGS,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
