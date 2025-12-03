@@ -38,8 +38,15 @@ pub enum MoleculeGlobalActivity {
 impl MoleculeGlobalActivity {
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
-            Self::DataRoomActivity(a) => a.event_time,
-            Self::Announcement(a) => a.system_columns.event_time,
+            Self::DataRoomActivity(entity) => entity.event_time,
+            Self::Announcement(entity) => entity.system_columns.event_time,
+        }
+    }
+
+    pub fn ipnft_uid(&self) -> &String {
+        match self {
+            Self::DataRoomActivity(entity) => &entity.ipnft_uid,
+            Self::Announcement(entity) => &entity.record.ipnft_uid,
         }
     }
 }

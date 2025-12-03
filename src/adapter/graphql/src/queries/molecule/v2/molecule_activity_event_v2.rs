@@ -33,7 +33,6 @@ impl MoleculeActivityEventV2 {
         Self::FileRemoved(MoleculeActivityFileRemovedV2 { entry })
     }
 
-    #[expect(dead_code)]
     pub fn announcement(announcement: MoleculeAnnouncementEntry) -> Self {
         Self::Announcement(MoleculeActivityAnnouncementV2 { announcement })
     }

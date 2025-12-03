@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
@@ -57,54 +59,67 @@ impl MoleculeAnnouncements {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeAnnouncementEntry;
+pub struct MoleculeAnnouncementEntry {
+    pub entity: kamu_molecule_domain::MoleculeGlobalAnnouncementRecord,
+    pub project: Arc<MoleculeProjectV2>,
+}
+
+impl MoleculeAnnouncementEntry {
+    pub fn new_from_global_announcement_record(
+        project: &Arc<MoleculeProjectV2>,
+        entity: kamu_molecule_domain::MoleculeGlobalAnnouncementRecord,
+    ) -> Self {
+        Self {
+            entity,
+            project: project.clone(),
+        }
+    }
+}
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncementEntry {
-    #[expect(clippy::unused_async)]
-    async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
-        todo!()
+    async fn project(&self) -> &MoleculeProjectV2 {
+        self.project.as_ref()
     }
 
-    #[expect(clippy::unused_async)]
-    async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementId> {
-        todo!()
+    async fn id(&self) -> MoleculeAnnouncementId {
+        let id = self.entity.record.announcement_id.as_ref().unwrap();
+        id.to_string()
     }
 
-    #[expect(clippy::unused_async)]
-    async fn headline(&self, _ctx: &Context<'_>) -> Result<String> {
-        todo!()
+    async fn headline(&self) -> &String {
+        &self.entity.record.headline
     }
 
-    #[expect(clippy::unused_async)]
-    async fn body(&self, _ctx: &Context<'_>) -> Result<String> {
-        todo!()
+    async fn body(&self) -> &String {
+        &self.entity.record.body
     }
 
-    #[expect(clippy::unused_async)]
-    async fn attachments(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
-        todo!()
+    async fn attachments<'a>(&'a self) -> Vec<DatasetID<'a>> {
+        self.entity
+            .record
+            .attachments
+            .iter()
+            .map(Into::into)
+            .collect()
     }
 
-    #[expect(clippy::unused_async)]
-    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
-        todo!()
+    async fn access_level(&self) -> &MoleculeAccessLevel {
+        &self.entity.record.access_level
     }
 
-    #[expect(clippy::unused_async)]
-    async fn change_by(&self, _ctx: &Context<'_>) -> Result<AccountID<'static>> {
-        todo!()
+    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    async fn change_by(&self) -> &String {
+        &self.entity.record.change_by
     }
 
-    #[expect(clippy::unused_async)]
-    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeCategory>> {
-        todo!()
+    async fn categories(&self) -> &Vec<MoleculeCategory> {
+        &self.entity.record.categories
     }
 
-    #[expect(clippy::unused_async)]
-    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeTag>> {
-        todo!()
+    async fn tags(&self) -> &Vec<MoleculeTag> {
+        &self.entity.record.tags
     }
 }
 
