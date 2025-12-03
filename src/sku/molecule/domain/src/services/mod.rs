@@ -9,6 +9,8 @@
 
 mod molecule_data_room_collection_service;
 mod molecule_dataset_service;
+mod molecule_project_announcement_entries_service;
 
 pub use molecule_data_room_collection_service::*;
 pub use molecule_dataset_service::*;
+pub use molecule_project_announcement_entries_service::*;

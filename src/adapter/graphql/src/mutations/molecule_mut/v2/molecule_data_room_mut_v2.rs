@@ -295,6 +295,7 @@ impl MoleculeDataRoomMutV2 {
             .get_latest_data_room_entry(ctx, reference.as_ref())
             .await?
         else {
+            //
             todo!();
         };
 
