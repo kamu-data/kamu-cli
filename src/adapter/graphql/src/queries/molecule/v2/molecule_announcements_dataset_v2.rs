@@ -66,6 +66,7 @@ impl MoleculeAnnouncements {
         filters: Option<MoleculeAnnouncementsFilters>,
     ) -> Result<MoleculeAnnouncementEntryConnection> {
         // TODO: extract a use-case
+        //       (same at MoleculeProjectV2::get_announcement_activity_events())
 
         assert!(filters.is_none());
 

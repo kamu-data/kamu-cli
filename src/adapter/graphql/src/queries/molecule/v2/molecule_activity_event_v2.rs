@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
+
 use crate::prelude::*;
 use crate::queries::molecule::v2::{MoleculeAnnouncementEntry, MoleculeDataRoomEntry};
 
@@ -44,6 +46,15 @@ impl MoleculeActivityEventV2 {
             Self::FileUpdated(event) => Some(&event.entry),
             Self::FileRemoved(event) => Some(&event.entry),
             Self::Announcement(_) => None,
+        }
+    }
+
+    pub fn event_time(&self) -> DateTime<Utc> {
+        match self {
+            Self::FileAdded(e) => e.entry.entity.event_time,
+            Self::FileUpdated(e) => e.entry.entity.event_time,
+            Self::FileRemoved(e) => e.entry.entity.event_time,
+            Self::Announcement(e) => e.announcement.entity.system_columns.event_time,
         }
     }
 }

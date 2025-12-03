@@ -37,6 +37,18 @@ pub struct MoleculeProjectAnnouncementDataRecord {
 pub type MoleculeProjectAnnouncementRecord =
     odf::serde::DatasetDefaultVocabularyRecord<MoleculeProjectAnnouncementDataRecord>;
 
+pub trait MoleculeProjectAnnouncementRecordExt {
+    fn from_json(
+        record: serde_json::Value,
+    ) -> Result<MoleculeProjectAnnouncementRecord, InternalError>;
+}
+
+impl MoleculeProjectAnnouncementRecordExt for MoleculeProjectAnnouncementRecord {
+    fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        serde_json::from_value(record).int_err()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -73,6 +85,8 @@ pub trait MoleculeGlobalAnnouncementRecordExt {
     ) -> Result<MoleculeGlobalAnnouncementRecord, InternalError>;
 
     fn as_project_announcement_record(&self) -> MoleculeProjectAnnouncementRecord;
+
+    fn into_project_announcement_record(self) -> MoleculeProjectAnnouncementRecord;
 }
 
 impl MoleculeGlobalAnnouncementRecordExt for MoleculeGlobalAnnouncementRecord {
@@ -92,6 +106,22 @@ impl MoleculeGlobalAnnouncementRecordExt for MoleculeGlobalAnnouncementRecord {
                 access_level: self.record.access_level.clone(),
                 categories: self.record.categories.clone(),
                 tags: self.record.tags.clone(),
+            },
+        }
+    }
+
+    fn into_project_announcement_record(self) -> MoleculeProjectAnnouncementRecord {
+        MoleculeProjectAnnouncementRecord {
+            system_columns: self.system_columns,
+            record: MoleculeProjectAnnouncementDataRecord {
+                announcement_id: self.record.announcement_id,
+                headline: self.record.headline,
+                body: self.record.body,
+                attachments: self.record.attachments,
+                change_by: self.record.change_by,
+                access_level: self.record.access_level,
+                categories: self.record.categories,
+                tags: self.record.tags,
             },
         }
     }
