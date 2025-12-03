@@ -13,7 +13,7 @@ use kamu_datasets::{CollectionEntry, CollectionPath, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDataRoomEntry {
     /// System time when this entry was created
     pub system_time: DateTime<Utc>,
@@ -51,7 +51,7 @@ impl MoleculeDataRoomEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// These fields are stored as extra columns in data room collection
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
     pub version: FileVersion,
     pub content_type: String,

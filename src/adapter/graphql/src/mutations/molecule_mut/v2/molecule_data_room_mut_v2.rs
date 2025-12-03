@@ -754,10 +754,13 @@ impl MoleculeDataRoomMutV2 {
         to_path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
+        let molecule_subject = molecule_subject(ctx)?;
+
         let move_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeMoveDataRoomEntryUseCase);
 
         match move_data_room_entry_uc
             .execute(
+                &molecule_subject,
                 &self.project.entity,
                 from_path.clone().into(),
                 to_path.into(),
@@ -802,11 +805,14 @@ impl MoleculeDataRoomMutV2 {
         path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
+        let molecule_subject = molecule_subject(ctx)?;
+
         let remove_data_room_entry_uc =
             from_catalog_n!(ctx, dyn MoleculeRemoveDataRoomEntryUseCase);
 
         match remove_data_room_entry_uc
             .execute(
+                &molecule_subject,
                 &self.project.entity,
                 path.clone().into(),
                 expected_head.map(Into::into),

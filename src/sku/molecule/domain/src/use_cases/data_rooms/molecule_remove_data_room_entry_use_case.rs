@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
 
 use crate::{MoleculeProject, MoleculeUpdateDataRoomEntryResult};
@@ -18,6 +19,7 @@ use crate::{MoleculeProject, MoleculeUpdateDataRoomEntryResult};
 pub trait MoleculeRemoveDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,

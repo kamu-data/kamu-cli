@@ -9,8 +9,10 @@
 
 use std::sync::Arc;
 
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::domain::*;
 
@@ -20,6 +22,7 @@ use crate::domain::*;
 #[dill::interface(dyn MoleculeMoveDataRoomEntryUseCase)]
 pub struct MoleculeMoveDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +38,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
     )]
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         path_from: CollectionPath,
         path_to: CollectionPath,
@@ -44,8 +48,8 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
             .data_room_collection_service
             .move_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
-                path_from,
-                path_to,
+                path_from.clone(),
+                path_to.clone(),
                 expected_head,
             )
             .await
@@ -62,7 +66,22 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                 }
             })?;
 
-        // TODO: outbox event
+        if let MoleculeUpdateDataRoomEntryResult::Success(success) = &result {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
+                    MoleculeDataRoomMessage::moved(
+                        success.system_time,
+                        molecule_subject.account_id.clone(),
+                        molecule_project.account_id.clone(),
+                        molecule_project.ipnft_uid.clone(),
+                        path_from,
+                        path_to,
+                    ),
+                )
+                .await
+                .int_err()?;
+        }
 
         Ok(result)
     }

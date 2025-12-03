@@ -9,8 +9,10 @@
 
 use std::sync::Arc;
 
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::domain::*;
 
@@ -20,6 +22,7 @@ use crate::domain::*;
 #[dill::interface(dyn MoleculeRemoveDataRoomEntryUseCase)]
 pub struct MoleculeRemoveDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +38,7 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
     )]
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
@@ -43,7 +47,7 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
             .data_room_collection_service
             .remove_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
-                path,
+                path.clone(),
                 expected_head,
             )
             .await
@@ -60,14 +64,33 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
                 }
             })?;
 
-        // TODO: outbox event
-
         match result {
+            MoleculeUpdateDataRoomEntryResult::Success(success) => {
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
+                        MoleculeDataRoomMessage::removed(
+                            success.system_time,
+                            molecule_subject.account_id.clone(),
+                            molecule_project.account_id.clone(),
+                            molecule_project.ipnft_uid.clone(),
+                            path,
+                        ),
+                    )
+                    .await
+                    .int_err()?;
+
+                Ok(MoleculeUpdateDataRoomEntryResult::Success(success))
+            }
+
             MoleculeUpdateDataRoomEntryResult::EntryNotFound(_) => {
                 // Deletes are idempotent
                 Ok(MoleculeUpdateDataRoomEntryResult::UpToDate)
             }
-            _ => Ok(result),
+
+            MoleculeUpdateDataRoomEntryResult::UpToDate => {
+                Ok(MoleculeUpdateDataRoomEntryResult::UpToDate)
+            }
         }
     }
 }
