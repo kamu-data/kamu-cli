@@ -91,7 +91,8 @@ impl MoleculeProjectV2 {
             )
             .int_err()?;
 
-        // Sorting will be done after merge
+        // We need sorting here, since the order is important for processing.
+        let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
 
         let records = df.collect_json_aos().await.int_err()?;
 
