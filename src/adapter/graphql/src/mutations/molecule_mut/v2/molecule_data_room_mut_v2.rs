@@ -64,26 +64,18 @@ use crate::queries::molecule::v2::{
     MoleculeVersionedFileExtraData,
     MoleculeVersionedFilePrefetch,
 };
-use crate::queries::{Account, DatasetRequestState, VersionedFileEntry};
+use crate::queries::{Account, VersionedFileEntry};
 use crate::utils::{ContentSource, get_content_args};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeDataRoomMutV2 {
     project: Arc<MoleculeProjectV2>,
-    _data_room_writable_state: DatasetRequestState, /* TODO: check if we can propagate it
-                                                     * somehow instead of ReBAC in use cases */
 }
 
 impl MoleculeDataRoomMutV2 {
-    pub fn new(
-        project: Arc<MoleculeProjectV2>,
-        data_room_writable_state: DatasetRequestState,
-    ) -> Self {
-        Self {
-            project,
-            _data_room_writable_state: data_room_writable_state,
-        }
+    pub fn new(project: Arc<MoleculeProjectV2>) -> Self {
+        Self { project }
     }
 
     // TODO: Specialize error handling
