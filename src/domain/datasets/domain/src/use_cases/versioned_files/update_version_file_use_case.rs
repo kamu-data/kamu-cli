@@ -47,6 +47,7 @@ pub struct UpdateVersionFileResult {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
     pub content_hash: odf::Multihash,
+    pub system_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -515,10 +515,19 @@ pub struct MoleculeVersionedFileEntryDetailedInfo {
 #[derive(serde::Serialize)]
 pub struct MoleculeVersionedFileExtraData<'a> {
     #[serde(flatten)]
-    basic_info: &'a MoleculeVersionedFileEntryBasicInfo,
+    pub basic_info: &'a MoleculeVersionedFileEntryBasicInfo,
 
     #[serde(flatten)]
-    detailed_info: &'a MoleculeVersionedFileEntryDetailedInfo,
+    pub detailed_info: &'a MoleculeVersionedFileEntryDetailedInfo,
+}
+
+impl MoleculeVersionedFileExtraData<'_> {
+    pub fn to_extra_data_fields(&self) -> kamu_datasets::ExtraDataFields {
+        let serde_json::Value::Object(json) = serde_json::to_value(self).unwrap() else {
+            unreachable!()
+        };
+        kamu_datasets::ExtraDataFields::new(json)
+    }
 }
 
 #[derive(Clone)]

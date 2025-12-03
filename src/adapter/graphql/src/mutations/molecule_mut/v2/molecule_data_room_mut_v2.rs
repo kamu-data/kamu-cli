@@ -61,6 +61,7 @@ use crate::queries::molecule::v2::{
     MoleculeVersionedFileEntry,
     MoleculeVersionedFileEntryBasicInfo,
     MoleculeVersionedFileEntryDetailedInfo,
+    MoleculeVersionedFileExtraData,
     MoleculeVersionedFilePrefetch,
 };
 use crate::queries::{Account, DatasetRequestState, VersionedFileEntry};
@@ -155,36 +156,22 @@ impl MoleculeDataRoomMutV2 {
         let content_length = content_args.content_length;
         let content_hash = versioned_file_head.clone();
 
-        let mut versioned_file_entry = MoleculeVersionedFileEntry {
-            entry: VersionedFileEntry {
-                file_dataset: versioned_file_dataset.clone(),
-                entity: kamu_datasets::VersionedFileEntry {
-                    system_time: event_time, // TODO: take from ingest result
-                    event_time,
-                    version: 0,
-                    content_type: content_args
-                        .content_type
-                        .as_ref()
-                        .map(|ct| ct.0.clone())
-                        .unwrap_or_default(),
-                    content_length: content_args.content_length,
-                    content_hash: content_hash.clone(),
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
-            },
-            basic_info: MoleculeVersionedFileEntryBasicInfo {
-                access_level: access_level.clone(),
-                change_by: change_by.clone(),
-                description: description.clone(),
-                categories: categories.clone().unwrap_or_default(),
-                tags: tags.clone().unwrap_or_default(),
-            },
-            detailed_info: tokio::sync::OnceCell::new_with(Some(
-                MoleculeVersionedFileEntryDetailedInfo {
-                    content_text,
-                    encryption_metadata,
-                },
-            )),
+        let versioned_file_basic_info = MoleculeVersionedFileEntryBasicInfo {
+            access_level: access_level.clone(),
+            change_by: change_by.clone(),
+            description: description.clone(),
+            categories: categories.clone().unwrap_or_default(),
+            tags: tags.clone().unwrap_or_default(),
+        };
+
+        let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
+            content_text,
+            encryption_metadata,
+        };
+
+        let versioned_file_extra_data = MoleculeVersionedFileExtraData {
+            basic_info: &versioned_file_basic_info,
+            detailed_info: &versioned_file_detailed_info,
         };
 
         let update_version_result = update_versioned_file_uc
@@ -193,13 +180,30 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 Some(content_args),
                 None,
-                Some(versioned_file_entry.to_versioned_file_extra_data()),
+                Some(versioned_file_extra_data.to_extra_data_fields()),
             )
             .await
             .int_err()?;
 
-        versioned_file_entry.entry.entity.version = update_version_result.new_version;
-        versioned_file_entry.entry.entity.content_hash = update_version_result.content_hash;
+        let versioned_file_entry = MoleculeVersionedFileEntry {
+            entry: VersionedFileEntry {
+                file_dataset: versioned_file_dataset.clone(),
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: update_version_result.system_time,
+                    event_time,
+                    version: update_version_result.new_version,
+                    content_type: content_type
+                        .as_ref()
+                        .map(|ct| ct.0.clone())
+                        .unwrap_or_default(),
+                    content_length,
+                    content_hash: update_version_result.content_hash,
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
+                },
+            },
+            basic_info: versioned_file_basic_info,
+            detailed_info: tokio::sync::OnceCell::new_with(Some(versioned_file_detailed_info)),
+        };
 
         // 3. Add the file to the data room.
 
@@ -243,7 +247,7 @@ impl MoleculeDataRoomMutV2 {
             };
 
             append_global_data_room_activity_uc
-                .execute(&molecule_subject, data_room_activity)
+                .execute(&molecule_subject, Some(event_time), data_room_activity)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
@@ -315,36 +319,22 @@ impl MoleculeDataRoomMutV2 {
         let content_type = content_args.content_type.clone();
         let content_length = content_args.content_length;
 
-        let mut versioned_file_entry = MoleculeVersionedFileEntry {
-            entry: VersionedFileEntry {
-                file_dataset: file_dataset.clone(),
-                entity: kamu_datasets::VersionedFileEntry {
-                    system_time: event_time, // TODO: take from ingest result
-                    event_time,
-                    version: 0,
-                    content_type: content_args
-                        .content_type
-                        .as_ref()
-                        .map(|ct| ct.0.clone())
-                        .unwrap_or_default(),
-                    content_length: content_args.content_length,
-                    content_hash: odf::Multihash::from_digest_sha3_256(b""),
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
-            },
-            basic_info: MoleculeVersionedFileEntryBasicInfo {
-                access_level: access_level.clone(),
-                change_by: change_by.clone(),
-                description: description.clone(),
-                categories: categories.clone().unwrap_or_default(),
-                tags: tags.clone().unwrap_or_default(),
-            },
-            detailed_info: tokio::sync::OnceCell::new_with(Some(
-                MoleculeVersionedFileEntryDetailedInfo {
-                    content_text,
-                    encryption_metadata,
-                },
-            )),
+        let versioned_file_basic_info = MoleculeVersionedFileEntryBasicInfo {
+            access_level: access_level.clone(),
+            change_by: change_by.clone(),
+            description: description.clone(),
+            categories: categories.clone().unwrap_or_default(),
+            tags: tags.clone().unwrap_or_default(),
+        };
+
+        let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
+            content_text,
+            encryption_metadata,
+        };
+
+        let versioned_file_extra_data = MoleculeVersionedFileExtraData {
+            basic_info: &versioned_file_basic_info,
+            detailed_info: &versioned_file_detailed_info,
         };
 
         let update_version_result = update_versioned_file_uc
@@ -353,13 +343,30 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 Some(content_args),
                 None,
-                Some(versioned_file_entry.to_versioned_file_extra_data()),
+                Some(versioned_file_extra_data.to_extra_data_fields()),
             )
             .await
             .int_err()?;
 
-        versioned_file_entry.entry.entity.version = update_version_result.new_version;
-        versioned_file_entry.entry.entity.content_hash = update_version_result.content_hash.clone();
+        let versioned_file_entry = MoleculeVersionedFileEntry {
+            entry: VersionedFileEntry {
+                file_dataset: file_dataset.clone(),
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: update_version_result.system_time,
+                    event_time,
+                    version: update_version_result.new_version,
+                    content_type: content_type
+                        .as_ref()
+                        .map(|ct| ct.0.clone())
+                        .unwrap_or_default(),
+                    content_length,
+                    content_hash: update_version_result.content_hash.clone(),
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
+                },
+            },
+            basic_info: versioned_file_basic_info,
+            detailed_info: tokio::sync::OnceCell::new_with(Some(versioned_file_detailed_info)),
+        };
 
         // 3. Update the file state in the data room.
 
@@ -403,7 +410,7 @@ impl MoleculeDataRoomMutV2 {
             };
 
             append_global_data_room_activity_uc
-                .execute(&molecule_subject, data_room_activity)
+                .execute(&molecule_subject, Some(event_time), data_room_activity)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
@@ -503,64 +510,36 @@ impl MoleculeDataRoomMutV2 {
 
         let (_op, collection_entry_record) = inserted_records.into_iter().next_back().unwrap();
 
-        // TODO: Revisit after Molecule data room domain/adapter breakdown -->
-        let data_room_entry = MoleculeDataRoomEntry::new_from_data_room_entry(
-            &self.project,
-            kamu_molecule_domain::MoleculeDataRoomEntry::try_from_collection_entry(
-                kamu_datasets::CollectionEntry {
-                    system_time: event_time, // TODO: take from ingest result
-                    event_time,
-                    path: collection_entry_record.path,
-                    reference: collection_entry_record.reference,
-                    extra_data: collection_entry_record.extra_data,
-                },
-            )?,
-        );
+        let denormalized_latest_file_info =
+            kamu_molecule_domain::MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(
+                collection_entry_record.extra_data,
+            )
+            .int_err()?;
+
         let data_room_activity = MoleculeDataRoomActivityEntity {
             system_time: event_time, // TODO: take from ingest result
             event_time,
             activity_type,
             ipnft_uid: self.project.entity.ipnft_uid.clone(),
-            path: data_room_entry.entity.path,
-            r#ref: data_room_entry.entity.reference,
-            version: data_room_entry.entity.denormalized_latest_file_info.version,
-            change_by: data_room_entry
-                .entity
-                .denormalized_latest_file_info
-                .change_by,
-            access_level: data_room_entry
-                .entity
-                .denormalized_latest_file_info
-                .access_level,
+            path: collection_entry_record.path,
+            r#ref: collection_entry_record.reference,
+            version: denormalized_latest_file_info.version,
+            change_by: denormalized_latest_file_info.change_by,
+            access_level: denormalized_latest_file_info.access_level,
             content_type: {
-                let s = data_room_entry
-                    .entity
-                    .denormalized_latest_file_info
-                    .content_type;
+                let s = denormalized_latest_file_info.content_type;
                 if !s.is_empty() { Some(s.into()) } else { None }
             },
-            content_length: data_room_entry
-                .entity
-                .denormalized_latest_file_info
-                .content_length,
-            content_hash: data_room_entry
-                .entity
-                .denormalized_latest_file_info
-                .content_hash,
-            description: data_room_entry
-                .entity
-                .denormalized_latest_file_info
-                .description,
-            categories: data_room_entry
-                .entity
-                .denormalized_latest_file_info
-                .categories,
-            tags: data_room_entry.entity.denormalized_latest_file_info.tags,
+            content_length: denormalized_latest_file_info.content_length,
+            content_hash: denormalized_latest_file_info.content_hash,
+            description: denormalized_latest_file_info.description,
+            categories: denormalized_latest_file_info.categories,
+            tags: denormalized_latest_file_info.tags,
         };
 
         // TODO: asynchronous write of activity log
         append_global_data_room_activity_uc
-            .execute(&molecule_subject, data_room_activity)
+            .execute(&molecule_subject, Some(event_time), data_room_activity)
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeAppendDataRoomActivityError as E;
@@ -1033,7 +1012,7 @@ impl MoleculeDataRoomMutV2 {
             };
 
             append_global_data_room_activity_uc
-                .execute(&molecule_subject, data_room_activity)
+                .execute(&molecule_subject, Some(event_time), data_room_activity)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
