@@ -72,7 +72,7 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
         // Map to entities
         let projects = records
             .into_iter()
-            .map(MoleculeProjectEntity::from_json)
+            .map(MoleculeProject::from_json)
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;
 

@@ -67,6 +67,7 @@ impl<'a> CollectionMut<'a> {
         match update_collection_entries
             .execute(
                 WriteCheckedDataset(collection_dataset),
+                None,
                 mapped_ops,
                 expected_head,
             )

@@ -14,7 +14,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Debug, Clone)]
-pub struct MoleculeProjectEntity {
+pub struct MoleculeProject {
     /// Account ID associated with this project
     pub account_id: odf::AccountID,
 
@@ -46,7 +46,7 @@ pub struct MoleculeProjectEntity {
     pub ipnft_token_id: num_bigint::BigInt,
 }
 
-impl MoleculeProjectEntity {
+impl MoleculeProject {
     pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let record: MoleculeProjectChangelogRecord = serde_json::from_value(record).int_err()?;
 

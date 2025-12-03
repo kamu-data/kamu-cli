@@ -32,7 +32,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectEntity>, MoleculeFindProjectError> {
+    ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
         let (_, project) = self
             .molecule_dataset_service
             .get_project_changelog_entry(molecule_subject, DatasetAction::Read, false, &ipnft_uid)

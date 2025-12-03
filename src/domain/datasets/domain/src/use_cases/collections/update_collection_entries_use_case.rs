@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use odf::dataset::RefCASError;
 use thiserror::Error;
@@ -20,6 +21,7 @@ pub trait UpdateCollectionEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
         collection_dataset: WriteCheckedDataset<'_>,
+        source_event_time: Option<DateTime<Utc>>,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<UpdateCollectionEntriesResult, UpdateCollectionEntriesUseCaseError>;
@@ -97,6 +99,7 @@ pub struct UpdateCollectionEntriesSuccess {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
     pub inserted_records: Vec<(odf::metadata::OperationType, CollectionEntryRecord)>,
+    pub system_time: DateTime<Utc>,
 }
 
 #[derive(Debug)]

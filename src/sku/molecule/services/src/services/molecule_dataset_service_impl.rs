@@ -159,13 +159,19 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         Ok((projects_dataset, df))
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDatasetServiceImpl_get_project_changelog_entry,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist, %ipnft_uid)
+    )]
     async fn get_project_changelog_entry(
         &self,
         molecule_subject: &LoggedAccount,
         action: auth::DatasetAction,
         create_if_not_exist: bool,
         ipnft_uid: &str,
-    ) -> Result<(ResolvedDataset, Option<MoleculeProjectEntity>), MoleculeGetDatasetError> {
+    ) -> Result<(ResolvedDataset, Option<MoleculeProject>), MoleculeGetDatasetError> {
         use datafusion::prelude::*;
 
         let (projects_dataset, df_opt) = self
@@ -185,7 +191,7 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         let project = records
             .into_iter()
             .next()
-            .map(|record| MoleculeProjectEntity::from_json(record).int_err())
+            .map(|record| MoleculeProject::from_json(record).int_err())
             .transpose()?;
 
         Ok((projects_dataset, project))
@@ -230,7 +236,6 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
                     .await
                     .int_err()?;
 
-                // TODO: Use case should return ResolvedDataset directly
                 Ok(ResolvedDataset::new(
                     create_res.dataset,
                     create_res.dataset_handle,
@@ -246,6 +251,12 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         }
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDatasetServiceImpl_get_global_data_room_activity_data_frame,
+        skip_all,
+        fields(molecule_account_name, ?action, create_if_not_exist)
+    )]
     async fn get_global_data_room_activity_data_frame(
         &self,
         molecule_account_name: &odf::AccountName,

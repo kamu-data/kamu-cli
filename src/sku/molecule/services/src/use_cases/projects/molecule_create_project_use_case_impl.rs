@@ -59,7 +59,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: num_bigint::BigInt,
-    ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError> {
+    ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
         // Resolve projects ledger with Write privileges
         let (projects_dataset, df_opt) = self
             .molecule_dataset_service
@@ -89,7 +89,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
                 return Err(MoleculeCreateProjectError::Conflict {
-                    project: MoleculeProjectEntity::from_json(record)?,
+                    project: MoleculeProject::from_json(record)?,
                 });
             }
         }
@@ -183,7 +183,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         let now = self.time_source.now();
 
         // Add project entry
-        let project = MoleculeProjectEntity {
+        let project = MoleculeProject {
             account_id: project_account.id.clone(),
             system_time: now,
             event_time: now,

@@ -9,8 +9,8 @@
 
 use database_common::PaginationOpts;
 use kamu_datasets::{
+    FindCollectionEntriesError,
     FindCollectionEntriesUseCase,
-    FindCollectionEntryUseCaseError,
     ReadCheckedDataset,
     ViewCollectionEntriesError,
     ViewCollectionEntriesUseCase,
@@ -111,7 +111,7 @@ impl CollectionProjection<'_> {
             )
             .await
             .map_err(|e| match e {
-                e @ FindCollectionEntryUseCaseError::Internal(_) => e.int_err(),
+                e @ FindCollectionEntriesError::Internal(_) => e.int_err(),
             })?
             .map(CollectionEntry::new);
 
@@ -189,7 +189,7 @@ impl CollectionProjection<'_> {
             )
             .await
             .map_err(|e| match e {
-                e @ FindCollectionEntryUseCaseError::Internal(_) => e.int_err(),
+                e @ FindCollectionEntriesError::Internal(_) => e.int_err(),
             })?;
 
         let nodes = entries

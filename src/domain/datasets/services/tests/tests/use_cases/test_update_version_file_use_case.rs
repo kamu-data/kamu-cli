@@ -63,6 +63,7 @@ async fn test_update_versioned_file_use_case() {
         .use_case
         .execute(
             WriteCheckedDataset(&file_dataset),
+            None,
             Some(content_args),
             None,
             None,
@@ -79,6 +80,7 @@ async fn test_update_versioned_file_use_case() {
         .use_case
         .execute(
             WriteCheckedDataset(&file_dataset),
+            None,
             Some(content_args),
             None,
             None,
@@ -110,6 +112,7 @@ async fn test_update_versioned_file_use_case_errors() {
         .use_case
         .execute(
             WriteCheckedDataset(&file_dataset),
+            None,
             Some(content_args),
             Some(seed_bloch_hash),
             None,
@@ -126,6 +129,7 @@ async fn test_update_versioned_file_use_case_errors() {
         .use_case
         .execute(
             WriteCheckedDataset(&file_dataset),
+            None,
             Some(content_args),
             Some(old_head),
             None,

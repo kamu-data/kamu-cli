@@ -7,31 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
+use crate::{MoleculeGetDatasetError, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeCreateProjectUseCase: Send + Sync {
+pub trait MoleculeViewProjectsUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
-        ipnft_symbol: String,
-        ipnft_uid: String,
-        ipnft_address: String,
-        ipnft_token_id: num_bigint::BigInt,
-    ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError>;
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type MoleculeProjectListing = EntityPageListing<MoleculeProject>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeCreateProjectError {
-    #[error("Project with the same IPNFT UID or symbol already exists")]
-    Conflict { project: MoleculeProjectEntity },
+pub enum MoleculeViewProjectsError {
+    #[error(transparent)]
+    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
 
     #[error(transparent)]
     Access(
@@ -44,14 +46,14 @@ pub enum MoleculeCreateProjectError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetDatasetError> for MoleculeCreateProjectError {
+impl From<MoleculeGetDatasetError> for MoleculeViewProjectsError {
     fn from(e: MoleculeGetDatasetError) -> Self {
         match e {
             MoleculeGetDatasetError::NotFound(err) => {
-                unreachable!("Projects dataset should be created if not exist: {}", err)
+                MoleculeViewProjectsError::NoProjectsDataset(err)
             }
-            MoleculeGetDatasetError::Access(err) => MoleculeCreateProjectError::Access(err),
-            MoleculeGetDatasetError::Internal(err) => MoleculeCreateProjectError::Internal(err),
+            MoleculeGetDatasetError::Access(err) => MoleculeViewProjectsError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeViewProjectsError::Internal(err),
         }
     }
 }

@@ -14,8 +14,8 @@ use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
     CollectionPath,
+    FindCollectionEntriesError,
     FindCollectionEntriesUseCase,
-    FindCollectionEntryUseCaseError,
     ReadCheckedDataset,
 };
 
@@ -42,7 +42,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-    ) -> Result<Option<CollectionEntry>, FindCollectionEntryUseCaseError> {
+    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError> {
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self
@@ -87,6 +87,23 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
     }
 
     #[tracing::instrument(
+        name = FindCollectionEntriesUseCaseImpl_execute_find_by_ref,
+        skip_all,
+        fields(as_of = ?as_of, r#ref = ?r#ref)
+    )]
+    async fn execute_find_by_ref(
+        &self,
+        collection_dataset: ReadCheckedDataset<'_>,
+        as_of: Option<odf::Multihash>,
+        r#ref: &[&odf::DatasetID],
+    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError> {
+        let mut results = self
+            .execute_find_multi_by_refs(collection_dataset, as_of, r#ref)
+            .await?;
+        Ok(results.pop())
+    }
+
+    #[tracing::instrument(
         name = FindCollectionEntriesUseCaseImpl_execute_find_multi_by_refs,
         skip_all,
         fields(as_of = ?as_of, refs = ?refs)
@@ -96,7 +113,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
-    ) -> Result<Vec<CollectionEntry>, FindCollectionEntryUseCaseError> {
+    ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError> {
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self

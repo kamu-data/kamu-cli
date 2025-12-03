@@ -36,13 +36,13 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         level = "info",
         name = MoleculeDisableProjectUseCaseImpl_execute,
         skip_all,
-        fields(?ipnft_uid)
+        fields(ipnft_uid)
     )]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<MoleculeProjectEntity, MoleculeDisableProjectError> {
+    ) -> Result<MoleculeProject, MoleculeDisableProjectError> {
         let now = chrono::Utc::now();
 
         let (projects_dataset, project_opt) = self

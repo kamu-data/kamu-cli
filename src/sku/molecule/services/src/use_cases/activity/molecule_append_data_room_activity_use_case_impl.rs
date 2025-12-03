@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::auth;
 
@@ -38,6 +39,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
+        source_event_time: Option<DateTime<Utc>>,
         activity: MoleculeDataRoomActivityEntity,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
         let data_room_activity_dataset = self
@@ -69,7 +71,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
                 kamu_core::DataSource::Buffer(data_record.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
-                    source_event_time: None,
+                    source_event_time,
                     is_ingest_from_upload: false,
                     media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
                     expected_head: None,
