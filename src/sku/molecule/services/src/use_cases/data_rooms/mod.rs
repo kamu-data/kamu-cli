@@ -7,14 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod molecule_create_data_room_entry_use_case_impl;
 mod molecule_find_data_room_entry_use_case_impl;
 mod molecule_move_data_room_entry_use_case_impl;
 mod molecule_remove_data_room_entry_use_case_impl;
-mod molecule_upsert_data_room_entry_use_case_impl;
+mod molecule_update_data_room_entry_use_case_impl;
 mod molecule_view_data_room_entries_use_case_impl;
 
+pub use molecule_create_data_room_entry_use_case_impl::*;
 pub use molecule_find_data_room_entry_use_case_impl::*;
 pub use molecule_move_data_room_entry_use_case_impl::*;
 pub use molecule_remove_data_room_entry_use_case_impl::*;
-pub use molecule_upsert_data_room_entry_use_case_impl::*;
+pub use molecule_update_data_room_entry_use_case_impl::*;
 pub use molecule_view_data_room_entries_use_case_impl::*;

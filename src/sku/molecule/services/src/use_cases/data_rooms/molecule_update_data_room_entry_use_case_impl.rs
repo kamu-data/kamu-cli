@@ -10,38 +10,42 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeUpsertDataRoomEntryUseCase)]
-pub struct MoleculeUpsertDataRoomEntryUseCaseImpl {
+#[dill::interface(dyn MoleculeUpdateDataRoomEntryUseCase)]
+pub struct MoleculeUpdateDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeUpsertDataRoomEntryUseCase for MoleculeUpsertDataRoomEntryUseCaseImpl {
+impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeUpsertDataRoomEntryUseCaseImpl_execute,
+        name = MoleculeUpdateDataRoomEntryUseCaseImpl_execute,
         skip_all,
         fields(ipnft_uid = %molecule_project.ipnft_uid, %path, %reference)
     )]
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         reference: odf::DatasetID,
         denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
-    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertDataRoomEntryError> {
+    ) -> Result<MoleculeDataRoomEntry, MoleculeUpdateDataRoomEntryError> {
         let entry = self
             .data_room_collection_service
             .upsert_data_room_collection_entry(
@@ -54,28 +58,42 @@ impl MoleculeUpsertDataRoomEntryUseCase for MoleculeUpsertDataRoomEntryUseCaseIm
             .await
             .map_err(|e| match e {
                 MoleculeDataRoomCollectionWriteError::DataRoomNotFound(e) => {
-                    MoleculeUpsertDataRoomEntryError::Internal(e.int_err())
+                    MoleculeUpdateDataRoomEntryError::Internal(e.int_err())
                 }
                 MoleculeDataRoomCollectionWriteError::RefCASFailed(e) => {
-                    MoleculeUpsertDataRoomEntryError::RefCASFailed(e)
+                    MoleculeUpdateDataRoomEntryError::RefCASFailed(e)
                 }
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
-                    MoleculeUpsertDataRoomEntryError::Access(e)
+                    MoleculeUpdateDataRoomEntryError::Access(e)
                 }
                 e @ MoleculeDataRoomCollectionWriteError::Internal(_) => {
-                    MoleculeUpsertDataRoomEntryError::Internal(e.int_err())
+                    MoleculeUpdateDataRoomEntryError::Internal(e.int_err())
                 }
             })?;
 
-        // TODO: outbox event
-
-        Ok(MoleculeDataRoomEntry {
+        let data_room_entry = MoleculeDataRoomEntry {
             system_time: entry.system_time,
             event_time: entry.event_time,
             path: entry.path,
             reference: entry.reference,
             denormalized_latest_file_info,
-        })
+        };
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
+                MoleculeDataRoomMessage::updated(
+                    data_room_entry.system_time,
+                    molecule_subject.account_id.clone(),
+                    molecule_project.account_id.clone(),
+                    molecule_project.ipnft_uid.clone(),
+                    data_room_entry.clone(),
+                ),
+            )
+            .await
+            .int_err()?;
+
+        Ok(data_room_entry)
     }
 }
 

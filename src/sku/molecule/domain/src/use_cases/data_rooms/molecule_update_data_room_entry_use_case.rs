@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
 
 use crate::{MoleculeDataRoomEntry, MoleculeDenormalizeFileToDataRoom, MoleculeProject};
@@ -16,21 +17,22 @@ use crate::{MoleculeDataRoomEntry, MoleculeDenormalizeFileToDataRoom, MoleculePr
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeUpsertDataRoomEntryUseCase: Send + Sync {
+pub trait MoleculeUpdateDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         reference: odf::DatasetID,
         denormalized_file_info: MoleculeDenormalizeFileToDataRoom,
-    ) -> Result<MoleculeDataRoomEntry, MoleculeUpsertDataRoomEntryError>;
+    ) -> Result<MoleculeDataRoomEntry, MoleculeUpdateDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeUpsertDataRoomEntryError {
+pub enum MoleculeUpdateDataRoomEntryError {
     #[error(transparent)]
     RefCASFailed(#[from] odf::dataset::RefCASError),
 

@@ -26,6 +26,8 @@ use kamu_datasets::{
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
     MoleculeAppendGlobalDataRoomActivityUseCase,
+    MoleculeCreateDataRoomEntryError,
+    MoleculeCreateDataRoomEntryUseCase,
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
@@ -33,9 +35,9 @@ use kamu_molecule_domain::{
     MoleculeMoveDataRoomEntryUseCase,
     MoleculeRemoveDataRoomEntryError,
     MoleculeRemoveDataRoomEntryUseCase,
+    MoleculeUpdateDataRoomEntryError,
     MoleculeUpdateDataRoomEntryResult,
-    MoleculeUpsertDataRoomEntryError,
-    MoleculeUpsertDataRoomEntryUseCase,
+    MoleculeUpdateDataRoomEntryUseCase,
 };
 
 use crate::molecule::molecule_subject;
@@ -105,14 +107,14 @@ impl MoleculeDataRoomMutV2 {
             rebac_service,
             create_dataset_from_snapshot_uc,
             update_versioned_file_uc,
-            upsert_data_room_entry_uc,
+            create_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
             dyn kamu_auth_rebac::RebacService,
             dyn CreateDatasetFromSnapshotUseCase,
             dyn UpdateVersionedFileUseCase,
-            dyn MoleculeUpsertDataRoomEntryUseCase,
+            dyn MoleculeCreateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -198,8 +200,9 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Add the file to the data room.
 
-        let data_room_entry = upsert_data_room_entry_uc
+        let data_room_entry = create_data_room_entry_uc
             .execute(
+                &molecule_subject,
                 &self.project.entity,
                 Some(now),
                 path.clone().into(),
@@ -208,11 +211,11 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
             .map_err(|e| match e {
-                MoleculeUpsertDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpsertDataRoomEntryError::RefCASFailed(_) => {
+                MoleculeCreateDataRoomEntryError::Access(e) => e.into(),
+                MoleculeCreateDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
                 }
-                e @ MoleculeUpsertDataRoomEntryError::Internal(_) => e.int_err().into(),
+                e @ MoleculeCreateDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
 
         // 4. Log the activity.
@@ -277,13 +280,13 @@ impl MoleculeDataRoomMutV2 {
         let (
             dataset_registry,
             update_versioned_file_uc,
-            upsert_data_room_entry_uc,
+            update_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
             dyn DatasetRegistry,
             dyn UpdateVersionedFileUseCase,
-            dyn MoleculeUpsertDataRoomEntryUseCase,
+            dyn MoleculeUpdateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -355,8 +358,9 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Update the file state in the data room.
 
-        let updated_data_room_entry = upsert_data_room_entry_uc
+        let updated_data_room_entry = update_data_room_entry_uc
             .execute(
+                &molecule_subject,
                 &self.project.entity,
                 Some(now),
                 existing_data_room_entry.path.clone(),
@@ -365,11 +369,11 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
             .map_err(|e| match e {
-                MoleculeUpsertDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpsertDataRoomEntryError::RefCASFailed(_) => {
+                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
+                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
                 }
-                e @ MoleculeUpsertDataRoomEntryError::Internal(_) => e.int_err().into(),
+                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
 
         // 4. Log the activity.
@@ -873,13 +877,13 @@ impl MoleculeDataRoomMutV2 {
         let (
             dataset_registry,
             update_versioned_file_uc,
-            upsert_data_room_entry_uc,
+            update_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
             dyn DatasetRegistry,
             dyn UpdateVersionedFileUseCase,
-            dyn MoleculeUpsertDataRoomEntryUseCase,
+            dyn MoleculeUpdateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
@@ -969,8 +973,9 @@ impl MoleculeDataRoomMutV2 {
 
         // 2. Update the file state in the data room.
 
-        let updated_data_room_entry = upsert_data_room_entry_uc
+        let updated_data_room_entry = update_data_room_entry_uc
             .execute(
+                &molecule_subject,
                 &self.project.entity,
                 Some(now),
                 existing_data_room_entry.path.clone(),
@@ -979,11 +984,11 @@ impl MoleculeDataRoomMutV2 {
             )
             .await
             .map_err(|e| match e {
-                MoleculeUpsertDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpsertDataRoomEntryError::RefCASFailed(_) => {
+                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
+                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
                 }
-                e @ MoleculeUpsertDataRoomEntryError::Internal(_) => e.int_err().into(),
+                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
 
         // 3. Log the activity.
