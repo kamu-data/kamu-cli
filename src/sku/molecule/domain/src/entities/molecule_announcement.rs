@@ -11,6 +11,12 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: introduce Entity (based on composition), e.g.:
+// pub struct AnnouncementEntity {
+//    pub announcement_id: String,
+//    pub record: DatasetDefaultVocabularyRecord<AnnouncementRecord>,
+// }
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectAnnouncementDataRecord {
     pub announcement_id: Option<uuid::Uuid>, // Optional for creation
@@ -53,6 +59,7 @@ impl MoleculeProjectAnnouncementRecordExt for MoleculeProjectAnnouncementRecord 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// todo выразить через проектную
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct MoleculeGlobalAnnouncementDataRecord {
     pub announcement_id: Option<uuid::Uuid>, // Optional for creation
