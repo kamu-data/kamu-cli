@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
@@ -21,6 +22,7 @@ pub trait MoleculeRemoveDataRoomEntryUseCase: Send + Sync {
         &self,
         molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
+        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeRemoveDataRoomEntryError>;

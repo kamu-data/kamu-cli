@@ -52,6 +52,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
     async fn move_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
+        source_event_time: Option<DateTime<Utc>>,
         path_from: CollectionPath,
         path_to: CollectionPath,
         expected_head: Option<odf::Multihash>,
@@ -60,6 +61,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
     async fn remove_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
+        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;

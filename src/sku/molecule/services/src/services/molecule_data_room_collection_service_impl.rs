@@ -80,6 +80,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
     async fn execute_collection_update(
         &self,
         data_room_dataset_id: &odf::DatasetID,
+        source_event_time: Option<DateTime<Utc>>,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
@@ -89,6 +90,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
             .update_collection_entries
             .execute(
                 WriteCheckedDataset(&writable_data_room),
+                source_event_time,
                 operations,
                 expected_head,
             )
@@ -224,6 +226,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         let result = self
             .execute_collection_update(
                 data_room_dataset_id,
+                source_event_time,
                 vec![CollectionUpdateOperation::add(path, r#ref, extra_data)],
                 None,
             )
@@ -260,12 +263,14 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
     async fn move_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
+        source_event_time: Option<DateTime<Utc>>,
         path_from: CollectionPath,
         path_to: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
         self.execute_collection_update(
             data_room_dataset_id,
+            source_event_time,
             vec![CollectionUpdateOperation::r#move(path_from, path_to, None)],
             expected_head,
         )
@@ -281,11 +286,13 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
     async fn remove_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
+        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
         self.execute_collection_update(
             data_room_dataset_id,
+            source_event_time,
             vec![CollectionUpdateOperation::remove(path)],
             expected_head,
         )

@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{
@@ -191,6 +192,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
     async fn execute(
         &self,
         collection_dataset: WriteCheckedDataset<'_>,
+        source_event_time: Option<DateTime<Utc>>,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<UpdateCollectionEntriesResult, UpdateCollectionEntriesUseCaseError> {
@@ -240,7 +242,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                     data_sources,
                     kamu_core::PushIngestDataUseCaseOptions {
                         source_name: None,
-                        source_event_time: None,
+                        source_event_time,
                         is_ingest_from_upload: false,
                         media_type: Some(MediaType::NDJSON.to_owned()),
                         expected_head: Some(expected_head_value),

@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
@@ -40,6 +41,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
+        source_event_time: Option<DateTime<Utc>>,
         path_from: CollectionPath,
         path_to: CollectionPath,
         expected_head: Option<odf::Multihash>,
@@ -48,6 +50,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
             .data_room_collection_service
             .move_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
+                source_event_time,
                 path_from.clone(),
                 path_to.clone(),
                 expected_head,

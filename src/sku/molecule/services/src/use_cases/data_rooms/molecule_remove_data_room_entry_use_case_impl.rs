@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
@@ -40,6 +41,7 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
         &self,
         molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
+        source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeRemoveDataRoomEntryError> {
@@ -47,6 +49,7 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
             .data_room_collection_service
             .remove_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
+                source_event_time,
                 path.clone(),
                 expected_head,
             )

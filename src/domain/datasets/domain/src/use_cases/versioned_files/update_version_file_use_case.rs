@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::InternalError;
 use odf::dataset::RefCASError;
@@ -22,6 +23,7 @@ pub trait UpdateVersionedFileUseCase: Send + Sync {
     async fn execute(
         &self,
         file_dataset: WriteCheckedDataset<'_>,
+        source_event_time: Option<DateTime<Utc>>,
         content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,

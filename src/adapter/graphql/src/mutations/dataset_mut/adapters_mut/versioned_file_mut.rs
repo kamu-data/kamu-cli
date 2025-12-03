@@ -69,6 +69,7 @@ impl<'a> VersionedFileMut<'a> {
         match update_versioned_file
             .execute(
                 WriteCheckedDataset(file_dataset),
+                None,
                 Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
@@ -163,6 +164,7 @@ impl<'a> VersionedFileMut<'a> {
         match update_versioned_file
             .execute(
                 WriteCheckedDataset(file_dataset),
+                None,
                 Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
@@ -203,6 +205,7 @@ impl<'a> VersionedFileMut<'a> {
         match update_versioned_file
             .execute(
                 WriteCheckedDataset(file_dataset),
+                None,
                 None,
                 expected_head.map(Into::into),
                 Some(extra_data.into()),

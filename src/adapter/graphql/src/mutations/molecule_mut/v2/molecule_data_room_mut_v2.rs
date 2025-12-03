@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
@@ -39,6 +39,7 @@ use kamu_molecule_domain::{
     MoleculeUpdateDataRoomEntryResult,
     MoleculeUpdateDataRoomEntryUseCase,
 };
+use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
 use crate::mutations::{
@@ -100,11 +101,9 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        // TODO: Align timestamps with ingest
-        let now = chrono::Utc::now();
-
         let (
             rebac_service,
+            time_source,
             create_dataset_from_snapshot_uc,
             update_versioned_file_uc,
             create_data_room_entry_uc,
@@ -112,11 +111,14 @@ impl MoleculeDataRoomMutV2 {
         ) = from_catalog_n!(
             ctx,
             dyn kamu_auth_rebac::RebacService,
+            dyn SystemTimeSource,
             dyn CreateDatasetFromSnapshotUseCase,
             dyn UpdateVersionedFileUseCase,
             dyn MoleculeCreateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
+
+        let event_time = time_source.now();
 
         // 1. Create an empty versioned dataset.
         let alias = self.build_new_file_dataset_alias(ctx, &path).await;
@@ -157,8 +159,8 @@ impl MoleculeDataRoomMutV2 {
             entry: VersionedFileEntry {
                 file_dataset: versioned_file_dataset.clone(),
                 entity: kamu_datasets::VersionedFileEntry {
-                    system_time: now,
-                    event_time: now,
+                    system_time: event_time, // TODO: take from ingest result
+                    event_time,
                     version: 0,
                     content_type: content_args
                         .content_type
@@ -188,6 +190,7 @@ impl MoleculeDataRoomMutV2 {
         let update_version_result = update_versioned_file_uc
             .execute(
                 WriteCheckedDataset(&versioned_file_dataset),
+                Some(event_time),
                 Some(content_args),
                 None,
                 Some(versioned_file_entry.to_versioned_file_extra_data()),
@@ -204,7 +207,7 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 &molecule_subject,
                 &self.project.entity,
-                Some(now),
+                Some(event_time),
                 path.clone().into(),
                 versioned_file_dataset.get_id().clone(),
                 versioned_file_entry.to_denormalized().into(),
@@ -222,8 +225,8 @@ impl MoleculeDataRoomMutV2 {
         // TODO: asynchronous write of activity log
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
-                system_time: now,
-                event_time: now,
+                system_time: event_time, // TODO: take from ingest result
+                event_time,
                 activity_type: MoleculeDataRoomFileActivityType::Added,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: path.into(),
@@ -274,21 +277,22 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        // TODO: Align timestamps with ingest
-        let now = chrono::Utc::now();
-
         let (
             dataset_registry,
+            time_source,
             update_versioned_file_uc,
             update_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
             dyn DatasetRegistry,
+            dyn SystemTimeSource,
             dyn UpdateVersionedFileUseCase,
             dyn MoleculeUpdateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
+
+        let event_time = time_source.now();
 
         // 1. Get the existing versioned dataset entry -- we need to know `path`;
         let Some(existing_data_room_entry) = self
@@ -315,8 +319,8 @@ impl MoleculeDataRoomMutV2 {
             entry: VersionedFileEntry {
                 file_dataset: file_dataset.clone(),
                 entity: kamu_datasets::VersionedFileEntry {
-                    system_time: now,
-                    event_time: now,
+                    system_time: event_time, // TODO: take from ingest result
+                    event_time,
                     version: 0,
                     content_type: content_args
                         .content_type
@@ -346,6 +350,7 @@ impl MoleculeDataRoomMutV2 {
         let update_version_result = update_versioned_file_uc
             .execute(
                 WriteCheckedDataset(&file_dataset),
+                Some(event_time),
                 Some(content_args),
                 None,
                 Some(versioned_file_entry.to_versioned_file_extra_data()),
@@ -362,7 +367,7 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 &molecule_subject,
                 &self.project.entity,
-                Some(now),
+                Some(event_time),
                 existing_data_room_entry.path.clone(),
                 existing_data_room_entry.reference.clone(),
                 versioned_file_entry.to_denormalized().into(),
@@ -380,8 +385,8 @@ impl MoleculeDataRoomMutV2 {
         // TODO: asynchronous write of activity log
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
-                system_time: now,
-                event_time: now,
+                system_time: event_time, // TODO: take from ingest result
+                event_time,
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: updated_data_room_entry.path.clone(),
@@ -477,15 +482,13 @@ impl MoleculeDataRoomMutV2 {
     async fn append_global_data_room_activity(
         &self,
         ctx: &Context<'_>,
+        event_time: DateTime<Utc>,
         inserted_records: Vec<(
             odf::metadata::OperationType,
             kamu_datasets::CollectionEntryRecord,
         )>,
         activity_type: MoleculeDataRoomFileActivityType,
     ) -> Result<()> {
-        // TODO: Align timestamps with ingest
-        let now = Utc::now();
-
         match activity_type {
             // Update happens in two records
             MoleculeDataRoomFileActivityType::Updated if inserted_records.len() == 2 => {}
@@ -505,8 +508,8 @@ impl MoleculeDataRoomMutV2 {
             &self.project,
             kamu_molecule_domain::MoleculeDataRoomEntry::try_from_collection_entry(
                 kamu_datasets::CollectionEntry {
-                    system_time: now,
-                    event_time: now,
+                    system_time: event_time, // TODO: take from ingest result
+                    event_time,
                     path: collection_entry_record.path,
                     reference: collection_entry_record.reference,
                     extra_data: collection_entry_record.extra_data,
@@ -514,8 +517,8 @@ impl MoleculeDataRoomMutV2 {
             )?,
         );
         let data_room_activity = MoleculeDataRoomActivityEntity {
-            system_time: now,
-            event_time: now,
+            system_time: event_time, // TODO: take from ingest result
+            event_time,
             activity_type,
             ipnft_uid: self.project.entity.ipnft_uid.clone(),
             path: data_room_entry.entity.path,
@@ -760,12 +763,19 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let move_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeMoveDataRoomEntryUseCase);
+        let (time_source, move_data_room_entry_uc) = from_catalog_n!(
+            ctx,
+            dyn SystemTimeSource,
+            dyn MoleculeMoveDataRoomEntryUseCase
+        );
+
+        let event_time = time_source.now();
 
         match move_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
+                Some(event_time),
                 from_path.clone().into(),
                 to_path.into(),
                 expected_head.map(Into::into),
@@ -776,6 +786,7 @@ impl MoleculeDataRoomMutV2 {
                 // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
+                    event_time,
                     r.inserted_records,
                     MoleculeDataRoomFileActivityType::Updated,
                 )
@@ -811,13 +822,19 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let remove_data_room_entry_uc =
-            from_catalog_n!(ctx, dyn MoleculeRemoveDataRoomEntryUseCase);
+        let (time_sourcem, remove_data_room_entry_uc) = from_catalog_n!(
+            ctx,
+            dyn SystemTimeSource,
+            dyn MoleculeRemoveDataRoomEntryUseCase
+        );
+
+        let event_time = time_sourcem.now();
 
         match remove_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
+                Some(event_time),
                 path.clone().into(),
                 expected_head.map(Into::into),
             )
@@ -827,6 +844,7 @@ impl MoleculeDataRoomMutV2 {
                 // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
+                    event_time,
                     r.inserted_records,
                     MoleculeDataRoomFileActivityType::Removed,
                 )
@@ -871,21 +889,22 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        // TODO: Align timestamps with ingest
-        let now = Utc::now();
-
         let (
             dataset_registry,
+            time_source,
             update_versioned_file_uc,
             update_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
             dyn DatasetRegistry,
+            dyn SystemTimeSource,
             dyn UpdateVersionedFileUseCase,
             dyn MoleculeUpdateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
+
+        let event_time = time_source.now();
 
         // NOTE: Access rights will be checked inside the use case.
         let file_dataset = {
@@ -961,6 +980,7 @@ impl MoleculeDataRoomMutV2 {
         let new_version = update_versioned_file_uc
             .execute(
                 WriteCheckedDataset(&file_dataset),
+                Some(event_time),
                 None,
                 None,
                 Some(file_entry.to_versioned_file_extra_data()),
@@ -977,7 +997,7 @@ impl MoleculeDataRoomMutV2 {
             .execute(
                 &molecule_subject,
                 &self.project.entity,
-                Some(now),
+                Some(event_time),
                 existing_data_room_entry.path.clone(),
                 reference.into(),
                 new_denormalized_file_info.clone(),
@@ -995,8 +1015,8 @@ impl MoleculeDataRoomMutV2 {
         // TODO: asynchronous write of activity log
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
-                system_time: now,
-                event_time: now,
+                system_time: event_time, // TODO: take from ingest result
+                event_time,
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: updated_data_room_entry.path.clone(),

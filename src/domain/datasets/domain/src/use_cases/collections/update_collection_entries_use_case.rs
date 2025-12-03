@@ -21,6 +21,7 @@ pub trait UpdateCollectionEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
         collection_dataset: WriteCheckedDataset<'_>,
+        source_event_time: Option<DateTime<Utc>>,
         operations: Vec<CollectionUpdateOperation>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<UpdateCollectionEntriesResult, UpdateCollectionEntriesUseCaseError>;
