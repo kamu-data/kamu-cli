@@ -32,7 +32,13 @@ impl MoleculeViewProjectDataRoomEntriesUseCase for MoleculeViewProjectDataRoomEn
         level = "debug",
         name = MoleculeViewProjectDataRoomEntriesUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, path_prefix = ?path_prefix, max_depth = ?max_depth, pagination = ?pagination)
+        fields(
+            ipnft_uid = %molecule_project.ipnft_uid,
+            as_of = ?as_of,
+            path_prefix = ?path_prefix,
+            max_depth = ?max_depth,
+            pagination = ?pagination
+        )
     )]
     async fn execute(
         &self,

@@ -120,8 +120,15 @@ impl MoleculeDataRoomCollectionServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl {
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_get_data_room_collection_entries,
+        skip_all,
+        fields(%data_room_dataset_id, ?as_of, ?path_prefix, ?max_depth, ?pagination)
+    )]
     async fn get_data_room_collection_entries(
         &self,
         data_room_dataset_id: &odf::DatasetID,
@@ -153,6 +160,12 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         Ok(entries_listing)
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_find_data_room_collection_entry_by_path,
+        skip_all,
+        fields(%data_room_dataset_id, ?as_of, %path)
+    )]
     async fn find_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
@@ -172,6 +185,12 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         Ok(maybe_entry)
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_find_data_room_collection_entry_by_ref,
+        skip_all,
+        fields(%data_room_dataset_id, ?as_of, %r#ref)
+    )]
     async fn find_data_room_collection_entry_by_ref(
         &self,
         data_room_dataset_id: &odf::DatasetID,
@@ -191,6 +210,12 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         Ok(maybe_entry)
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_upsert_data_room_collection_entry,
+        skip_all,
+        fields(%data_room_dataset_id, %path, %r#ref)
+    )]
     async fn upsert_data_room_collection_entry(
         &self,
         data_room_dataset_id: &odf::DatasetID,
@@ -229,6 +254,12 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         }
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_move_data_room_collection_entry_by_path,
+        skip_all,
+        fields(%data_room_dataset_id, %path_from, %path_to, ?expected_head)
+    )]
     async fn move_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
@@ -245,6 +276,12 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         .await
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_remove_data_room_collection_entry_by_path,
+        skip_all,
+        fields(%data_room_dataset_id, %path, ?expected_head)
+    )]
     async fn remove_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,

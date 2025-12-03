@@ -36,7 +36,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         level = "info",
         name = MoleculeDisableProjectUseCaseImpl_execute,
         skip_all,
-        fields(?ipnft_uid)
+        fields(ipnft_uid)
     )]
     async fn execute(
         &self,
