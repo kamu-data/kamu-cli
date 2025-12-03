@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use kamu_datasets::{
+    CollectionEntryAdd,
     CollectionEntryMove,
     CollectionEntryRemove,
-    CollectionEntryUpdate,
     CollectionUpdateOperation,
     UpdateCollectionEntriesResult,
     UpdateCollectionEntriesUseCase,
@@ -41,12 +41,14 @@ impl<'a> CollectionMut<'a> {
         operations: Vec<CollectionUpdateInput>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<CollectionUpdateResult> {
-        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         let mut mapped_ops = Vec::with_capacity(operations.len());
         for op in operations {
             if let Some(add) = op.add {
-                mapped_ops.push(CollectionUpdateOperation::Add(add.entry.into()));
+                mapped_ops.push(CollectionUpdateOperation::Add(CollectionEntryAdd {
+                    record: add.entry.into(),
+                }));
             } else if let Some(remove) = op.remove {
                 mapped_ops.push(CollectionUpdateOperation::Remove(CollectionEntryRemove {
                     path: remove.path.into(),
@@ -62,9 +64,10 @@ impl<'a> CollectionMut<'a> {
 
         let collection_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
                 WriteCheckedDataset(collection_dataset),
+                None,
                 mapped_ops,
                 expected_head,
             )
@@ -125,8 +128,8 @@ impl CollectionMut<'_> {
     pub async fn move_entry(
         &self,
         ctx: &Context<'_>,
-        path_from: CollectionPath,
-        path_to: CollectionPath,
+        path_from: CollectionPath<'static>,
+        path_to: CollectionPath<'static>,
         extra_data: Option<ExtraData>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
@@ -150,7 +153,7 @@ impl CollectionMut<'_> {
     pub async fn remove_entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
         self.update_entries_impl(
@@ -182,7 +185,7 @@ impl CollectionMut<'_> {
 #[derive(InputObject, Debug)]
 pub struct CollectionEntryInput {
     /// Entry path
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
@@ -192,7 +195,7 @@ pub struct CollectionEntryInput {
     pub extra_data: Option<ExtraData>,
 }
 
-impl From<CollectionEntryInput> for CollectionEntryUpdate {
+impl From<CollectionEntryInput> for kamu_datasets::CollectionEntryRecord {
     fn from(value: CollectionEntryInput) -> Self {
         Self {
             path: value.path.into(),
@@ -227,8 +230,8 @@ pub struct CollectionUpdateInputAdd {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputMove {
-    pub path_from: CollectionPath,
-    pub path_to: CollectionPath,
+    pub path_from: CollectionPath<'static>,
+    pub path_to: CollectionPath<'static>,
 
     /// Optionally update the extra data
     pub extra_data: Option<ExtraData>,
@@ -236,7 +239,7 @@ pub struct CollectionUpdateInputMove {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputRemove {
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,7 +302,7 @@ impl CollectionUpdateErrorCasFailed {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateErrorNotFound {
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 }
 
 #[ComplexObject]

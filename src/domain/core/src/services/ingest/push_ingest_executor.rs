@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
@@ -44,6 +45,7 @@ pub enum PushIngestResult {
         old_head: odf::Multihash,
         new_head: odf::Multihash,
         num_blocks: usize,
+        system_time: DateTime<Utc>,
     },
 }
 

@@ -93,7 +93,7 @@ impl MoleculeFullTextSearchSchemaProvider {
 
         // Index each project
         let mut documents_by_id = Vec::new();
-        for project in projects_listing.projects {
+        for project in projects_listing.list {
             // Serialize project into search document
             let document = helpers::index_project_from_entity(&project);
 

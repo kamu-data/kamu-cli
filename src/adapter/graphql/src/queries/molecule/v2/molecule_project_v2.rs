@@ -10,12 +10,17 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::{QueryService, auth};
+use odf::metadata::OperationType;
 
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
+    MoleculeActivityEventV2,
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncements,
     MoleculeDataRoom,
+    MoleculeDataRoomEntry,
 };
 use crate::queries::{Account, Dataset};
 
@@ -24,18 +29,131 @@ use crate::queries::{Account, Dataset};
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Clone)]
 pub struct MoleculeProjectV2 {
-    pub(crate) entity: kamu_molecule_domain::MoleculeProjectEntity,
+    pub(crate) entity: kamu_molecule_domain::MoleculeProject,
 }
 
 impl MoleculeProjectV2 {
-    pub fn new(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn new(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self { entity }
+    }
+
+    fn as_arc(&self) -> Arc<Self> {
+        Arc::new(self.clone())
+    }
+
+    async fn get_data_room_activity_events(
+        &self,
+        ctx: &Context<'_>,
+        page: usize,
+        per_page: usize,
+        filters: Option<MoleculeProjectActivityFilters>,
+    ) -> Result<Vec<MoleculeActivityEventV2>> {
+        // TODO: filters
+        assert!(filters.is_none());
+
+        let (query_service, rebac_dataset_registry_facade) =
+            from_catalog_n!(ctx, dyn QueryService, dyn RebacDatasetRegistryFacade);
+
+        let resolved_dataset = rebac_dataset_registry_facade
+            .resolve_dataset_by_ref(
+                &self.entity.data_room_dataset_id.as_local_ref(),
+                auth::DatasetAction::Read,
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use RebacDatasetRefUnresolvedError as E;
+
+                match e {
+                    E::Access(e) => e.into(),
+                    E::NotFound(_) | E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        let df = query_service
+            .get_data(resolved_dataset, Default::default())
+            .await
+            .int_err()?
+            .df;
+
+        let Some(df) = df else {
+            return Ok(Vec::new());
+        };
+
+        // For any data room update, we always have two entries: -C and +C.
+        // We can ignore all -C entries.
+        use datafusion::logical_expr::{col, lit};
+
+        let vocab = odf::metadata::DatasetVocabulary::default();
+        let mut df = df
+            .filter(
+                col(vocab.operation_type_column.as_str())
+                    .not_eq(lit(OperationType::CorrectFrom as i32)),
+            )
+            .int_err()?;
+
+        // Sort the df by offset descending
+        df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
+
+        // Apply pagination
+        df = df.limit(page * per_page, Some(per_page)).int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+        let self_arc = self.as_arc();
+
+        let mut nodes = Vec::with_capacity(records.len());
+        let mut record_iter = records.into_iter().peekable();
+
+        while let Some(current) = record_iter.next() {
+            let (op, entry) = MoleculeDataRoomEntry::new_from_json(current, &self_arc, &vocab)?;
+
+            let event = match op {
+                OperationType::Append => {
+                    // NOTE: Reverse order due to ORDER BY.
+                    //
+                    // If the next entry is equivalent to the current
+                    // one, then it's a file update.
+                    //
+                    // More details: UpdateCollectionEntriesUseCaseImpl
+
+                    // TODO: extract use case based on common logic like
+                    //       UpdateCollectionEntriesUseCaseImpl.
+                    let is_file_updated_event = if let Some(next) = record_iter.peek() {
+                        let (next_op, next_entry) =
+                            MoleculeDataRoomEntry::new_from_json(next.clone(), &self_arc, &vocab)?;
+
+                        next_op == OperationType::Retract && entry.is_same_reference(&next_entry)
+                    } else {
+                        false
+                    };
+
+                    if is_file_updated_event {
+                        // Yes, these two records represent the same update event,
+                        // no need to process the next one, so we consume it.
+                        let _ = record_iter.next();
+                        MoleculeActivityEventV2::file_updated(entry)
+                    } else {
+                        MoleculeActivityEventV2::file_added(entry)
+                    }
+                }
+                OperationType::Retract => MoleculeActivityEventV2::file_removed(entry),
+                OperationType::CorrectTo => MoleculeActivityEventV2::file_updated(entry),
+                OperationType::CorrectFrom => {
+                    unreachable!()
+                }
+            };
+
+            nodes.push(event);
+        }
+
+        Ok(nodes)
     }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeProjectV2 {
+    const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
+
     /// System time when this project was created/updated
     pub async fn system_time(&self) -> DateTime<Utc> {
         self.entity.system_time
@@ -61,12 +179,9 @@ impl MoleculeProjectV2 {
         &self.entity.ipnft_address
     }
 
-    // NOTE: For backward compatibility (and existing projects),
-    //       we continue using BigInt type, which is wider than needed U256.
-
     /// Token ID withing the IPNFT contract
-    pub async fn ipnft_token_id(&self) -> BigInt {
-        BigInt::new(self.entity.ipnft_token_id.clone())
+    pub async fn ipnft_token_id(&self) -> U256 {
+        U256::new(self.entity.ipnft_token_id.clone())
     }
 
     /// Project's organizational account
@@ -108,12 +223,21 @@ impl MoleculeProjectV2 {
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
-        let _ = ctx;
-        let _ = page;
-        let _ = per_page;
-        let _ = filters;
-        // TODO: implement
-        Ok(MoleculeActivityEventV2Connection::new(vec![], 0, 0))
+        // TODO: filters
+        assert!(filters.is_none());
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
+
+        // TODO: PERF: share data room df with data_room() method (lazy initialization)
+
+        let events = self
+            .get_data_room_activity_events(ctx, page, per_page, filters)
+            .await?;
+
+        Ok(MoleculeActivityEventV2Connection::new(
+            events, page, per_page,
+        ))
     }
 }
 

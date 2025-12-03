@@ -32,8 +32,14 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool)
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
     b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
+
+    b.add::<FindCollectionEntriesUseCaseImpl>();
     b.add::<UpdateCollectionEntriesUseCaseImpl>();
-    b.add::<UpdateVersionFileUseCaseImpl>();
+    b.add::<ViewCollectionEntriesUseCaseImpl>();
+
+    b.add::<FindVersionedFileVersionUseCaseImpl>();
+    b.add::<ViewVersionedFileHistoryUseCaseImpl>();
+    b.add::<UpdateVersionedFileUseCaseImpl>();
 
     b.add::<CreateDatasetUseCaseHelper>();
 

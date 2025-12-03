@@ -46,8 +46,8 @@ impl MoleculeMutV1 {
 
         let molecule_subject = molecule_subject(ctx)?;
 
-        let molecule_create_project = from_catalog_n!(ctx, dyn MoleculeCreateProjectUseCase);
-        let project = match molecule_create_project
+        let create_project_uc = from_catalog_n!(ctx, dyn MoleculeCreateProjectUseCase);
+        let project = match create_project_uc
             .execute(
                 &molecule_subject,
                 ipnft_symbol,
@@ -84,8 +84,9 @@ impl MoleculeMutV1 {
     ) -> Result<Option<MoleculeProjectMut>> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let molecule_find_project = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
-        let maybe_project = molecule_find_project
+        let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
+
+        let maybe_project = find_project_uc
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
@@ -109,7 +110,7 @@ pub struct MoleculeProjectMut {
 }
 
 impl MoleculeProjectMut {
-    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn from_entity(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self {
             account_id: entity.account_id,
             data_room_dataset_id: entity.data_room_dataset_id,
@@ -132,7 +133,7 @@ impl MoleculeProjectMut {
         molecule_access_level: String,
         molecule_change_by: String,
     ) -> Result<CreateAnnouncementResult> {
-        let (dataset_reg, push_ingest_use_case) =
+        let (dataset_reg, push_ingest_uc) =
             from_catalog_n!(ctx, dyn DatasetRegistry, dyn domain::PushIngestDataUseCase);
 
         // Validate attachment links
@@ -179,7 +180,7 @@ impl MoleculeProjectMut {
             "molecule_change_by": molecule_change_by,
         });
 
-        push_ingest_use_case
+        push_ingest_uc
             .execute(
                 target_dataset,
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(

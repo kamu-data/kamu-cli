@@ -9,14 +9,11 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::domain::{
-    MoleculeProjectEntity,
-    molecule_project_full_text_search_schema as project_schema,
-};
+use crate::domain::{MoleculeProject, molecule_project_full_text_search_schema as project_schema};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn index_project_from_entity(project: &MoleculeProjectEntity) -> serde_json::Value {
+pub(crate) fn index_project_from_entity(project: &MoleculeProject) -> serde_json::Value {
     serde_json::json!({
         project_schema::FIELD_IPNFT_SYMBOL: project.ipnft_symbol,
         project_schema::FIELD_IPNFT_UID: project.ipnft_uid,

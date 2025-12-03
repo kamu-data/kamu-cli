@@ -14,7 +14,13 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetResult,
+    DatasetRegistry,
+    DatasetRegistryExt,
+};
+use odf::dataset::MetadataChainExt;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs_ext};
@@ -1442,16 +1448,19 @@ impl GraphQLMoleculeV1Harness {
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 
+        let base_gql_catalog = base_gql_harness.catalog();
+
         let cache_dir = base_gql_harness.temp_dir().join("cache");
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
-            .add::<kamu_datasets_services::UpdateVersionFileUseCaseImpl>()
+        let mut base_builder = dill::CatalogBuilder::new_chained(base_gql_catalog);
+        base_builder
+            .add::<kamu_datasets_services::FindVersionedFileVersionUseCaseImpl>()
+            .add::<kamu_datasets_services::UpdateVersionedFileUseCaseImpl>()
+            .add::<kamu_datasets_services::ViewVersionedFileHistoryUseCaseImpl>()
+            .add::<kamu_datasets_services::FindCollectionEntriesUseCaseImpl>()
             .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeCreateProjectUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeFindProjectUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeViewProjectsUseCaseImpl>()
-            .add::<kamu_molecule_services::MoleculeProjectServiceImpl>()
+            .add::<kamu_datasets_services::ViewCollectionEntriesUseCaseImpl>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
             .add::<kamu::QueryDatasetDataUseCaseImpl>()
@@ -1467,8 +1476,11 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
-            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
-            .build();
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
+
+        kamu_molecule_services::register_dependencies(&mut base_builder);
+
+        let base_catalog = base_builder.build();
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
 
@@ -1523,6 +1535,25 @@ impl GraphQLMoleculeV1Harness {
                     .data(catalog),
             )
             .await
+    }
+
+    pub async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
+        let dataset_reg = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap();
+        let projects_dataset = dataset_reg
+            .get_dataset_by_ref(&dataset_alias.as_local_ref())
+            .await
+            .unwrap();
+
+        let last_block = projects_dataset
+            .as_metadata_chain()
+            .get_block_by_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap();
+
+        usize::try_from(last_block.sequence_number).unwrap() + 1
     }
 }
 

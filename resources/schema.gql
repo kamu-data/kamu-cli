@@ -634,11 +634,11 @@ type Collection {
 
 type CollectionEntry {
 	"""
-	Time when this version was created
+	System time when this entry was created
 	"""
 	systemTime: DateTime!
 	"""
-	Time when this version was created
+	Event time when this entry was created
 	"""
 	eventTime: DateTime!
 	"""
@@ -715,9 +715,6 @@ type CollectionMut {
 	updateEntries(operations: [CollectionUpdateInput!]!, expectedHead: Multihash): CollectionUpdateResult!
 }
 
-"""
-Collection entry paths are similar to HTTP path components. They are rooted (start with `/`), separated by forward slashes, with elements URL-encoded (e.g. `/foo%20bar/baz`)
-"""
 scalar CollectionPath
 
 type CollectionProjection {
@@ -3177,7 +3174,7 @@ type MoleculeActivityAnnouncementV2 {
 	announcement: MoleculeAnnouncementEntry!
 }
 
-union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityAnnouncementV2
+union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityAnnouncementV2
 
 type MoleculeActivityEventV2Connection {
 	"""
@@ -3283,7 +3280,7 @@ input MoleculeDataRoomEntriesFilters {
 
 type MoleculeDataRoomEntry {
 	"""
-	Back link to the project
+	Backlink to the project
 	"""
 	project: MoleculeProjectV2!
 	"""
@@ -3427,14 +3424,6 @@ type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
 	message: String!
 }
 
-type MoleculeDisableProjectResultV2 {
-	dummy: String!
-}
-
-type MoleculeEnableProjectResultV2 {
-	dummy: String!
-}
-
 type MoleculeMut {
 	"""
 	Shortcut for `v1 { create_project() }`.
@@ -3472,8 +3461,8 @@ type MoleculeMutV2 {
 	its symbol will remain reserved, data will remain intact,
 	but the project will no longer appear in the listing.
 	"""
-	disableProject(ipnftUid: String!): MoleculeDisableProjectResultV2!
-	enableProject(ipnftUid: String!): MoleculeEnableProjectResultV2!
+	disableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
+	enableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
 	"""
 	Looks up the project
 	"""
@@ -3658,6 +3647,11 @@ type MoleculeProjectMutV2 {
 	announcements: MoleculeAnnouncementsDatasetMutV2!
 }
 
+type MoleculeProjectMutationResultV2 {
+	project: MoleculeProjectMutV2!
+	message: String!
+}
+
 type MoleculeProjectV2 {
 	"""
 	System time when this project was created/updated
@@ -3682,7 +3676,7 @@ type MoleculeProjectV2 {
 	"""
 	Token ID withing the IPNFT contract
 	"""
-	ipnftTokenId: BigInt!
+	ipnftTokenId: U256!
 	"""
 	Project's organizational account
 	"""
@@ -5115,11 +5109,11 @@ type VersionedFileContentDownload {
 
 type VersionedFileEntry {
 	"""
-	System time when this version was created/updated
+	System time when this version was created
 	"""
 	systemTime: DateTime!
 	"""
-	Event time when this version was created/updated
+	Event time when this version was created
 	"""
 	eventTime: DateTime!
 	"""

@@ -15,14 +15,26 @@ use crate::*;
 
 pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<MoleculeFullTextSearchSchemaProvider>();
-
     b.add::<MoleculeProjectFullTextSearchUpdateHandler>();
 
-    b.add::<MoleculeProjectServiceImpl>();
+    b.add::<MoleculeDatasetServiceImpl>();
+    b.add::<MoleculeDataRoomCollectionServiceImpl>();
 
+    b.add::<MoleculeEnableProjectUseCaseImpl>();
     b.add::<MoleculeCreateProjectUseCaseImpl>();
+    b.add::<MoleculeDisableProjectUseCaseImpl>();
     b.add::<MoleculeFindProjectUseCaseImpl>();
     b.add::<MoleculeViewProjectsUseCaseImpl>();
+
+    b.add::<MoleculeCreateDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeFindDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeMoveDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeRemoveDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeUpdateDataRoomEntryUseCaseImpl>();
+    b.add::<MoleculeViewDataRoomEntriesUseCaseImpl>();
+
+    b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
+    b.add::<MoleculeViewGlobalDataRoomActivitiesUseCaseImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

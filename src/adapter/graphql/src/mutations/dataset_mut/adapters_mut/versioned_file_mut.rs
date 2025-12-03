@@ -10,7 +10,11 @@
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{UpdateVersionFileUseCase, UpdateVersionFileUseCaseError, WriteCheckedDataset};
+use kamu_datasets::{
+    UpdateVersionFileUseCaseError,
+    UpdateVersionedFileUseCase,
+    WriteCheckedDataset,
+};
 
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, FileVersion};
@@ -50,7 +54,7 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
+        let update_versioned_file = from_catalog_n!(ctx, dyn UpdateVersionedFileUseCase);
 
         let content_args = get_content_args(
             ctx,
@@ -62,9 +66,10 @@ impl<'a> VersionedFileMut<'a> {
 
         let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_version_file_use_case
+        match update_versioned_file
             .execute(
                 WriteCheckedDataset(file_dataset),
+                None,
                 Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
@@ -148,7 +153,7 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
+        let update_versioned_file = from_catalog_n!(ctx, dyn UpdateVersionedFileUseCase);
 
         let content_args = get_content_args(ctx, ContentSource::Token(upload_token), None)
             .await
@@ -156,9 +161,10 @@ impl<'a> VersionedFileMut<'a> {
 
         let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_version_file_use_case
+        match update_versioned_file
             .execute(
                 WriteCheckedDataset(file_dataset),
+                None,
                 Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
@@ -192,13 +198,14 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
+        let update_versioned_file = from_catalog_n!(ctx, dyn UpdateVersionedFileUseCase);
 
         let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_version_file_use_case
+        match update_versioned_file
             .execute(
                 WriteCheckedDataset(file_dataset),
+                None,
                 None,
                 expected_head.map(Into::into),
                 Some(extra_data.into()),

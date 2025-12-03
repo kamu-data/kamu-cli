@@ -8300,6 +8300,7 @@ dependencies = [
  "bytes",
  "chrono",
  "database-common",
+ "file-utils",
  "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
@@ -8338,6 +8339,7 @@ dependencies = [
  "num-bigint",
  "opendatafabric",
  "serde_json",
+ "time-source",
  "tokio",
  "tracing",
 ]

@@ -111,8 +111,9 @@ impl MoleculeV1 {
     ) -> Result<MoleculeProjectListing> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let molecule_view_projects = from_catalog_n!(ctx, dyn MoleculeViewProjectsUseCase);
-        let listing = molecule_view_projects
+        let view_projects_uc = from_catalog_n!(ctx, dyn MoleculeViewProjectsUseCase);
+
+        let listing = view_projects_uc
             .execute(&molecule_subject, pagination)
             .await
             .map_err(|e| match e {
@@ -142,8 +143,9 @@ impl MoleculeV1 {
     ) -> Result<Option<MoleculeProject>> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let molecule_find_project = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
-        let maybe_project = molecule_find_project
+        let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
+
+        let maybe_project = find_project_uc
             .execute(&molecule_subject, ipnft_uid)
             .await
             .map_err(|e| match e {
@@ -168,20 +170,10 @@ impl MoleculeV1 {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
         let listing = self
-            .get_molecule_projects_listing(
-                ctx,
-                Some(PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                }),
-            )
+            .get_molecule_projects_listing(ctx, Some(PaginationOpts::from_page(page, per_page)))
             .await?;
 
-        let nodes = listing
-            .projects
-            .into_iter()
-            .map(MoleculeProject::new)
-            .collect();
+        let nodes = listing.list.into_iter().map(MoleculeProject::new).collect();
 
         Ok(MoleculeProjectConnection::new(
             nodes,
@@ -205,7 +197,7 @@ impl MoleculeV1 {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
-        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
+        let query_dataset_data_uc = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
         // TODO: PERF: This "brute force" approach will not scale with growth of
         // projects and has to be revisited
@@ -220,7 +212,7 @@ impl MoleculeV1 {
             odf::DatasetID,
             Arc<MoleculeProject>,
         > = projects_listing
-            .projects
+            .list
             .into_iter()
             .map(MoleculeProject::new)
             .map(|p| (p.entity.announcements_dataset_id.clone(), Arc::new(p)))
@@ -234,7 +226,7 @@ impl MoleculeV1 {
         let mut announcement_dataframes = Vec::new();
         const DATASET_ID_COL: &str = "__dataset_id__";
 
-        for resp in query_dataset_data
+        for resp in query_dataset_data_uc
             .get_data_multi(&announcement_dataset_refs, true)
             .await
             .int_err()?
@@ -296,11 +288,11 @@ impl MoleculeV1 {
 
 #[derive(Clone)]
 pub struct MoleculeProject {
-    pub(crate) entity: kamu_molecule_domain::MoleculeProjectEntity,
+    pub(crate) entity: kamu_molecule_domain::MoleculeProject,
 }
 
 impl MoleculeProject {
-    pub fn new(entity: kamu_molecule_domain::MoleculeProjectEntity) -> Self {
+    pub fn new(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self { entity }
     }
 
@@ -309,9 +301,9 @@ impl MoleculeProject {
         ctx: &Context<'_>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
-        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
+        let query_dataset_data_uc = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
-        let df = match query_dataset_data
+        let df = match query_dataset_data_uc
             .tail(
                 &self.entity.announcements_dataset_id.as_local_ref(),
                 0,
@@ -354,9 +346,9 @@ impl MoleculeProject {
         ctx: &Context<'_>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
-        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
+        let query_dataset_data_uc = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
-        let df = match query_dataset_data
+        let df = match query_dataset_data_uc
             .tail(
                 &self.entity.data_room_dataset_id.as_local_ref(),
                 0,
@@ -386,7 +378,8 @@ impl MoleculeProject {
             })
             .filter(|(op, _)| *op != odf::metadata::OperationType::CorrectFrom)
             .map(|(op, record)| {
-                let entry = CollectionEntry::from_json(record)?;
+                let entity = kamu_datasets::CollectionEntry::from_json(record)?;
+                let entry = CollectionEntry::new(entity);
 
                 let event = match op {
                     odf::metadata::OperationType::Append => {
@@ -431,9 +424,9 @@ impl MoleculeProject {
         ctx: &Context<'_>,
         limit: usize,
     ) -> Result<Vec<MoleculeProjectEvent>> {
-        let query_dataset_data = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
+        let query_dataset_data_uc = from_catalog_n!(ctx, dyn domain::QueryDatasetDataUseCase);
 
-        let df = match query_dataset_data
+        let df = match query_dataset_data_uc
             .get_data(
                 &self.entity.data_room_dataset_id.as_local_ref(),
                 domain::GetDataOptions::default(),
@@ -465,7 +458,7 @@ impl MoleculeProject {
         let mut events = Vec::new();
 
         for did in dataset_ids {
-            let (df, source) = match query_dataset_data
+            let (df, source) = match query_dataset_data_uc
                 .tail(
                     &did.as_local_ref(),
                     0,
@@ -493,7 +486,8 @@ impl MoleculeProject {
                 let dataset =
                     Dataset::from_resolved_authorized_dataset(project_account.clone(), &source);
 
-                let entry = VersionedFileEntry::from_json(source.clone(), record)?;
+                let entity = kamu_datasets::VersionedFileEntry::from_json(record)?;
+                let entry = VersionedFileEntry::new(source.clone(), entity);
 
                 events.push(MoleculeProjectEvent::FileUpdated(
                     MoleculeProjectEventFileUpdated {
@@ -651,7 +645,7 @@ pub struct MoleculeProjectEventDataRoomEntryAdded {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryAdded {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.entry.system_time
+        self.entry.entity.system_time
     }
 }
 
@@ -666,7 +660,7 @@ pub struct MoleculeProjectEventDataRoomEntryRemoved {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryRemoved {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.entry.system_time
+        self.entry.entity.system_time
     }
 }
 
@@ -681,7 +675,7 @@ pub struct MoleculeProjectEventDataRoomEntryUpdated {
 #[ComplexObject]
 impl MoleculeProjectEventDataRoomEntryUpdated {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.new_entry.system_time
+        self.new_entry.entity.system_time
     }
 }
 
@@ -723,7 +717,7 @@ pub struct MoleculeProjectEventFileUpdated {
 #[ComplexObject]
 impl MoleculeProjectEventFileUpdated {
     async fn system_time(&self) -> DateTime<Utc> {
-        self.new_entry.system_time
+        self.new_entry.entity.system_time
     }
 }
 
