@@ -65,6 +65,21 @@ impl MoleculeDatasetServiceImpl {
             Err(e) => Err(e.int_err().into()),
         }
     }
+
+    async fn try_get_data_frame(
+        &self,
+        dataset: ResolvedDataset,
+    ) -> Result<Option<DataFrameExt>, MoleculeGetDatasetError> {
+        match self
+            .query_service
+            .get_data(dataset, GetDataOptions::default())
+            .await
+        {
+            Ok(res) => Ok(res.df),
+            Err(QueryError::Access(e)) => Err(e.into()),
+            Err(e) => Err(e.int_err().into()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,18 +159,10 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
             .await?;
 
         // Query full data
-        let df = match self
-            .query_service
-            .get_data(projects_dataset.clone(), GetDataOptions::default())
-            .await
-        {
-            Ok(res) => Ok(res.df),
-            Err(QueryError::Access(err)) => Err(MoleculeGetDatasetError::Access(err)),
-            Err(err) => Err(MoleculeGetDatasetError::Internal(err.int_err())),
-        }?;
+        let maybe_df = self.try_get_data_frame(projects_dataset.clone()).await?;
 
         // Project into snapshot
-        let df = if let Some(df) = df {
+        let df = if let Some(df) = maybe_df {
             Some(
                 odf::utils::data::changelog::project(
                     df,
@@ -255,20 +262,11 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
             )
             .await?;
 
-        let df = match self
-            .query_service
-            .get_data(
-                data_room_activity_dataset.clone(),
-                GetDataOptions::default(),
-            )
-            .await
-        {
-            Ok(res) => Ok(res.df),
-            Err(QueryError::Access(err)) => Err(MoleculeGetDatasetError::Access(err)),
-            Err(err) => Err(MoleculeGetDatasetError::Internal(err.int_err())),
-        }?;
+        let maybe_df = self
+            .try_get_data_frame(data_room_activity_dataset.clone())
+            .await?;
 
-        Ok((data_room_activity_dataset, df))
+        Ok((data_room_activity_dataset, maybe_df))
     }
 
     #[tracing::instrument(
@@ -307,10 +305,15 @@ impl MoleculeDatasetService for MoleculeDatasetServiceImpl {
         action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
-        let _ = molecule_account_name;
-        let _ = action;
-        let _ = create_if_not_exist;
-        todo!()
+        let announcements_dataset = self
+            .get_global_announcements_dataset(molecule_account_name, action, create_if_not_exist)
+            .await?;
+
+        let maybe_df = self
+            .try_get_data_frame(announcements_dataset.clone())
+            .await?;
+
+        Ok((announcements_dataset, maybe_df))
     }
 }
 

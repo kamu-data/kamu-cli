@@ -7,10 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::{ErrorIntoInternal, InternalError};
 
-use crate::{MoleculeDataRoomActivityEntity, MoleculeGetDatasetError};
+use crate::{
+    MoleculeDataRoomActivityEntity,
+    MoleculeGetDatasetError,
+    MoleculeGlobalAnnouncementRecord,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +30,21 @@ pub trait MoleculeViewGlobalDataRoomActivitiesUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeDataRoomActivityEntity>;
+pub enum MoleculeGlobalActivity {
+    DataRoomActivity(MoleculeDataRoomActivityEntity),
+    Announcement(MoleculeGlobalAnnouncementRecord),
+}
+
+impl MoleculeGlobalActivity {
+    pub fn event_time(&self) -> DateTime<Utc> {
+        match self {
+            Self::DataRoomActivity(a) => a.event_time,
+            Self::Announcement(a) => a.system_columns.event_time,
+        }
+    }
+}
+
+pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeGlobalActivity>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

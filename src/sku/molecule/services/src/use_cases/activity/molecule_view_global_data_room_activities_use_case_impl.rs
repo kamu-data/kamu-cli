@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth;
 
@@ -22,6 +22,72 @@ use crate::domain::*;
 #[dill::interface(dyn MoleculeViewGlobalDataRoomActivitiesUseCase)]
 pub struct MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
     molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+}
+
+impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
+    async fn get_global_data_room_activities_listing(
+        &self,
+        molecule_subject: &LoggedAccount,
+    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
+        let (_, maybe_df) = self
+            .molecule_dataset_service
+            .get_global_data_room_activity_data_frame(
+                &molecule_subject.account_name,
+                auth::DatasetAction::Read,
+                false,
+            )
+            .await?;
+
+        let Some(df) = maybe_df else {
+            return Ok(MoleculeDataRoomActivityListing::default());
+        };
+
+        // Sorting will be done after merge
+        let records = df.collect_json_aos().await.int_err()?;
+        let total_count = records.len();
+
+        let list = records
+            .into_iter()
+            .map(|record| {
+                let entity = MoleculeDataRoomActivityEntity::from_json(record)?;
+                Ok(MoleculeGlobalActivity::DataRoomActivity(entity))
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?;
+
+        Ok(MoleculeDataRoomActivityListing { list, total_count })
+    }
+
+    async fn get_global_announcement_activities_listing(
+        &self,
+        molecule_subject: &LoggedAccount,
+    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
+        let (_, maybe_df) = self
+            .molecule_dataset_service
+            .get_global_announcements_data_frame(
+                &molecule_subject.account_name,
+                auth::DatasetAction::Read,
+                false,
+            )
+            .await?;
+
+        let Some(df) = maybe_df else {
+            return Ok(MoleculeDataRoomActivityListing::default());
+        };
+
+        // Sorting will be done after merge
+        let records = df.collect_json_aos().await.int_err()?;
+        let total_count = records.len();
+
+        let list = records
+            .into_iter()
+            .map(|record| {
+                let entity = MoleculeGlobalAnnouncementRecord::from_json(record)?;
+                Ok(MoleculeGlobalActivity::Announcement(entity))
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?;
+
+        Ok(MoleculeDataRoomActivityListing { list, total_count })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,42 +103,32 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCase
         molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let Some(df) = self
-            .molecule_dataset_service
-            .get_global_data_room_activity_data_frame(
-                &molecule_subject.account_name,
-                auth::DatasetAction::Read,
-                false,
-            )
-            .await?
-            .1
-        else {
-            return Ok(MoleculeDataRoomActivityListing::default());
-        };
+        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
+            self.get_global_data_room_activities_listing(molecule_subject),
+            self.get_global_announcement_activities_listing(molecule_subject),
+        )?;
 
         // Get the total count before pagination
-        let total_count = df.clone().count().await.int_err()?;
+        let total_count =
+            data_room_listing.total_count + announcement_activities_listing.total_count;
 
-        // Sort the df by offset descending
-        use datafusion::logical_expr::col;
-
-        let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
-
-        // Apply pagination
-        let df = if let Some(pagination) = pagination {
-            df.limit(pagination.offset, Some(pagination.limit))
-                .int_err()?
-        } else {
-            df
+        // Merge lists
+        let mut list = {
+            let mut v = Vec::with_capacity(total_count);
+            v.append(&mut data_room_listing.list);
+            v.append(&mut announcement_activities_listing.list);
+            v
         };
 
-        let records = df.collect_json_aos().await.int_err()?;
+        // Sort by event time descending
+        list.sort_unstable_by_key(|item| std::cmp::Reverse(item.event_time()));
 
-        let list = records
-            .into_iter()
-            .map(MoleculeDataRoomActivityEntity::from_json)
-            .collect::<Result<Vec<_>, _>>()
-            .int_err()?;
+        // Pagination
+        if let Some(pagination) = pagination {
+            let safe_offset = pagination.offset.min(total_count);
+            list.drain(..safe_offset);
+            list.truncate(pagination.limit);
+        }
 
         Ok(MoleculeDataRoomActivityListing { list, total_count })
     }

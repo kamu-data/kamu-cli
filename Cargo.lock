@@ -8317,6 +8317,7 @@ dependencies = [
  "opendatafabric",
  "serde_json",
  "time-source",
+ "tokio",
  "tracing",
  "uuid",
 ]

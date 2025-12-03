@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::{InternalError, ResultIntoInternal};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -41,6 +43,8 @@ pub type MoleculeProjectAnnouncementRecord =
 pub struct MoleculeGlobalAnnouncementDataRecord {
     pub announcement_id: Option<uuid::Uuid>, // Optional for creation
 
+    pub ipnft_uid: String,
+
     pub headline: String,
 
     pub body: String,
@@ -64,10 +68,18 @@ pub type MoleculeGlobalAnnouncementRecord =
     odf::serde::DatasetDefaultVocabularyRecord<MoleculeGlobalAnnouncementDataRecord>;
 
 pub trait MoleculeGlobalAnnouncementRecordExt {
+    fn from_json(
+        record: serde_json::Value,
+    ) -> Result<MoleculeGlobalAnnouncementRecord, InternalError>;
+
     fn as_project_announcement_record(&self) -> MoleculeProjectAnnouncementRecord;
 }
 
 impl MoleculeGlobalAnnouncementRecordExt for MoleculeGlobalAnnouncementRecord {
+    fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        serde_json::from_value(record).int_err()
+    }
+
     fn as_project_announcement_record(&self) -> MoleculeProjectAnnouncementRecord {
         MoleculeProjectAnnouncementRecord {
             system_columns: self.system_columns.clone(),

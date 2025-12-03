@@ -57,6 +57,7 @@ impl MoleculeProjectMutV2 {
 
         Ok(MoleculeAnnouncementsDatasetMutV2::new(
             data_room_writable_state,
+            self.project.as_ref(),
         ))
     }
 }
