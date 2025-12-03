@@ -120,6 +120,7 @@ impl MoleculeFullTextSearchIndexer {
             "Indexing data room entries for Molecule organization account",
         );
 
+        const PARALLEL_PROJECTS: usize = 10;
         let mut total_documents_count = 0;
         let mut documents_by_id = Vec::new();
 
@@ -130,50 +131,70 @@ impl MoleculeFullTextSearchIndexer {
             .await
             .int_err()?;
 
-        for project in projects_listing.list {
-            // Load data room entries for the project
-            let data_room_entries = self
-                .molecule_view_data_room_entries_uc
-                .execute(
-                    &project, None, /* latest */
-                    None, /* all prefixes */
-                    None, /* any depth */
-                    None, /* no pagination */
-                )
-                .await
-                .map_err(|e| {
-                    tracing::warn!(
-                        project_ipnft_uid = project.ipnft_uid.as_str(),
-                        error = ?e,
-                        "Failed to load data room entries for project",
-                    );
-                    e
-                })
-                .int_err()?;
+        // Process projects in parallel batches
+        use futures::stream::{FuturesUnordered, StreamExt};
 
-            // Skip empty rooms
-            if data_room_entries.list.is_empty() {
-                continue;
+        let project_chunks = projects_listing.list.chunks(PARALLEL_PROJECTS);
+        for project_chunk in project_chunks {
+            // Load data room entries for multiple projects in parallel
+            let mut futures = FuturesUnordered::new();
+
+            for project in project_chunk {
+                let project_clone = project.clone();
+                let view_uc = Arc::clone(&self.molecule_view_data_room_entries_uc);
+
+                futures.push(async move {
+                    let result = view_uc
+                        .execute(
+                            &project_clone,
+                            None, /* latest */
+                            None, /* all prefixes */
+                            None, /* any depth */
+                            None, /* no pagination */
+                        )
+                        .await
+                        .map_err(|e| {
+                            tracing::warn!(
+                                project_ipnft_uid = project_clone.ipnft_uid.as_str(),
+                                error = ?e,
+                                "Failed to load data room entries for project",
+                            );
+                            e
+                        })
+                        .int_err();
+
+                    (project_clone, result)
+                });
             }
 
-            // Prepare documents for indexing
-            for entry in data_room_entries.list {
-                let document = helpers::index_data_room_entry_from_entity(&project, &entry);
+            // Process results as they complete
+            while let Some((project, data_room_entries_result)) = futures.next().await {
+                let data_room_entries = data_room_entries_result?;
 
-                // Synthesize document ID as "<ipnft_uid>:<entry_path>"
-                let entry_document_id = format!("{}:{}", project.ipnft_uid, entry.path);
-                documents_by_id.push((entry_document_id, document));
+                // Skip empty rooms
+                if data_room_entries.list.is_empty() {
+                    continue;
+                }
 
-                // Bulk index when we reach BULK_SIZE
-                if documents_by_id.len() >= Self::BULK_SIZE {
-                    tracing::debug!(
-                        documents_count = documents_by_id.len(),
-                        "Bulk indexing data room entries batch",
-                    );
-                    repo.index_bulk(data_room_entry_schema::SCHEMA_NAME, documents_by_id)
-                        .await?;
-                    total_documents_count += Self::BULK_SIZE;
-                    documents_by_id = Vec::new();
+                // Prepare documents for indexing
+                for entry in data_room_entries.list {
+                    let document = helpers::index_data_room_entry_from_entity(&project, &entry);
+
+                    // Synthesize document ID as "<ipnft_uid>:<entry_path>"
+                    let entry_document_id = format!("{}:{}", project.ipnft_uid, entry.path);
+                    documents_by_id.push((entry_document_id, document));
+
+                    // Bulk index when we reach BULK_SIZE
+                    if documents_by_id.len() >= Self::BULK_SIZE {
+                        tracing::debug!(
+                            documents_count = documents_by_id.len(),
+                            "Bulk indexing data room entries batch",
+                        );
+                        repo.index_bulk(data_room_entry_schema::SCHEMA_NAME, documents_by_id)
+                            .await?;
+                        total_documents_count += Self::BULK_SIZE;
+                        documents_by_id = Vec::new();
+                    }
                 }
             }
         }

@@ -8327,6 +8327,7 @@ dependencies = [
  "datafusion",
  "dill",
  "file-utils",
+ "futures",
  "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
