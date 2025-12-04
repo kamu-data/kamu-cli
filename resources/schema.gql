@@ -3189,9 +3189,9 @@ type MoleculeAnnouncementEntry {
 	id: String!
 	headline: String!
 	body: String!
-	attachments: [String!]!
+	attachments: [DatasetID!]!
 	accessLevel: String!
-	changeBy: AccountID!
+	changeBy: String!
 	categories: [String!]!
 	tags: [String!]!
 }
@@ -3222,7 +3222,7 @@ type MoleculeAnnouncements {
 	"""
 	dataset: Dataset!
 	tail(page: Int, perPage: Int, filters: MoleculeAnnouncementsFilters): MoleculeAnnouncementEntryConnection!
-	byId(id: String!): MoleculeAnnouncementEntry!
+	byId(id: String!): MoleculeAnnouncementEntry
 }
 
 type MoleculeAnnouncementsDatasetMutV2 {
@@ -3233,7 +3233,7 @@ type MoleculeAnnouncementsDatasetMutV2 {
 		"""
 		List of dataset DIDs to link
 		"""
-		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!,		categories: [String!]!,		tags: [String!]!
+		attachments: [DatasetID!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!,		categories: [String!]!,		tags: [String!]!
 	): CreateAnnouncementResult!
 }
 

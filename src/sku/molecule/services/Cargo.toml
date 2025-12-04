@@ -47,4 +47,9 @@ dill = { version = "0.14", default-features = false }
 indoc = { version = "2", default-features = false }
 num-bigint = { version = "0.4", default-features = false }
 serde_json = { version = "1.0", default-features = false }
+tokio = { version = "1", default-features = false, features = ["macros"] }
 tracing = { version = "0.1", default-features = false }
+uuid = { version = "1", default-features = false, features = ["v4"] }
+
+
+[dev-dependencies]

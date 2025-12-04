@@ -7,30 +7,35 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{EntityPageListing, PaginationOpts};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 
-use crate::{MoleculeDataRoomActivityEntity, MoleculeGetDatasetError};
+use crate::{MoleculeGlobalAnnouncementDataRecord, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeViewGlobalDataRoomActivitiesUseCase: Send + Sync {
+pub trait MoleculeCreateAnnouncementUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
-        pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError>;
+        molecule_project: &MoleculeProject,
+        global_announcement: MoleculeGlobalAnnouncementDataRecord,
+    ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeDataRoomActivityEntity>;
+pub struct MoleculeCreateAnnouncementResult {
+    pub new_announcement_id: uuid::Uuid,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
-pub enum MoleculeViewDataRoomActivitiesError {
+#[derive(Debug, thiserror::Error)]
+pub enum MoleculeCreateAnnouncementError {
+    #[error(transparent)]
+    NotFoundAttachments(#[from] MoleculeCreateAnnouncementNotFoundAttachmentsError),
+
     #[error(transparent)]
     Access(
         #[from]
@@ -42,14 +47,13 @@ pub enum MoleculeViewDataRoomActivitiesError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetDatasetError> for MoleculeViewDataRoomActivitiesError {
-    fn from(e: MoleculeGetDatasetError) -> Self {
-        use MoleculeGetDatasetError as E;
-        match e {
-            E::Access(e) => e.into(),
-            E::NotFound(_) | E::Internal(_) => e.int_err().into(),
-        }
-    }
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "Not found attachment(s): {}",
+    format_utils::format_collection(not_found_dataset_ids)
+)]
+pub struct MoleculeCreateAnnouncementNotFoundAttachmentsError {
+    pub not_found_dataset_ids: Vec<odf::DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

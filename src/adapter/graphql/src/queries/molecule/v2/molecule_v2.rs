@@ -15,6 +15,7 @@ use kamu_molecule_domain::{
     MoleculeDataRoomFileActivityType,
     MoleculeFindProjectError,
     MoleculeFindProjectUseCase,
+    MoleculeGlobalActivity,
     MoleculeProjectListing,
     MoleculeViewDataRoomActivitiesError,
     MoleculeViewGlobalDataRoomActivitiesUseCase,
@@ -156,8 +157,6 @@ impl MoleculeV2 {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
-        // TODO: announcements
-
         let listing = view_global_data_room_activities_uc
             .execute(
                 &molecule_subject,
@@ -195,30 +194,46 @@ impl MoleculeV2 {
                 })
                 .collect()
         };
-        let mut nodes = Vec::with_capacity(listing.list.len());
 
-        for activity in listing.list {
-            let Some(project) = projects_mapping.get(&activity.ipnft_uid) else {
-                return Err(GqlError::gql(format!(
-                    "Project [{}] unexpectedly not found",
-                    activity.ipnft_uid
-                )));
-            };
+        let nodes = listing
+            .list
+            .into_iter()
+            .map(|activity| {
+                let ipnft_uid = activity.ipnft_uid();
+                let Some(project) = projects_mapping.get(ipnft_uid) else {
+                    return Err(GqlError::gql(format!(
+                        "Project [{ipnft_uid}] unexpectedly not found",
+                    )));
+                };
 
-            let activity_type = activity.activity_type;
-            let entry =
-                MoleculeDataRoomEntry::new_from_data_room_activity_entity(project, activity);
+                match activity {
+                    MoleculeGlobalActivity::DataRoomActivity(data_room_activity_entity) => {
+                        let activity_type = data_room_activity_entity.activity_type;
+                        let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
+                            project,
+                            data_room_activity_entity,
+                        );
 
-            use MoleculeDataRoomFileActivityType as Type;
+                        use MoleculeDataRoomFileActivityType as Type;
 
-            let activity_event = match activity_type {
-                Type::Added => MoleculeActivityEventV2::file_added(entry),
-                Type::Updated => MoleculeActivityEventV2::file_updated(entry),
-                Type::Removed => MoleculeActivityEventV2::file_removed(entry),
-            };
+                        let activity_event = match activity_type {
+                            Type::Added => MoleculeActivityEventV2::file_added(entry),
+                            Type::Updated => MoleculeActivityEventV2::file_updated(entry),
+                            Type::Removed => MoleculeActivityEventV2::file_removed(entry),
+                        };
 
-            nodes.push(activity_event);
-        }
+                        Ok(activity_event)
+                    }
+                    MoleculeGlobalActivity::Announcement(announcement_activity_entity) => {
+                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement_record(
+                            project,
+                            announcement_activity_entity,
+                        );
+                        Ok(MoleculeActivityEventV2::announcement(entry))
+                    }
+                }
+            })
+            .collect::<Result<_, _>>()?;
 
         Ok(MoleculeActivityEventV2Connection::new(
             nodes, page, per_page,

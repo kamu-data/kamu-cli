@@ -171,6 +171,7 @@ impl MoleculeProjectMut {
         let announcement_id = uuid::Uuid::new_v4();
 
         let record = serde_json::json!({
+            // V1:
             "op": u8::from(odf::metadata::OperationType::Append),
             "announcement_id": announcement_id.to_string(),
             "headline": headline,
@@ -178,6 +179,9 @@ impl MoleculeProjectMut {
             "attachments": attachments,
             "molecule_access_level": molecule_access_level,
             "molecule_change_by": molecule_change_by,
+            // V2:
+            "categories": [],
+            "tags": [],
         });
 
         push_ingest_uc
@@ -282,7 +286,7 @@ impl CreateAnnouncementSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateAnnouncementErrorInvalidAttachment {
-    message: String,
+    pub(crate) message: String,
 }
 #[ComplexObject]
 impl CreateAnnouncementErrorInvalidAttachment {

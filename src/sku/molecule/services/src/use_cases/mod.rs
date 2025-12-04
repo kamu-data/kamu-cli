@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod activity;
+mod activities;
+mod announcements;
 mod data_rooms;
 mod projects;
 
-pub use activity::*;
+pub use activities::*;
+pub use announcements::*;
 pub use data_rooms::*;
 pub use projects::*;

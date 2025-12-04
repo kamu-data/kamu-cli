@@ -149,7 +149,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = MoleculeDatasetSnapshots::announcements(project_account_name);
+        let snapshot = MoleculeDatasetSnapshots::announcements_v2(project_account_name);
         let announcements_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(
