@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use kamu_core::auth;
 use kamu_molecule_domain::MoleculeGlobalAnnouncementRecordExt;
 use odf::utils::data::DataFrameExt;
@@ -180,6 +181,14 @@ impl MoleculeAnnouncementEntry {
 impl MoleculeAnnouncementEntry {
     async fn project(&self) -> &MoleculeProjectV2 {
         self.project.as_ref()
+    }
+
+    async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_columns.system_time
+    }
+
+    async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.system_columns.event_time
     }
 
     async fn id(&self) -> MoleculeAnnouncementId {
