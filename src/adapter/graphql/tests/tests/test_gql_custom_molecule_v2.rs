@@ -84,6 +84,112 @@ const ENABLE_PROJECT: &str = indoc!(
     "#
 );
 
+// TODO: find a way to output tags/categories
+const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
+    r#"
+    {
+      molecule {
+        v2 {
+          activity {
+            nodes {
+              ... on MoleculeActivityFileAddedV2 {
+                __typename
+                entry {
+                  path
+                  ref
+                  changeBy
+                }
+              }
+              ... on MoleculeActivityFileUpdatedV2 {
+                __typename
+                entry {
+                  path
+                  ref
+                  changeBy
+                }
+              }
+              ... on MoleculeActivityFileRemovedV2 {
+                __typename
+                entry {
+                  path
+                  ref
+                  changeBy
+                }
+              }
+              ... on MoleculeActivityAnnouncementV2 {
+                __typename
+                announcement {
+                  id
+                  headline
+                  body
+                  attachments
+                  accessLevel
+                  changeBy
+                  categories
+                  tags
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
+const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
+    r#"
+    query ($ipnftUid: String!) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            activity {
+              nodes {
+                ... on MoleculeActivityFileAddedV2 {
+                  __typename
+                  entry {
+                    path
+                    ref
+                    changeBy
+                  }
+                }
+                ... on MoleculeActivityFileUpdatedV2 {
+                  __typename
+                  entry {
+                    path
+                    ref
+                    changeBy
+                  }
+                }
+                ... on MoleculeActivityFileRemovedV2 {
+                  __typename
+                  entry {
+                    path
+                    ref
+                    changeBy
+                  }
+                }
+                ... on MoleculeActivityAnnouncementV2 {
+                  __typename
+                  announcement {
+                    id
+                    headline
+                    body
+                    attachments
+                    accessLevel
+                    changeBy
+                    categories
+                    tags
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
@@ -743,87 +849,6 @@ async fn test_molecule_v2_data_room_operations() {
                 }
             }
         })
-    );
-
-    // Global activity
-    // TODO: find a way to output tags/categories
-    const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
-        r#"
-        {
-          molecule {
-            v2 {
-              activity {
-                nodes {
-                  ... on MoleculeActivityFileAddedV2 {
-                    __typename
-                    entry {
-                      path
-                      ref
-                      changeBy
-                    }
-                  }
-                  ... on MoleculeActivityFileUpdatedV2 {
-                    __typename
-                    entry {
-                      path
-                      ref
-                      changeBy
-                    }
-                  }
-                  ... on MoleculeActivityFileRemovedV2 {
-                    __typename
-                    entry {
-                      path
-                      ref
-                      changeBy
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-        "#
-    );
-    const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
-        r#"
-        query ($ipnftUid: String!) {
-          molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
-                activity {
-                  nodes {
-                    ... on MoleculeActivityFileAddedV2 {
-                      __typename
-                      entry {
-                        path
-                        ref
-                        changeBy
-                      }
-                    }
-                    ... on MoleculeActivityFileUpdatedV2 {
-                      __typename
-                      entry {
-                        path
-                        ref
-                        changeBy
-                      }
-                    }
-                    ... on MoleculeActivityFileRemovedV2 {
-                      __typename
-                      entry {
-                        path
-                        ref
-                        changeBy
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-        "#
     );
 
     let expected_activity_node = value!({
@@ -2565,7 +2590,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                 "accessLevel": "public",
                 "description": "Plain text file (bar)",
                 "categories": [],
@@ -2687,7 +2712,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "body": "Blah blah 2",
                 "attachments": [project_1_file_1_dataset_id],
                 "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
             })),
@@ -2733,7 +2758,7 @@ async fn test_molecule_v2_announcements_operations() {
                     project_1_file_2_dataset_id,
                 ],
                 "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                 "categories": [],
                 "tags": ["test-tag1"],
             })),
@@ -2833,7 +2858,7 @@ async fn test_molecule_v2_announcements_operations() {
                                             project_1_file_2_dataset_id,
                                         ],
                                         "accessLevel": "holders",
-                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                                         "categories": [],
                                         "tags": ["test-tag1"],
                                     },
@@ -2845,7 +2870,7 @@ async fn test_molecule_v2_announcements_operations() {
                                             project_1_file_1_dataset_id,
                                         ],
                                         "accessLevel": "holders",
-                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                                         "categories": ["test-category-1"],
                                         "tags": ["test-tag1", "test-tag2"],
                                     },
@@ -2863,6 +2888,105 @@ async fn test_molecule_v2_announcements_operations() {
                             }
                         }
                     }
+                }
+            }
+        })
+    );
+
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "announcement": {
+                        "id": project_1_announcement_3_id,
+                        "headline": "Test announcement 3",
+                        "body": "Blah blah 3",
+                        "attachments": [
+                            project_1_file_1_dataset_id,
+                            project_1_file_2_dataset_id,
+                        ],
+                        "accessLevel": "holders",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                        "categories": [],
+                        "tags": ["test-tag1"],
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "announcement": {
+                        "id": project_1_announcement_2_id,
+                        "headline": "Test announcement 2",
+                        "body": "Blah blah 2",
+                        "attachments": [
+                            project_1_file_1_dataset_id,
+                        ],
+                        "accessLevel": "holders",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                        "categories": ["test-category-1"],
+                        "tags": ["test-tag1", "test-tag2"],
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "announcement": {
+                        "id": project_1_announcement_1_id,
+                        "headline": "Test announcement 1",
+                        "body": "Blah blah 1",
+                        "attachments": [],
+                        "accessLevel": "holders",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                        "categories": ["test-category-1", "test-category-2"],
+                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    }
+                },
+            ]
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::default(),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
                 }
             }
         })
