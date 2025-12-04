@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod molecule_data_room_full_text_search_update_handler;
 mod molecule_project_full_text_search_update_handler;
 
+pub use molecule_data_room_full_text_search_update_handler::*;
 pub use molecule_project_full_text_search_update_handler::*;

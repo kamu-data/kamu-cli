@@ -14,6 +14,7 @@ use crate::*;
 pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeFullTextSearchSchemaProvider>();
     b.add::<MoleculeProjectFullTextSearchUpdateHandler>();
+    b.add::<MoleculeDataRoomFullTextSearchUpdateHandler>();
 
     b.add::<MoleculeDatasetServiceImpl>();
     b.add::<MoleculeDataRoomCollectionServiceImpl>();

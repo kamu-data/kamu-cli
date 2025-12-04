@@ -263,7 +263,6 @@ kamu-adapter-flight-sql = { version = "0.253.1", path = "src/adapter/flight-sql"
 kamu-adapter-flow-dataset = { version = "0.253.1", path = "src/adapter/flow-dataset", default-features = false }
 kamu-adapter-flow-webhook = { version = "0.253.1", path = "src/adapter/flow-webhook", default-features = false }
 kamu-adapter-task-dataset = { version = "0.253.1", path = "src/adapter/task-dataset", default-features = false }
-
 kamu-adapter-task-webhook = { version = "0.253.1", path = "src/adapter/task-webhook", default-features = false }
 kamu-adapter-flow-task = { version = "0.253.1", path = "src/adapter/flow-task", default-features = false }
 kamu-adapter-graphql = { version = "0.253.1", path = "src/adapter/graphql", default-features = false }

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_search::{FullTextSearchContext, FullTextSearchService};
+use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
 use messaging_outbox::{MessageConsumer, MessageConsumerT};
 
 use crate::domain::{
@@ -47,10 +47,13 @@ impl MoleculeProjectFullTextSearchUpdateHandler {
         );
 
         self.full_text_search_service
-            .index_bulk(
+            .bulk_update(
                 ctx,
                 project_schema::SCHEMA_NAME,
-                vec![(created_message.ipnft_uid.clone(), project_document)],
+                vec![FullTextUpdateOperation::Index {
+                    id: created_message.ipnft_uid.clone(),
+                    doc: project_document,
+                }],
             )
             .await?;
 
@@ -67,10 +70,13 @@ impl MoleculeProjectFullTextSearchUpdateHandler {
             disabled_message.event_time,
         );
         self.full_text_search_service
-            .update_bulk(
+            .bulk_update(
                 ctx,
                 project_schema::SCHEMA_NAME,
-                vec![(disabled_message.ipnft_uid.clone(), partial_update)],
+                vec![FullTextUpdateOperation::Update {
+                    id: disabled_message.ipnft_uid.clone(),
+                    doc: partial_update,
+                }],
             )
             .await?;
 
@@ -87,10 +93,13 @@ impl MoleculeProjectFullTextSearchUpdateHandler {
             reenabled_message.event_time,
         );
         self.full_text_search_service
-            .update_bulk(
+            .bulk_update(
                 ctx,
                 project_schema::SCHEMA_NAME,
-                vec![(reenabled_message.ipnft_uid.clone(), partial_update)],
+                vec![FullTextUpdateOperation::Update {
+                    id: reenabled_message.ipnft_uid.clone(),
+                    doc: partial_update,
+                }],
             )
             .await?;
 
@@ -120,7 +129,6 @@ impl MessageConsumerT<MoleculeProjectMessage> for MoleculeProjectFullTextSearchU
 
         let ctx = FullTextSearchContext {
             catalog: target_catalog,
-            actor_account_id: None, // system actor
         };
 
         match message {

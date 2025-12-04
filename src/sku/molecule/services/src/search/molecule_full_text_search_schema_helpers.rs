@@ -65,13 +65,13 @@ pub(crate) fn partial_update_project_when_ban_status_changed(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn index_data_room_entry_from_entity(
-    project: &MoleculeProject,
+    ipnft_uid: &str,
     entry: &MoleculeDataRoomEntry,
 ) -> serde_json::Value {
     serde_json::json!({
         data_room_entry_schema::FIELD_CREATED_AT: entry.system_time,
         data_room_entry_schema::FIELD_UPDATED_AT: entry.system_time,
-        data_room_entry_schema::FIELD_IPNFT_UID: project.ipnft_uid,
+        data_room_entry_schema::FIELD_IPNFT_UID: ipnft_uid,
         data_room_entry_schema::FIELD_REFERENCE: entry.reference,
         data_room_entry_schema::FIELD_PATH: entry.path,
         data_room_entry_schema::FIELD_VERSION: entry.denormalized_latest_file_info.version,

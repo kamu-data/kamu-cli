@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
-use kamu_search::FullTextSearchRepository;
+use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
 
 use super::super::molecule_full_text_search_schema_helpers as helpers;
 use crate::domain::{
@@ -55,7 +55,7 @@ impl MoleculeFullTextSearchIndexer {
         );
 
         let mut total_documents_count = 0;
-        let mut documents_by_id = Vec::new();
+        let mut operations = Vec::new();
 
         // Load all projects for the organization account
         let projects_listing = self
@@ -71,29 +71,32 @@ impl MoleculeFullTextSearchIndexer {
 
             // Note: for now, use IPNFT UID as document ID
             // This should be revised after implementing non-tokenized projects
-            documents_by_id.push((project.ipnft_uid.clone(), document));
+            operations.push(FullTextUpdateOperation::Index {
+                id: project.ipnft_uid.clone(),
+                doc: document,
+            });
 
             // Bulk index when we reach BULK_SIZE
-            if documents_by_id.len() >= Self::BULK_SIZE {
+            if operations.len() >= Self::BULK_SIZE {
                 tracing::debug!(
-                    documents_count = documents_by_id.len(),
+                    documents_count = operations.len(),
                     "Bulk indexing projects batch",
                 );
-                repo.index_bulk(project_schema::SCHEMA_NAME, documents_by_id)
+                repo.bulk_update(project_schema::SCHEMA_NAME, operations)
                     .await?;
                 total_documents_count += Self::BULK_SIZE;
-                documents_by_id = Vec::new();
+                operations = Vec::new();
             }
         }
 
         // Index remaining documents
-        if !documents_by_id.is_empty() {
-            let remaining_count = documents_by_id.len();
+        if !operations.is_empty() {
+            let remaining_count = operations.len();
             tracing::debug!(
                 documents_count = remaining_count,
                 "Bulk indexing final projects batch",
             );
-            repo.index_bulk(project_schema::SCHEMA_NAME, documents_by_id)
+            repo.bulk_update(project_schema::SCHEMA_NAME, operations)
                 .await?;
             total_documents_count += remaining_count;
         }
@@ -122,7 +125,7 @@ impl MoleculeFullTextSearchIndexer {
 
         const PARALLEL_PROJECTS: usize = 10;
         let mut total_documents_count = 0;
-        let mut documents_by_id = Vec::new();
+        let mut operations = Vec::new();
 
         // Load all projects for the organization account
         let projects_listing = self
@@ -178,35 +181,37 @@ impl MoleculeFullTextSearchIndexer {
 
                 // Prepare documents for indexing
                 for entry in data_room_entries.list {
-                    let document = helpers::index_data_room_entry_from_entity(&project, &entry);
+                    let document =
+                        helpers::index_data_room_entry_from_entity(&project.ipnft_uid, &entry);
 
-                    // Synthesize document ID as "<ipnft_uid>:<entry_path>"
-                    let entry_document_id = format!("{}:{}", project.ipnft_uid, entry.path);
-                    documents_by_id.push((entry_document_id, document));
+                    operations.push(FullTextUpdateOperation::Index {
+                        id: data_room_entry_schema::unique_id(&project.ipnft_uid, &entry.path),
+                        doc: document,
+                    });
 
                     // Bulk index when we reach BULK_SIZE
-                    if documents_by_id.len() >= Self::BULK_SIZE {
+                    if operations.len() >= Self::BULK_SIZE {
                         tracing::debug!(
-                            documents_count = documents_by_id.len(),
+                            documents_count = operations.len(),
                             "Bulk indexing data room entries batch",
                         );
-                        repo.index_bulk(data_room_entry_schema::SCHEMA_NAME, documents_by_id)
+                        repo.bulk_update(data_room_entry_schema::SCHEMA_NAME, operations)
                             .await?;
                         total_documents_count += Self::BULK_SIZE;
-                        documents_by_id = Vec::new();
+                        operations = Vec::new();
                     }
                 }
             }
         }
 
         // Index remaining documents
-        if !documents_by_id.is_empty() {
-            let remaining_count = documents_by_id.len();
+        if !operations.is_empty() {
+            let remaining_count = operations.len();
             tracing::debug!(
                 documents_count = remaining_count,
                 "Bulk indexing final data room entries batch",
             );
-            repo.index_bulk(data_room_entry_schema::SCHEMA_NAME, documents_by_id)
+            repo.bulk_update(data_room_entry_schema::SCHEMA_NAME, operations)
                 .await?;
             total_documents_count += remaining_count;
         }
