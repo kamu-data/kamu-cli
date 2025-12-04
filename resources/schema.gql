@@ -3186,6 +3186,8 @@ type MoleculeActivityFileUpdatedV2 {
 
 type MoleculeAnnouncementEntry {
 	project: MoleculeProjectV2!
+	systemTime: DateTime!
+	eventTime: DateTime!
 	id: String!
 	headline: String!
 	body: String!
