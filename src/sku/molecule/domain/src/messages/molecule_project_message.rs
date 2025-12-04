@@ -124,11 +124,11 @@ impl Message for MoleculeProjectMessage {
 /// Contains details about a newly created Molecule project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageCreated {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    ipnft_symbol: String,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub ipnft_symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,11 +136,11 @@ pub struct MoleculeProjectMessageCreated {
 /// Contains details about a disabled Molecule project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageDisabled {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    ipnft_symbol: String,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub ipnft_symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,11 +148,11 @@ pub struct MoleculeProjectMessageDisabled {
 /// Contains details about a re-enabled Molecule project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageReenabled {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    ipnft_symbol: String,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub ipnft_symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

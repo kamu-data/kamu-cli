@@ -70,6 +70,7 @@ impl MoleculeDataRoomMessage {
         ipnft_uid: String,
         path_from: CollectionPath,
         path_to: CollectionPath,
+        data_room_entry: MoleculeDataRoomEntry,
     ) -> Self {
         Self::EntryMoved(MoleculeDataRoomMessageEntryMoved {
             event_time,
@@ -78,6 +79,7 @@ impl MoleculeDataRoomMessage {
             ipnft_uid,
             path_from,
             path_to,
+            data_room_entry,
         })
     }
 
@@ -146,45 +148,46 @@ impl Message for MoleculeDataRoomMessage {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDataRoomMessageEntryCreated {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    data_room_entry: MoleculeDataRoomEntry,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub data_room_entry: MoleculeDataRoomEntry,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDataRoomMessageEntryUpdated {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    data_room_entry: MoleculeDataRoomEntry,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub data_room_entry: MoleculeDataRoomEntry,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDataRoomMessageEntryMoved {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    path_from: CollectionPath,
-    path_to: CollectionPath,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub path_from: CollectionPath,
+    pub path_to: CollectionPath,
+    pub data_room_entry: MoleculeDataRoomEntry,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDataRoomMessageEntryRemoved {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    path: CollectionPath,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub path: CollectionPath,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

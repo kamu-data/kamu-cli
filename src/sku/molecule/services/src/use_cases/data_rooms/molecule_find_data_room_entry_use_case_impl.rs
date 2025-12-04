@@ -57,10 +57,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 }
             })?;
 
-        let maybe_molecule_entry = maybe_entry
-            .map(MoleculeDataRoomEntry::try_from_collection_entry)
-            .transpose()?;
-
+        let maybe_molecule_entry = maybe_entry.map(MoleculeDataRoomEntry::from_collection_entry);
         Ok(maybe_molecule_entry)
     }
 
@@ -94,10 +91,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 }
             })?;
 
-        let maybe_molecule_entry = maybe_entry
-            .map(MoleculeDataRoomEntry::try_from_collection_entry)
-            .transpose()?;
-
+        let maybe_molecule_entry = maybe_entry.map(MoleculeDataRoomEntry::from_collection_entry);
         Ok(maybe_molecule_entry)
     }
 }

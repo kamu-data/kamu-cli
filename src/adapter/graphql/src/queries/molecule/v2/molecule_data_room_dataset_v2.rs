@@ -194,9 +194,7 @@ impl MoleculeDataRoomEntry {
 
         let collection_entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
         let data_room_entity =
-            kamu_molecule_domain::MoleculeDataRoomEntry::try_from_collection_entry(
-                collection_entity,
-            )?;
+            kamu_molecule_domain::MoleculeDataRoomEntry::from_collection_entry(collection_entity);
 
         let data_room_entry =
             MoleculeDataRoomEntry::new_from_data_room_entry(project, data_room_entity);
