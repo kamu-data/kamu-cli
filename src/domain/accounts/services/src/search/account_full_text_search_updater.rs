@@ -48,10 +48,13 @@ impl AccountFullTextSearchUpdater {
         );
 
         self.full_text_search_service
-            .index_bulk(
+            .bulk_update(
                 ctx,
                 account_schema::SCHEMA_NAME,
-                vec![(new_account_message.account_id.to_string(), doc)],
+                vec![FullTextUpdateOperation::Index {
+                    id: new_account_message.account_id.to_string(),
+                    doc,
+                }],
             )
             .await
     }
@@ -80,13 +83,13 @@ impl AccountFullTextSearchUpdater {
         );
 
         self.full_text_search_service
-            .update_bulk(
+            .bulk_update(
                 ctx,
                 account_schema::SCHEMA_NAME,
-                vec![(
-                    updated_account_message.account_id.to_string(),
-                    partial_update,
-                )],
+                vec![FullTextUpdateOperation::Update {
+                    id: updated_account_message.account_id.to_string(),
+                    doc: partial_update,
+                }],
             )
             .await
     }
@@ -97,10 +100,12 @@ impl AccountFullTextSearchUpdater {
         account_id: &odf::AccountID,
     ) -> Result<(), InternalError> {
         self.full_text_search_service
-            .delete_bulk(
+            .bulk_update(
                 ctx,
                 account_schema::SCHEMA_NAME,
-                vec![account_id.to_string()],
+                vec![FullTextUpdateOperation::Delete {
+                    id: account_id.to_string(),
+                }],
             )
             .await
     }
@@ -128,7 +133,6 @@ impl MessageConsumerT<AccountLifecycleMessage> for AccountFullTextSearchUpdater 
 
         let ctx = FullTextSearchContext {
             catalog: target_catalog,
-            actor_account_id: None, // system actor
         };
 
         match message {

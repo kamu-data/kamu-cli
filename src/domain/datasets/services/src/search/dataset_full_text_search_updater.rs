@@ -65,10 +65,13 @@ impl DatasetFullTextSearchUpdater {
 
         // Sent it to the full text search service for indexing
         self.full_text_search_service
-            .index_bulk(
+            .bulk_update(
                 ctx,
                 dataset_schema::SCHEMA_NAME,
-                vec![(created_message.dataset_id.to_string(), dataset_document)],
+                vec![FullTextUpdateOperation::Index {
+                    id: created_message.dataset_id.to_string(),
+                    doc: dataset_document,
+                }],
             )
             .await
     }
@@ -103,10 +106,13 @@ impl DatasetFullTextSearchUpdater {
 
         // Send it to the full text search service for updating
         self.full_text_search_service
-            .update_bulk(
+            .bulk_update(
                 ctx,
                 dataset_schema::SCHEMA_NAME,
-                vec![(updated_message.dataset_id.to_string(), partial_update)],
+                vec![FullTextUpdateOperation::Update {
+                    id: updated_message.dataset_id.to_string(),
+                    doc: partial_update,
+                }],
             )
             .await
     }
@@ -121,10 +127,13 @@ impl DatasetFullTextSearchUpdater {
 
         // Send it to the full text search service for updating
         self.full_text_search_service
-            .update_bulk(
+            .bulk_update(
                 ctx,
                 dataset_schema::SCHEMA_NAME,
-                vec![(renamed_message.dataset_id.to_string(), partial_update)],
+                vec![FullTextUpdateOperation::Update {
+                    id: renamed_message.dataset_id.to_string(),
+                    doc: partial_update,
+                }],
             )
             .await
     }
@@ -135,10 +144,12 @@ impl DatasetFullTextSearchUpdater {
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError> {
         self.full_text_search_service
-            .delete_bulk(
+            .bulk_update(
                 ctx,
                 dataset_schema::SCHEMA_NAME,
-                vec![dataset_id.to_string()],
+                vec![FullTextUpdateOperation::Delete {
+                    id: dataset_id.to_string(),
+                }],
             )
             .await
     }
@@ -165,12 +176,15 @@ impl DatasetFullTextSearchUpdater {
                 entry.name.clone(),
             );
             let partial_update = partial_update_for_rename(&new_alias);
-            updates.push((entry.id.to_string(), partial_update));
+            updates.push(FullTextUpdateOperation::Update {
+                id: entry.id.to_string(),
+                doc: partial_update,
+            });
         }
 
         // Send them to the full text search service for updating
         self.full_text_search_service
-            .update_bulk(ctx, dataset_schema::SCHEMA_NAME, updates)
+            .bulk_update(ctx, dataset_schema::SCHEMA_NAME, updates)
             .await?;
 
         Ok(())
@@ -199,7 +213,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetFullTextSearchUpdater 
 
         let ctx = FullTextSearchContext {
             catalog: target_catalog,
-            actor_account_id: None, // system actor
         };
 
         match message {
@@ -237,7 +250,6 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetFullTextSearchUpdater 
 
         let ctx = FullTextSearchContext {
             catalog: target_catalog,
-            actor_account_id: None, // system actor
         };
 
         match message {
@@ -277,7 +289,6 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetFullTextSearchUpdater 
 
         let ctx = FullTextSearchContext {
             catalog: target_catalog,
-            actor_account_id: None, // system actor
         };
 
         match message {

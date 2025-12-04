@@ -32,25 +32,11 @@ pub trait FullTextSearchService: Send + Sync {
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError>;
 
-    async fn index_bulk(
+    async fn bulk_update(
         &self,
         ctx: FullTextSearchContext<'_>,
         schema_name: FullTextEntitySchemaName,
-        docs: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError>;
-
-    async fn update_bulk(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        updates: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError>;
-
-    async fn delete_bulk(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        ids: Vec<FullTextEntityId>,
+        operations: Vec<FullTextUpdateOperation>,
     ) -> Result<(), InternalError>;
 }
 
@@ -58,7 +44,22 @@ pub trait FullTextSearchService: Send + Sync {
 
 pub struct FullTextSearchContext<'a> {
     pub catalog: &'a dill::Catalog,
-    pub actor_account_id: Option<odf::AccountID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum FullTextUpdateOperation {
+    Index {
+        id: FullTextEntityId,
+        doc: serde_json::Value,
+    },
+    Update {
+        id: FullTextEntityId,
+        doc: serde_json::Value,
+    },
+    Delete {
+        id: FullTextEntityId,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

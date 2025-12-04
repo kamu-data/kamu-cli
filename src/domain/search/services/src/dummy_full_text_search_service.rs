@@ -43,29 +43,11 @@ impl FullTextSearchService for DummyFullTextSearchService {
         })
     }
 
-    async fn index_bulk(
+    async fn bulk_update(
         &self,
         _ctx: FullTextSearchContext<'_>,
         _schema_name: FullTextEntitySchemaName,
-        _docs: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError> {
-        Ok(())
-    }
-
-    async fn update_bulk(
-        &self,
-        _ctx: FullTextSearchContext<'_>,
-        _schema_name: FullTextEntitySchemaName,
-        _updates: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError> {
-        Ok(())
-    }
-
-    async fn delete_bulk(
-        &self,
-        _ctx: FullTextSearchContext<'_>,
-        _schema_name: FullTextEntitySchemaName,
-        _ids: Vec<FullTextEntityId>,
+        _operations: Vec<FullTextUpdateOperation>,
     ) -> Result<(), InternalError> {
         Ok(())
     }

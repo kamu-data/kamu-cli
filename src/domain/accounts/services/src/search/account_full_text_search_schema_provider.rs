@@ -49,28 +49,31 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
         use kamu_accounts::ExpensiveAccountRepositoryExt;
         let mut accounts_stream = self.expensive_account_repo.all_accounts();
 
-        let mut account_documents = Vec::new();
+        let mut operations = Vec::new();
         let mut total_indexed = 0;
 
         use futures::TryStreamExt;
         while let Some(account) = accounts_stream.try_next().await? {
             // Prepare document
             let account_document = index_from_account(&account);
-            account_documents.push((account.id.to_string(), account_document));
+            operations.push(FullTextUpdateOperation::Index {
+                id: account.id.to_string(),
+                doc: account_document,
+            });
 
             // Index in chunks to avoid memory overwhelming
-            if account_documents.len() >= CHUNK_SIZE {
-                repo.index_bulk(account_schema::SCHEMA_NAME, account_documents)
+            if operations.len() >= CHUNK_SIZE {
+                repo.bulk_update(account_schema::SCHEMA_NAME, operations)
                     .await?;
                 total_indexed += CHUNK_SIZE;
-                account_documents = Vec::new();
+                operations = Vec::new();
             }
         }
 
         // Index remaining documents
-        if !account_documents.is_empty() {
-            let remaining_count = account_documents.len();
-            repo.index_bulk(account_schema::SCHEMA_NAME, account_documents)
+        if !operations.is_empty() {
+            let remaining_count = operations.len();
+            repo.bulk_update(account_schema::SCHEMA_NAME, operations)
                 .await?;
             total_indexed += remaining_count;
         }
