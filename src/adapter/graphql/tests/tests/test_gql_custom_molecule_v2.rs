@@ -2593,57 +2593,78 @@ async fn test_molecule_v2_announcements_operations() {
         })
     );
 
-    /*
     // Create an announcement without attachments
     const CREATE_ANNOUNCEMENT: &str = indoc!(
         r#"
-        mutation (
-            $ipnftUid: String!,
-            $headline: String!,
-            $body: String!,
-            $attachments: [String!],
-            $moleculeAccessLevel: String!,
-            $moleculeChangeBy: String!,
-        ) {
-            molecule {
-                project(ipnftUid: $ipnftUid) {
-                    createAnnouncement(
-                        headline: $headline,
-                        body: $body,
-                        attachments: $attachments,
-                        moleculeAccessLevel: $moleculeAccessLevel,
-                        moleculeChangeBy: $moleculeChangeBy,
-                    ) {
-                        isSuccess
-                        message
+        mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $moleculeAccessLevel: String!, $moleculeChangeBy: String!, $categories: [String!]!, $tags: [String!]!) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                announcements {
+                  create(
+                    headline: $headline
+                    body: $body
+                    attachments: $attachments
+                    moleculeAccessLevel: $moleculeAccessLevel
+                    moleculeChangeBy: $moleculeChangeBy
+                    categories: $categories
+                    tags: $tags
+                  ) {
+                    isSuccess
+                    message
+                    __typename
+                    ... on CreateAnnouncementSuccess {
+                      announcementId
                     }
+                  }
                 }
+              }
             }
+          }
         }
         "#
     );
 
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "headline": "Test announcement 1",
-                "body": "Blah blah",
-                "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-            })),
-        ))
-        .await;
+    let mut create_project_1_announcement_1_res_json_data = GraphQLQueryRequest::new(
+        CREATE_ANNOUNCEMENT,
+        async_graphql::Variables::from_value(value!({
+            "ipnftUid": PROJECT_1_UID,
+            "headline": "Test announcement 1",
+            "body": "Blah blah 1",
+            "attachments": [],
+            "moleculeAccessLevel": "holders",
+            "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "categories": ["test-category-1", "test-category-2"],
+            "tags": ["test-tag1", "test-tag2", "test-tag3"],
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await
+    .data
+    .into_json()
+    .unwrap();
 
-    assert!(res.is_ok(), "{res:#?}");
+    let mut create_project_1_announcement_1_create_node =
+        create_project_1_announcement_1_res_json_data["molecule"]["v2"]["project"]["announcements"]
+            ["create"]
+            .take();
+    // Extract node for simpler comparison
+    let announcement_1_id = create_project_1_announcement_1_create_node["announcementId"]
+        .take()
+        .as_str()
+        .unwrap();
+
     assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        create_project_1_announcement_1_create_node,
         json!({
+            "__typename": "CreateAnnouncementSuccess",
+            "announcementId": null, // Extracted above
             "isSuccess": true,
             "message": "",
         })
     );
 
+    /*
     // Create an announcement with one attachment
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
