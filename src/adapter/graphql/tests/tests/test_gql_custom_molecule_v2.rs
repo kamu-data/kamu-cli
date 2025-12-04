@@ -735,63 +735,64 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation (
-                    $ipnftUid: String!
-                    $path: String!
-                    $content: Base64Usnp!
-                    $contentType: String!
-                    $changeBy: String!
-                    $accessLevel: String!
-                    $description: String
-                    $categories: [String!]
-                    $tags: [String!]
-                    $contentText: String
-                    $encryptionMetadata: String
-                ) {
-                    molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                dataRoom {
-                                    uploadFile(
-                                        path: $path
-                                        content: $content
-                                        contentType: $contentType
-                                        changeBy: $changeBy
-                                        accessLevel: $accessLevel
-                                        description: $description
-                                        categories: $categories
-                                        tags: $tags
-                                        contentText: $contentText
-                                        encryptionMetadata: $encryptionMetadata
-                                    ) {
-                                        isSuccess
-                                        message
-                                        ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                                            entry {
-                                                project {
-                                                    account { accountName }
-                                                }
-                                                path
-                                                ref
-                                                asVersionedFile {
-                                                    latest {
-                                                        version
-                                                        contentHash
-                                                        contentType
-                                                        changeBy
-                                                        accessLevel
-                                                        description
-                                                        categories
-                                                        tags
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                  molecule {
+                    v2 {
+                      project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                          uploadFile(
+                            path: $path
+                            content: $content
+                            contentType: $contentType
+                            changeBy: $changeBy
+                            accessLevel: $accessLevel
+                            description: $description
+                            categories: $categories
+                            tags: $tags
+                            contentText: $contentText
+                            encryptionMetadata: $encryptionMetadata
+                          ) {
+                            isSuccess
+                            message
+                            ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                              entry {
+                                project {
+                                  account {
+                                    accountName
+                                  }
                                 }
+                                path
+                                ref
+                                asVersionedFile {
+                                  latest {
+                                    version
+                                    contentHash
+                                    contentType
+                                    changeBy
+                                    accessLevel
+                                    description
+                                    categories
+                                    tags
+                                    encryptionMetadata {
+                                      dataToEncryptHash
+                                      accessControlConditions
+                                      encryptedBy
+                                      encryptedAt
+                                      chain
+                                      litSdkVersion
+                                      litNetwork
+                                      templateName
+                                      contractVersion
+                                    }
+                                  }
+                                }
+                              }
                             }
+                          }
                         }
+                      }
                     }
+                  }
                 }
                 "#
             ))
@@ -806,7 +807,17 @@ async fn test_molecule_v2_data_room_operations() {
                 "categories": ["test-category"],
                 "tags": ["test-tag1", "test-tag2"],
                 "contentText": "hello",
-                "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
             }))),
         )
         .await;
@@ -843,6 +854,17 @@ async fn test_molecule_v2_data_room_operations() {
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                         "accessLevel": "public",
                         "description": "Plain text file",
+                        "encryptionMetadata": {
+                            "accessControlConditions": "EM2",
+                            "chain": "EM5",
+                            "contractVersion": "EM9",
+                            "dataToEncryptHash": "EM1",
+                            "encryptedAt": "EM4",
+                            "encryptedBy": "EM3",
+                            "litNetwork": "EM7",
+                            "litSdkVersion": "EM6",
+                            "templateName": "EM8",
+                        },
                         "categories": ["test-category"],
                         "tags": ["test-tag1", "test-tag2"],
                     }
@@ -904,63 +926,61 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation (
-                    $ipnftUid: String!
-                    $path: String!
-                    $content: Base64Usnp!
-                    $contentType: String!
-                    $changeBy: String!
-                    $accessLevel: String!
-                    $description: String
-                    $categories: [String!]
-                    $tags: [String!]
-                    $contentText: String
-                    $encryptionMetadata: String
-                ) {
-                    molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                dataRoom {
-                                    uploadFile(
-                                        path: $path
-                                        content: $content
-                                        contentType: $contentType
-                                        changeBy: $changeBy
-                                        accessLevel: $accessLevel
-                                        description: $description
-                                        categories: $categories
-                                        tags: $tags
-                                        contentText: $contentText
-                                        encryptionMetadata: $encryptionMetadata
-                                    ) {
-                                        isSuccess
-                                        message
-                                        ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                                            entry {
-                                                path
-                                                ref
-                                                asVersionedFile {
-                                                    latest {
-                                                        version
-                                                        contentHash
-                                                        contentType
-                                                        changeBy
-                                                        accessLevel
-                                                        description
-                                                        categories
-                                                        tags
-                                                        contentText
-                                                        encryptionMetadata
-                                                        content
-                                                    }
-                                                }
-                                            }
-                                        }
+                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                  molecule {
+                    v2 {
+                      project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                          uploadFile(
+                            path: $path
+                            content: $content
+                            contentType: $contentType
+                            changeBy: $changeBy
+                            accessLevel: $accessLevel
+                            description: $description
+                            categories: $categories
+                            tags: $tags
+                            contentText: $contentText
+                            encryptionMetadata: $encryptionMetadata
+                          ) {
+                            isSuccess
+                            message
+                            ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                              entry {
+                                path
+                                ref
+                                asVersionedFile {
+                                  latest {
+                                    version
+                                    contentHash
+                                    contentType
+                                    changeBy
+                                    accessLevel
+                                    description
+                                    categories
+                                    tags
+                                    contentText
+                                    encryptionMetadata {
+                                      dataToEncryptHash
+                                      accessControlConditions
+                                      encryptedBy
+                                      encryptedAt
+                                      chain
+                                      litSdkVersion
+                                      litNetwork
+                                      templateName
+                                      contractVersion
                                     }
+                                    content
+                                  }
                                 }
+                              }
                             }
+                          }
                         }
+                      }
                     }
+                  }
                 }
                 "#
             ))
@@ -975,7 +995,17 @@ async fn test_molecule_v2_data_room_operations() {
                 "categories": ["test-category"],
                 "tags": ["test-tag1", "test-tag2"],
                 "contentText": "hello",
-                "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
             }))),
         )
         .await;
@@ -1010,7 +1040,17 @@ async fn test_molecule_v2_data_room_operations() {
                         "categories": ["test-category"],
                         "tags": ["test-tag1", "test-tag2"],
                         "contentText": "hello",
-                        "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                        "encryptionMetadata": {
+                            "dataToEncryptHash": "EM1",
+                            "accessControlConditions": "EM2",
+                            "encryptedBy": "EM3",
+                            "encryptedAt": "EM4",
+                            "chain": "EM5",
+                            "litSdkVersion": "EM6",
+                            "litNetwork": "EM7",
+                            "templateName": "EM8",
+                            "contractVersion": "EM9",
+                        },
                         "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                     }
                 }
@@ -1081,63 +1121,61 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation (
-                    $ipnftUid: String!
-                    $path: String!
-                    $content: Base64Usnp!
-                    $contentType: String!
-                    $changeBy: String!
-                    $accessLevel: String!
-                    $description: String
-                    $categories: [String!]
-                    $tags: [String!]
-                    $contentText: String
-                    $encryptionMetadata: String
-                ) {
-                    molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                dataRoom {
-                                    uploadFile(
-                                        path: $path
-                                        content: $content
-                                        contentType: $contentType
-                                        changeBy: $changeBy
-                                        accessLevel: $accessLevel
-                                        description: $description
-                                        categories: $categories
-                                        tags: $tags
-                                        contentText: $contentText
-                                        encryptionMetadata: $encryptionMetadata
-                                    ) {
-                                        isSuccess
-                                        message
-                                        ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                                            entry {
-                                                path
-                                                ref
-                                                asVersionedFile {
-                                                    latest {
-                                                        version
-                                                        contentHash
-                                                        contentType
-                                                        changeBy
-                                                        accessLevel
-                                                        description
-                                                        categories
-                                                        tags
-                                                        contentText
-                                                        encryptionMetadata
-                                                        content
-                                                    }
-                                                }
-                                            }
-                                        }
+                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                  molecule {
+                    v2 {
+                      project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                          uploadFile(
+                            path: $path
+                            content: $content
+                            contentType: $contentType
+                            changeBy: $changeBy
+                            accessLevel: $accessLevel
+                            description: $description
+                            categories: $categories
+                            tags: $tags
+                            contentText: $contentText
+                            encryptionMetadata: $encryptionMetadata
+                          ) {
+                            isSuccess
+                            message
+                            ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                              entry {
+                                path
+                                ref
+                                asVersionedFile {
+                                  latest {
+                                    version
+                                    contentHash
+                                    contentType
+                                    changeBy
+                                    accessLevel
+                                    description
+                                    categories
+                                    tags
+                                    contentText
+                                    encryptionMetadata {
+                                      dataToEncryptHash
+                                      accessControlConditions
+                                      encryptedBy
+                                      encryptedAt
+                                      chain
+                                      litSdkVersion
+                                      litNetwork
+                                      templateName
+                                      contractVersion
                                     }
+                                    content
+                                  }
                                 }
+                              }
                             }
+                          }
                         }
+                      }
                     }
+                  }
                 }
                 "#
             ))
@@ -1360,63 +1398,61 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation (
-                    $ipnftUid: String!
-                    $ref: DatasetID!
-                    $content: Base64Usnp!
-                    $contentType: String!
-                    $changeBy: String!
-                    $accessLevel: String!
-                    $description: String
-                    $categories: [String!]
-                    $tags: [String!]
-                    $contentText: String
-                    $encryptionMetadata: String
-                ) {
-                    molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                dataRoom {
-                                    uploadFile(
-                                        ref: $ref
-                                        content: $content
-                                        contentType: $contentType
-                                        changeBy: $changeBy
-                                        accessLevel: $accessLevel
-                                        description: $description
-                                        categories: $categories
-                                        tags: $tags
-                                        contentText: $contentText
-                                        encryptionMetadata: $encryptionMetadata
-                                    ) {
-                                        isSuccess
-                                        message
-                                        ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                                            entry {
-                                                path
-                                                ref
-                                                asVersionedFile {
-                                                    latest {
-                                                        version
-                                                        contentHash
-                                                        contentType
-                                                        changeBy
-                                                        accessLevel
-                                                        description
-                                                        categories
-                                                        tags
-                                                        contentText
-                                                        encryptionMetadata
-                                                        content
-                                                    }
-                                                }
-                                            }
-                                        }
+                mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                  molecule {
+                    v2 {
+                      project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                          uploadFile(
+                            ref: $ref
+                            content: $content
+                            contentType: $contentType
+                            changeBy: $changeBy
+                            accessLevel: $accessLevel
+                            description: $description
+                            categories: $categories
+                            tags: $tags
+                            contentText: $contentText
+                            encryptionMetadata: $encryptionMetadata
+                          ) {
+                            isSuccess
+                            message
+                            ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                              entry {
+                                path
+                                ref
+                                asVersionedFile {
+                                  latest {
+                                    version
+                                    contentHash
+                                    contentType
+                                    changeBy
+                                    accessLevel
+                                    description
+                                    categories
+                                    tags
+                                    contentText
+                                    encryptionMetadata {
+                                      dataToEncryptHash
+                                      accessControlConditions
+                                      encryptedBy
+                                      encryptedAt
+                                      chain
+                                      litSdkVersion
+                                      litNetwork
+                                      templateName
+                                      contractVersion
                                     }
+                                    content
+                                  }
                                 }
+                              }
                             }
+                          }
                         }
+                      }
                     }
+                  }
                 }
                 "#
             ))
@@ -1431,7 +1467,17 @@ async fn test_molecule_v2_data_room_operations() {
                 "categories": ["test-category"],
                 "tags": ["test-tag1", "test-tag2"],
                 "contentText": "bye",
-                "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
             }))),
         )
         .await;
@@ -1462,7 +1508,17 @@ async fn test_molecule_v2_data_room_operations() {
                         "categories": ["test-category"],
                         "tags": ["test-tag1", "test-tag2"],
                         "contentText": "bye",
-                        "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                        "encryptionMetadata": {
+                            "dataToEncryptHash": "EM1",
+                            "accessControlConditions": "EM2",
+                            "encryptedBy": "EM3",
+                            "encryptedAt": "EM4",
+                            "chain": "EM5",
+                            "litSdkVersion": "EM6",
+                            "litNetwork": "EM7",
+                            "templateName": "EM8",
+                            "contractVersion": "EM9",
+                        },
                         "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
                     }
                 }
@@ -1547,37 +1603,46 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Request::new(indoc!(
                 r#"
                 query ($ipnftUid: String!) {
-                    molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                dataRoom {
-                                    latest {
-                                        entry(path: "/foo.txt") {
-                                            path
-                                            ref
-                                            changeBy
-
-                                            asVersionedFile {
-                                                latest {
-                                                    version
-                                                    contentHash
-                                                    contentType
-                                                    changeBy
-                                                    accessLevel
-                                                    description
-                                                    categories
-                                                    tags
-                                                    contentText
-                                                    encryptionMetadata
-                                                    content
-                                                }
-                                            }
-                                        }
-                                    }
+                  molecule {
+                    v2 {
+                      project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                          latest {
+                            entry(path: "/foo.txt") {
+                              path
+                              ref
+                              changeBy
+                              asVersionedFile {
+                                latest {
+                                  version
+                                  contentHash
+                                  contentType
+                                  changeBy
+                                  accessLevel
+                                  description
+                                  categories
+                                  tags
+                                  contentText
+                                  encryptionMetadata {
+                                    dataToEncryptHash
+                                    accessControlConditions
+                                    encryptedBy
+                                    encryptedAt
+                                    chain
+                                    litSdkVersion
+                                    litNetwork
+                                    templateName
+                                    contractVersion
+                                  }
+                                  content
                                 }
+                              }
                             }
+                          }
                         }
+                      }
                     }
+                  }
                 }
                 "#
             ))
@@ -1605,7 +1670,17 @@ async fn test_molecule_v2_data_room_operations() {
                     "description": "Plain text file that was updated",
                     "categories": ["test-category"],
                     "tags": ["test-tag1", "test-tag2"],
-                    "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                    "encryptionMetadata": {
+                        "dataToEncryptHash": "EM1",
+                        "accessControlConditions": "EM2",
+                        "encryptedBy": "EM3",
+                        "encryptedAt": "EM4",
+                        "chain": "EM5",
+                        "litSdkVersion": "EM6",
+                        "litNetwork": "EM7",
+                        "templateName": "EM8",
+                        "contractVersion": "EM9",
+                    },
                     "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
                 }
             },
@@ -1618,37 +1693,46 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Request::new(indoc!(
                 r#"
                 query ($ipnftUid: String!) {
-                    molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                dataRoom {
-                                    latest {
-                                        entry(path: "/baz.txt") {
-                                            path
-                                            ref
-                                            changeBy
-
-                                            asVersionedFile {
-                                                latest {
-                                                    version
-                                                    contentHash
-                                                    contentType
-                                                    changeBy
-                                                    accessLevel
-                                                    description
-                                                    categories
-                                                    tags
-                                                    contentText
-                                                    encryptionMetadata
-                                                    content
-                                                }
-                                            }
-                                        }
-                                    }
+                  molecule {
+                    v2 {
+                      project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                          latest {
+                            entry(path: "/baz.txt") {
+                              path
+                              ref
+                              changeBy
+                              asVersionedFile {
+                                latest {
+                                  version
+                                  contentHash
+                                  contentType
+                                  changeBy
+                                  accessLevel
+                                  description
+                                  categories
+                                  tags
+                                  contentText
+                                  encryptionMetadata {
+                                    dataToEncryptHash
+                                    accessControlConditions
+                                    encryptedBy
+                                    encryptedAt
+                                    chain
+                                    litSdkVersion
+                                    litNetwork
+                                    templateName
+                                    contractVersion
+                                  }
+                                  content
                                 }
+                              }
                             }
+                          }
                         }
+                      }
                     }
+                  }
                 }
                 "#
             ))
@@ -2123,7 +2207,7 @@ async fn test_molecule_v2_data_room_operations() {
     ////////////////////////
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: String) {
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
           molecule {
             v2 {
               project(ipnftUid: $ipnftUid) {
@@ -2164,7 +2248,17 @@ async fn test_molecule_v2_data_room_operations() {
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
                 "contentText": "bye bye bye",
-                "encryptionMetadata": r#"{"encryption": "lit", "chain": 1 }"#,
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1-updated",
+                    "accessControlConditions": "EM2-updated",
+                    "encryptedBy": "EM3-updated",
+                    "encryptedAt": "EM4-updated",
+                    "chain": "EM5-updated",
+                    "litSdkVersion": "EM6-updated",
+                    "litNetwork": "EM7-updated",
+                    "templateName": "EM8-updated",
+                    "contractVersion": "EM9-updated",
+                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2199,7 +2293,17 @@ async fn test_molecule_v2_data_room_operations() {
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
                 "contentText": "bye bye bye",
-                "encryptionMetadata": r#"{"encryption": "lit", "chain": 1 }"#,
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1-updated",
+                    "accessControlConditions": "EM2-updated",
+                    "encryptedBy": "EM3-updated",
+                    "encryptedAt": "EM4-updated",
+                    "chain": "EM5-updated",
+                    "litSdkVersion": "EM6-updated",
+                    "litNetwork": "EM7-updated",
+                    "templateName": "EM8-updated",
+                    "contractVersion": "EM9-updated",
+                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2298,7 +2402,7 @@ async fn test_molecule_v2_data_room_operations() {
             "categories": ["test-category-1", "test-category-2"],
             "content_text": "bye bye bye",
             "description": "Plain text file that was updated... again",
-            "encryption_metadata": "{\"encryption\": \"lit\", \"chain\": 1 }",
+            "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1-updated\",\"accessControlConditions\":\"EM2-updated\",\"encryptedBy\":\"EM3-updated\",\"encryptedAt\":\"EM4-updated\",\"chain\":\"EM5-updated\",\"litSdkVersion\":\"EM6-updated\",\"litNetwork\":\"EM7-updated\",\"templateName\":\"EM8-updated\",\"contractVersion\":\"EM9-updated\"}",
             "molecule_access_level": "holder",
             "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
@@ -2503,7 +2607,7 @@ async fn test_molecule_v2_announcements_operations() {
     // Create a few versioned files to use as attachments
     const CREATE_VERSIONED_FILE: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: String) {
+        mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
           molecule {
             v2 {
               project(ipnftUid: $ipnftUid) {
@@ -2550,7 +2654,17 @@ async fn test_molecule_v2_announcements_operations() {
                 "categories": ["test-category"],
                 "tags": ["test-tag1", "test-tag2"],
                 "contentText": "hello foo",
-                "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2596,7 +2710,17 @@ async fn test_molecule_v2_announcements_operations() {
                 "categories": [],
                 "tags": [],
                 "contentText": "hello bar",
-                "encryptionMetadata": r#"{"encryption": "lit"}"#,
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
