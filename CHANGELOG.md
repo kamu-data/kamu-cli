@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows
+- `odf::DataSchema` now supports a `diff()` method that allows detailed comparisons between two schemas
+- `SetDataSchema` event adds a limited supports for schema migrations, allowing to extend the schema with new optional columns
 ### Changed
 - Refactoring: `ResolvedDataset` and `DatasetRegistry` moved to `kamu-datasets` domain
 - Experiment: Introduce `WriteCheckedDataset` and `ReadCheckedDataset` types, 
