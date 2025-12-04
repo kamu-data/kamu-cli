@@ -2805,74 +2805,68 @@ async fn test_molecule_v2_announcements_operations() {
         })
     );
 
-    /*
     // Announcements are listed as expected
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(LIST_ANNOUNCEMENTS).variables(
-            async_graphql::Variables::from_json(json!({
-                "datasetId": announcements_did,
-            })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    let content = res.data.into_json().unwrap()["datasets"]["byId"]["data"]["tail"]["data"]
-        ["content"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let mut content: serde_json::Value = serde_json::from_str(&content).unwrap();
-    let any = "<any>";
-    content.as_array_mut().unwrap().iter_mut().for_each(|r| {
-        let obj = r.as_object_mut().unwrap();
-        obj["system_time"] = any.to_string().into();
-        obj["event_time"] = any.to_string().into();
-        obj["announcement_id"] = any.to_string().into();
-    });
     assert_eq!(
-        content,
-        json!(
-            [
-                {
-                    "molecule_access_level": "holders",
-                    "announcement_id": any,
-                    "attachments": [],
-                    "body": "Blah blah",
-                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "event_time": any,
-                    "headline": "Test announcement 1",
-                    "offset": 0,
-                    "op": 0,
-                    "system_time": any,
-                },
-                {
-                    "molecule_access_level": "holders",
-                    "announcement_id": any,
-                    "attachments": [test_file_1],
-                    "body": "Blah blah",
-                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "event_time": any,
-                    "headline": "Test announcement 2",
-                    "offset": 1,
-                    "op": 0,
-                    "system_time": any,
-                },
-                {
-                    "molecule_access_level": "holders",
-                    "announcement_id": any,
-                    "attachments": [test_file_1, test_file_2],
-                    "body": "Blah blah",
-                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "event_time": any,
-                    "headline": "Test announcement 3",
-                    "offset": 2,
-                    "op": 0,
-                    "system_time": any,
-                },
-            ]
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+            })),
         )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 3,
+                                "nodes": [
+                                    {
+                                        "id": project_1_announcement_3_id,
+                                        "headline": "Test announcement 3",
+                                        "body": "Blah blah 3",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                            project_1_file_2_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": [],
+                                        "tags": ["test-tag1"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_2_id,
+                                        "headline": "Test announcement 2",
+                                        "body": "Blah blah 2",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1"],
+                                        "tags": ["test-tag1", "test-tag2"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
     );
-     */
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
