@@ -11,12 +11,14 @@
 
 mod entities;
 mod messages;
+mod search;
 mod services;
 mod snapshots;
 mod use_cases;
 
 pub use entities::*;
 pub use messages::*;
+pub use search::*;
 pub use services::*;
 pub use snapshots::*;
 pub use use_cases::*;

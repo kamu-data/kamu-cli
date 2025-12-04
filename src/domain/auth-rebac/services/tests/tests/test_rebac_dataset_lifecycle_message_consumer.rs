@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
+use chrono::Utc;
 use dill::{Catalog, CatalogBuilder};
 use kamu_auth_rebac::{DatasetProperties, Entity, RebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -58,6 +59,7 @@ async fn test_rebac_properties_added() {
     {
         harness
             .mimic(DatasetLifecycleMessage::created(
+                Utc::now(),
                 public_dataset_id.clone(),
                 owner_id.clone(),
                 odf::DatasetVisibility::Public,
@@ -66,6 +68,7 @@ async fn test_rebac_properties_added() {
             .await;
         harness
             .mimic(DatasetLifecycleMessage::created(
+                Utc::now(),
                 private_dataset_id.clone(),
                 owner_id,
                 odf::DatasetVisibility::Private,
@@ -112,6 +115,7 @@ async fn test_rebac_properties_deleted() {
     {
         harness
             .mimic(DatasetLifecycleMessage::created(
+                Utc::now(),
                 dataset_id.clone(),
                 owner_id.clone(),
                 odf::DatasetVisibility::Public,
@@ -137,7 +141,10 @@ async fn test_rebac_properties_deleted() {
     // Simulate deletion
     {
         harness
-            .mimic(DatasetLifecycleMessage::deleted(dataset_id.clone()))
+            .mimic(DatasetLifecycleMessage::deleted(
+                Utc::now(),
+                dataset_id.clone(),
+            ))
             .await;
     }
 
@@ -158,7 +165,10 @@ async fn test_rebac_properties_deleted() {
     // Simulate deletion again to check idempotency
     {
         harness
-            .mimic(DatasetLifecycleMessage::deleted(dataset_id.clone()))
+            .mimic(DatasetLifecycleMessage::deleted(
+                Utc::now(),
+                dataset_id.clone(),
+            ))
             .await;
     }
 
