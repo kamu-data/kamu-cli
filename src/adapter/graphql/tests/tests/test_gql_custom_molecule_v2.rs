@@ -2398,22 +2398,24 @@ async fn test_molecule_v2_announcements_operations() {
     // Create the first project
     const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let create_project_1_res = GraphQLQueryRequest::new(
-        CREATE_PROJECT,
-        async_graphql::Variables::from_value(value!({
-            "ipnftSymbol": "vitafast",
-            "ipnftUid": PROJECT_1_UID,
-            "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-            "ipnftTokenId": "9",
-        })),
-    )
-    .execute(&harness.schema, &harness.catalog_authorized)
-    .await;
-
     assert_eq!(
         {
-            let json = create_project_1_res.data.into_json().unwrap();
-            json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            let res_json = GraphQLQueryRequest::new(
+                CREATE_PROJECT,
+                async_graphql::Variables::from_value(value!({
+                    "ipnftSymbol": "vitafast",
+                    "ipnftUid": PROJECT_1_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                    "ipnftTokenId": "9",
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+
+            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -2509,91 +2511,97 @@ async fn test_molecule_v2_announcements_operations() {
         "#
     );
 
-    let mut create_project_1_file_1_res_json_data = GraphQLQueryRequest::new(
-        CREATE_VERSIONED_FILE,
-        async_graphql::Variables::from_value(value!({
-            "ipnftUid": PROJECT_1_UID,
-            "path": "/foo.txt",
-            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
-            "contentType": "text/plain",
-            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-            "accessLevel": "public",
-            "description": "Plain text file (foo)",
-            "categories": ["test-category"],
-            "tags": ["test-tag1", "test-tag2"],
-            "contentText": "hello foo",
-            "encryptionMetadata": r#"{"encryption": "lit"}"#,
-        })),
-    )
-    .execute(&harness.schema, &harness.catalog_authorized)
-    .await
-    .data
-    .into_json()
-    .unwrap();
+    let project_1_file_1_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                "contentType": "text/plain",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+                "description": "Plain text file (foo)",
+                "categories": ["test-category"],
+                "tags": ["test-tag1", "test-tag2"],
+                "contentText": "hello foo",
+                "encryptionMetadata": r#"{"encryption": "lit"}"#,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
 
-    let mut create_project_1_file_1_upload_file_node = create_project_1_file_1_res_json_data
-        ["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]
-        .take();
-    // Extract node for simpler comparison
-    let project_1_file_1_dataset_id = create_project_1_file_1_upload_file_node["entry"]["ref"]
-        .take()
-        .as_str()
-        .unwrap()
-        .to_owned();
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
 
-    assert_eq!(
-        create_project_1_file_1_upload_file_node,
-        json!({
-            "entry": {
-                "ref": null, // Extracted above
-            },
-            "isSuccess": true,
-            "message": "",
-        })
-    );
+        assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
 
-    let mut create_project_1_file_2_res_json_data = GraphQLQueryRequest::new(
-        CREATE_VERSIONED_FILE,
-        async_graphql::Variables::from_value(value!({
-            "ipnftUid": PROJECT_1_UID,
-            "path": "/bar.txt",
-            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
-            "contentType": "text/plain",
-            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-            "accessLevel": "public",
-            "description": "Plain text file (bar)",
-            "categories": [],
-            "tags": [],
-            "contentText": "hello bar",
-            "encryptionMetadata": r#"{"encryption": "lit"}"#,
-        })),
-    )
-    .execute(&harness.schema, &harness.catalog_authorized)
-    .await
-    .data
-    .into_json()
-    .unwrap();
+        file_dataset_id
+    };
 
-    let mut create_project_1_file_2_upload_file_node = create_project_1_file_2_res_json_data
-        ["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]
-        .take();
-    // Extract node for simpler comparison
-    let project_1_file_2_dataset_id = create_project_1_file_2_upload_file_node["entry"]["ref"]
-        .take()
-        .as_str()
-        .unwrap()
-        .to_owned();
+    let project_1_file_2_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/bar.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
+                "contentType": "text/plain",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+                "description": "Plain text file (bar)",
+                "categories": [],
+                "tags": [],
+                "contentText": "hello bar",
+                "encryptionMetadata": r#"{"encryption": "lit"}"#,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
 
-    assert_eq!(
-        create_project_1_file_2_upload_file_node,
-        json!({
-            "entry": {
-                "ref": null, // Extracted above
-            },
-            "isSuccess": true,
-            "message": "",
-        })
-    );
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    };
 
     // Create an announcement without attachments
     const CREATE_ANNOUNCEMENT: &str = indoc!(
@@ -2627,109 +2635,138 @@ async fn test_molecule_v2_announcements_operations() {
         "#
     );
 
-    let mut create_project_1_announcement_1_res_json_data = GraphQLQueryRequest::new(
-        CREATE_ANNOUNCEMENT,
-        async_graphql::Variables::from_value(value!({
-            "ipnftUid": PROJECT_1_UID,
-            "headline": "Test announcement 1",
-            "body": "Blah blah 1",
-            "attachments": [],
-            "moleculeAccessLevel": "holders",
-            "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-            "categories": ["test-category-1", "test-category-2"],
-            "tags": ["test-tag1", "test-tag2", "test-tag3"],
-        })),
-    )
-    .execute(&harness.schema, &harness.catalog_authorized)
-    .await
-    .data
-    .into_json()
-    .unwrap();
-
-    let mut create_project_1_announcement_1_create_node =
-        create_project_1_announcement_1_res_json_data["molecule"]["v2"]["project"]["announcements"]
-            ["create"]
-            .take();
-    // Extract node for simpler comparison
-    let announcement_1_id = create_project_1_announcement_1_create_node["announcementId"]
-        .take()
-        .as_str()
-        .unwrap();
-
-    assert_eq!(
-        create_project_1_announcement_1_create_node,
-        json!({
-            "__typename": "CreateAnnouncementSuccess",
-            "announcementId": null, // Extracted above
-            "isSuccess": true,
-            "message": "",
-        })
-    );
-
-    // Create an announcement with one attachment
-    let mut create_project_1_announcement_2_res_json_data = GraphQLQueryRequest::new(
-        CREATE_ANNOUNCEMENT,
-        async_graphql::Variables::from_value(value!({
-            "ipnftUid": PROJECT_1_UID,
-            "headline": "Test announcement 2",
-            "body": "Blah blah 2",
-            "attachments": [project_1_file_1_dataset_id],
-            "moleculeAccessLevel": "holders",
-            "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-            "categories": ["test-category-1"],
-            "tags": ["test-tag1", "test-tag2"],
-        })),
-    )
-    .execute(&harness.schema, &harness.catalog_authorized)
-    .await
-    .data
-    .into_json()
-    .unwrap();
-
-    let mut create_project_1_announcement_2_create_node =
-        create_project_1_announcement_2_res_json_data["molecule"]["v2"]["project"]["announcements"]
-            ["create"]
-            .take();
-    // Extract node for simpler comparison
-    let announcement_2_id = create_project_1_announcement_2_create_node["announcementId"]
-        .take()
-        .as_str()
-        .unwrap();
-
-    assert_eq!(
-        create_project_1_announcement_2_create_node,
-        json!({
-            "__typename": "CreateAnnouncementSuccess",
-            "announcementId": null, // Extracted above
-            "isSuccess": true,
-            "message": "",
-        })
-    );
-
-    /*
-    // Create an announcement with two attachments
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "headline": "Test announcement 3",
-                "body": "Blah blah",
-                "attachments": [test_file_1, test_file_2],
+    let project_1_announcement_1_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "headline": "Test announcement 1",
+                "body": "Blah blah 1",
+                "attachments": [],
                 "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "categories": ["test-category-1", "test-category-2"],
+                "tags": ["test-tag1", "test-tag2", "test-tag3"],
             })),
-        ))
-        .await;
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
 
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
-        json!({
-            "isSuccess": true,
-            "message": "",
-        })
-    );
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
 
+        assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    // Create an announcement with one attachment
+    let project_1_announcement_2_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "headline": "Test announcement 2",
+                "body": "Blah blah 2",
+                "attachments": [project_1_file_1_dataset_id],
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1", "test-tag2"],
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    // Create an announcement with two attachments
+    let project_1_announcement_3_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "headline": "Test announcement 3",
+                "body": "Blah blah 3",
+                "attachments": [
+                    project_1_file_1_dataset_id,
+                    project_1_file_2_dataset_id,
+                ],
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "categories": [],
+                "tags": ["test-tag1"],
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    /*
     // Create an announcement with invalid attachment DID
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
