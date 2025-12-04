@@ -27,13 +27,13 @@ pub struct MoleculeProjectAnnouncementDataRecord {
 
     pub attachments: Vec<odf::DatasetID>,
 
-    // NOTE: This should be odf::AccountID, but kept as String for safety.
-    #[serde(rename = "molecule_change_by")]
-    pub change_by: String,
-
     // TODO: enum?
     #[serde(rename = "molecule_access_level")]
     pub access_level: String,
+
+    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    #[serde(rename = "molecule_change_by")]
+    pub change_by: String,
 
     #[serde(default)]
     pub categories: Vec<String>,
@@ -72,13 +72,13 @@ pub struct MoleculeGlobalAnnouncementDataRecord {
 
     pub attachments: Vec<odf::DatasetID>,
 
-    // NOTE: This should be odf::AccountID, but kept as String for safety.
-    #[serde(rename = "molecule_change_by")]
-    pub change_by: String,
-
     // TODO: enum?
     #[serde(rename = "molecule_access_level")]
     pub access_level: String,
+
+    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    #[serde(rename = "molecule_change_by")]
+    pub change_by: String,
 
     pub categories: Vec<String>,
 

@@ -333,8 +333,8 @@ impl MoleculeDatasetSnapshots {
                     "attachments",
                     odf::schema::DataType::optional(odf::schema::DataType::string()),
                 ),
-                odf::schema::DataField::string("molecule_change_by"),
                 odf::schema::DataField::string("molecule_access_level"),
+                odf::schema::DataField::string("molecule_change_by"),
                 // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
                 //       types in the following columns during ingesting:
                 //       REQUIRED group categories (LIST) {

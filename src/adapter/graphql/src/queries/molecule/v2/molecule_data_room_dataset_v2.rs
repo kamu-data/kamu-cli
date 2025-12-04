@@ -259,12 +259,12 @@ impl MoleculeDataRoomEntry {
         Dataset::try_from_ref(ctx, &self.entity.reference.as_local_ref()).await
     }
 
-    async fn system_time(&self) -> &DateTime<Utc> {
-        &self.entity.system_time
+    async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_time
     }
 
-    async fn event_time(&self) -> &DateTime<Utc> {
-        &self.entity.event_time
+    async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.event_time
     }
 
     async fn path(&self) -> CollectionPath<'_> {
