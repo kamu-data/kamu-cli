@@ -33,9 +33,9 @@ impl MoleculeProjectMutV2 {
     }
 
     /// Strongly typed announcements mutator
-    #[expect(clippy::unused_async)]
-    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementsDatasetMutV2> {
-        todo!()
+    #[tracing::instrument(level = "info", name = MoleculeProjectMutV2_announcements, skip_all)]
+    async fn announcements(&self) -> Result<MoleculeAnnouncementsDatasetMutV2> {
+        Ok(MoleculeAnnouncementsDatasetMutV2::new(self.project.clone()))
     }
 }
 

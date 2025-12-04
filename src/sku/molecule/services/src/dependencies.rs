@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(b: &mut CatalogBuilder) {
+pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeFullTextSearchSchemaProvider>();
     b.add::<MoleculeProjectFullTextSearchUpdateHandler>();
 
@@ -35,6 +33,8 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
 
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
     b.add::<MoleculeViewGlobalDataRoomActivitiesUseCaseImpl>();
+
+    b.add::<MoleculeCreateAnnouncementUseCaseImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

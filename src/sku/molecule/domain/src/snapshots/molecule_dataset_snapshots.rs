@@ -181,18 +181,65 @@ impl MoleculeDatasetSnapshots {
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn announcements(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+    pub fn announcements_v2(project_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "announcements";
 
         let alias = odf::DatasetAlias::new(
-            Some(molecule_account_name),
+            Some(project_account_name),
             odf::DatasetName::new_unchecked(DATASET_NAME),
         );
+
+        let schema = odf::schema::DataSchema::builder()
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
+            .extend([
+                odf::schema::DataField::string("announcement_id"),
+                odf::schema::DataField::string("headline"),
+                odf::schema::DataField::string("body"),
+                // TODO: Link as odf::DatasetIDs not just strings
+                // NOTE: read comment about optionality below
+                odf::schema::DataField::list(
+                    "attachments",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                odf::schema::DataField::string("molecule_access_level"),
+                odf::schema::DataField::string("molecule_change_by"),
+                // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
+                //       types in the following columns during ingesting:
+                //       REQUIRED group categories (LIST) {
+                //         REPEATED group list {
+                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (1)
+                //          }
+                //       }
+                //       REQUIRED group tags (LIST) {
+                //         REPEATED group list {
+                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (2)
+                //         }
+                //       }
+                //
+                // (1), (2) OPTIONAL by some reason (in new data), but it's not in data frame.
+                //          Expected: REQUIRED like it should be.
+                //
+                //       By the reason of this, we need to add these columns as optional into data
+                //       schema.
+                // -->
+                odf::schema::DataField::list(
+                    "categories",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                odf::schema::DataField::list(
+                    "tags",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                // <--
+            ])
+            .build()
+            .expect("Schema is always valid as there are no user inputs");
 
         odf::DatasetSnapshot {
             name: alias,
             kind: odf::DatasetKind::Root,
             metadata: vec![
+                odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema::new(schema)),
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
@@ -205,6 +252,8 @@ impl MoleculeDatasetSnapshots {
                                 "attachments Array<STRING> NOT NULL",
                                 "molecule_access_level STRING NOT NULL",
                                 "molecule_change_by STRING NOT NULL",
+                                "categories Array<STRING> NOT NULL",
+                                "tags Array<STRING> NOT NULL",
                             ]
                             .into_iter()
                             .map(str::to_string)
@@ -214,6 +263,7 @@ impl MoleculeDatasetSnapshots {
                     }
                     .into(),
                     preprocess: None,
+                    // TODO: append strategy?
                     merge: odf::metadata::MergeStrategyChangelogStream {
                         primary_key: vec!["announcement_id".to_string()],
                     }
@@ -247,6 +297,139 @@ impl MoleculeDatasetSnapshots {
                     .into(),
                 }
                 .into(),
+            ],
+        }
+    }
+
+    pub fn global_announcements_alias(
+        molecule_account_name: odf::AccountName,
+    ) -> odf::DatasetAlias {
+        const DATASET_NAME: &str = "announcements";
+
+        odf::DatasetAlias::new(
+            Some(molecule_account_name),
+            odf::DatasetName::new_unchecked(DATASET_NAME),
+        )
+    }
+
+    pub fn global_announcements(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+        const DATASET_NAME: &str = "announcements";
+
+        let alias = odf::DatasetAlias::new(
+            Some(molecule_account_name),
+            odf::DatasetName::new_unchecked(DATASET_NAME),
+        );
+
+        let schema = odf::schema::DataSchema::builder()
+            .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
+            .extend([
+                odf::schema::DataField::string("ipnft_uid"),
+                odf::schema::DataField::string("announcement_id"),
+                odf::schema::DataField::string("headline"),
+                odf::schema::DataField::string("body"),
+                // TODO: Link as odf::DatasetIDs not just strings
+                // NOTE: read comment about optionality below
+                odf::schema::DataField::list(
+                    "attachments",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                odf::schema::DataField::string("molecule_change_by"),
+                odf::schema::DataField::string("molecule_access_level"),
+                // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
+                //       types in the following columns during ingesting:
+                //       REQUIRED group categories (LIST) {
+                //         REPEATED group list {
+                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (1)
+                //          }
+                //       }
+                //       REQUIRED group tags (LIST) {
+                //         REPEATED group list {
+                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (2)
+                //         }
+                //       }
+                //
+                // (1), (2) OPTIONAL by some reason (in new data), but it's not in data frame.
+                //          Expected: REQUIRED like it should be.
+                //
+                //       By the reason of this, we need to add these columns as optional into data
+                //       schema.
+                // -->
+                odf::schema::DataField::list(
+                    "categories",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                odf::schema::DataField::list(
+                    "tags",
+                    odf::schema::DataType::optional(odf::schema::DataType::string()),
+                ),
+                // <--
+            ])
+            .build()
+            .expect("Schema is always valid as there are no user inputs");
+
+        odf::DatasetSnapshot {
+            name: alias,
+            kind: odf::DatasetKind::Root,
+            metadata: vec![
+                odf::MetadataEvent::SetDataSchema(odf::metadata::SetDataSchema::new(schema)),
+                odf::metadata::AddPushSource {
+                    source_name: "default".to_string(),
+                    read: odf::metadata::ReadStepNdJson {
+                        schema: Some(
+                            [
+                                "op INT NOT NULL",
+                                "ipnft_uid STRING NOT NULL",
+                                "announcement_id STRING NOT NULL",
+                                "headline STRING NOT NULL",
+                                "body STRING NOT NULL",
+                                "attachments Array<STRING> NOT NULL",
+                                "molecule_access_level STRING NOT NULL",
+                                "molecule_change_by STRING NOT NULL",
+                                "categories Array<STRING> NOT NULL",
+                                "tags Array<STRING> NOT NULL",
+                            ]
+                                .into_iter()
+                                .map(str::to_string)
+                                .collect(),
+                        ),
+                        ..Default::default()
+                    }
+                        .into(),
+                    preprocess: None,
+                    // TODO: append strategy? if so, remove "op INT NOT NULL" from the schema
+                    merge: odf::metadata::MergeStrategyChangelogStream {
+                        primary_key: vec!["announcement_id".to_string()],
+                    }
+                        .into(),
+                }
+                    .into(),
+                odf::metadata::SetInfo {
+                    description: Some("Project announcements".into()),
+                    keywords: Some(vec![
+                        "DeSci".to_string(),
+                        "BioTech".to_string(),
+                        "Funding".to_string(),
+                        "Crypto".to_string(),
+                    ]),
+                }
+                    .into(),
+                odf::metadata::SetAttachments {
+                    attachments: odf::metadata::AttachmentsEmbedded {
+                        items: vec![odf::metadata::AttachmentEmbedded {
+                            path: "README.md".into(),
+                            content: indoc::indoc!(
+                                r#"
+                                # Announcements
+
+                                Dataset automatically combines announcements from individual projects.
+                                "#
+                            )
+                                .into(),
+                        }],
+                    }
+                        .into(),
+                }
+                    .into(),
             ],
         }
     }

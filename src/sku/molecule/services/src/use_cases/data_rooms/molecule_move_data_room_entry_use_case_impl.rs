@@ -70,6 +70,9 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
             })?;
 
         if let MoleculeUpdateDataRoomEntryResult::Success(success) = &result {
+            assert!(!success.inserted_records.is_empty());
+            let last_inserted_record = &(success.inserted_records.last().unwrap().1);
+
             self.outbox
                 .post_message(
                     MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
@@ -80,6 +83,15 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                         molecule_project.ipnft_uid.clone(),
                         path_from,
                         path_to,
+                        MoleculeDataRoomEntry::from_collection_entry(
+                            kamu_datasets::CollectionEntry {
+                                system_time: success.system_time,
+                                event_time: source_event_time.unwrap_or(success.system_time),
+                                path: last_inserted_record.path.clone(),
+                                reference: last_inserted_record.reference.clone(),
+                                extra_data: last_inserted_record.extra_data.clone(),
+                            },
+                        ),
                     ),
                 )
                 .await

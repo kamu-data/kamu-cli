@@ -5151,6 +5151,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "format-utils"
+version = "0.253.1"
+dependencies = [
+ "pretty_assertions",
+]
+
+[[package]]
 name = "fraction"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8301,6 +8308,7 @@ dependencies = [
  "chrono",
  "database-common",
  "file-utils",
+ "format-utils",
  "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
@@ -8313,6 +8321,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.17",
+ "uuid",
 ]
 
 [[package]]
@@ -8343,6 +8352,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

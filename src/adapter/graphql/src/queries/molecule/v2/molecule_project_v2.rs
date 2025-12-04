@@ -18,6 +18,7 @@ use crate::prelude::*;
 use crate::queries::molecule::v2::{
     MoleculeActivityEventV2,
     MoleculeActivityEventV2Connection,
+    MoleculeAnnouncementEntry,
     MoleculeAnnouncements,
     MoleculeDataRoom,
     MoleculeDataRoomEntry,
@@ -44,8 +45,7 @@ impl MoleculeProjectV2 {
     async fn get_data_room_activity_events(
         &self,
         ctx: &Context<'_>,
-        page: usize,
-        per_page: usize,
+        project: &Arc<MoleculeProjectV2>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<Vec<MoleculeActivityEventV2>> {
         // TODO: filters
@@ -84,27 +84,23 @@ impl MoleculeProjectV2 {
         use datafusion::logical_expr::{col, lit};
 
         let vocab = odf::metadata::DatasetVocabulary::default();
-        let mut df = df
+        let df = df
             .filter(
                 col(vocab.operation_type_column.as_str())
                     .not_eq(lit(OperationType::CorrectFrom as i32)),
             )
             .int_err()?;
 
-        // Sort the df by offset descending
-        df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
-
-        // Apply pagination
-        df = df.limit(page * per_page, Some(per_page)).int_err()?;
+        // We need sorting here, since the order is important for processing.
+        let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
 
         let records = df.collect_json_aos().await.int_err()?;
-        let self_arc = self.as_arc();
 
         let mut nodes = Vec::with_capacity(records.len());
         let mut record_iter = records.into_iter().peekable();
 
         while let Some(current) = record_iter.next() {
-            let (op, entry) = MoleculeDataRoomEntry::new_from_json(current, &self_arc, &vocab)?;
+            let (op, entry) = MoleculeDataRoomEntry::new_from_json(current, project, &vocab)?;
 
             let event = match op {
                 OperationType::Append => {
@@ -119,7 +115,7 @@ impl MoleculeProjectV2 {
                     //       UpdateCollectionEntriesUseCaseImpl.
                     let is_file_updated_event = if let Some(next) = record_iter.peek() {
                         let (next_op, next_entry) =
-                            MoleculeDataRoomEntry::new_from_json(next.clone(), &self_arc, &vocab)?;
+                            MoleculeDataRoomEntry::new_from_json(next.clone(), project, &vocab)?;
 
                         next_op == OperationType::Retract && entry.is_same_reference(&next_entry)
                     } else {
@@ -146,6 +142,48 @@ impl MoleculeProjectV2 {
         }
 
         Ok(nodes)
+    }
+
+    async fn get_announcement_activity_events(
+        &self,
+        ctx: &Context<'_>,
+        project: &Arc<MoleculeProjectV2>,
+        filters: Option<MoleculeProjectActivityFilters>,
+    ) -> Result<Vec<MoleculeActivityEventV2>> {
+        // TODO: filters
+        assert!(filters.is_none());
+
+        // TODO: extract a use-case
+        //       (same at MoleculeAnnouncements::tail())
+
+        let molecule_dataset_service =
+            from_catalog_n!(ctx, dyn kamu_molecule_domain::MoleculeDatasetService);
+
+        let (_, maybe_df) = molecule_dataset_service
+            .get_project_announcements_data_frame(
+                &self.entity.announcements_dataset_id,
+                auth::DatasetAction::Read,
+            )
+            .await
+            .int_err()?;
+
+        let Some(df) = maybe_df else {
+            return Ok(Vec::new());
+        };
+
+        // Sorting will be done after merge
+
+        let records = df.collect_json_aos().await.int_err()?;
+
+        let events = records
+            .into_iter()
+            .map(|record| {
+                let entry = MoleculeAnnouncementEntry::from_json(project, record)?;
+                Ok(MoleculeActivityEventV2::announcement(entry))
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?;
+
+        Ok(events)
     }
 }
 
@@ -194,11 +232,13 @@ impl MoleculeProjectV2 {
     /// Strongly typed data room accessor
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_data_room, skip_all)]
     async fn data_room(&self, ctx: &Context<'_>) -> Result<MoleculeDataRoom> {
+        // TODO: revisit after use-case breakdown (to remove auth checks)
+
         let Some(dataset) =
             Dataset::try_from_ref(ctx, &self.entity.data_room_dataset_id.as_local_ref()).await?
         else {
             return Err(GqlError::Access(odf::AccessError::Unauthorized(
-                "Dataset inaccessible".into(),
+                "Data room dataset inaccessible".into(),
             )));
         };
 
@@ -210,8 +250,22 @@ impl MoleculeProjectV2 {
 
     /// Strongly typed announcements accessor
     #[tracing::instrument(level = "info", name = MoleculeProjectV2_announcements, skip_all)]
-    async fn announcements(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncements> {
-        todo!()
+    async fn announcements(&self, ctx: &Context<'_>) -> Result<MoleculeAnnouncements> {
+        // TODO: revisit after use-case breakdown (to remove auth checks)
+
+        let Some(dataset) =
+            Dataset::try_from_ref(ctx, &self.entity.announcements_dataset_id.as_local_ref())
+                .await?
+        else {
+            return Err(GqlError::Access(odf::AccessError::Unauthorized(
+                "Announcements dataset inaccessible".into(),
+            )));
+        };
+
+        Ok(MoleculeAnnouncements {
+            dataset,
+            project: Arc::new(self.clone()),
+        })
     }
 
     /// Project's activity events in reverse chronological order
@@ -223,17 +277,39 @@ impl MoleculeProjectV2 {
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
+        // TODO: extract use case
+
         // TODO: filters
         assert!(filters.is_none());
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
-        // TODO: PERF: share data room df with data_room() method (lazy initialization)
+        let self_arc = self.as_arc();
 
-        let events = self
-            .get_data_room_activity_events(ctx, page, per_page, filters)
-            .await?;
+        let (mut data_room_activity_events, mut announcement_activity_events) = tokio::try_join!(
+            self.get_data_room_activity_events(ctx, &self_arc, filters.clone()),
+            self.get_announcement_activity_events(ctx, &self_arc, filters),
+        )?;
+
+        // Get the total count before pagination
+        let total_count = data_room_activity_events.len() + announcement_activity_events.len();
+
+        // Merge lists
+        let mut events = {
+            let mut v = Vec::with_capacity(total_count);
+            v.append(&mut data_room_activity_events);
+            v.append(&mut announcement_activity_events);
+            v
+        };
+
+        // Sort by event time descending
+        events.sort_unstable_by_key(|event| std::cmp::Reverse(event.event_time()));
+
+        // Pagination
+        let safe_offset = (page * per_page).min(total_count);
+        events.drain(..safe_offset);
+        events.truncate(per_page);
 
         Ok(MoleculeActivityEventV2Connection::new(
             events, page, per_page,
@@ -249,7 +325,7 @@ page_based_connection!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(InputObject)]
+#[derive(Clone, InputObject)]
 pub struct MoleculeProjectActivityFilters {
     // TODO: replace w/ real filters.
     /// This filter is provided as an example.

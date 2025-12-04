@@ -234,7 +234,7 @@ impl<'de> serde::Deserialize<'de> for OperationType {
 // DatasetDefaultVocabularyRecord
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct DatasetDefaultVocabularySystemColumns {
     pub offset: Option<u64>, // Optional for creation
 
