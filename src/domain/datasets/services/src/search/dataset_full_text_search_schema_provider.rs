@@ -43,7 +43,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: &dyn FullTextSearchRepository,
+        repo: Arc<dyn FullTextSearchRepository>,
         schema: &FullTextSearchEntitySchema,
     ) -> Result<usize, InternalError> {
         assert!(schema.schema_name == dataset_schema::SCHEMA_NAME);
@@ -54,7 +54,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
 
         let mut entries_stream = self.dataset_entry_service.all_entries();
 
-        let mut dataset_documents = Vec::new();
+        let mut operations = Vec::new();
         let mut total_indexed = 0;
 
         use futures::TryStreamExt;
@@ -78,21 +78,24 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
             );
 
             // Add dataset document to the chunk
-            dataset_documents.push((entry.id.to_string(), dataset_document_json));
+            operations.push(FullTextUpdateOperation::Index {
+                id: entry.id.to_string(),
+                doc: dataset_document_json,
+            });
 
             // Index in chunks to avoid memory overwhelming
-            if dataset_documents.len() >= CHUNK_SIZE {
-                repo.index_bulk(dataset_schema::SCHEMA_NAME, dataset_documents)
+            if operations.len() >= CHUNK_SIZE {
+                repo.bulk_update(dataset_schema::SCHEMA_NAME, operations)
                     .await?;
                 total_indexed += CHUNK_SIZE;
-                dataset_documents = Vec::new();
+                operations = Vec::new();
             }
         }
 
         // Index remaining documents
-        if !dataset_documents.is_empty() {
-            let remaining_count = dataset_documents.len();
-            repo.index_bulk(dataset_schema::SCHEMA_NAME, dataset_documents)
+        if !operations.is_empty() {
+            let remaining_count = operations.len();
+            repo.bulk_update(dataset_schema::SCHEMA_NAME, operations)
                 .await?;
             total_indexed += remaining_count;
         }

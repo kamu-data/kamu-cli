@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use internal_error::InternalError;
 
 use crate::{FullTextSearchEntitySchema, FullTextSearchRepository};
@@ -21,7 +23,7 @@ pub trait FullTextSearchEntitySchemaProvider: Send + Sync {
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: &dyn FullTextSearchRepository,
+        repo: Arc<dyn FullTextSearchRepository>,
         schema: &FullTextSearchEntitySchema,
     ) -> Result<usize, InternalError>;
 }

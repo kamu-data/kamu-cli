@@ -84,34 +84,14 @@ impl FullTextSearchService for FullTextSearchImplLazyInit {
         inner.search(ctx, req).await
     }
 
-    async fn index_bulk(
+    async fn bulk_update(
         &self,
         ctx: FullTextSearchContext<'_>,
         schema_name: FullTextEntitySchemaName,
-        docs: Vec<(FullTextEntityId, serde_json::Value)>,
+        operations: Vec<FullTextUpdateOperation>,
     ) -> Result<(), InternalError> {
         let inner = self.inner(ctx.catalog).await?;
-        inner.index_bulk(ctx, schema_name, docs).await
-    }
-
-    async fn update_bulk(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        updates: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError> {
-        let inner = self.inner(ctx.catalog).await?;
-        inner.update_bulk(ctx, schema_name, updates).await
-    }
-
-    async fn delete_bulk(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        ids: Vec<FullTextEntityId>,
-    ) -> Result<(), InternalError> {
-        let inner = self.inner(ctx.catalog).await?;
-        inner.delete_bulk(ctx, schema_name, ids).await
+        inner.bulk_update(ctx, schema_name, operations).await
     }
 }
 

@@ -130,10 +130,7 @@ impl Search {
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
         let catalog = ctx.data::<dill::Catalog>().unwrap();
-        let context = kamu_search::FullTextSearchContext {
-            catalog,
-            actor_account_id: None, // TODO: support access control
-        };
+        let context = kamu_search::FullTextSearchContext { catalog };
 
         // Run actual search request
         let search_results = {

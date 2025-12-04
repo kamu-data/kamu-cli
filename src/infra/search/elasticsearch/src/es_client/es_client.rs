@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_search::FullTextUpdateOperation;
+
 use super::*;
 use crate::ElasticSearchFullTextSearchConfig;
 
@@ -354,75 +356,45 @@ impl ElasticSearchClient {
 
     #[tracing::instrument(
         level = "debug",
-        name = ElasticSearchClient_bulk_index,
-        skip_all,
-        fields(index_name, num_docs = docs.len())
-    )]
-    pub async fn bulk_index(
-        &self,
-        index_name: &str,
-        docs: Vec<(String, serde_json::Value)>,
-    ) -> Result<(), ElasticSearchClientError> {
-        use elasticsearch::BulkParts;
-
-        if docs.is_empty() {
-            return Ok(());
-        }
-
-        let mut body: Vec<elasticsearch::BulkOperation<_>> = Vec::with_capacity(docs.len() * 2);
-
-        for (doc_id, doc_value) in docs {
-            body.push(
-                elasticsearch::BulkOperation::index(doc_value)
-                    .id(doc_id)
-                    .into(),
-            );
-        }
-
-        tracing::debug!(
-            index_name,
-            num_operations = body.len(),
-            "Executing bulk index operation"
-        );
-
-        let response = self
-            .client
-            .bulk(BulkParts::Index(index_name))
-            .body(body)
-            .send()
-            .await?;
-
-        handle_bulk_response(response, index_name, "index").await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
         name = ElasticSearchClient_bulk_update,
         skip_all,
-        fields(index_name, num_updates = updates.len())
+        fields(index_name, num_operations = operations.len())
     )]
     pub async fn bulk_update(
         &self,
         index_name: &str,
-        updates: Vec<(String, serde_json::Value)>,
+        operations: Vec<FullTextUpdateOperation>,
     ) -> Result<(), ElasticSearchClientError> {
         use elasticsearch::BulkParts;
 
-        if updates.is_empty() {
+        if operations.is_empty() {
             return Ok(());
         }
 
         let mut body: Vec<elasticsearch::BulkOperation<serde_json::Value>> =
-            Vec::with_capacity(updates.len());
+            Vec::with_capacity(operations.len());
 
-        for (doc_id, partial_doc) in updates {
-            body.push(
-                elasticsearch::BulkOperation::update(
-                    doc_id,
-                    serde_json::json!({"doc": partial_doc}),
-                )
-                .into(),
-            );
+        for op in operations {
+            match op {
+                FullTextUpdateOperation::Index { id, doc } => {
+                    body.push(elasticsearch::BulkOperation::index(doc).id(id).into());
+                }
+                FullTextUpdateOperation::Update {
+                    id,
+                    doc: partial_doc,
+                } => {
+                    body.push(
+                        elasticsearch::BulkOperation::update(
+                            id,
+                            serde_json::json!({"doc": partial_doc}),
+                        )
+                        .into(),
+                    );
+                }
+                FullTextUpdateOperation::Delete { id } => {
+                    body.push(elasticsearch::BulkOperation::delete(id).into());
+                }
+            }
         }
 
         tracing::debug!(
@@ -439,46 +411,6 @@ impl ElasticSearchClient {
             .await?;
 
         handle_bulk_response(response, index_name, "update").await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = ElasticSearchClient_bulk_delete,
-        skip_all,
-        fields(index_name, num_ids = ids.len())
-    )]
-    pub async fn bulk_delete(
-        &self,
-        index_name: &str,
-        ids: Vec<String>,
-    ) -> Result<(), ElasticSearchClientError> {
-        use elasticsearch::BulkParts;
-
-        if ids.is_empty() {
-            return Ok(());
-        }
-
-        let mut body: Vec<elasticsearch::BulkOperation<serde_json::Value>> =
-            Vec::with_capacity(ids.len());
-
-        for doc_id in ids {
-            body.push(elasticsearch::BulkOperation::delete(doc_id).into());
-        }
-
-        tracing::debug!(
-            index_name,
-            num_operations = body.len(),
-            "Executing bulk delete operation"
-        );
-
-        let response = self
-            .client
-            .bulk(BulkParts::Index(index_name))
-            .body(body)
-            .send()
-            .await?;
-
-        handle_bulk_response(response, index_name, "delete").await
     }
 }
 

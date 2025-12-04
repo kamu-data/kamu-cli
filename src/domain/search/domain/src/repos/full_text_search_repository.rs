@@ -34,22 +34,10 @@ pub trait FullTextSearchRepository: Send + Sync {
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError>;
 
-    async fn index_bulk(
+    async fn bulk_update(
         &self,
         schema_name: FullTextEntitySchemaName,
-        docs: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError>;
-
-    async fn update_bulk(
-        &self,
-        schema_name: FullTextEntitySchemaName,
-        updates: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError>;
-
-    async fn delete_bulk(
-        &self,
-        schema_name: FullTextEntitySchemaName,
-        ids: Vec<FullTextEntityId>,
+        operations: Vec<FullTextUpdateOperation>,
     ) -> Result<(), InternalError>;
 }
 

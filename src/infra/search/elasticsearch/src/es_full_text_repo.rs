@@ -304,37 +304,15 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         })
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_index_bulk, skip_all, fields(schema_name, num_docs = docs.len()))]
-    async fn index_bulk(
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_bulk_update, skip_all, fields(schema_name, num_operations = operations.len()))]
+    async fn bulk_update(
         &self,
         schema_name: FullTextEntitySchemaName,
-        docs: Vec<(FullTextEntityId, serde_json::Value)>,
+        operations: Vec<FullTextUpdateOperation>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
         let index_name = self.resolve_writable_index_name(client, schema_name)?;
-        client.bulk_index(&index_name, docs).await.int_err()
-    }
-
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_update_bulk, skip_all, fields(schema_name, num_updates = updates.len()))]
-    async fn update_bulk(
-        &self,
-        schema_name: FullTextEntitySchemaName,
-        updates: Vec<(FullTextEntityId, serde_json::Value)>,
-    ) -> Result<(), InternalError> {
-        let client = self.es_client().await?;
-        let index_name = self.resolve_writable_index_name(client, schema_name)?;
-        client.bulk_update(&index_name, updates).await.int_err()
-    }
-
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_delete_bulk, skip_all, fields(schema_name, num_ids = ids.len()))]
-    async fn delete_bulk(
-        &self,
-        schema_name: FullTextEntitySchemaName,
-        ids: Vec<FullTextEntityId>,
-    ) -> Result<(), InternalError> {
-        let client = self.es_client().await?;
-        let index_name = self.resolve_writable_index_name(client, schema_name)?;
-        client.bulk_delete(&index_name, ids).await.int_err()
+        client.bulk_update(&index_name, operations).await.int_err()
     }
 }
 
