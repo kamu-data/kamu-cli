@@ -2766,53 +2766,46 @@ async fn test_molecule_v2_announcements_operations() {
         new_announcement_id
     };
 
-    /*
-    // Create an announcement with invalid attachment DID
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "headline": "Test announcement 3",
-                "body": "Blah blah",
-                "attachments": ["x"],
-                "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-            })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
-        json!({
-            "isSuccess": false,
-            "message": "Value 'x' is not a valid did:odf",
-        })
-    );
-
     // Create an announcement with attachment DID that does not exist
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "headline": "Test announcement 3",
-                "body": "Blah blah",
-                "attachments": [odf::DatasetID::new_seeded_ed25519(b"does-not-exist").to_string()],
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "headline": "Test announcement 4",
+                "body": "Blah blah 4",
+                "attachments": [
+                    project_1_file_1_dataset_id,
+                    project_1_file_2_dataset_id,
+                    odf::DatasetID::new_seeded_ed25519(b"does-not-exist").to_string(),
+                ],
                 "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "categories": [],
+                "tags": ["test-tag1"],
             })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
-        json!({
-            "isSuccess": false,
-            "message": "Dataset did:odf:fed011ba79f25e520298ba6945dd6197083a366364bef178d5899b100c434748d88e5 not found",
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "create": {
+                                "isSuccess": false,
+                                "message": "Not found attachment(s): [did:odf:fed011ba79f25e520298ba6945dd6197083a366364bef178d5899b100c434748d88e5]",
+                                "__typename": "CreateAnnouncementErrorInvalidAttachment",
+                            }
+                        }
+                    }
+                }
+            }
         })
     );
 
+    /*
     // Announcements are listed as expected
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(LIST_ANNOUNCEMENTS).variables(
