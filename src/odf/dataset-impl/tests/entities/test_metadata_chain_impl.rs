@@ -1020,6 +1020,52 @@ async fn test_append_set_data_schema_evolution() {
             AppendValidationError::InvalidEvent(..)
         ))
     );
+
+    // Adding required fields is rejected (survey_url)
+    // TODO: Eventually we'll want to support this, but this will require providing
+    // a default or computed value for this column along with new schema
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+                odf::schema::DataField::string("survey_url"),
+            ])))
+            .prev(&head, 3)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // Adding optional fields is OK (survey_url)
+    chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+                odf::schema::DataField::string("survey_url").optional(),
+            ])))
+            .prev(&head, 3)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -24,6 +24,7 @@ use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::utils::data::DataFrameExt;
 use tempfile::TempDir;
 use test_utils::LocalS3Server;
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 use crate::tests::queries::helpers;
 
@@ -412,6 +413,7 @@ async fn test_sql_statement_with_state_simple() {
     .unwrap();
 
     write_data(
+        &catalog,
         foo_target.clone(),
         &mut writer,
         Some(
@@ -487,6 +489,7 @@ async fn test_sql_statement_with_state_simple() {
 
     // Add more data
     write_data(
+        &catalog,
         foo_target,
         &mut writer,
         Some(
@@ -625,6 +628,7 @@ async fn test_sql_statement_with_state_cte() {
     .unwrap();
 
     write_data(
+        &catalog,
         foo_target.clone(),
         &mut writer_foo,
         Some(
@@ -664,6 +668,7 @@ async fn test_sql_statement_with_state_cte() {
     .unwrap();
 
     write_data(
+        &catalog,
         bar_target.clone(),
         &mut writer_bar,
         Some(
@@ -759,6 +764,7 @@ async fn test_sql_statement_with_state_cte() {
 
     // Add more data
     write_data(
+        &catalog,
         foo_target,
         &mut writer_foo,
         Some(
@@ -783,6 +789,7 @@ async fn test_sql_statement_with_state_cte() {
     .await;
 
     write_data(
+        &catalog,
         bar_target,
         &mut writer_bar,
         Some(
@@ -977,18 +984,223 @@ async fn test_sql_statement_with_state_cte() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_sql_statement_with_schema_migration() {
+    use ::datafusion::arrow::datatypes::DataType;
+    use ::datafusion::prelude::*;
+    use odf::schema::*;
+
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::allowing(),
+    );
+
+    let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
+    time_source.set(Utc.with_ymd_and_hms(2010, 1, 1, 12, 0, 0).unwrap());
+
+    let ctx = SessionContext::new();
+
+    // 0: Init dataset
+    let (foo_stored, foo_alias) = helpers::create_empty_dataset(&catalog, "foo").await;
+
+    let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
+
+    foo_target
+        .commit_event(
+            odf::metadata::SetDataSchema::new(DataSchema::new(vec![
+                DataField::i64("offset"),
+                DataField::i32("op"),
+                DataField::timestamp_millis_utc("system_time"),
+                DataField::timestamp_millis_utc("event_time"),
+                DataField::string("city"),
+                DataField::i64("population"),
+            ]))
+            .into(),
+            odf::dataset::CommitOpts {
+                system_time: Some(time_source.now()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let mut writer_foo = DataWriterDataFusion::from_metadata_chain(
+        ctx.clone(),
+        foo_target.clone(),
+        &odf::BlockRef::Head,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // 1: Add data
+    write_data(
+        &catalog,
+        foo_target.clone(),
+        &mut writer_foo,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("city", DataType::Utf8, false),
+                        Field::new("population", DataType::Int64, false),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["a", "b"])),
+                        Arc::new(Int64Array::from(vec![100, 200])),
+                    ],
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .into(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
+
+    // 2: Query
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                select * from {foo_alias}
+                order by offset
+                "#
+            ),
+            QueryOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    odf::utils::testing::assert_data_eq(
+        res.df,
+        indoc::indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2010-01-01T12:00:00Z | a    | 100        |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2010-01-01T12:00:00Z | b    | 200        |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // 3: Add new `census_url` optional field
+    foo_target
+        .commit_event(
+            odf::metadata::SetDataSchema::new(DataSchema::new(vec![
+                DataField::i64("offset"),
+                DataField::i32("op"),
+                DataField::timestamp_millis_utc("system_time"),
+                DataField::timestamp_millis_utc("event_time"),
+                DataField::string("city"),
+                DataField::i64("population"),
+                DataField::string("census_url").optional(),
+            ]))
+            .into(),
+            odf::dataset::CommitOpts {
+                system_time: Some(time_source.now()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    // Need to re-initialize the writer to pick up the new schema
+    let mut writer_foo = DataWriterDataFusion::from_metadata_chain(
+        ctx.clone(),
+        foo_target.clone(),
+        &odf::BlockRef::Head,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // 4: Add data with new schema
+    write_data(
+        &catalog,
+        foo_target.clone(),
+        &mut writer_foo,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("city", DataType::Utf8, false),
+                        Field::new("population", DataType::Int64, false),
+                        Field::new("census_url", DataType::Utf8, true),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["c", "d"])),
+                        Arc::new(Int64Array::from(vec![300, 400])),
+                        Arc::new(StringArray::from(vec![Some("http://c.ca/census"), None])),
+                    ],
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .into(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
+
+    // 5: Query
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res = query_svc
+        .sql_statement(
+            &format!(
+                r#"
+                select * from {foo_alias}
+                order by offset
+                "#
+            ),
+            QueryOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    odf::utils::testing::assert_data_eq(
+        res.df,
+        indoc::indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+--------------------+
+            | offset | op | system_time          | event_time           | city | population | census_url         |
+            +--------+----+----------------------+----------------------+------+------------+--------------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2010-01-01T12:00:00Z | a    | 100        |                    |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2010-01-01T12:00:00Z | b    | 200        |                    |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2010-01-01T12:00:00Z | c    | 300        | http://c.ca/census |
+            | 3      | 0  | 2010-01-01T12:00:00Z | 2010-01-01T12:00:00Z | d    | 400        |                    |
+            +--------+----+----------------------+----------------------+------+------------+--------------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn write_data(
+    catalog: &dill::Catalog,
     target: ResolvedDataset,
     writer: &mut DataWriterDataFusion,
     data: Option<DataFrameExt>,
     data_staging_path: PathBuf,
 ) {
+    let time = catalog.get_one::<dyn SystemTimeSource>().unwrap();
+    let now = time.now();
+
     let write_result = writer
         .write(
             data,
             WriteDataOpts {
-                system_time: Utc::now(),
-                source_event_time: Utc::now(),
+                system_time: now,
+                source_event_time: now,
                 new_watermark: None,
                 new_source_state: None,
                 data_staging_path,

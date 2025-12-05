@@ -39,7 +39,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
 
     for i in 0..num_rows {
         offset.append_value(i as u64);
-        op.append_value(rng.gen_range(
+        op.append_value(rng.random_range(
             odf::metadata::OperationType::Append as u8
                 ..=odf::metadata::OperationType::CorrectTo as u8,
         ));
@@ -47,22 +47,22 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
 
     let mut buf = vec![0; num_rows];
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     pk1.append_slice(&buf[..]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     pk2.append_slice(&buf[..]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     cmp1.append_slice(&buf[..]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     cmp2.append_slice(&buf[..]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     aux1.append_slice(&buf[..]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     aux2.append_slice(&buf[..]);
 
     ctx.read_batch(

@@ -81,7 +81,7 @@ tonic = { version = "0.12", default-features = false, features = [
 arrow = { optional = true, version = "56", default-features = false, features = [
     "ipc",
 ] }
-rand = { optional = true, version = "0.8", default-features = false }
+rand = { optional = true, version = "0.9", default-features = false }
 sqlx = { optional = true, version = "0.8", default-features = false }
 ssi-caips = { optional = true, version = "0.2", default-features = false, features = [
     "eip",
@@ -92,4 +92,4 @@ utoipa = { optional = true, version = "5", default-features = false }
 [dev-dependencies]
 indoc = "2"
 pretty_assertions = { version = "1" }
-rand = { version = "0.8", default-features = false }
+rand = { version = "0.9", default-features = false }

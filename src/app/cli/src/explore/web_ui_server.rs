@@ -12,13 +12,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 
-use axum::Extension;
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use database_common::DatabaseTransactionRunner;
-use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
-use http_common::ApiError;
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{
@@ -28,7 +25,6 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
 };
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
-use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;
@@ -36,7 +32,7 @@ use serde::Serialize;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 
-use super::{UIConfiguration, UIFeatureFlags};
+use super::{UIConfiguration, UIFeatureFlags, graphql_handler};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -310,24 +306,6 @@ async fn ui_configuration_handler(
     ui_configuration: axum::extract::Extension<UIConfiguration>,
 ) -> axum::Json<UIConfiguration> {
     axum::Json(ui_configuration.0)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[transactional_handler]
-async fn graphql_handler(
-    Extension(schema): Extension<kamu_adapter_graphql::Schema>,
-    Extension(catalog): Extension<Catalog>,
-    req: async_graphql_axum::GraphQLRequest,
-) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
-    let graphql_request = req
-        .into_inner()
-        .data(account_entity_data_loader(&catalog))
-        .data(dataset_handle_data_loader(&catalog))
-        .data(catalog);
-    let graphql_response = schema.execute(graphql_request).await.into();
-
-    Ok(graphql_response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -36,10 +36,11 @@ ed25519-dalek = { version = "2", default-features = false, features = [
     "rand_core",
 ] }
 hex = { version = "0.4", default-features = false, features = [] }
-rand = { version = "0.8", default-features = false, features = [
-    "getrandom",
-    "small_rng",
+rand = { version = "0.9", default-features = false, features = [
+    "std",
+    "std_rng",
 ] }
+rand_core = "0.6"
 sha3 = { version = "0.10", default-features = false, features = [] }
 serde = { version = "1", default-features = false, features = [] }
 thiserror = { version = "2", default-features = false, features = ["std"] }

@@ -40,7 +40,7 @@ impl WebhookSecretGenerator for WebhookSecretGeneratorImpl {
         use rand::RngCore;
 
         let mut bytes = [0u8; 32]; // 32 bytes = 256 bits
-        rand::rngs::OsRng.fill_bytes(&mut bytes);
+        rand::rng().fill_bytes(&mut bytes);
         let raw_secret = SecretString::from(hex::encode(bytes));
 
         WebhookSubscriptionSecret::try_new(self.webhook_secret_encryption_key.as_ref(), &raw_secret)

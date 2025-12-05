@@ -46,8 +46,8 @@ impl MinioServer {
 
         let mut container_name = "kamu-test-minio-".to_owned();
         container_name.extend(
-            rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
+            rand::rng()
+                .sample_iter(&rand::distr::Alphanumeric)
                 .take(30)
                 .map(char::from),
         );
