@@ -164,7 +164,6 @@ impl MoleculeDatasetSnapshots {
         DatasetSnapshots::versioned_file(
             alias,
             vec![
-                // TODO: NOT NULL cols?
                 // Extra columns
                 DatasetColumn::string(COLUMN_NAME_ACCESS_LEVEL),
                 DatasetColumn::string(COLUMN_NAME_CHANGE_BY),
