@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod create_dataset_use_case_helper;
+mod dataset_name_generator;
 
 pub use create_dataset_use_case_helper::*;
+pub use dataset_name_generator::*;
