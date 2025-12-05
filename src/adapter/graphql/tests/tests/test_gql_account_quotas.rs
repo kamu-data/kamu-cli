@@ -97,7 +97,7 @@ async fn test_set_and_get_account_quota() {
               accounts {
                 me {
                   quotas {
-                    setAccountLevelQuotas(quotas: { storage: { limitTotalBytes: 12345 } }) {
+                    setAccountQuotas(quotas: { storage: { limitTotalBytes: 12345 } }) {
                       success
                     }
                   }
@@ -115,7 +115,7 @@ async fn test_set_and_get_account_quota() {
             "accounts": {
                 "me": {
                     "quotas": {
-                        "setAccountLevelQuotas": {
+                        "setAccountQuotas": {
                             "success": true
                         }
                     }

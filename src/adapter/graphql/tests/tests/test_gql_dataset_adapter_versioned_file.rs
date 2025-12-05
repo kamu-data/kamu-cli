@@ -697,7 +697,7 @@ async fn test_versioned_file_quota_exceeded() {
               accounts {
                 me {
                   quotas {
-                    setAccountLevelQuotas(quotas: { storage: { limitTotalBytes: 3000 } }) {
+                    setAccountQuotas(quotas: { storage: { limitTotalBytes: 3000 } }) {
                       success
                     }
                   }
