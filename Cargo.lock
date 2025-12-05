@@ -7843,7 +7843,6 @@ dependencies = [
  "merge",
  "messaging-outbox",
  "mockall",
- "nutype",
  "opendatafabric",
  "secrecy",
  "serde",
