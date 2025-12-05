@@ -27,17 +27,16 @@ use pretty_assertions::assert_eq;
 #[case("file.txt", "00000000-1111-2222-3333-444444444444-file-txt")]
 #[case("file.tar.gz", "00000000-1111-2222-3333-444444444444-file-tar-gz")]
 #[case(
-    "file with spaces",
-    "00000000-1111-2222-3333-444444444444-file-with-spaces"
-)]
-#[case(
     "-name--with---dashes----",
     "00000000-1111-2222-3333-444444444444-name-with-dashes"
 )]
-// Just in case (URL encoded)
 #[case(
-    "/file%20with%20spaces.txt",
-    "00000000-1111-2222-3333-444444444444-file-20with-20spaces-txt"
+    "%20file%20with%20encoded%20spaces.txt",
+    "00000000-1111-2222-3333-444444444444-file-with-encoded-spaces-txt"
+)]
+#[case(
+    "%2Ffile%2Fwith%2Fencoded%2Fslashes.txt",
+    "00000000-1111-2222-3333-444444444444-file-with-encoded-slashes-txt"
 )]
 fn test_dataset_name_generator(#[case] input: &str, #[case] expected: &str) {
     let static_uuid_v4 = uuid::Uuid::parse_str("00000000-1111-2222-3333-444444444444").unwrap();

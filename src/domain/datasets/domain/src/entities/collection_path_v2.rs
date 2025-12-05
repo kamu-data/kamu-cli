@@ -98,7 +98,7 @@ mod tests {
             "/path/to/file",
             *CollectionPathV2::try_new("/path/to/file").unwrap()
         );
-        assert_eq!("file.exe", *CollectionPathV2::try_new("file.exe").unwrap());
+        assert_eq!("/file.exe", *CollectionPathV2::try_new("file.exe").unwrap());
         // Leading / is optional
         assert_eq!(
             "/path/to/file",
@@ -113,7 +113,7 @@ mod tests {
         );
         // Trim decoded spaces
         assert_eq!(
-            "path to file",
+            "/path to file",
             *CollectionPathV2::try_new(format!(
                 "{SPACE}{SPACE}path{SPACE}to{SPACE}file{SPACE}{SPACE}"
             ))
