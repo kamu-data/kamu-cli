@@ -61,6 +61,6 @@ features = [
 
 
 [dev-dependencies]
-mockall = { version = "0.13", default-features = false }
+mockall = { version = "0.14", default-features = false }
 pretty_assertions = { version = "1" }
 tokio = { version = "1", default-features = true, features = ["macros"] }

@@ -77,7 +77,7 @@ async fn test_insert_bytes_long() {
     use rand::RngCore;
 
     let mut data = [0u8; 16000];
-    rand::thread_rng().fill_bytes(&mut data);
+    rand::rng().fill_bytes(&mut data);
 
     let hash = Multihash::from_digest_sha3_256(&data);
 
@@ -141,7 +141,7 @@ async fn test_insert_stream_long() {
     use rand::RngCore;
 
     let mut data = [0u8; 16000];
-    rand::thread_rng().fill_bytes(&mut data);
+    rand::rng().fill_bytes(&mut data);
     let hash = Multihash::from_digest_sha3_256(&data);
 
     assert_eq!(

@@ -190,14 +190,14 @@ pub async fn test_multiple_boundaries(catalog: &Catalog) {
         .get_one::<dyn OutboxMessageConsumptionRepository>()
         .unwrap();
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for producer_suffix in ["A", "B"] {
         for consumer_suffix in ["X", "Y"] {
             let boundary = OutboxMessageConsumptionBoundary {
                 consumer_name: format!("{TEST_CONSUMER}_{consumer_suffix}"),
                 producer_name: format!("{TEST_PRODUCER}_{producer_suffix}"),
-                last_consumed_message_id: OutboxMessageID::new(rng.r#gen()),
+                last_consumed_message_id: OutboxMessageID::new(rng.random()),
             };
             let res = consumption_repo.create_consumption_boundary(boundary).await;
             assert_matches!(res, Ok(_));

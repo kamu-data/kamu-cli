@@ -156,7 +156,7 @@ impl FileTestHelper {
         use rand::RngCore;
 
         let mut data = vec![0u8; data_size];
-        rand::thread_rng().fill_bytes(&mut data);
+        rand::rng().fill_bytes(&mut data);
 
         std::fs::write(path, data).unwrap();
         data_size

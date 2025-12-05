@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.254.0] - 2025-12-05
 ### Added
 - GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows
 - `odf::DataSchema` now supports a `diff()` method that allows detailed comparisons between two schemas

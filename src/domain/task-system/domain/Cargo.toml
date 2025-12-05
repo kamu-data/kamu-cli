@@ -42,7 +42,7 @@ tokio-stream = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde"] }
 
 # Optional
-mockall = { optional = true, version = "0.13", default-features = false }
+mockall = { optional = true, version = "0.14", default-features = false }
 
 [dev-dependencies]
-mockall = { version = "0.13", default-features = false }
+mockall = { version = "0.14", default-features = false }

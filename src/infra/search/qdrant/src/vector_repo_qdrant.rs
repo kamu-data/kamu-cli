@@ -106,7 +106,7 @@ impl VectorRepository for VectorRepositoryQdrant {
         }
 
         let points: Vec<_> = {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             points
                 .into_iter()

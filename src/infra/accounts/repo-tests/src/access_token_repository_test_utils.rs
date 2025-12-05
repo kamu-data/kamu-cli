@@ -31,6 +31,6 @@ pub(crate) fn make_test_access_token(
 
 pub(crate) fn generate_random_bytes() -> [u8; 32] {
     let mut random_bytes = [0_u8; 32];
-    rand::thread_rng().fill(&mut random_bytes);
+    rand::rng().fill(&mut random_bytes);
     random_bytes
 }
