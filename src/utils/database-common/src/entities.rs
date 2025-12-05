@@ -41,10 +41,24 @@ impl PaginationOpts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct EntityPageListing<Entity> {
     pub list: Vec<Entity>,
     pub total_count: usize,
 }
+
+// Entity may be a type that doesn't implement Default, so we implement it
+// manually
+impl<Entity> Default for EntityPageListing<Entity> {
+    fn default() -> Self {
+        Self {
+            list: Vec::new(),
+            total_count: 0,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type EntityPageStream<'a, Entity> =
     Pin<Box<dyn Stream<Item = Result<Entity, InternalError>> + Send + 'a>>;

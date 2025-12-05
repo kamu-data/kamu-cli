@@ -5128,6 +5128,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "format-utils"
+version = "0.253.1"
+dependencies = [
+ "pretty_assertions",
+]
+
+[[package]]
 name = "fraction"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7088,6 +7095,8 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-molecule-domain",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-task-system",
  "kamu-task-system-inmem",
@@ -7565,6 +7574,7 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-search-openai",
  "kamu-search-qdrant",
@@ -7952,6 +7962,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sha3",
  "tempfile",
  "test-log",
  "thiserror 2.0.17",
@@ -8256,6 +8267,59 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+]
+
+[[package]]
+name = "kamu-molecule-domain"
+version = "0.253.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "database-common",
+ "file-utils",
+ "format-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-core",
+ "kamu-datasets",
+ "messaging-outbox",
+ "num-bigint",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-molecule-services"
+version = "0.253.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "common-macros",
+ "database-common",
+ "datafusion",
+ "dill",
+ "file-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-molecule-domain",
+ "messaging-outbox",
+ "num-bigint",
+ "opendatafabric",
+ "serde_json",
+ "time-source",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

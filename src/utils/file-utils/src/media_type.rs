@@ -64,13 +64,13 @@ impl std::fmt::Display for MediaTypeRef<'_> {
     }
 }
 
-impl<'a> std::cmp::PartialEq<MediaTypeRef<'a>> for MediaType {
+impl<'a> PartialEq<MediaTypeRef<'a>> for MediaType {
     fn eq(&self, other: &MediaTypeRef<'a>) -> bool {
         self.0 == other.0
     }
 }
 
-impl std::cmp::PartialEq<MediaType> for MediaTypeRef<'_> {
+impl PartialEq<MediaType> for MediaTypeRef<'_> {
     fn eq(&self, other: &MediaType) -> bool {
         self.0 == other.0
     }

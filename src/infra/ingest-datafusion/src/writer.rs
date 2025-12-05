@@ -560,7 +560,7 @@ impl DataWriterDataFusion {
         // See: https://github.com/apache/datafusion/issues/13323
         assert!(
             path.extension().is_some(),
-            "Ouput file name must have an extension"
+            "Output file name must have an extension"
         );
 
         let res = match df

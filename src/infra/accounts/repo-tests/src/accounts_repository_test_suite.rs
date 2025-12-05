@@ -454,35 +454,30 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
 
     // All
     assert_eq!(
-        [
-            name(&"adMin1"),
-            name(&"uSer1"),
-            name(&"usEr2"),
-            name(&"useR3"),
-        ],
+        [name(&ADMIN_1), name(&USER_1), name(&USER_2), name(&USER_3),],
         *search(&account_repo, "", Filters::default()).await
     );
 
     // Search by account name
     assert_eq!(
-        [name(&"uSer1"), name(&"usEr2"), name(&"useR3")],
+        [name(&USER_1), name(&USER_2), name(&USER_3)],
         *search(&account_repo, "uS", Filters::default()).await
     );
     assert_eq!(
-        [name(&"uSer1"), name(&"usEr2"), name(&"useR3")],
+        [name(&USER_1), name(&USER_2), name(&USER_3)],
         *search(&account_repo, "sE", Filters::default()).await
     );
     assert_eq!(
-        [name(&"uSer1")],
+        [name(&USER_1)],
         *search(&account_repo, "r1", Filters::default()).await
     );
     assert_eq!(
-        [name(&"usEr2")],
+        [name(&USER_2)],
         *search(
             &account_repo,
             "user",
             Filters {
-                exclude_accounts_by_ids: vec![account_id(&"uSer1"), account_id(&"useR3")]
+                exclude_accounts_by_ids: vec![account_id(&USER_1), account_id(&USER_3)]
             }
         )
         .await
@@ -490,11 +485,11 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
 
     // Search by display name
     assert_eq!(
-        [name(&"uSer1"), name(&"usEr2")],
+        [name(&USER_1), name(&USER_2)],
         *search(&account_repo, "ali", Filters::default()).await
     );
     assert_eq!(
-        [name(&"useR3")],
+        [name(&USER_3)],
         *search(&account_repo, "ob", Filters::default()).await
     );
     assert_eq!(
@@ -503,7 +498,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
             &account_repo,
             "ob",
             Filters {
-                exclude_accounts_by_ids: vec![account_id(&"useR3")]
+                exclude_accounts_by_ids: vec![account_id(&USER_3)]
             }
         )
         .await
