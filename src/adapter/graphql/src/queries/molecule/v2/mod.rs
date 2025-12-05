@@ -13,6 +13,7 @@ mod molecule_data_room_dataset_v2;
 mod molecule_project_v2;
 mod molecule_scalars_v2;
 mod molecule_v2;
+mod molecule_versioned_file;
 
 pub use molecule_activity_event_v2::*;
 pub use molecule_announcements_dataset_v2::*;
@@ -20,3 +21,4 @@ pub use molecule_data_room_dataset_v2::*;
 pub use molecule_project_v2::*;
 pub use molecule_scalars_v2::*;
 pub use molecule_v2::*;
+pub use molecule_versioned_file::*;

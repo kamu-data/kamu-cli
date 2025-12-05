@@ -59,7 +59,6 @@ impl MoleculeProjectAnnouncementRecordExt for MoleculeProjectAnnouncementRecord 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// todo выразить через проектную
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct MoleculeGlobalAnnouncementDataRecord {
     pub announcement_id: Option<uuid::Uuid>, // Optional for creation

@@ -27,7 +27,6 @@ use crate::queries::molecule::v2::{
     MoleculeCategory,
     MoleculeChangeBy,
     MoleculeEncryptionMetadata,
-    MoleculeEncryptionMetadataRecord,
     MoleculeProjectV2,
     MoleculeTag,
 };
@@ -480,13 +479,12 @@ impl MoleculeVersionedFileEntry {
     async fn encryption_metadata(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<Option<&MoleculeEncryptionMetadata>> {
+    ) -> Result<Option<MoleculeEncryptionMetadata>> {
         let detailed_info = self.detailed_info(ctx).await?;
-
         Ok(detailed_info
             .encryption_metadata
             .as_ref()
-            .map(|em| &em.record))
+            .map(|metadata_record| metadata_record.as_entity().into()))
     }
 
     /// Returns encoded content in-band. Should be used for small files only and
@@ -517,7 +515,7 @@ pub struct MoleculeVersionedFileEntryBasicInfo {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeVersionedFileEntryDetailedInfo {
     pub content_text: Option<String>,
-    pub encryption_metadata: Option<MoleculeEncryptionMetadataRecord>,
+    pub encryption_metadata: Option<kamu_molecule_domain::MoleculeEncryptionMetadataRecord>,
 }
 
 #[derive(Debug, serde::Serialize)]
