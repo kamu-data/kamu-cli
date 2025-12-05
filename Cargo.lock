@@ -7234,6 +7234,7 @@ dependencies = [
  "kamu-webhooks-inmem",
  "kamu-webhooks-services",
  "messaging-outbox",
+ "num-bigint",
  "nutype",
  "observability",
  "oop",
