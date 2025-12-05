@@ -13,6 +13,7 @@ use dill::{component, interface};
 use event_sourcing::{EventID, EventStore, GetEventsOpts, SaveEventsError};
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,9 +31,10 @@ impl SqliteAccountQuotaEventStore {
         quota_type.to_string()
     }
 
-    fn parse_event(row: &AccountQuotaEventRow) -> Result<(EventID, AccountQuotaEvent), InternalError> {
-        let event: AccountQuotaEvent =
-            serde_json::from_str(&row.event_payload).int_err()?;
+    fn parse_event(
+        row: &AccountQuotaEventRow,
+    ) -> Result<(EventID, AccountQuotaEvent), InternalError> {
+        let event: AccountQuotaEvent = serde_json::from_str(&row.event_payload).int_err()?;
 
         Ok((EventID::new(row.id), event))
     }
@@ -186,9 +188,14 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
         }
 
         let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await.map_err(ErrorIntoInternal::int_err)?;
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(ErrorIntoInternal::int_err)?;
 
-        let last_id = Self::last_event_id(connection_mut, query).await.map_err(ErrorIntoInternal::int_err)?;
+        let last_id = Self::last_event_id(connection_mut, query)
+            .await
+            .map_err(ErrorIntoInternal::int_err)?;
 
         Self::map_save_error(maybe_prev_stored_event_id, last_id)?;
 

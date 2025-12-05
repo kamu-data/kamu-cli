@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod test_sqlite_access_token_repository;
-mod test_sqlite_account_repository;
 mod test_sqlite_account_quota_event_store;
+mod test_sqlite_account_repository;
 mod test_sqlite_did_secret_key_repository;
 mod test_sqlite_oauth_device_code_repository;
 mod test_sqlite_password_hash_repository;

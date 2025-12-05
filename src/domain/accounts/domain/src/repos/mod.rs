@@ -8,15 +8,15 @@
 // by the Apache License, Version 2.0.
 
 mod access_token_repository;
-mod account_repository;
 mod account_quotas_repository;
+mod account_repository;
 mod did_secret_key_repository;
 mod oauth_device_code_repository;
 mod password_hash_repository;
 
 pub use access_token_repository::*;
-pub use account_repository::*;
 pub use account_quotas_repository::*;
+pub use account_repository::*;
 pub use did_secret_key_repository::*;
 pub use oauth_device_code_repository::*;
 pub use password_hash_repository::*;

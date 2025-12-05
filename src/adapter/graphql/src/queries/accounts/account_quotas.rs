@@ -62,7 +62,7 @@ impl<'a> AccountQuotasUsageStorage<'a> {
         Self { account }
     }
 
-    /// Total bytes limit for this account (projected from quota events).
+    /// Total bytes limit for this account.
     pub async fn limit_total_bytes(&self, ctx: &Context<'_>) -> Result<u64> {
         let quota_service = from_catalog_n!(ctx, dyn AccountQuotaService);
 

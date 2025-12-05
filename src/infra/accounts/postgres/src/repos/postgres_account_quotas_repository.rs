@@ -32,7 +32,9 @@ impl PostgresAccountQuotaEventStore {
         quota_type.to_string()
     }
 
-    fn parse_event(row: AccountQuotaEventRow) -> Result<(EventID, AccountQuotaEvent), InternalError> {
+    fn parse_event(
+        row: AccountQuotaEventRow,
+    ) -> Result<(EventID, AccountQuotaEvent), InternalError> {
         let event: AccountQuotaEvent = serde_json::from_value(row.event_payload).int_err()?;
 
         Ok((EventID::new(row.id), event))
@@ -176,9 +178,14 @@ impl EventStore<AccountQuotaState> for PostgresAccountQuotaEventStore {
         }
 
         let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await.map_err(ErrorIntoInternal::int_err)?;
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(ErrorIntoInternal::int_err)?;
 
-        let last_id = Self::last_event_id(connection_mut, query).await.map_err(ErrorIntoInternal::int_err)?;
+        let last_id = Self::last_event_id(connection_mut, query)
+            .await
+            .map_err(ErrorIntoInternal::int_err)?;
 
         Self::map_save_error(maybe_prev_stored_event_id, last_id)?;
 
@@ -189,7 +196,9 @@ impl EventStore<AccountQuotaState> for PostgresAccountQuotaEventStore {
         let mut last_event_id = None;
 
         for event in events {
-            let payload = serde_json::to_value(&event).int_err().map_err(SaveEventsError::Internal)?;
+            let payload = serde_json::to_value(&event)
+                .int_err()
+                .map_err(SaveEventsError::Internal)?;
 
             let inserted: i64 = sqlx::query_scalar!(
                 r#"

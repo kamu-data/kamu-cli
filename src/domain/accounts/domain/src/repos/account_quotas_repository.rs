@@ -20,13 +20,7 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
-use crate::{
-    AccountQuota,
-    AccountQuotaEvent,
-    AccountQuotaState,
-    AccountQuotaQuery,
-    QuotaType,
-};
+use crate::{AccountQuota, AccountQuotaEvent, AccountQuotaQuery, AccountQuotaState, QuotaType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,15 +33,9 @@ pub trait AccountQuotaEventStore: EventStore<AccountQuotaState> {
         let mut stream = self.get_events(query, GetEventsOpts::default());
         let mut state: Option<AccountQuotaState> = None;
 
-        while let Some(next_event) = stream
-            .try_next()
-            .await
-            .map_err(map_get_events_error)? 
-        {
+        while let Some(next_event) = stream.try_next().await.map_err(map_get_events_error)? {
             let (_, event) = next_event;
-            state = Some(
-                AccountQuotaState::apply(state, event).map_err(InternalError::new)?,
-            );
+            state = Some(AccountQuotaState::apply(state, event).map_err(InternalError::new)?);
         }
 
         if let Some(projection) = state
@@ -88,11 +76,7 @@ pub trait AccountQuotaEventStore: EventStore<AccountQuotaState> {
         let mut stream = self.get_events(query, GetEventsOpts::default());
         let mut last_event_id: Option<EventID> = None;
 
-        while let Some(next_event) = stream
-            .try_next()
-            .await
-            .map_err(map_get_events_error)?
-        {
+        while let Some(next_event) = stream.try_next().await.map_err(map_get_events_error)? {
             let (event_id, _) = next_event;
             last_event_id = Some(event_id);
         }
@@ -135,9 +119,7 @@ pub enum SaveAccountQuotaError {
 impl From<SaveEventsError> for SaveAccountQuotaError {
     fn from(value: SaveEventsError) -> Self {
         match value {
-            SaveEventsError::ConcurrentModification(err) => {
-                SaveAccountQuotaError::Concurrent(err)
-            }
+            SaveEventsError::ConcurrentModification(err) => SaveAccountQuotaError::Concurrent(err),
             SaveEventsError::NothingToSave => {
                 SaveAccountQuotaError::Internal("Nothing to save".int_err())
             }

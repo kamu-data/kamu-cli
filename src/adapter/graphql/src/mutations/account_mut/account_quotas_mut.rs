@@ -26,8 +26,8 @@ impl<'a> AccountQuotasMut<'a> {
     }
 
     /// Setting quotas at the account level.
-    #[tracing::instrument(level = "info", name = AccountQuotasMut_set_account_level_quotas, skip_all)]
-    pub async fn set_account_level_quotas(
+    #[tracing::instrument(level = "info", name = AccountQuotasMut_set_account_quotas, skip_all)]
+    pub async fn set_account_quotas(
         &self,
         ctx: &Context<'_>,
         quotas: SetAccountQuotasInput,

@@ -264,7 +264,7 @@ type AccountQuotasMut {
 	"""
 	Setting quotas at the account level.
 	"""
-	setAccountLevelQuotas(quotas: SetAccountQuotasInput!): SetAccountQuotasResult!
+	setAccountQuotas(quotas: SetAccountQuotasInput!): SetAccountQuotasResult!
 }
 
 type AccountQuotasUsage {
@@ -276,7 +276,7 @@ type AccountQuotasUsage {
 
 type AccountQuotasUsageStorage {
 	"""
-	Total bytes limit for this account (projected from quota events).
+	Total bytes limit for this account.
 	"""
 	limitTotalBytes: Int!
 }

@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use internal_error::ErrorIntoInternal;
 use kamu_accounts::{
     AccountQuotaAdded,
     AccountQuotaEvent,
@@ -22,7 +23,6 @@ use kamu_accounts::{
     QuotaUnit,
     SetAccountQuotaError,
 };
-use internal_error::ErrorIntoInternal;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
