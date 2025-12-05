@@ -11,7 +11,8 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Validate correctness (not empty, valid URL-encoding)
+/// This type is kept for backward data compatibility.
+/// For new code, please use [`CollectionPathV2`](crate::CollectionPathV2)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CollectionPath(String);
 

@@ -22,7 +22,6 @@ deny = [
     ### Crates we shouldn't use ####
     { name = "md5", reason = "Use `md-5` instead, which is part of the RustCrypto ecosystem" },
     { name = "native-tls", reason = "We use rustls throughout the project" },
-
     ### Creates we deny multiple versions of ###
     # This is a temporary approach until we deny by default with some exceptions
     { name = "alloy", deny-multiple-versions = true },
@@ -116,4 +115,7 @@ ignore = [
     # ToDo: Remove once alloy will fix it
     # https://rustsec.org/advisories/RUSTSEC-2025-0058
     "RUSTSEC-2025-0073",
+    # Unmaintained (rustls-pemfile)
+    # https://rustsec.org/advisories/RUSTSEC-2025-0134
+    "RUSTSEC-2025-0134",
 ]

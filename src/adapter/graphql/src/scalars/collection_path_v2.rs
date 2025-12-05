@@ -11,12 +11,16 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// NOTE: This type is kept for backward data compatibility.
-//        For new code, please use `CollectionPathV2`
-
 // Collection entry paths are similar to HTTP path components. They are rooted
 // (start with `/`), separated by forward slashes, with elements URL-encoded
 // (e.g. `/foo%20bar/baz`)
-simple_string_scalar!(CollectionPath, kamu_datasets::CollectionPath);
+simple_string_scalar!(CollectionPathV2, kamu_datasets::CollectionPathV2, try_new);
+
+impl<'a> CollectionPathV2<'a> {
+    pub fn into_v1_scalar(self) -> CollectionPath<'a> {
+        let inner: kamu_datasets::CollectionPathV2 = self.into();
+        CollectionPath::from(inner.into_v1())
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

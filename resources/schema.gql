@@ -717,6 +717,8 @@ type CollectionMut {
 
 scalar CollectionPath
 
+scalar CollectionPathV2
+
 type CollectionProjection {
 	"""
 	Returns an entry at the specified path
@@ -3323,7 +3325,7 @@ type MoleculeDataRoomMutV2 {
 		"""
 		Base64-encoded file content (url-safe, no padding)
 		"""
-		content: Base64Usnp!,		ref: DatasetID,		path: CollectionPath,
+		content: Base64Usnp!,		ref: DatasetID,		path: CollectionPathV2,
 		"""
 		Media type of content (e.g. application/pdf)
 		"""
@@ -3346,15 +3348,15 @@ type MoleculeDataRoomMutV2 {
 	Allows creating a file, upload a new version, and link a file into the
 	data room via a single transaction.
 	"""
-	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPath, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomFinishUploadFileResult!
+	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPathV2, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomFinishUploadFileResult!
 	"""
 	Moves an entry in the data room.
 	"""
-	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
+	moveEntry(fromPath: CollectionPathV2!, toPath: CollectionPathV2!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
 	"""
 	Removes an entry from the data room.
 	"""
-	removeEntry(path: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
+	removeEntry(path: CollectionPathV2!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
 	"""
 	Updates the metadata of a file in the data room.
 	"""
