@@ -22,6 +22,7 @@ Recommendation: for ease of reading, use the following order:
     clearly indicating the access check on the resolved dataset was already performed
 ### Fixed
 - Flow events now processed transactionally
+- GraphQL endpoint errors now properly trigger transaction rollback
 
 ## [0.253.1] - 2025-11-24
 ### Changed
