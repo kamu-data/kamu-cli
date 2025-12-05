@@ -162,6 +162,9 @@ pub async fn dataset_ingest_handler(
             PushIngestDataError::Execution(PushIngestError::ReadError(e)) => {
                 ApiError::bad_request(e)
             }
+            PushIngestDataError::Execution(PushIngestError::QuotaExceeded(e)) => {
+                ApiError::bad_request(e)
+            }
             e => e.int_err().api_err(),
         })?;
 

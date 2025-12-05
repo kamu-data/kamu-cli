@@ -13,6 +13,7 @@ use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_core::*;
+use kamu_datasets::DatasetStatisticsRepository;
 use kamu_datasets_services::*;
 use serde_json::json;
 
@@ -669,6 +670,110 @@ async fn test_versioned_file_extra_data() {
                 "bar": 321,
             },
         })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_versioned_file_quota_exceeded() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Create dataset
+    let did = harness
+        .create_versioned_file(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("quota-file"),
+        ))
+        .await;
+
+    let set_quota_res = harness
+        .execute_authorized_query(async_graphql::Request::new(indoc!(
+            r#"
+            mutation {
+              accounts {
+                me {
+                  quotas {
+                    setAccountLevelQuotas(quotas: { storage: { limitTotalBytes: 3000 } }) {
+                      success
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )))
+        .await;
+    assert!(set_quota_res.is_ok(), "{set_quota_res:#?}");
+
+    // First upload should fit
+    let first_upload = harness
+        .in_band_upload_versioned_file(&did, base64usnp_encode(b"hello").as_str())
+        .await;
+    assert!(first_upload.is_ok(), "{first_upload:#?}");
+    let _head_v1 = first_upload.data.clone().into_json().unwrap()["datasets"]["byId"]
+        ["asVersionedFile"]["uploadNewVersion"]["newHead"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Record stats for first upload so quota checker sees usage
+    {
+        let repo = harness
+            .catalog_authorized
+            .get_one::<dyn DatasetStatisticsRepository>()
+            .unwrap();
+        let dataset_id = odf::DatasetID::from_did_str(did.as_str()).unwrap();
+        let head_ref = odf::BlockRef::Head;
+        repo.set_dataset_statistics(
+            &dataset_id,
+            &head_ref,
+            kamu_datasets::DatasetStatistics {
+                data_size_bytes: 2900,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    // Second upload should exceed quota
+    let second_upload = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                uploadNewVersion(content: $content) {
+                                    ... on UpdateVersionSuccess {
+                                        newVersion
+                                        contentHash
+                                        newHead
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "content": base64usnp_encode(b"world"),
+            }))),
+        )
+        .await;
+
+    assert!(second_upload.is_err(), "{second_upload:#?}");
+    let msg = &second_upload.errors[0].message;
+    assert!(
+        msg.contains("Quota exceeded"),
+        "unexpected error message: {msg}"
     );
 }
 

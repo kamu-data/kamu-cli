@@ -13,6 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::{AccountQuotaChecker, AccountQuotaStorageChecker, AccountService};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -32,6 +33,35 @@ pub struct PushIngestExecutorImpl {
     data_format_registry: Arc<dyn DataFormatRegistry>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
+    account_service: Arc<dyn AccountService>,
+    account_quota_storage_checker: Arc<dyn AccountQuotaStorageChecker>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AccountQuotaChecker for PushIngestExecutorImpl {
+    async fn ensure_quota(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        incoming_bytes: u64,
+    ) -> Result<(), kamu_accounts::QuotaExceededError> {
+        let Some(account_name) = dataset_handle.alias.account_name.as_ref() else {
+            return Ok(());
+        };
+
+        let account = self
+            .account_service
+            .get_account_by_name(account_name)
+            .await
+            .int_err()?;
+
+        self.account_quota_storage_checker
+            .ensure_within_quota(&account.id, incoming_bytes)
+            .await?;
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +74,7 @@ impl PushIngestExecutorImpl {
         source: DataSource,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
+        let dataset_handle = target.get_handle().clone();
         let ctx: SessionContext = ingest_common::new_session_context(
             &self.ingest_config_datafusion,
             self.object_store_registry.clone(),
@@ -58,7 +89,14 @@ impl PushIngestExecutorImpl {
         listener.begin();
 
         match self
-            .do_ingest_inner(plan.args, source, data_writer, ctx, listener.clone())
+            .do_ingest_inner(
+                dataset_handle,
+                plan.args,
+                source,
+                data_writer,
+                ctx,
+                listener.clone(),
+            )
             .await
         {
             Ok(res) => {
@@ -83,6 +121,7 @@ impl PushIngestExecutorImpl {
     )]
     async fn do_ingest_inner(
         &self,
+        dataset_handle: odf::DatasetHandle,
         args: PushIngestArgs,
         source: DataSource,
         mut data_writer: DataWriterDataFusion,
@@ -146,6 +185,9 @@ impl PushIngestExecutorImpl {
 
         match stage_result {
             Ok(staged) => {
+                let estimated_size = Self::estimate_staged_size(&staged)?;
+                self.ensure_quota(&dataset_handle, estimated_size).await?;
+
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
 
                 let res = data_writer.commit(staged).await?;
@@ -228,7 +270,14 @@ impl PushIngestExecutorImpl {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    fn estimate_staged_size(staged: &StageDataResult) -> Result<u64, PushIngestError> {
+        if let Some(data_file) = &staged.data_file {
+            let meta = std::fs::metadata(data_file.as_path()).int_err()?;
+            Ok(meta.len())
+        } else {
+            Ok(0)
+        }
+    }
     async fn read(
         &self,
         input_data_path: &Path,

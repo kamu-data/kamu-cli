@@ -14,8 +14,16 @@ use bytes::Bytes;
 use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{
+    AccountQuotaServiceImpl,
+    AccountServiceImpl,
+    QuotaCheckerStorageImpl,
+};
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::DatasetStatisticsServiceImpl;
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -229,6 +237,13 @@ impl PushIngestDataUseCaseHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add::<QuotaCheckerStorageImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>();

@@ -87,6 +87,9 @@ impl<'a> VersionedFileMut<'a> {
                     actual_head: err.actual.unwrap().into(),
                 }),
             ),
+            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {err}")))
+            }
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -181,6 +184,9 @@ impl<'a> VersionedFileMut<'a> {
                     actual_head: err.actual.unwrap().into(),
                 }),
             ),
+            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {err}")))
+            }
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -221,6 +227,9 @@ impl<'a> VersionedFileMut<'a> {
                     actual_head: err.actual.unwrap().into(),
                 }),
             ),
+            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {err}")))
+            }
             Err(e) => Err(e.int_err().into()),
         }
     }

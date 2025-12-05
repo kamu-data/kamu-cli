@@ -238,6 +238,9 @@ impl MoleculeDataRoomMutV2 {
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {e}")))
+            }
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }?;
 
@@ -410,6 +413,9 @@ impl MoleculeDataRoomMutV2 {
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {e}")))
             }
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }?;
@@ -852,6 +858,9 @@ impl MoleculeDataRoomMutV2 {
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {e}")))
+            }
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }
     }
@@ -902,6 +911,9 @@ impl MoleculeDataRoomMutV2 {
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {e}")))
             }
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }
@@ -1046,6 +1058,9 @@ impl MoleculeDataRoomMutV2 {
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {e}")))
             }
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }

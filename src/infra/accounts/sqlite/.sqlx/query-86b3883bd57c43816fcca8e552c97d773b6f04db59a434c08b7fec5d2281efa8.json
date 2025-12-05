@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO account_quota_events (\n                    account_id,\n                    quota_type,\n                    event_type,\n                    event_payload,\n                    event_time\n                )\n                VALUES (?1, ?2, ?3, ?4, ?5)\n                RETURNING id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "86b3883bd57c43816fcca8e552c97d773b6f04db59a434c08b7fec5d2281efa8"
+}

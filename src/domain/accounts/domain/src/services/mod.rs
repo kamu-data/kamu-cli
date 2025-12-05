@@ -9,6 +9,7 @@
 
 mod access_token_service;
 mod account_service;
+mod account_quota_service;
 mod authentication_config;
 mod authentication_errors;
 mod authentication_provider;
@@ -19,6 +20,7 @@ mod oauth_device_code_service;
 
 pub use access_token_service::*;
 pub use account_service::*;
+pub use account_quota_service::*;
 pub use authentication_config::*;
 pub use authentication_errors::*;
 pub use authentication_provider::*;

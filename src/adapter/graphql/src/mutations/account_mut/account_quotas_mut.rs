@@ -7,14 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::Account;
+use kamu_accounts::{Account, AccountQuotaService, SetAccountQuotaError};
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountQuotasMut<'a> {
-    #[expect(dead_code)]
     account: &'a Account,
 }
 
@@ -26,32 +25,54 @@ impl<'a> AccountQuotasMut<'a> {
         Self { account }
     }
 
-    /// Setting quotas at the user level.
-    #[tracing::instrument(level = "info", name = AccountQuotasMut_set_user_level_quotas, skip_all)]
-    pub async fn set_user_level_quotas(
+    /// Setting quotas at the account level.
+    #[tracing::instrument(level = "info", name = AccountQuotasMut_set_account_level_quotas, skip_all)]
+    pub async fn set_account_level_quotas(
         &self,
-        quotas: SetUserLevelQuotasInput,
-    ) -> Result<SetUserLevelQuotasResult> {
-        let _ = quotas;
-        todo!()
+        ctx: &Context<'_>,
+        quotas: SetAccountQuotasInput,
+    ) -> Result<SetAccountQuotasResult> {
+        let quota_service = from_catalog_n!(ctx, dyn AccountQuotaService);
+        let account_id = self.account.id.clone();
+
+        let limit_total_bytes = quotas
+            .storage
+            .and_then(|s| s.limit_total_bytes)
+            .ok_or_else(|| GqlError::gql("storage.limitTotalBytes is required"))?;
+
+        quota_service
+            .set_account_storage_quota(&account_id, limit_total_bytes)
+            .await
+            .map_err(map_set_quota_error)?;
+
+        Ok(SetAccountQuotasResult { success: true })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug)]
-pub struct SetUserLevelQuotasInput {
-    pub storage: Option<SetUserLevelQuotasStorageInput>,
+pub struct SetAccountQuotasInput {
+    pub storage: Option<SetAccountQuotasStorageInput>,
 }
 
 #[derive(InputObject, Debug)]
-pub struct SetUserLevelQuotasStorageInput {
+pub struct SetAccountQuotasStorageInput {
     pub limit_total_bytes: Option<u64>,
 }
 
 #[derive(SimpleObject, Debug)]
-pub struct SetUserLevelQuotasResult {
-    dummy: bool,
+pub struct SetAccountQuotasResult {
+    success: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_set_quota_error(e: SetAccountQuotaError) -> GqlError {
+    match e {
+        SetAccountQuotaError::Save(inner) => GqlError::gql(format!("Failed to set quota: {inner}")),
+        SetAccountQuotaError::Internal(inner) => inner.into(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -293,6 +293,9 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
 
                     return Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e));
                 }
+                Err(PushIngestDataError::Execution(PushIngestError::QuotaExceeded(e))) => {
+                    return Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e));
+                }
                 Err(err) => {
                     return Err(UpdateCollectionEntriesUseCaseError::Internal(err.int_err()));
                 }

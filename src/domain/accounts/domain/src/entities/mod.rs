@@ -9,6 +9,7 @@
 
 mod access_token;
 mod account;
+mod account_quota;
 mod auth_config;
 mod current_account_subject;
 mod device_token;
@@ -20,6 +21,7 @@ mod predefined_accounts_config;
 
 pub use access_token::*;
 pub use account::*;
+pub use account_quota::*;
 pub use auth_config::*;
 pub use current_account_subject::*;
 pub use device_token::*;

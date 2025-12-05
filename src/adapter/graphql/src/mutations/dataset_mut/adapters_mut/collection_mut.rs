@@ -93,6 +93,9 @@ impl<'a> CollectionMut<'a> {
                 }),
             ),
             Err(UpdateCollectionEntriesUseCaseError::Access(err)) => Err(err.int_err().into()),
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(err)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {err}")))
+            }
             Err(UpdateCollectionEntriesUseCaseError::Internal(err)) => Err(err.into()),
         }
     }

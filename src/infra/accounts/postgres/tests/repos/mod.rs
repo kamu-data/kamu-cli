@@ -9,6 +9,7 @@
 
 mod test_postgres_access_token_repository;
 mod test_postgres_account_repository;
+mod test_postgres_account_quota_event_store;
 mod test_postgres_did_secret_key_repository;
 mod test_postgres_oauth_device_code_repository;
 mod test_postgres_password_hash_repository;

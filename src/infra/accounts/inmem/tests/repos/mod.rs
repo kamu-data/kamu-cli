@@ -9,6 +9,7 @@
 
 mod test_inmem_access_token_repository;
 mod test_inmem_account_repository;
+mod test_inmem_account_quota_event_store;
 mod test_inmem_did_secret_key_repository;
 mod test_inmem_oauth_device_code_repository;
 mod test_inmem_password_hash_repository;

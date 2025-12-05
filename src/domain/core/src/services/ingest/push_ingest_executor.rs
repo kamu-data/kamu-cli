@@ -156,6 +156,13 @@ pub enum PushIngestError {
         odf::metadata::AccessError,
     ),
 
+    #[error("Quota exceeded")]
+    QuotaExceeded(
+        #[from]
+        #[backtrace]
+        kamu_accounts::QuotaExceededError,
+    ),
+
     #[error(transparent)]
     Internal(
         #[from]

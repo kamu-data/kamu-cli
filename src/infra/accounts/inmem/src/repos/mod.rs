@@ -9,10 +9,12 @@
 
 mod inmem_access_token_repository;
 mod inmem_account_repository;
+mod inmem_account_quotas_repository;
 mod inmem_did_secret_key_repository;
 mod inmem_oauth_device_code_repository;
 
 pub use inmem_access_token_repository::*;
 pub use inmem_account_repository::*;
+pub use inmem_account_quotas_repository::*;
 pub use inmem_did_secret_key_repository::*;
 pub use inmem_oauth_device_code_repository::*;

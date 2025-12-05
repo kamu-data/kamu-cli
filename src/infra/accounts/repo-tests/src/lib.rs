@@ -11,6 +11,7 @@
 
 mod access_token_repository_test_utils;
 mod accounts_repository_test_utils;
+mod account_quota_event_store_test_suite;
 
 mod access_token_repository_test_suite;
 mod accounts_repository_test_suite;
@@ -22,6 +23,7 @@ pub use access_token_repository_test_suite::*;
 pub(crate) use access_token_repository_test_utils::*;
 pub use accounts_repository_test_suite::*;
 pub(crate) use accounts_repository_test_utils::*;
+pub use account_quota_event_store_test_suite::*;
 pub use password_hash_repository_test_suite::*;
 pub mod oauth_device_code_repository {
     pub use super::oauth_device_code_repository_test_suite::*;

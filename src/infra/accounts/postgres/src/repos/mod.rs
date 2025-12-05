@@ -9,10 +9,12 @@
 
 mod postgres_access_token_repository;
 mod postgres_account_repository;
+mod postgres_account_quotas_repository;
 mod postgres_did_secret_key_repository;
 mod postgres_oauth_device_code_repository;
 
 pub use postgres_access_token_repository::*;
 pub use postgres_account_repository::*;
+pub use postgres_account_quotas_repository::*;
 pub use postgres_did_secret_key_repository::*;
 pub use postgres_oauth_device_code_repository::*;

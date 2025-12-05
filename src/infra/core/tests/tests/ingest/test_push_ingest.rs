@@ -18,7 +18,15 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{
+    AccountQuotaServiceImpl,
+    AccountServiceImpl,
+    QuotaCheckerStorageImpl,
+};
 use kamu_datasets::*;
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::DatasetStatisticsServiceImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
@@ -1084,6 +1092,13 @@ impl IngestTestHarness {
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add::<QuotaCheckerStorageImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
