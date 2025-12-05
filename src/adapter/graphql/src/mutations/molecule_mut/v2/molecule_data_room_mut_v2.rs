@@ -23,6 +23,7 @@ use kamu_datasets::{
     UpdateVersionedFileUseCase,
     WriteCheckedDataset,
 };
+use kamu_datasets_services::utils::DatasetNameGenerator;
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
     MoleculeAppendGlobalDataRoomActivityUseCase,
@@ -464,16 +465,7 @@ impl MoleculeDataRoomMutV2 {
                 )
             });
         let project_account_name = project_account.account_name_internal().clone();
-
-        let new_file_name = {
-            use std::borrow::Borrow;
-
-            // NOTE: We assume that `file_path` has already validated via `CollectionPath`
-            //       scalar.
-            let file_path_as_str: &String = file_path.borrow();
-            let filename_encoded = file_path_as_str.rsplit('/').next().unwrap();
-            odf::DatasetName::new_unchecked(filename_encoded)
-        };
+        let new_file_name = DatasetNameGenerator::based_on_collection_path(file_path.as_ref());
 
         odf::DatasetAlias::new(Some(project_account_name), new_file_name)
     }
