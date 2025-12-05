@@ -7,21 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::CollectionPath;
+use kamu_datasets::CollectionPathV2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetNameGenerator;
 
 impl DatasetNameGenerator {
-    pub fn based_on_collection_path(path: &CollectionPath) -> odf::DatasetName {
+    pub fn based_on_collection_path(path: &CollectionPathV2) -> odf::DatasetName {
         let uuid = uuid::Uuid::new_v4();
         Self::based_on_collection_path_with_uuid(path, uuid)
     }
 
     // Public for testing purposes
     pub fn based_on_collection_path_with_uuid(
-        path: &CollectionPath,
+        path: &CollectionPathV2,
         uuid: uuid::Uuid,
     ) -> odf::DatasetName {
         // Dataset name PEG grammar: [a-zA-Z0-9]+ ("-" [a-zA-Z0-9]+)*

@@ -7,18 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
+use crate::CollectionPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Pre-encoded characters
 const DELIM: &str = "%2F";
-const SPACE: &str = "%20";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CollectionPathV2(String); // Stored decoded
+/// Collection path that was verified at creation time.
+#[derive(Clone, Debug, derive_more::Deref, derive_more::Display, Eq, PartialEq)]
+pub struct CollectionPathV2(String); // Stored trimmed decoded value
 
 impl CollectionPathV2 {
     pub fn try_new(path: impl Into<String>) -> Result<Self, CollectionPathValidationError> {
@@ -49,8 +48,8 @@ impl CollectionPathV2 {
         Ok(Self(trimmed_decoded.to_owned()))
     }
 
-    pub fn original_encoded_value(&self) -> Cow<'_, str> {
-        urlencoding::encode(&self.0)
+    pub fn into_v1(self) -> CollectionPath {
+        CollectionPath::new(self.0)
     }
 }
 
@@ -63,14 +62,6 @@ pub enum CollectionPathValidationError {
     InvalidUrlEncoding { path: String },
 }
 
-impl std::ops::Deref for CollectionPathV2 {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::assert_matches::assert_matches;
@@ -79,6 +70,8 @@ mod tests {
 
     #[test]
     fn test_collection_path_v2() {
+        const SPACE: &str = "%20";
+
         // --- Invalid paths ---
         assert_matches!(
             CollectionPathV2::try_new(""),

@@ -36,6 +36,10 @@ messaging-outbox = { workspace = true }
 odf = { workspace = true, features = ["datafusion"] }
 
 async-trait = { version = "0.1", default-features = false }
+derive_more = { version = "2", default-features = false, features = [
+    "display",
+    "deref"
+] }
 bytes = { version = "1", default-features = false }
 cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",

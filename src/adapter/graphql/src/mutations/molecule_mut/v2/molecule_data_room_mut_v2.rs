@@ -84,7 +84,7 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         content_args: ContentArgs,
-        path: CollectionPath<'static>,
+        path: kamu_datasets::CollectionPathV2,
         access_level: MoleculeAccessLevel,
         change_by: String,
         description: Option<String>,
@@ -205,7 +205,7 @@ impl MoleculeDataRoomMutV2 {
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
-                path.clone().into(),
+                path.clone().into_v1(),
                 versioned_file_dataset.get_id().clone(),
                 versioned_file_entry.to_denormalized().into(),
             )
@@ -226,7 +226,7 @@ impl MoleculeDataRoomMutV2 {
                 event_time,
                 activity_type: MoleculeDataRoomFileActivityType::Added,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
-                path: path.into(),
+                path: path.into_v1(),
                 r#ref: versioned_file_dataset.get_id().clone(),
                 version: update_version_result.new_version,
                 change_by,
@@ -451,7 +451,7 @@ impl MoleculeDataRoomMutV2 {
     async fn build_new_file_dataset_alias(
         &self,
         ctx: &Context<'_>,
-        file_path: &CollectionPath<'static>,
+        file_path: &kamu_datasets::CollectionPathV2,
     ) -> odf::DatasetAlias {
         // TODO: PERF: Add AccountRequestState similar to DatasetRequestState and reuse
         //             possibly resolved account?
@@ -464,7 +464,7 @@ impl MoleculeDataRoomMutV2 {
                 )
             });
         let project_account_name = project_account.account_name_internal().clone();
-        let new_file_name = DatasetNameGenerator::based_on_collection_path(file_path.as_ref());
+        let new_file_name = DatasetNameGenerator::based_on_collection_path(&file_path);
 
         odf::DatasetAlias::new(Some(project_account_name), new_file_name)
     }
@@ -552,7 +552,7 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         #[graphql(desc = "Base64-encoded file content (url-safe, no padding)")] content: Base64Usnp,
         #[graphql(name = "ref")] reference: Option<DatasetID<'static>>,
-        path: Option<CollectionPath<'static>>,
+        path: Option<CollectionPathV2<'static>>,
         #[graphql(desc = "Media type of content (e.g. application/pdf)")] content_type: Option<
             String,
         >,
@@ -577,7 +577,7 @@ impl MoleculeDataRoomMutV2 {
                 self.finish_upload_file_new_file(
                     ctx,
                     content_args,
-                    path,
+                    path.into(),
                     access_level,
                     change_by,
                     description,
@@ -662,7 +662,7 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         upload_token: String,
         #[graphql(name = "ref")] reference: Option<DatasetID<'static>>,
-        path: Option<CollectionPath<'static>>,
+        path: Option<CollectionPathV2<'static>>,
         access_level: MoleculeAccessLevel,
         change_by: String,
         description: Option<String>,
@@ -684,7 +684,7 @@ impl MoleculeDataRoomMutV2 {
                 self.finish_upload_file_new_file(
                     ctx,
                     content_args,
-                    path,
+                    path.into(),
                     access_level,
                     change_by,
                     description,
@@ -719,8 +719,8 @@ impl MoleculeDataRoomMutV2 {
     async fn move_entry(
         &self,
         ctx: &Context<'_>,
-        from_path: CollectionPath<'static>,
-        to_path: CollectionPath<'static>,
+        from_path: CollectionPathV2<'static>,
+        to_path: CollectionPathV2<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
@@ -738,8 +738,8 @@ impl MoleculeDataRoomMutV2 {
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
-                from_path.clone().into(),
-                to_path.into(),
+                from_path.into_v1_scalar().into(),
+                to_path.into_v1_scalar().into(),
                 expected_head.map(Into::into),
             )
             .await
@@ -779,7 +779,7 @@ impl MoleculeDataRoomMutV2 {
     async fn remove_entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath<'static>,
+        path: CollectionPathV2<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
@@ -791,6 +791,7 @@ impl MoleculeDataRoomMutV2 {
         );
 
         let event_time = time_sourcem.now();
+        let path = path.into_v1_scalar();
 
         match remove_data_room_entry_uc
             .execute(

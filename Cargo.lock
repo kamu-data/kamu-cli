@@ -7836,6 +7836,7 @@ dependencies = [
  "chrono",
  "crypto-utils",
  "database-common",
+ "derive_more",
  "file-utils",
  "futures",
  "internal-error",
