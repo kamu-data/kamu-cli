@@ -52,10 +52,10 @@ use crate::mutations::{
 };
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
-    EncryptionMetadata,
     MoleculeAccessLevel,
     MoleculeCategory,
     MoleculeDataRoomEntry,
+    MoleculeEncryptionMetadataInput,
     MoleculeProjectV2,
     MoleculeTag,
     MoleculeVersionedFileEntry,
@@ -90,7 +90,7 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -158,7 +158,7 @@ impl MoleculeDataRoomMutV2 {
 
         let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
             content_text,
-            encryption_metadata,
+            encryption_metadata: encryption_metadata.map(Into::into),
         };
 
         let versioned_file_extra_data = MoleculeVersionedFileExtraData {
@@ -269,7 +269,7 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -321,7 +321,7 @@ impl MoleculeDataRoomMutV2 {
 
         let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
             content_text,
-            encryption_metadata,
+            encryption_metadata: encryption_metadata.map(Into::into),
         };
 
         let versioned_file_extra_data = MoleculeVersionedFileExtraData {
@@ -571,7 +571,7 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let content_args = get_content_args(
             ctx,
@@ -678,7 +678,7 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         // IMPORTANT: If after file creation or version update an error occurs,
         //            all DB will be cleared (transaction rollback). Dataset data
@@ -856,7 +856,7 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<String>>,
         tags: Option<Vec<String>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -939,12 +939,8 @@ impl MoleculeDataRoomMutV2 {
             // Safety: we just initialized the value
             let detailed_info = file_entry.detailed_info.get_mut().unwrap();
 
-            if let Some(content_text) = content_text {
-                detailed_info.content_text = Some(content_text);
-            }
-            if let Some(encryption_metadata) = encryption_metadata {
-                detailed_info.encryption_metadata = Some(encryption_metadata);
-            }
+            detailed_info.content_text = content_text;
+            detailed_info.encryption_metadata = encryption_metadata.map(Into::into);
         }
 
         // TODO: we need to do a retraction if any errors...

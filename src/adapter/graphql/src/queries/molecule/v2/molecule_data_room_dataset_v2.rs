@@ -23,10 +23,10 @@ use kamu_molecule_domain::{
 use crate::data_loader::AccessCheckedDatasetRef;
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
-    EncryptionMetadata,
     MoleculeAccessLevel,
     MoleculeCategory,
     MoleculeChangeBy,
+    MoleculeEncryptionMetadata,
     MoleculeProjectV2,
     MoleculeTag,
 };
@@ -472,11 +472,19 @@ impl MoleculeVersionedFileEntry {
     }
 
     async fn content_text(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
-        Ok(&self.detailed_info(ctx).await?.content_text)
+        let detailed_info = self.detailed_info(ctx).await?;
+        Ok(&detailed_info.content_text)
     }
 
-    async fn encryption_metadata(&self, ctx: &Context<'_>) -> Result<&Option<EncryptionMetadata>> {
-        Ok(&self.detailed_info(ctx).await?.encryption_metadata)
+    async fn encryption_metadata(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<MoleculeEncryptionMetadata>> {
+        let detailed_info = self.detailed_info(ctx).await?;
+        Ok(detailed_info
+            .encryption_metadata
+            .as_ref()
+            .map(|metadata_record| metadata_record.as_entity().into()))
     }
 
     /// Returns encoded content in-band. Should be used for small files only and
@@ -493,7 +501,7 @@ impl MoleculeVersionedFileEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeVersionedFileEntryBasicInfo {
     #[serde(rename = "molecule_access_level")]
     pub access_level: MoleculeAccessLevel,
@@ -504,13 +512,13 @@ pub struct MoleculeVersionedFileEntryBasicInfo {
     pub tags: Vec<MoleculeTag>,
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeVersionedFileEntryDetailedInfo {
     pub content_text: Option<String>,
-    pub encryption_metadata: Option<EncryptionMetadata>,
+    pub encryption_metadata: Option<kamu_molecule_domain::MoleculeEncryptionMetadataRecord>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct MoleculeVersionedFileExtraData<'a> {
     #[serde(flatten)]
     pub basic_info: &'a MoleculeVersionedFileEntryBasicInfo,

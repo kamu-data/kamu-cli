@@ -11,8 +11,10 @@ mod molecule_announcement;
 mod molecule_data_room_activity;
 mod molecule_data_room_entry;
 mod molecule_project;
+mod molecule_versioned_file;
 
 pub use molecule_announcement::*;
 pub use molecule_data_room_activity::*;
 pub use molecule_data_room_entry::*;
 pub use molecule_project::*;
+pub use molecule_versioned_file::*;
