@@ -15,8 +15,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_utils::BackgroundAgent;
-use axum::Extension;
-use axum::middleware;
+use axum::{Extension, middleware};
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
