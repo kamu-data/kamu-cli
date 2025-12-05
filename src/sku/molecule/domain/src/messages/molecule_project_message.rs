@@ -17,7 +17,7 @@ const MOLECULE_PROJECT_MESSAGE_OUTBOX_VERSION: u32 = 1;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents messages related to the lifecycle of a Molecule project
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum MoleculeProjectMessage {
     /// Message indicating that a project has been created.
     Created(MoleculeProjectMessageCreated),
@@ -122,37 +122,37 @@ impl Message for MoleculeProjectMessage {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Contains details about a newly created Molecule project.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageCreated {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    ipnft_symbol: String,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub ipnft_symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Contains details about a disabled Molecule project.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageDisabled {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    ipnft_symbol: String,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub ipnft_symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Contains details about a re-enabled Molecule project.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageReenabled {
-    event_time: DateTime<Utc>,
-    molecule_account_id: odf::AccountID,
-    project_account_id: odf::AccountID,
-    ipnft_uid: String,
-    ipnft_symbol: String,
+    pub event_time: DateTime<Utc>,
+    pub molecule_account_id: odf::AccountID,
+    pub project_account_id: odf::AccountID,
+    pub ipnft_uid: String,
+    pub ipnft_symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

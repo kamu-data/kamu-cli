@@ -8,29 +8,33 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{EntityPageListing, PaginationOpts};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeDataRoomActivityEntity, MoleculeGetDatasetError};
+use crate::{MoleculeGetDatasetError, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeViewGlobalDataRoomActivitiesUseCase: Send + Sync {
+pub trait MoleculeViewProjectsUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: &kamu_accounts::LoggedAccount,
+        molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError>;
+    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeDataRoomActivityEntity>;
+pub type MoleculeProjectListing = EntityPageListing<MoleculeProject>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeViewDataRoomActivitiesError {
+pub enum MoleculeViewProjectsError {
+    #[error(transparent)]
+    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
+
     #[error(transparent)]
     Access(
         #[from]
@@ -42,12 +46,14 @@ pub enum MoleculeViewDataRoomActivitiesError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetDatasetError> for MoleculeViewDataRoomActivitiesError {
+impl From<MoleculeGetDatasetError> for MoleculeViewProjectsError {
     fn from(e: MoleculeGetDatasetError) -> Self {
-        use MoleculeGetDatasetError as E;
         match e {
-            E::Access(e) => e.into(),
-            E::NotFound(_) | E::Internal(_) => e.int_err().into(),
+            MoleculeGetDatasetError::NotFound(err) => {
+                MoleculeViewProjectsError::NoProjectsDataset(err)
+            }
+            MoleculeGetDatasetError::Access(err) => MoleculeViewProjectsError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeViewProjectsError::Internal(err),
         }
     }
 }

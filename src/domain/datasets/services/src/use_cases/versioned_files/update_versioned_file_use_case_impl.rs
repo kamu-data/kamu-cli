@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{
@@ -104,6 +105,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
     async fn execute(
         &self,
         file_dataset: WriteCheckedDataset<'_>,
+        source_event_time: Option<DateTime<Utc>>,
         content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
@@ -116,7 +118,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
 
             let result = VersionedFileEntry::new(
                 now,
-                now,
+                source_event_time.unwrap_or(now),
                 new_version,
                 args.content_hash.clone(),
                 args.content_length,
@@ -164,7 +166,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                 kamu_core::DataSource::Buffer(entity.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
-                    source_event_time: None,
+                    source_event_time,
                     is_ingest_from_upload: false,
                     media_type: Some(MediaType::NDJSON.to_owned()),
                     expected_head,
@@ -189,11 +191,13 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                 old_head,
                 new_head,
                 num_blocks: _,
+                system_time,
             } => Ok(UpdateVersionFileResult {
                 new_version: version,
                 old_head,
                 new_head,
                 content_hash,
+                system_time,
             }),
             kamu_core::PushIngestResult::UpToDate => unreachable!(),
         }

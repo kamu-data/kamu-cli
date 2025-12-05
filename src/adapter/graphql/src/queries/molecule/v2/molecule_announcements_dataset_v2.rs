@@ -7,6 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+use kamu_core::auth;
+use kamu_molecule_domain::MoleculeGlobalAnnouncementRecordExt;
+use odf::utils::data::DataFrameExt;
+
 use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
@@ -19,92 +26,208 @@ use crate::queries::molecule::v2::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeAnnouncements;
+pub struct MoleculeAnnouncements {
+    pub dataset: Dataset,
+    pub project: Arc<MoleculeProjectV2>,
+}
+
+impl MoleculeAnnouncements {
+    async fn get_data_frame(&self, ctx: &Context<'_>) -> Result<Option<DataFrameExt>> {
+        let molecule_dataset_service =
+            from_catalog_n!(ctx, dyn kamu_molecule_domain::MoleculeDatasetService);
+
+        let (_, maybe_df) = molecule_dataset_service
+            .get_project_announcements_data_frame(
+                &self.project.entity.announcements_dataset_id,
+                auth::DatasetAction::Read,
+            )
+            .await
+            .int_err()?;
+
+        Ok(maybe_df)
+    }
+}
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncements {
-    #[expect(clippy::unused_async)]
+    const DEFAULT_ENTRIES_PER_PAGE: usize = 100;
+
     /// Access the underlying core Dataset
-    async fn dataset(&self, _ctx: &Context<'_>) -> Result<Dataset> {
-        todo!()
+    async fn dataset(&self) -> &Dataset {
+        &self.dataset
     }
 
-    #[expect(clippy::unused_async)]
+    #[tracing::instrument(level = "info", name = MoleculeAnnouncements_tail, skip_all, fields(?page, ?per_page))]
     async fn tail(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
         filters: Option<MoleculeAnnouncementsFilters>,
     ) -> Result<MoleculeAnnouncementEntryConnection> {
-        let _ = page;
-        let _ = per_page;
-        let _ = filters;
-        Ok(MoleculeAnnouncementEntryConnection::new(vec![], 0, 0, 0))
+        // TODO: extract a use-case
+        //       (same at MoleculeProjectV2::get_announcement_activity_events())
+
+        assert!(filters.is_none());
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
+
+        let maybe_df = self.get_data_frame(ctx).await?;
+
+        let Some(df) = maybe_df else {
+            return Ok(MoleculeAnnouncementEntryConnection::new(
+                vec![],
+                page,
+                per_page,
+                0,
+            ));
+        };
+
+        use datafusion::logical_expr::col;
+
+        // Sort the df by offset descending
+        // TODO: add col const from snapshot?
+        let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
+        // Apply pagination
+        let df = df.limit(page * per_page, Some(per_page)).int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+        let total_count = records.len();
+        let nodes = records
+            .into_iter()
+            .map(|record| MoleculeAnnouncementEntry::from_json(&self.project, record))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(MoleculeAnnouncementEntryConnection::new(
+            nodes,
+            page,
+            per_page,
+            total_count,
+        ))
     }
 
-    #[expect(clippy::unused_async)]
+    #[tracing::instrument(level = "info", name = MoleculeAnnouncements_tail, skip_all, fields(id))]
     async fn by_id(
         &self,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
         id: MoleculeAnnouncementId,
-    ) -> Result<MoleculeAnnouncementEntry> {
-        let _ = id;
-        todo!()
+    ) -> Result<Option<MoleculeAnnouncementEntry>> {
+        // TODO: extract a use-case
+
+        let maybe_df = self.get_data_frame(ctx).await?;
+
+        let Some(df) = maybe_df else {
+            return Ok(None);
+        };
+
+        use datafusion::logical_expr::{col, lit};
+
+        // TODO: add col const from snapshot?
+        let df = df.filter(col("announcement_id").eq(lit(id))).int_err()?;
+        let records = df.collect_json_aos().await.int_err()?;
+        let entry = records
+            .into_iter()
+            .next()
+            .map(|record| MoleculeAnnouncementEntry::from_json(&self.project, record))
+            .transpose()?;
+
+        Ok(entry)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeAnnouncementEntry;
+pub struct MoleculeAnnouncementEntry {
+    pub entity: kamu_molecule_domain::MoleculeProjectAnnouncementRecord,
+    pub project: Arc<MoleculeProjectV2>,
+}
+
+impl MoleculeAnnouncementEntry {
+    pub fn from_json(
+        project: &Arc<MoleculeProjectV2>,
+        record: serde_json::Value,
+    ) -> Result<Self, InternalError> {
+        let record: kamu_molecule_domain::MoleculeProjectAnnouncementRecord =
+            serde_json::from_value(record).int_err()?;
+
+        Ok(Self::new_from_project_announcement_record(project, record))
+    }
+
+    pub fn new_from_global_announcement_record(
+        project: &Arc<MoleculeProjectV2>,
+        entity: kamu_molecule_domain::MoleculeGlobalAnnouncementRecord,
+    ) -> Self {
+        Self {
+            entity: entity.into_project_announcement_record(),
+            project: project.clone(),
+        }
+    }
+
+    pub fn new_from_project_announcement_record(
+        project: &Arc<MoleculeProjectV2>,
+        entity: kamu_molecule_domain::MoleculeProjectAnnouncementRecord,
+    ) -> Self {
+        Self {
+            entity,
+            project: project.clone(),
+        }
+    }
+}
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncementEntry {
-    #[expect(clippy::unused_async)]
-    async fn project(&self, _ctx: &Context<'_>) -> Result<MoleculeProjectV2> {
-        todo!()
+    async fn project(&self) -> &MoleculeProjectV2 {
+        self.project.as_ref()
     }
 
-    #[expect(clippy::unused_async)]
-    async fn id(&self, _ctx: &Context<'_>) -> Result<MoleculeAnnouncementId> {
-        todo!()
+    async fn system_time(&self) -> DateTime<Utc> {
+        self.entity.system_columns.system_time
     }
 
-    #[expect(clippy::unused_async)]
-    async fn headline(&self, _ctx: &Context<'_>) -> Result<String> {
-        todo!()
+    async fn event_time(&self) -> DateTime<Utc> {
+        self.entity.system_columns.event_time
     }
 
-    #[expect(clippy::unused_async)]
-    async fn body(&self, _ctx: &Context<'_>) -> Result<String> {
-        todo!()
+    async fn id(&self) -> MoleculeAnnouncementId {
+        let id = self.entity.record.announcement_id.as_ref().unwrap();
+        id.to_string()
     }
 
-    #[expect(clippy::unused_async)]
-    async fn attachments(&self, _ctx: &Context<'_>) -> Result<Vec<String>> {
-        todo!()
+    async fn headline(&self) -> &String {
+        &self.entity.record.headline
     }
 
-    #[expect(clippy::unused_async)]
-    async fn access_level(&self, _ctx: &Context<'_>) -> Result<MoleculeAccessLevel> {
-        todo!()
+    async fn body(&self) -> &String {
+        &self.entity.record.body
     }
 
-    #[expect(clippy::unused_async)]
-    async fn change_by(&self, _ctx: &Context<'_>) -> Result<AccountID<'static>> {
-        todo!()
+    async fn attachments<'a>(&'a self) -> Vec<DatasetID<'a>> {
+        self.entity
+            .record
+            .attachments
+            .iter()
+            .map(Into::into)
+            .collect()
     }
 
-    #[expect(clippy::unused_async)]
-    async fn categories(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeCategory>> {
-        todo!()
+    async fn access_level(&self) -> &MoleculeAccessLevel {
+        &self.entity.record.access_level
     }
 
-    #[expect(clippy::unused_async)]
-    async fn tags(&self, _ctx: &Context<'_>) -> Result<Vec<MoleculeTag>> {
-        todo!()
+    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    async fn change_by(&self) -> &String {
+        &self.entity.record.change_by
+    }
+
+    async fn categories(&self) -> &Vec<MoleculeCategory> {
+        &self.entity.record.categories
+    }
+
+    async fn tags(&self) -> &Vec<MoleculeTag> {
+        &self.entity.record.tags
     }
 }
 

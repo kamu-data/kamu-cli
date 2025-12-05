@@ -20,20 +20,27 @@ pub trait FindCollectionEntriesUseCase: Send + Sync {
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         path: CollectionPath,
-    ) -> Result<Option<CollectionEntry>, FindCollectionEntryUseCaseError>;
+    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError>;
+
+    async fn execute_find_by_ref(
+        &self,
+        collection_dataset: ReadCheckedDataset<'_>,
+        as_of: Option<odf::Multihash>,
+        r#ref: &[&odf::DatasetID],
+    ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError>;
 
     async fn execute_find_multi_by_refs(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
-    ) -> Result<Vec<CollectionEntry>, FindCollectionEntryUseCaseError>;
+    ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum FindCollectionEntryUseCaseError {
+pub enum FindCollectionEntriesError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

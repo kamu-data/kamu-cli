@@ -12,15 +12,15 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
-use kamu_core::auth;
+use kamu_core::auth::DatasetAction;
 
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeViewGlobalDataRoomActivitiesUseCase)]
-pub struct MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
+#[dill::interface(dyn MoleculeViewProjectsUseCase)]
+pub struct MoleculeViewProjectsUseCaseImpl {
     molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
 }
 
@@ -28,35 +28,35 @@ pub struct MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeViewGlobalDataRoomActivitiesUseCase
-    for MoleculeViewGlobalDataRoomActivitiesUseCaseImpl
-{
-    #[tracing::instrument(level = "debug", name = MoleculeViewGlobalDataRoomActivitiesUseCaseImpl_execute, skip_all, fields(?pagination))]
+impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = MoleculeViewProjectsUseCaseImpl_execute, skip_all, fields(?pagination))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
+    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
+        // Access projects dataset snapshot
         let Some(df) = self
             .molecule_dataset_service
-            .get_global_data_room_activity_data_frame(
-                &molecule_subject.account_name,
-                auth::DatasetAction::Read,
+            .get_projects_changelog_projection_data_frame(
+                molecule_subject,
+                DatasetAction::Read,
                 false,
             )
             .await?
             .1
         else {
-            return Ok(MoleculeDataRoomActivityListing::default());
+            return Ok(MoleculeProjectListing::default());
         };
 
-        // Get the total count before pagination
+        // Get total count before pagination
         let total_count = df.clone().count().await.int_err()?;
 
-        // Sort the df by offset descending
+        // Sort DF by ipnft_symbol
         use datafusion::logical_expr::col;
-
-        let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
+        let df = df
+            .sort(vec![col("ipnft_symbol").sort(true, false)])
+            .int_err()?;
 
         // Apply pagination
         let df = if let Some(pagination) = pagination {
@@ -66,15 +66,21 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCase
             df
         };
 
+        // Convert to JSON AoS
         let records = df.collect_json_aos().await.int_err()?;
 
-        let list = records
+        // Map to entities
+        let projects = records
             .into_iter()
-            .map(MoleculeDataRoomActivityEntity::from_json)
+            .map(MoleculeProject::from_json)
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;
 
-        Ok(MoleculeDataRoomActivityListing { list, total_count })
+        // Return listing
+        Ok(MoleculeProjectListing {
+            list: projects,
+            total_count,
+        })
     }
 }
 

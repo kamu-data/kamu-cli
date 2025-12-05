@@ -7,50 +7,43 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
+use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
+use crate::{MoleculeProject, MoleculeUpdateDataRoomEntryResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeFindProjectUseCase: Send + Sync {
+pub trait MoleculeMoveDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
-        ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectEntity>, MoleculeFindProjectError>;
+        molecule_project: &MoleculeProject,
+        source_event_time: Option<DateTime<Utc>>,
+        path_from: CollectionPath,
+        path_to: CollectionPath,
+        expected_head: Option<odf::Multihash>,
+    ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeMoveDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeFindProjectError {
+pub enum MoleculeMoveDataRoomEntryError {
     #[error(transparent)]
-    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
+    RefCASFailed(#[from] odf::dataset::RefCASError),
 
     #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
+    Access(#[from] odf::AccessError),
+
+    #[error(transparent)]
+    QuotaExceeded(#[from] kamu_accounts::QuotaExceededError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<MoleculeGetDatasetError> for MoleculeFindProjectError {
-    fn from(e: MoleculeGetDatasetError) -> Self {
-        match e {
-            MoleculeGetDatasetError::NotFound(err) => {
-                MoleculeFindProjectError::NoProjectsDataset(err)
-            }
-            MoleculeGetDatasetError::Access(err) => MoleculeFindProjectError::Access(err),
-            MoleculeGetDatasetError::Internal(err) => MoleculeFindProjectError::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -190,12 +190,15 @@ impl PushIngestExecutorImpl {
 
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
 
+                let system_time = staged.system_time;
+
                 let res = data_writer.commit(staged).await?;
 
                 Ok(PushIngestResult::Updated {
                     old_head: res.old_head,
                     new_head: res.new_head,
                     num_blocks: 1,
+                    system_time,
                 })
             }
             Err(StageDataError::BadInputSchema(e)) => Err(e.into()),

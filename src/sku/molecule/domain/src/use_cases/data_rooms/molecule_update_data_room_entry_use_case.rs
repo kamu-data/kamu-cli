@@ -7,31 +7,40 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
+use kamu_datasets::CollectionPath;
 
-use crate::MoleculeDataRoomActivityEntity;
+use crate::{MoleculeDataRoomEntry, MoleculeDenormalizeFileToDataRoom, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeAppendGlobalDataRoomActivityUseCase: Send + Sync {
+pub trait MoleculeUpdateDataRoomEntryUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: &kamu_accounts::LoggedAccount,
-        activity: MoleculeDataRoomActivityEntity,
-    ) -> Result<(), MoleculeAppendDataRoomActivityError>;
+        molecule_subject: &LoggedAccount,
+        molecule_project: &MoleculeProject,
+        source_event_time: Option<DateTime<Utc>>,
+        path: CollectionPath,
+        reference: odf::DatasetID,
+        denormalized_file_info: MoleculeDenormalizeFileToDataRoom,
+    ) -> Result<MoleculeDataRoomEntry, MoleculeUpdateDataRoomEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeAppendDataRoomActivityError {
+pub enum MoleculeUpdateDataRoomEntryError {
     #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
+    RefCASFailed(#[from] odf::dataset::RefCASError),
+
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
+
+    #[error(transparent)]
+    QuotaExceeded(#[from] kamu_accounts::QuotaExceededError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

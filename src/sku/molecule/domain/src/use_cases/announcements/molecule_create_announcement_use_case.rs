@@ -7,33 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
-use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
+use crate::{MoleculeGlobalAnnouncementDataRecord, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeViewProjectsUseCase: Send + Sync {
+pub trait MoleculeCreateAnnouncementUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: &LoggedAccount,
-        pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError>;
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        molecule_project: &MoleculeProject,
+        global_announcement: MoleculeGlobalAnnouncementDataRecord,
+    ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeProjectListing = EntityPageListing<MoleculeProjectEntity>;
+pub struct MoleculeCreateAnnouncementResult {
+    pub new_announcement_id: uuid::Uuid,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
-pub enum MoleculeViewProjectsError {
+#[derive(Debug, thiserror::Error)]
+pub enum MoleculeCreateAnnouncementError {
     #[error(transparent)]
-    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
+    NotFoundAttachments(#[from] MoleculeCreateAnnouncementNotFoundAttachmentsError),
 
     #[error(transparent)]
     Access(
@@ -46,16 +47,13 @@ pub enum MoleculeViewProjectsError {
     Internal(#[from] InternalError),
 }
 
-impl From<MoleculeGetDatasetError> for MoleculeViewProjectsError {
-    fn from(e: MoleculeGetDatasetError) -> Self {
-        match e {
-            MoleculeGetDatasetError::NotFound(err) => {
-                MoleculeViewProjectsError::NoProjectsDataset(err)
-            }
-            MoleculeGetDatasetError::Access(err) => MoleculeViewProjectsError::Access(err),
-            MoleculeGetDatasetError::Internal(err) => MoleculeViewProjectsError::Internal(err),
-        }
-    }
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "Not found attachment(s): {}",
+    format_utils::format_collection(not_found_dataset_ids)
+)]
+pub struct MoleculeCreateAnnouncementNotFoundAttachmentsError {
+    pub not_found_dataset_ids: Vec<odf::DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

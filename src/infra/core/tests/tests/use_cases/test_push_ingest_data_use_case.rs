@@ -193,6 +193,7 @@ async fn test_push_ingest_data_execute_multi() {
             old_head,
             new_head,
             num_blocks,
+            system_time: _,
         } => {
             assert_eq!(old_head, initial_head);
             assert_ne!(new_head, old_head);

@@ -9,34 +9,37 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
-use datafusion::logical_expr::{col, lit};
+use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
-    CollectionUpdateOperation,
     ContentArgs,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCaseOptions,
     DatasetRegistry,
     DatasetRegistryExt,
-    ExtraDataFields,
     ResolvedDataset,
-    UpdateCollectionEntriesResult,
-    UpdateCollectionEntriesUseCase,
-    UpdateCollectionEntriesUseCaseError,
     UpdateVersionedFileUseCase,
     WriteCheckedDataset,
 };
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
     MoleculeAppendGlobalDataRoomActivityUseCase,
+    MoleculeCreateDataRoomEntryError,
+    MoleculeCreateDataRoomEntryUseCase,
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
     MoleculeDatasetSnapshots,
+    MoleculeMoveDataRoomEntryError,
+    MoleculeMoveDataRoomEntryUseCase,
+    MoleculeRemoveDataRoomEntryError,
+    MoleculeRemoveDataRoomEntryUseCase,
+    MoleculeUpdateDataRoomEntryError,
+    MoleculeUpdateDataRoomEntryResult,
+    MoleculeUpdateDataRoomEntryUseCase,
 };
-use odf::utils::data::DataFrameExt;
+use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
 use crate::mutations::{
@@ -49,36 +52,30 @@ use crate::mutations::{
 };
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
-    EncryptionMetadata,
     MoleculeAccessLevel,
     MoleculeCategory,
     MoleculeDataRoomEntry,
+    MoleculeEncryptionMetadataInput,
     MoleculeProjectV2,
     MoleculeTag,
     MoleculeVersionedFileEntry,
     MoleculeVersionedFileEntryBasicInfo,
     MoleculeVersionedFileEntryDetailedInfo,
+    MoleculeVersionedFileExtraData,
     MoleculeVersionedFilePrefetch,
 };
-use crate::queries::{Account, CollectionEntry, DatasetRequestState, VersionedFileEntry};
+use crate::queries::{Account, VersionedFileEntry};
 use crate::utils::{ContentSource, get_content_args};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeDataRoomMutV2 {
     project: Arc<MoleculeProjectV2>,
-    data_room_writable_state: DatasetRequestState,
 }
 
 impl MoleculeDataRoomMutV2 {
-    pub fn new(
-        project: Arc<MoleculeProjectV2>,
-        data_room_writable_state: DatasetRequestState,
-    ) -> Self {
-        Self {
-            project,
-            data_room_writable_state,
-        }
+    pub fn new(project: Arc<MoleculeProjectV2>) -> Self {
+        Self { project }
     }
 
     // TODO: Specialize error handling
@@ -93,34 +90,35 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        // TODO: Align timestamps with ingest
-        let now = chrono::Utc::now();
-
         let (
-            create_dataset_from_snapshot,
-            update_versioned_file,
-            update_collection_entries,
             rebac_service,
-            append_global_data_room_activity,
+            time_source,
+            create_dataset_from_snapshot_uc,
+            update_versioned_file_uc,
+            create_data_room_entry_uc,
+            append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
+            dyn kamu_auth_rebac::RebacService,
+            dyn SystemTimeSource,
             dyn CreateDatasetFromSnapshotUseCase,
             dyn UpdateVersionedFileUseCase,
-            dyn UpdateCollectionEntriesUseCase,
-            dyn kamu_auth_rebac::RebacService,
+            dyn MoleculeCreateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
+
+        let event_time = time_source.now();
 
         // 1. Create an empty versioned dataset.
         let alias = self.build_new_file_dataset_alias(ctx, &path).await;
         let versioned_file_snapshot = MoleculeDatasetSnapshots::versioned_file_v2(alias);
 
         let (versioned_file_dataset, versioned_file_head) = {
-            let create_versioned_file_res = create_dataset_from_snapshot
+            let create_versioned_file_res = create_dataset_from_snapshot_uc
                 .execute(
                     versioned_file_snapshot,
                     CreateDatasetUseCaseOptions::default(),
@@ -150,105 +148,84 @@ impl MoleculeDataRoomMutV2 {
         let content_length = content_args.content_length;
         let content_hash = versioned_file_head.clone();
 
-        let mut versioned_file_entry = MoleculeVersionedFileEntry {
-            entry: VersionedFileEntry {
-                file_dataset: versioned_file_dataset.clone(),
-                entity: kamu_datasets::VersionedFileEntry {
-                    system_time: now,
-                    event_time: now,
-                    version: 0,
-                    content_type: content_args
-                        .content_type
-                        .as_ref()
-                        .map(|ct| ct.0.clone())
-                        .unwrap_or_default(),
-                    content_length: content_args.content_length,
-                    content_hash: content_hash.clone(),
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
-            },
-            basic_info: MoleculeVersionedFileEntryBasicInfo {
-                access_level: access_level.clone(),
-                change_by: change_by.clone(),
-                description: description.clone(),
-                categories: categories.clone().unwrap_or_default(),
-                tags: tags.clone().unwrap_or_default(),
-            },
-            detailed_info: tokio::sync::OnceCell::new_with(Some(
-                MoleculeVersionedFileEntryDetailedInfo {
-                    content_text,
-                    encryption_metadata,
-                },
-            )),
+        let versioned_file_basic_info = MoleculeVersionedFileEntryBasicInfo {
+            access_level: access_level.clone(),
+            change_by: change_by.clone(),
+            description: description.clone(),
+            categories: categories.clone().unwrap_or_default(),
+            tags: tags.clone().unwrap_or_default(),
         };
 
-        let update_version_result = update_versioned_file
+        let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
+            content_text,
+            encryption_metadata: encryption_metadata.map(Into::into),
+        };
+
+        let versioned_file_extra_data = MoleculeVersionedFileExtraData {
+            basic_info: &versioned_file_basic_info,
+            detailed_info: &versioned_file_detailed_info,
+        };
+
+        let update_version_result = update_versioned_file_uc
             .execute(
                 WriteCheckedDataset(&versioned_file_dataset),
+                Some(event_time),
                 Some(content_args),
                 None,
-                Some(versioned_file_entry.to_versioned_file_extra_data()),
+                Some(versioned_file_extra_data.to_extra_data_fields()),
             )
             .await
             .int_err()?;
 
-        versioned_file_entry.entry.entity.version = update_version_result.new_version;
-        versioned_file_entry.entry.entity.content_hash = update_version_result.content_hash;
-
-        // 3. Add the file to the data room.
-
-        // TODO: extract to domain layer
-        let data_room_entry = MoleculeDataRoomEntry {
-            entry: CollectionEntry {
-                entity: kamu_datasets::CollectionEntry {
-                    system_time: now,
-                    event_time: now,
-                    path: path.clone().into(),
-                    reference: versioned_file_dataset.get_id().clone(),
+        let versioned_file_entry = MoleculeVersionedFileEntry {
+            entry: VersionedFileEntry {
+                file_dataset: versioned_file_dataset.clone(),
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: update_version_result.system_time,
+                    event_time,
+                    version: update_version_result.new_version,
+                    content_type: content_type
+                        .as_ref()
+                        .map(|ct| ct.0.clone())
+                        .unwrap_or_default(),
+                    content_length,
+                    content_hash: update_version_result.content_hash,
                     extra_data: kamu_datasets::ExtraDataFields::default(),
                 },
             },
-            project: self.project.clone(),
-            denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
+            basic_info: versioned_file_basic_info,
+            detailed_info: tokio::sync::OnceCell::new_with(Some(versioned_file_detailed_info)),
         };
 
-        let data_room_writable_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
+        // 3. Add the file to the data room.
 
-        match update_collection_entries
+        let data_room_entry = create_data_room_entry_uc
             .execute(
-                WriteCheckedDataset(data_room_writable_dataset),
-                vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.entity.path.clone(),
-                    data_room_entry.entry.entity.reference.clone(),
-                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
-                )],
-                None,
+                &molecule_subject,
+                &self.project.entity,
+                Some(event_time),
+                path.clone().into(),
+                versioned_file_dataset.get_id().clone(),
+                versioned_file_entry.to_denormalized().into(),
             )
             .await
-        {
-            Ok(UpdateCollectionEntriesResult::Success(_)) => Ok(()),
-            Ok(
-                UpdateCollectionEntriesResult::UpToDate
-                | UpdateCollectionEntriesResult::NotFound(_),
-            ) => {
-                unreachable!()
-            }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
-                Err(GqlError::gql("Data room linking: CAS failed"))
-            }
-            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
-                Err(GqlError::gql(format!("Quota exceeded: {e}")))
-            }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
-        }?;
+            .map_err(|e| match e {
+                MoleculeCreateDataRoomEntryError::Access(e) => e.into(),
+                MoleculeCreateDataRoomEntryError::RefCASFailed(_) => {
+                    GqlError::gql("Data room linking: CAS failed")
+                }
+                MoleculeCreateDataRoomEntryError::QuotaExceeded(e) => {
+                    GqlError::gql(format!("Quota exceeded: {e}"))
+                }
+                e @ MoleculeCreateDataRoomEntryError::Internal(_) => e.int_err().into(),
+            })?;
 
         // 4. Log the activity.
+        // TODO: asynchronous write of activity log
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
-                system_time: now,
-                event_time: now,
+                system_time: event_time, // TODO: take from ingest result
+                event_time,
                 activity_type: MoleculeDataRoomFileActivityType::Added,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: path.into(),
@@ -264,8 +241,8 @@ impl MoleculeDataRoomMutV2 {
                 tags: tags.unwrap_or_default(),
             };
 
-            append_global_data_room_activity
-                .execute(&molecule_subject, data_room_activity)
+            append_global_data_room_activity_uc
+                .execute(&molecule_subject, Some(event_time), data_room_activity)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
@@ -278,7 +255,7 @@ impl MoleculeDataRoomMutV2 {
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
-            entry: data_room_entry,
+            entry: MoleculeDataRoomEntry::new_from_data_room_entry(&self.project, data_room_entry),
         }
         .into())
     }
@@ -295,28 +272,31 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        // TODO: Align timestamps with ingest
-        let now = chrono::Utc::now();
-
         let (
-            update_versioned_file,
             dataset_registry,
-            update_collection_entries,
-            append_global_data_room_activity,
+            time_source,
+            update_versioned_file_uc,
+            update_data_room_entry_uc,
+            append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
-            dyn UpdateVersionedFileUseCase,
             dyn DatasetRegistry,
-            dyn UpdateCollectionEntriesUseCase,
+            dyn SystemTimeSource,
+            dyn UpdateVersionedFileUseCase,
+            dyn MoleculeUpdateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
+        let event_time = time_source.now();
+
         // 1. Get the existing versioned dataset entry -- we need to know `path`;
-        let Some(collection_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
+        let Some(existing_data_room_entry) = self
+            .get_latest_data_room_entry(ctx, reference.as_ref())
+            .await?
         else {
             todo!();
         };
@@ -334,100 +314,87 @@ impl MoleculeDataRoomMutV2 {
         let content_type = content_args.content_type.clone();
         let content_length = content_args.content_length;
 
-        let mut versioned_file_entry = MoleculeVersionedFileEntry {
-            entry: VersionedFileEntry {
-                file_dataset: file_dataset.clone(),
-                entity: kamu_datasets::VersionedFileEntry {
-                    system_time: now,
-                    event_time: now,
-                    version: 0,
-                    content_type: content_args
-                        .content_type
-                        .as_ref()
-                        .map(|ct| ct.0.clone())
-                        .unwrap_or_default(),
-                    content_length: content_args.content_length,
-                    content_hash: odf::Multihash::from_digest_sha3_256(b""),
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
-            },
-            basic_info: MoleculeVersionedFileEntryBasicInfo {
-                access_level: access_level.clone(),
-                change_by: change_by.clone(),
-                description: description.clone(),
-                categories: categories.clone().unwrap_or_default(),
-                tags: tags.clone().unwrap_or_default(),
-            },
-            detailed_info: tokio::sync::OnceCell::new_with(Some(
-                MoleculeVersionedFileEntryDetailedInfo {
-                    content_text,
-                    encryption_metadata,
-                },
-            )),
+        let versioned_file_basic_info = MoleculeVersionedFileEntryBasicInfo {
+            access_level: access_level.clone(),
+            change_by: change_by.clone(),
+            description: description.clone(),
+            categories: categories.clone().unwrap_or_default(),
+            tags: tags.clone().unwrap_or_default(),
         };
 
-        let update_version_result = update_versioned_file
+        let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
+            content_text,
+            encryption_metadata: encryption_metadata.map(Into::into),
+        };
+
+        let versioned_file_extra_data = MoleculeVersionedFileExtraData {
+            basic_info: &versioned_file_basic_info,
+            detailed_info: &versioned_file_detailed_info,
+        };
+
+        let update_version_result = update_versioned_file_uc
             .execute(
                 WriteCheckedDataset(&file_dataset),
+                Some(event_time),
                 Some(content_args),
                 None,
-                Some(versioned_file_entry.to_versioned_file_extra_data()),
+                Some(versioned_file_extra_data.to_extra_data_fields()),
             )
             .await
             .int_err()?;
 
-        versioned_file_entry.entry.entity.version = update_version_result.new_version;
-        versioned_file_entry.entry.entity.content_hash = update_version_result.content_hash.clone();
+        let versioned_file_entry = MoleculeVersionedFileEntry {
+            entry: VersionedFileEntry {
+                file_dataset: file_dataset.clone(),
+                entity: kamu_datasets::VersionedFileEntry {
+                    system_time: update_version_result.system_time,
+                    event_time,
+                    version: update_version_result.new_version,
+                    content_type: content_type
+                        .as_ref()
+                        .map(|ct| ct.0.clone())
+                        .unwrap_or_default(),
+                    content_length,
+                    content_hash: update_version_result.content_hash.clone(),
+                    extra_data: kamu_datasets::ExtraDataFields::default(),
+                },
+            },
+            basic_info: versioned_file_basic_info,
+            detailed_info: tokio::sync::OnceCell::new_with(Some(versioned_file_detailed_info)),
+        };
 
         // 3. Update the file state in the data room.
 
-        let path = collection_entry.entity.path.clone();
-        let data_room_entry = MoleculeDataRoomEntry {
-            entry: collection_entry,
-            project: self.project.clone(),
-            denormalized_latest_file_info: versioned_file_entry.to_denormalized(),
-        };
-
-        let writable_data_room_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        match update_collection_entries
+        let updated_data_room_entry = update_data_room_entry_uc
             .execute(
-                WriteCheckedDataset(writable_data_room_dataset),
-                vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.entity.path.clone(),
-                    data_room_entry.entry.entity.reference.clone(),
-                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
-                )],
-                None,
+                &molecule_subject,
+                &self.project.entity,
+                Some(event_time),
+                existing_data_room_entry.path.clone(),
+                existing_data_room_entry.reference.clone(),
+                versioned_file_entry.to_denormalized().into(),
             )
             .await
-        {
-            Ok(UpdateCollectionEntriesResult::Success(_)) => Ok(()),
-            Ok(
-                UpdateCollectionEntriesResult::UpToDate
-                | UpdateCollectionEntriesResult::NotFound(_),
-            ) => {
-                unreachable!()
-            }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
-                Err(GqlError::gql("Data room linking: CAS failed"))
-            }
-            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
-                Err(GqlError::gql(format!("Quota exceeded: {e}")))
-            }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
-        }?;
+            .map_err(|e| match e {
+                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
+                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
+                    GqlError::gql("Data room linking: CAS failed")
+                }
+                MoleculeUpdateDataRoomEntryError::QuotaExceeded(e) => {
+                    GqlError::gql(format!("Quota exceeded: {e}"))
+                }
+                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
+            })?;
 
         // 4. Log the activity.
+        // TODO: asynchronous write of activity log
         {
             let data_room_activity = MoleculeDataRoomActivityEntity {
-                system_time: now,
-                event_time: now,
+                system_time: event_time, // TODO: take from ingest result
+                event_time,
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
-                path,
+                path: updated_data_room_entry.path.clone(),
                 r#ref: file_dataset_id,
                 version: update_version_result.new_version,
                 change_by,
@@ -440,8 +407,8 @@ impl MoleculeDataRoomMutV2 {
                 tags: tags.unwrap_or_default(),
             };
 
-            append_global_data_room_activity
-                .execute(&molecule_subject, data_room_activity)
+            append_global_data_room_activity_uc
+                .execute(&molecule_subject, Some(event_time), data_room_activity)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
@@ -454,72 +421,36 @@ impl MoleculeDataRoomMutV2 {
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
-            entry: data_room_entry,
+            entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                &self.project,
+                updated_data_room_entry,
+            ),
         }
         .into())
     }
 
-    async fn get_data_room_projection(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<(ResolvedDataset, Option<DataFrameExt>)> {
-        let query_service = from_catalog_n!(ctx, dyn domain::QueryService);
-
-        let resolved_dataset = self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        let res = query_service
-            .get_changelog_projection(
-                resolved_dataset.clone(),
-                domain::GetChangelogProjectionOptions {
-                    block_hash: None,
-                    // TODO: Maybe we don't need hints here. Added for performance reasons.
-                    hints: domain::ChangelogProjectionHints {
-                        // TODO: Extract "path" to constant
-                        primary_key: Some(vec!["path".to_string()]),
-                        dataset_vocabulary: Some(odf::metadata::DatasetVocabulary::default()),
-                    },
-                },
-            )
-            .await
-            .map_err(|e| -> GqlError {
-                use domain::QueryError as E;
-                match e {
-                    E::Access(e) => e.into(),
-                    _ => e.int_err().into(),
-                }
-            })?;
-
-        Ok((res.source, res.df))
-    }
-
-    // TODO: return typed collection entry
-    async fn get_data_room_entry(
+    async fn get_latest_data_room_entry(
         &self,
         ctx: &Context<'_>,
         reference: &odf::DatasetID,
-    ) -> Result<Option<CollectionEntry>> {
-        let (_, maybe_projection_df) = self.get_data_room_projection(ctx).await?;
+    ) -> Result<Option<kamu_molecule_domain::MoleculeDataRoomEntry>> {
+        let find_data_room_entry_uc = from_catalog_n!(
+            ctx,
+            dyn kamu_molecule_domain::MoleculeFindDataRoomEntryUseCase
+        );
 
-        let Some(df) = maybe_projection_df else {
-            return Ok(None);
-        };
+        let maybe_data_room_entry = find_data_room_entry_uc
+            .execute_find_by_ref(&self.project.entity, None /* latest */, reference)
+            .await
+            .map_err(|e| -> GqlError {
+                use kamu_molecule_domain::MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    e @ E::Internal(_) => e.int_err().into(),
+                }
+            })?;
 
-        let df = df
-            .filter(col("ref").eq(lit(reference.to_string())))
-            .int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-        if records.is_empty() {
-            return Ok(None);
-        }
-
-        assert_eq!(records.len(), 1);
-
-        let entity =
-            kamu_datasets::CollectionEntry::from_json(records.into_iter().next().unwrap())?;
-        let entry = CollectionEntry::new(entity);
-
-        Ok(Some(entry))
+        Ok(maybe_data_room_entry)
     }
 
     // TODO: Test with different paths
@@ -556,15 +487,13 @@ impl MoleculeDataRoomMutV2 {
     async fn append_global_data_room_activity(
         &self,
         ctx: &Context<'_>,
+        event_time: DateTime<Utc>,
         inserted_records: Vec<(
             odf::metadata::OperationType,
             kamu_datasets::CollectionEntryRecord,
         )>,
         activity_type: MoleculeDataRoomFileActivityType,
     ) -> Result<()> {
-        // TODO: Align timestamps with ingest
-        let now = Utc::now();
-
         match activity_type {
             // Update happens in two records
             MoleculeDataRoomFileActivityType::Updated if inserted_records.len() == 2 => {}
@@ -574,47 +503,41 @@ impl MoleculeDataRoomMutV2 {
 
         let molecule_subject = molecule_subject(ctx)?;
 
-        let append_global_data_room_activity =
+        let append_global_data_room_activity_uc =
             from_catalog_n!(ctx, dyn MoleculeAppendGlobalDataRoomActivityUseCase);
 
         let (_op, collection_entry_record) = inserted_records.into_iter().next_back().unwrap();
 
-        // TODO: Revisit after Molecule data room domain/adapter breakdown -->
-        let data_room_entry = MoleculeDataRoomEntry::new_from_collection_entry(
-            &self.project,
-            CollectionEntry {
-                entity: kamu_datasets::CollectionEntry {
-                    system_time: now,
-                    event_time: now,
-                    path: collection_entry_record.path,
-                    reference: collection_entry_record.reference,
-                    extra_data: collection_entry_record.extra_data,
-                },
-            },
-        )?;
+        let denormalized_latest_file_info =
+            kamu_molecule_domain::MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(
+                collection_entry_record.extra_data,
+            )
+            .int_err()?;
+
         let data_room_activity = MoleculeDataRoomActivityEntity {
-            system_time: now,
-            event_time: now,
+            system_time: event_time, // TODO: take from ingest result
+            event_time,
             activity_type,
             ipnft_uid: self.project.entity.ipnft_uid.clone(),
-            path: data_room_entry.entry.entity.path,
-            r#ref: data_room_entry.entry.entity.reference,
-            version: data_room_entry.denormalized_latest_file_info.version,
-            change_by: data_room_entry.denormalized_latest_file_info.change_by,
-            access_level: data_room_entry.denormalized_latest_file_info.access_level,
+            path: collection_entry_record.path,
+            r#ref: collection_entry_record.reference,
+            version: denormalized_latest_file_info.version,
+            change_by: denormalized_latest_file_info.change_by,
+            access_level: denormalized_latest_file_info.access_level,
             content_type: {
-                let s = data_room_entry.denormalized_latest_file_info.content_type;
+                let s = denormalized_latest_file_info.content_type;
                 if !s.is_empty() { Some(s.into()) } else { None }
             },
-            content_length: data_room_entry.denormalized_latest_file_info.content_length,
-            content_hash: data_room_entry.denormalized_latest_file_info.content_hash,
-            description: data_room_entry.denormalized_latest_file_info.description,
-            categories: data_room_entry.denormalized_latest_file_info.categories,
-            tags: data_room_entry.denormalized_latest_file_info.tags,
+            content_length: denormalized_latest_file_info.content_length,
+            content_hash: denormalized_latest_file_info.content_hash,
+            description: denormalized_latest_file_info.description,
+            categories: denormalized_latest_file_info.categories,
+            tags: denormalized_latest_file_info.tags,
         };
 
-        append_global_data_room_activity
-            .execute(&molecule_subject, data_room_activity)
+        // TODO: asynchronous write of activity log
+        append_global_data_room_activity_uc
+            .execute(&molecule_subject, Some(event_time), data_room_activity)
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeAppendDataRoomActivityError as E;
@@ -654,7 +577,7 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         let content_args = get_content_args(
             ctx,
@@ -761,7 +684,7 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<MoleculeCategory>>,
         tags: Option<Vec<MoleculeTag>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomFinishUploadFileResult> {
         // IMPORTANT: If after file creation or version update an error occurs,
         //            all DB will be cleared (transaction rollback). Dataset data
@@ -815,28 +738,32 @@ impl MoleculeDataRoomMutV2 {
         to_path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
-        // TODO: save update global activity entry
+        let molecule_subject = molecule_subject(ctx)?;
 
-        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let (time_source, move_data_room_entry_uc) = from_catalog_n!(
+            ctx,
+            dyn SystemTimeSource,
+            dyn MoleculeMoveDataRoomEntryUseCase
+        );
 
-        let data_room_writable_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
+        let event_time = time_source.now();
 
-        match update_collection_entries
+        match move_data_room_entry_uc
             .execute(
-                WriteCheckedDataset(data_room_writable_dataset),
-                vec![CollectionUpdateOperation::r#move(
-                    from_path.clone().into(),
-                    to_path.into(),
-                    None,
-                )],
+                &molecule_subject,
+                &self.project.entity,
+                Some(event_time),
+                from_path.clone().into(),
+                to_path.into(),
                 expected_head.map(Into::into),
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
+                // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
+                    event_time,
                     r.inserted_records,
                     MoleculeDataRoomFileActivityType::Updated,
                 )
@@ -848,20 +775,20 @@ impl MoleculeDataRoomMutV2 {
                 }
                 .into())
             }
-            Ok(UpdateCollectionEntriesResult::UpToDate) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
-            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound { path: from_path }.into())
+            Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(path)) => {
+                Ok(MoleculeDataRoomUpdateEntryNotFound { path: path.into() }.into())
             }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+            Err(MoleculeMoveDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeMoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
+            Err(MoleculeMoveDataRoomEntryError::QuotaExceeded(e)) => {
                 Err(GqlError::gql(format!("Quota exceeded: {e}")))
             }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ MoleculeMoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
@@ -873,22 +800,31 @@ impl MoleculeDataRoomMutV2 {
         path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
-        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let molecule_subject = molecule_subject(ctx)?;
 
-        let data_room_writable_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
+        let (time_sourcem, remove_data_room_entry_uc) = from_catalog_n!(
+            ctx,
+            dyn SystemTimeSource,
+            dyn MoleculeRemoveDataRoomEntryUseCase
+        );
 
-        match update_collection_entries
+        let event_time = time_sourcem.now();
+
+        match remove_data_room_entry_uc
             .execute(
-                WriteCheckedDataset(data_room_writable_dataset),
-                vec![CollectionUpdateOperation::remove(path.clone().into())],
+                &molecule_subject,
+                &self.project.entity,
+                Some(event_time),
+                path.clone().into(),
                 expected_head.map(Into::into),
             )
             .await
         {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => {
+            Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
+                // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
+                    event_time,
                     r.inserted_records,
                     MoleculeDataRoomFileActivityType::Removed,
                 )
@@ -900,22 +836,22 @@ impl MoleculeDataRoomMutV2 {
                 }
                 .into())
             }
-            Ok(UpdateCollectionEntriesResult::UpToDate) => {
-                // No action was performed - there was nothing to act upon
+            Ok(MoleculeUpdateDataRoomEntryResult::UpToDate) => {
                 Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
             }
-            Ok(UpdateCollectionEntriesResult::NotFound(_)) => {
-                // This error for moving operation
-                unreachable!()
+            Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(_)) => {
+                unreachable!(
+                    "Removals are idempotent, so UpToDate is returned instead of EntryNotFound"
+                )
             }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
+            Err(MoleculeRemoveDataRoomEntryError::Access(e)) => Err(e.into()),
+            Err(MoleculeRemoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
-            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
+            Err(MoleculeRemoveDataRoomEntryError::QuotaExceeded(e)) => {
                 Err(GqlError::gql(format!("Quota exceeded: {e}")))
             }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ MoleculeRemoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
@@ -932,14 +868,26 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<String>>,
         tags: Option<Vec<String>>,
         content_text: Option<String>,
-        encryption_metadata: Option<EncryptionMetadata>,
+        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
-        let (update_versioned_file, dataset_registry, update_collection_entries) = from_catalog_n!(
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let (
+            dataset_registry,
+            time_source,
+            update_versioned_file_uc,
+            update_data_room_entry_uc,
+            append_global_data_room_activity_uc,
+        ) = from_catalog_n!(
             ctx,
-            dyn UpdateVersionedFileUseCase,
             dyn DatasetRegistry,
-            dyn UpdateCollectionEntriesUseCase
+            dyn SystemTimeSource,
+            dyn UpdateVersionedFileUseCase,
+            dyn MoleculeUpdateDataRoomEntryUseCase,
+            dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
+
+        let event_time = time_source.now();
 
         // NOTE: Access rights will be checked inside the use case.
         let file_dataset = {
@@ -959,7 +907,9 @@ impl MoleculeDataRoomMutV2 {
             }
         };
 
-        let Some(collection_entry) = self.get_data_room_entry(ctx, reference.as_ref()).await?
+        let Some(existing_data_room_entry) = self
+            .get_latest_data_room_entry(ctx, reference.as_ref())
+            .await?
         else {
             // TODO: Should we differentiate between 'file not found'
             //       and 'file not linked to data room'?
@@ -970,24 +920,27 @@ impl MoleculeDataRoomMutV2 {
 
         // 1. Update the versioned dataset.
 
-        let mut data_room_entry =
-            MoleculeDataRoomEntry::new_from_collection_entry(&self.project, collection_entry)?;
+        let mut new_denormalized_file_info = existing_data_room_entry
+            .denormalized_latest_file_info
+            .clone();
 
-        data_room_entry.denormalized_latest_file_info.access_level = access_level;
-
-        data_room_entry.denormalized_latest_file_info.change_by = change_by;
-
+        new_denormalized_file_info.access_level = access_level;
+        new_denormalized_file_info.change_by = change_by;
         if let Some(description) = description {
-            data_room_entry.denormalized_latest_file_info.description = Some(description);
+            new_denormalized_file_info.description = Some(description);
         }
         if let Some(categories) = categories {
-            data_room_entry.denormalized_latest_file_info.categories = categories;
+            new_denormalized_file_info.categories = categories;
         }
         if let Some(tags) = tags {
-            data_room_entry.denormalized_latest_file_info.tags = tags;
+            new_denormalized_file_info.tags = tags;
         }
 
-        let prefetch = MoleculeVersionedFilePrefetch::new_from_data_room_entry(&data_room_entry);
+        let prefetch = MoleculeVersionedFilePrefetch {
+            system_time: existing_data_room_entry.system_time,
+            event_time: existing_data_room_entry.event_time,
+            denorm: new_denormalized_file_info.clone().into(),
+        };
         let mut file_entry =
             MoleculeVersionedFileEntry::new_from_prefetched(file_dataset.clone(), prefetch);
 
@@ -998,18 +951,15 @@ impl MoleculeDataRoomMutV2 {
             // Safety: we just initialized the value
             let detailed_info = file_entry.detailed_info.get_mut().unwrap();
 
-            if let Some(content_text) = content_text {
-                detailed_info.content_text = Some(content_text);
-            }
-            if let Some(encryption_metadata) = encryption_metadata {
-                detailed_info.encryption_metadata = Some(encryption_metadata);
-            }
+            detailed_info.content_text = content_text;
+            detailed_info.encryption_metadata = encryption_metadata.map(Into::into);
         }
 
         // TODO: we need to do a retraction if any errors...
-        let new_version = update_versioned_file
+        let new_version = update_versioned_file_uc
             .execute(
                 WriteCheckedDataset(&file_dataset),
+                Some(event_time),
                 None,
                 None,
                 Some(file_entry.to_versioned_file_extra_data()),
@@ -1018,52 +968,72 @@ impl MoleculeDataRoomMutV2 {
             .int_err()?
             .new_version;
 
+        new_denormalized_file_info.version = new_version;
+
         // 2. Update the file state in the data room.
 
-        data_room_entry.denormalized_latest_file_info.version = new_version;
-        let data_room_writable_dataset =
-            self.data_room_writable_state.resolved_dataset(ctx).await?;
-
-        match update_collection_entries
+        let updated_data_room_entry = update_data_room_entry_uc
             .execute(
-                WriteCheckedDataset(data_room_writable_dataset),
-                vec![CollectionUpdateOperation::add(
-                    data_room_entry.entry.entity.path.clone(),
-                    reference.into(),
-                    ExtraDataFields::new(data_room_entry.to_collection_extra_data().into()),
-                )],
-                None,
+                &molecule_subject,
+                &self.project.entity,
+                Some(event_time),
+                existing_data_room_entry.path.clone(),
+                reference.into(),
+                new_denormalized_file_info.clone(),
             )
             .await
-        {
-            Ok(UpdateCollectionEntriesResult::Success(r)) => {
-                self.append_global_data_room_activity(
-                    ctx,
-                    r.inserted_records,
-                    MoleculeDataRoomFileActivityType::Updated,
-                )
-                .await?;
-
-                Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {
-                    entry: data_room_entry,
+            .map_err(|e| match e {
+                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
+                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
+                    GqlError::gql("Data room linking: CAS failed")
                 }
-                .into())
-            }
-            Ok(
-                UpdateCollectionEntriesResult::UpToDate
-                | UpdateCollectionEntriesResult::NotFound(_),
-            ) => {
-                unreachable!()
-            }
-            Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(_)) => {
-                Err(GqlError::gql("Data room linking: CAS failed"))
-            }
-            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => {
-                Err(GqlError::gql(format!("Quota exceeded: {e}")))
-            }
-            Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
+                MoleculeUpdateDataRoomEntryError::QuotaExceeded(e) => {
+                    GqlError::gql(format!("Quota exceeded: {e}"))
+                }
+                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
+            })?;
+
+        // 3. Log the activity.
+        // TODO: asynchronous write of activity log
+        {
+            let data_room_activity = MoleculeDataRoomActivityEntity {
+                system_time: event_time, // TODO: take from ingest result
+                event_time,
+                activity_type: MoleculeDataRoomFileActivityType::Updated,
+                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                path: updated_data_room_entry.path.clone(),
+                r#ref: updated_data_room_entry.reference.clone(),
+                version: new_version,
+                change_by: new_denormalized_file_info.change_by,
+                access_level: new_denormalized_file_info.access_level,
+                content_type: Some(MediaType::from(new_denormalized_file_info.content_type)),
+                content_length: new_denormalized_file_info.content_length,
+                content_hash: new_denormalized_file_info.content_hash,
+                description: new_denormalized_file_info.description,
+                categories: new_denormalized_file_info.categories,
+                tags: new_denormalized_file_info.tags,
+            };
+
+            append_global_data_room_activity_uc
+                .execute(&molecule_subject, Some(event_time), data_room_activity)
+                .await
+                .map_err(|e| -> GqlError {
+                    use MoleculeAppendDataRoomActivityError as E;
+
+                    match e {
+                        E::Access(e) => e.into(),
+                        e @ E::Internal(_) => e.int_err().into(),
+                    }
+                })?;
         }
+
+        Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {
+            entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                &self.project,
+                updated_data_room_entry,
+            ),
+        }
+        .into())
     }
 }
 

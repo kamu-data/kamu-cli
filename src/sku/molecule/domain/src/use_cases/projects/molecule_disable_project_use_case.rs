@@ -10,28 +10,28 @@
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetDatasetError, MoleculeProjectEntity};
+use crate::{MoleculeGetDatasetError, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeCreateProjectUseCase: Send + Sync {
+pub trait MoleculeDisableProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
-        ipnft_symbol: String,
         ipnft_uid: String,
-        ipnft_address: String,
-        ipnft_token_id: num_bigint::BigInt,
-    ) -> Result<MoleculeProjectEntity, MoleculeCreateProjectError>;
+    ) -> Result<MoleculeProject, MoleculeDisableProjectError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeCreateProjectError {
-    #[error("Project with the same IPNFT UID or symbol already exists")]
-    Conflict { project: MoleculeProjectEntity },
+pub enum MoleculeDisableProjectError {
+    #[error(transparent)]
+    ProjectNotFound(#[from] ProjectNotFoundError),
+
+    #[error(transparent)]
+    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
 
     #[error(transparent)]
     Access(
@@ -41,19 +41,29 @@ pub enum MoleculeCreateProjectError {
     ),
 
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
-impl From<MoleculeGetDatasetError> for MoleculeCreateProjectError {
+impl From<MoleculeGetDatasetError> for MoleculeDisableProjectError {
     fn from(e: MoleculeGetDatasetError) -> Self {
         match e {
             MoleculeGetDatasetError::NotFound(err) => {
-                unreachable!("Projects dataset should be created if not exist: {}", err)
+                MoleculeDisableProjectError::NoProjectsDataset(err)
             }
-            MoleculeGetDatasetError::Access(err) => MoleculeCreateProjectError::Access(err),
-            MoleculeGetDatasetError::Internal(err) => MoleculeCreateProjectError::Internal(err),
+            MoleculeGetDatasetError::Access(err) => MoleculeDisableProjectError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeDisableProjectError::Internal(err),
         }
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Project with IPNFT UID {ipnft_uid} was not found")]
+pub struct ProjectNotFoundError {
+    pub ipnft_uid: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

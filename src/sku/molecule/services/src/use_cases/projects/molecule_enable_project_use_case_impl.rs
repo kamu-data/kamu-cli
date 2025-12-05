@@ -37,13 +37,13 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         level = "info",
         name = MoleculeEnableProjectUseCaseImpl_execute,
         skip_all,
-        fields(?ipnft_uid)
+        fields(ipnft_uid)
     )]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
-    ) -> Result<MoleculeProjectEntity, MoleculeEnableProjectError> {
+    ) -> Result<MoleculeProject, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
 
         let (projects_dataset, df_opt) = self
@@ -90,7 +90,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
-        let mut project = MoleculeProjectEntity::from_json(record).int_err()?;
+        let mut project = MoleculeProject::from_json(record).int_err()?;
         project.ipnft_symbol.make_ascii_lowercase();
 
         if !matches!(op, OperationType::Retract) {

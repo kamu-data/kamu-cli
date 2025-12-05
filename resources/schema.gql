@@ -3182,12 +3182,14 @@ type MoleculeActivityFileUpdatedV2 {
 
 type MoleculeAnnouncementEntry {
 	project: MoleculeProjectV2!
+	systemTime: DateTime!
+	eventTime: DateTime!
 	id: String!
 	headline: String!
 	body: String!
-	attachments: [String!]!
+	attachments: [DatasetID!]!
 	accessLevel: String!
-	changeBy: AccountID!
+	changeBy: String!
 	categories: [String!]!
 	tags: [String!]!
 }
@@ -3218,7 +3220,7 @@ type MoleculeAnnouncements {
 	"""
 	dataset: Dataset!
 	tail(page: Int, perPage: Int, filters: MoleculeAnnouncementsFilters): MoleculeAnnouncementEntryConnection!
-	byId(id: String!): MoleculeAnnouncementEntry!
+	byId(id: String!): MoleculeAnnouncementEntry
 }
 
 type MoleculeAnnouncementsDatasetMutV2 {
@@ -3229,7 +3231,7 @@ type MoleculeAnnouncementsDatasetMutV2 {
 		"""
 		List of dataset DIDs to link
 		"""
-		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!,		categories: [String!]!,		tags: [String!]!
+		attachments: [DatasetID!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!,		categories: [String!]!,		tags: [String!]!
 	): CreateAnnouncementResult!
 }
 
@@ -3321,7 +3323,7 @@ type MoleculeDataRoomMutV2 {
 		"""
 		Media type of content (e.g. application/pdf)
 		"""
-		contentType: String,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String,		encryptionMetadata: String
+		contentType: String,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String,		encryptionMetadata: MoleculeEncryptionMetadataInput
 	): MoleculeDataRoomFinishUploadFileResult!
 	"""
 	Starts the process of uploading a file to the data room.
@@ -3340,7 +3342,7 @@ type MoleculeDataRoomMutV2 {
 	Allows creating a file, upload a new version, and link a file into the
 	data room via a single transaction.
 	"""
-	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPath, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: String): MoleculeDataRoomFinishUploadFileResult!
+	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPath, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomFinishUploadFileResult!
 	"""
 	Moves an entry in the data room.
 	"""
@@ -3352,7 +3354,7 @@ type MoleculeDataRoomMutV2 {
 	"""
 	Updates the metadata of a file in the data room.
 	"""
-	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: String): MoleculeDataRoomUpdateFileMetadataResult!
+	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomUpdateFileMetadataResult!
 }
 
 type MoleculeDataRoomProjection {
@@ -3398,6 +3400,30 @@ type MoleculeDataRoomUpdateSuccess implements MoleculeDataRoomMoveEntryResult & 
 type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
 	isSuccess: Boolean!
 	message: String!
+}
+
+type MoleculeEncryptionMetadata {
+	dataToEncryptHash: String!
+	accessControlConditions: String!
+	encryptedBy: String!
+	encryptedAt: String!
+	chain: String!
+	litSdkVersion: String!
+	litNetwork: String!
+	templateName: String!
+	contractVersion: String!
+}
+
+input MoleculeEncryptionMetadataInput {
+	dataToEncryptHash: String!
+	accessControlConditions: String!
+	encryptedBy: String!
+	encryptedAt: String!
+	chain: String!
+	litSdkVersion: String!
+	litNetwork: String!
+	templateName: String!
+	contractVersion: String!
 }
 
 type MoleculeMut {
@@ -3784,7 +3810,7 @@ type MoleculeVersionedFileEntry {
 	categories: [String!]!
 	tags: [String!]!
 	contentText: String
-	encryptionMetadata: String
+	encryptionMetadata: MoleculeEncryptionMetadata
 	"""
 	Returns encoded content in-band. Should be used for small files only and
 	will return an error if called on large data.
