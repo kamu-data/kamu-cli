@@ -11,15 +11,18 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.254.0] - 2025-12-05
 ### Added
 - GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows
+- `odf::DataSchema` now supports a `diff()` method that allows detailed comparisons between two schemas
+- `SetDataSchema` event adds a limited supports for schema migrations, allowing to extend the schema with new optional columns
 ### Changed
 - Refactoring: `ResolvedDataset` and `DatasetRegistry` moved to `kamu-datasets` domain
 - Experiment: Introduce `WriteCheckedDataset` and `ReadCheckedDataset` types, 
     clearly indicating the access check on the resolved dataset was already performed
 ### Fixed
 - Flow events now processed transactionally
+- GraphQL endpoint errors now properly trigger transaction rollback
 
 ## [0.253.1] - 2025-11-24
 ### Changed

@@ -41,7 +41,7 @@ async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }
-mockall = "0.13"
+mockall = "0.14"
 futures = "0.3"
 serde_json = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = [] }
@@ -65,7 +65,7 @@ odf = { workspace = true, features = ["testing"] }
 
 cron = { version = "0.15", default-features = false }
 indoc = "2"
-mockall = "0.13"
+mockall = "0.14"
 pretty_assertions = "1"
 serde_json = { version = "1", default-features = false }
 test-log = { version = "0.2", features = ["trace"] }

@@ -48,7 +48,7 @@ serde_json = { version = "1", default-features = false }
 tracing = "0.1"
 thiserror = { version = "2", default-features = false }
 
-mockall = { version = "0.13", optional = true }
+mockall = { version = "0.14", optional = true }
 
 
 
@@ -60,7 +60,7 @@ kamu-flow-system = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
 
 
-mockall = { version = "0.13" }
+mockall = { version = "0.14" }
 pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }

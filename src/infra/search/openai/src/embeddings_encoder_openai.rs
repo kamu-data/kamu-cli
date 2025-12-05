@@ -87,11 +87,12 @@ impl EmbeddingsEncoder for EmbeddingsEncoderOpenAi {
         }
 
         // TODO: Handle too many tokens?
-        let embedding_request = async_openai::types::CreateEmbeddingRequestArgs::default()
-            .model(&self.config.model_name)
-            .input(input)
-            .build()
-            .int_err()?;
+        let embedding_request =
+            async_openai::types::embeddings::CreateEmbeddingRequestArgs::default()
+                .model(&self.config.model_name)
+                .input(input)
+                .build()
+                .int_err()?;
 
         let response = self
             .client()

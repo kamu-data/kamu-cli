@@ -25,7 +25,7 @@ doctest = false
 container-runtime = { workspace = true }
 
 axum = "0.8"
-rand = "0.8"
+rand = "0.9"
 tempfile = "3"
 tokio = { version = "1", default-features = false }
 tower = "0.5"
