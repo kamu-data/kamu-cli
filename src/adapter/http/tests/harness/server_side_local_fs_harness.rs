@@ -28,6 +28,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
+    InMemoryAccountQuotaEventStore,
     InMemoryAccountRepository,
     InMemoryDidSecretKeyRepository,
     InMemoryOAuthDeviceCodeRepository,
@@ -48,6 +49,7 @@ use kamu_datasets_inmem::{
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
+    InMemoryDatasetStatisticsRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -173,6 +175,11 @@ impl ServerSideLocalFsHarness {
                 .add::<RebacServiceImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
+                .add::<InMemoryAccountQuotaEventStore>()
+                .add::<AccountQuotaServiceImpl>()
+                .add::<InMemoryDatasetStatisticsRepository>()
+                .add::<DatasetStatisticsServiceImpl>()
+                .add::<QuotaCheckerStorageImpl>()
                 .add::<InMemoryRebacRepository>()
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())

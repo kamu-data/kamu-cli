@@ -180,6 +180,9 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                         odf::dataset::AppendError::RefCASFailed(e),
                     ),
                 )) => UpdateVersionFileUseCaseError::RefCASFailed(e),
+                PushIngestDataError::Execution(PushIngestError::QuotaExceeded(e)) => {
+                    UpdateVersionFileUseCaseError::QuotaExceeded(e)
+                }
                 err => UpdateVersionFileUseCaseError::Internal(err.int_err()),
             })?;
 

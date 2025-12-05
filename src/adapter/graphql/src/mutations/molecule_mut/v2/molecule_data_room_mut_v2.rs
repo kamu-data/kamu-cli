@@ -214,6 +214,9 @@ impl MoleculeDataRoomMutV2 {
                 MoleculeCreateDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
                 }
+                MoleculeCreateDataRoomEntryError::QuotaExceeded(e) => {
+                    GqlError::gql(format!("Quota exceeded: {e}"))
+                }
                 e @ MoleculeCreateDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
 
@@ -376,6 +379,9 @@ impl MoleculeDataRoomMutV2 {
                 MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
                 MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
+                }
+                MoleculeUpdateDataRoomEntryError::QuotaExceeded(e) => {
+                    GqlError::gql(format!("Quota exceeded: {e}"))
                 }
                 e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;
@@ -779,6 +785,9 @@ impl MoleculeDataRoomMutV2 {
             Err(MoleculeMoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
+            Err(MoleculeMoveDataRoomEntryError::QuotaExceeded(e)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {e}")))
+            }
             Err(e @ MoleculeMoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
     }
@@ -838,6 +847,9 @@ impl MoleculeDataRoomMutV2 {
             Err(MoleculeRemoveDataRoomEntryError::Access(e)) => Err(e.into()),
             Err(MoleculeRemoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(MoleculeRemoveDataRoomEntryError::QuotaExceeded(e)) => {
+                Err(GqlError::gql(format!("Quota exceeded: {e}")))
             }
             Err(e @ MoleculeRemoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
@@ -974,6 +986,9 @@ impl MoleculeDataRoomMutV2 {
                 MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
                 MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
                     GqlError::gql("Data room linking: CAS failed")
+                }
+                MoleculeUpdateDataRoomEntryError::QuotaExceeded(e) => {
+                    GqlError::gql(format!("Quota exceeded: {e}"))
                 }
                 e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
             })?;

@@ -40,6 +40,9 @@ pub enum MoleculeCreateDataRoomEntryError {
     Access(#[from] odf::AccessError),
 
     #[error(transparent)]
+    QuotaExceeded(#[from] kamu_accounts::QuotaExceededError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
