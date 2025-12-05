@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::CollectionPath;
+use kamu_datasets::CollectionPathV2;
 use kamu_datasets_services::utils::DatasetNameGenerator;
 use pretty_assertions::assert_eq;
 
@@ -42,7 +42,7 @@ use pretty_assertions::assert_eq;
 fn test_dataset_name_generator(#[case] input: &str, #[case] expected: &str) {
     let static_uuid_v4 = uuid::Uuid::parse_str("00000000-1111-2222-3333-444444444444").unwrap();
 
-    let path = CollectionPath::new(input.to_string());
+    let path = CollectionPathV2::try_new(input).unwrap();
     let name = DatasetNameGenerator::based_on_collection_path_with_uuid(&path, static_uuid_v4);
 
     assert_eq!(expected, name.as_str());

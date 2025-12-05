@@ -29,7 +29,7 @@ impl CollectionPathV2 {
         }
 
         // "/" is allowed in the path
-        let trimmed_path = trimmed_path.replace("/", DELIM);
+        let trimmed_path = trimmed_path.replace('/', DELIM);
 
         let Ok(decoded) = urlencoding::decode(&trimmed_path) else {
             return Err(CollectionPathValidationError::InvalidUrlEncoding { path });
@@ -45,7 +45,14 @@ impl CollectionPathV2 {
             return Err(CollectionPathValidationError::IsEmpty);
         }
 
-        Ok(Self(trimmed_decoded.to_owned()))
+        let result = if !trimmed_decoded.starts_with('/') {
+            // Add leading / if it was missing
+            format!("/{trimmed_decoded}")
+        } else {
+            trimmed_decoded.to_owned()
+        };
+
+        Ok(Self(result))
     }
 
     pub fn into_v1(self) -> CollectionPath {
@@ -58,7 +65,7 @@ pub enum CollectionPathValidationError {
     #[error("Path is empty")]
     IsEmpty,
 
-    #[error("Invalid URL encoding for path: {path}")]
+    #[error("Invalid URL encoding for path: `{path}`")]
     InvalidUrlEncoding { path: String },
 }
 
@@ -94,7 +101,7 @@ mod tests {
         assert_eq!("file.exe", *CollectionPathV2::try_new("file.exe").unwrap());
         // Leading / is optional
         assert_eq!(
-            "path/to/file",
+            "/path/to/file",
             *CollectionPathV2::try_new(format!("path{DELIM}to{DELIM}file")).unwrap()
         );
         assert_eq!(

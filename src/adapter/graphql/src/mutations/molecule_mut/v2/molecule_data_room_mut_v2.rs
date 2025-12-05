@@ -464,7 +464,7 @@ impl MoleculeDataRoomMutV2 {
                 )
             });
         let project_account_name = project_account.account_name_internal().clone();
-        let new_file_name = DatasetNameGenerator::based_on_collection_path(&file_path);
+        let new_file_name = DatasetNameGenerator::based_on_collection_path(file_path);
 
         odf::DatasetAlias::new(Some(project_account_name), new_file_name)
     }
