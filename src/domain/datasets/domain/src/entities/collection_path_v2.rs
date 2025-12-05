@@ -11,7 +11,13 @@ use std::borrow::Cow;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+// Pre-encoded characters
+const DELIM: &str = "%2F";
+const SPACE: &str = "%20";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CollectionPathV2(String); // Stored decoded
 
 impl CollectionPathV2 {
@@ -23,7 +29,10 @@ impl CollectionPathV2 {
             return Err(CollectionPathValidationError::IsEmpty);
         }
 
-        let Ok(decoded) = urlencoding::decode(trimmed_path) else {
+        // "/" is allowed in the path
+        let trimmed_path = trimmed_path.replace("/", DELIM);
+
+        let Ok(decoded) = urlencoding::decode(&trimmed_path) else {
             return Err(CollectionPathValidationError::InvalidUrlEncoding { path });
         };
 
@@ -70,10 +79,6 @@ mod tests {
 
     #[test]
     fn test_collection_path_v2() {
-        // -- URL encoding --
-        const SPACE: &str = "%20";
-        const DELIM: &str = "%2F";
-
         // --- Invalid paths ---
         assert_matches!(
             CollectionPathV2::try_new(""),
@@ -84,15 +89,15 @@ mod tests {
             Err(CollectionPathValidationError::IsEmpty)
         );
         assert_matches!(
-            CollectionPathV2::try_new("/path/to/file"),
-            Err(CollectionPathValidationError::InvalidUrlEncoding { .. })
-        );
-        assert_matches!(
             CollectionPathV2::try_new(format!("{DELIM}path{DELIM}to{DELIM}file with spaces")),
             Err(CollectionPathValidationError::InvalidUrlEncoding { .. })
         );
 
         // --- Valid paths ---
+        assert_eq!(
+            "/path/to/file",
+            *CollectionPathV2::try_new("/path/to/file").unwrap()
+        );
         assert_eq!("file.exe", *CollectionPathV2::try_new("file.exe").unwrap());
         // Leading / is optional
         assert_eq!(
