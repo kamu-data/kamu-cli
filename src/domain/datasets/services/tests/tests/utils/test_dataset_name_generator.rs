@@ -45,7 +45,7 @@ fn test_dataset_name_generator(#[case] input: &str, #[case] expected: &str) {
     let path = CollectionPath::new(input.to_string());
     let name = DatasetNameGenerator::based_on_collection_path_with_uuid(&path, static_uuid_v4);
 
-    assert_eq!(expected, name.as_str())
+    assert_eq!(expected, name.as_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

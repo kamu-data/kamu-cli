@@ -42,9 +42,9 @@ impl DatasetNameGenerator {
                     }
                     _ => {
                         s.push('-');
-                        prev_was_dash = true
+                        prev_was_dash = true;
                     }
-                };
+                }
             }
 
             if s.ends_with('-') {

@@ -1,0 +1,120 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::borrow::Cow;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct CollectionPathV2(String); // Stored decoded
+
+impl CollectionPathV2 {
+    pub fn try_new(path: impl Into<String>) -> Result<Self, CollectionPathValidationError> {
+        let path = path.into();
+        let trimmed_path = path.trim();
+
+        if trimmed_path.is_empty() {
+            return Err(CollectionPathValidationError::IsEmpty);
+        }
+
+        let Ok(decoded) = urlencoding::decode(trimmed_path) else {
+            return Err(CollectionPathValidationError::InvalidUrlEncoding { path });
+        };
+
+        if urlencoding::encode(&decoded) != trimmed_path {
+            return Err(CollectionPathValidationError::InvalidUrlEncoding { path });
+        }
+
+        let trimmed_decoded = decoded.trim();
+
+        if trimmed_decoded.is_empty() {
+            return Err(CollectionPathValidationError::IsEmpty);
+        }
+
+        Ok(Self(trimmed_decoded.to_owned()))
+    }
+
+    pub fn original_encoded_value(&self) -> Cow<'_, str> {
+        urlencoding::encode(&self.0)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CollectionPathValidationError {
+    #[error("Path is empty")]
+    IsEmpty,
+
+    #[error("Invalid URL encoding for path: {path}")]
+    InvalidUrlEncoding { path: String },
+}
+
+impl std::ops::Deref for CollectionPathV2 {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches::assert_matches;
+
+    use super::*;
+
+    #[test]
+    fn test_collection_path_v2() {
+        // -- URL encoding --
+        const SPACE: &str = "%20";
+        const DELIM: &str = "%2F";
+
+        // --- Invalid paths ---
+        assert_matches!(
+            CollectionPathV2::try_new(""),
+            Err(CollectionPathValidationError::IsEmpty)
+        );
+        assert_matches!(
+            CollectionPathV2::try_new("     "),
+            Err(CollectionPathValidationError::IsEmpty)
+        );
+        assert_matches!(
+            CollectionPathV2::try_new("/path/to/file"),
+            Err(CollectionPathValidationError::InvalidUrlEncoding { .. })
+        );
+        assert_matches!(
+            CollectionPathV2::try_new(format!("{DELIM}path{DELIM}to{DELIM}file with spaces")),
+            Err(CollectionPathValidationError::InvalidUrlEncoding { .. })
+        );
+
+        // --- Valid paths ---
+        assert_eq!("file.exe", *CollectionPathV2::try_new("file.exe").unwrap());
+        // Leading / is optional
+        assert_eq!(
+            "path/to/file",
+            *CollectionPathV2::try_new(format!("path{DELIM}to{DELIM}file")).unwrap()
+        );
+        assert_eq!(
+            "/path/to/file with spaces",
+            *CollectionPathV2::try_new(format!(
+                "{DELIM}path{DELIM}to{DELIM}file{SPACE}with{SPACE}spaces"
+            ))
+            .unwrap()
+        );
+        // Trim decoded spaces
+        assert_eq!(
+            "path to file",
+            *CollectionPathV2::try_new(format!(
+                "{SPACE}{SPACE}path{SPACE}to{SPACE}file{SPACE}{SPACE}"
+            ))
+            .unwrap()
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

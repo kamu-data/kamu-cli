@@ -448,7 +448,6 @@ impl MoleculeDataRoomMutV2 {
         Ok(maybe_data_room_entry)
     }
 
-    // TODO: Test with different paths
     async fn build_new_file_dataset_alias(
         &self,
         ctx: &Context<'_>,

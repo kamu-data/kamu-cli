@@ -7842,6 +7842,7 @@ dependencies = [
  "merge",
  "messaging-outbox",
  "mockall",
+ "nutype",
  "opendatafabric",
  "secrecy",
  "serde",
@@ -7852,6 +7853,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
+ "urlencoding",
  "uuid",
 ]
 
