@@ -134,7 +134,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        // TODO: extra data filters
+        filters: Option<GetDataRoomCollectionEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
@@ -146,14 +146,16 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 as_of,
                 path_prefix,
                 max_depth,
+                filters.and_then(Into::into),
                 pagination,
             )
             .await
-            .map_err(|e| match e {
-                ViewCollectionEntriesError::Access(e) => {
-                    MoleculeDataRoomCollectionReadError::Access(e)
+            .map_err(|e| {
+                use ViewCollectionEntriesError as E;
+                match e {
+                    E::Access(e) => MoleculeDataRoomCollectionReadError::Access(e),
+                    E::UnknownExtraDataFieldFilterNames(_) | E::Internal(_) => e.int_err().into(),
                 }
-                e @ ViewCollectionEntriesError::Internal(_) => e.int_err().into(),
             })?;
 
         Ok(entries_listing)
