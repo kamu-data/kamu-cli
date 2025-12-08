@@ -40,7 +40,7 @@ kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
-mockall = { optional = true, version = "0.13" }
+mockall = { optional = true, version = "0.14" }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
@@ -84,7 +84,7 @@ kamu-datasets-services = { workspace = true, features = ["testing"] }
 odf = { workspace = true, features = ["testing"] }
 
 indoc = "2"
-mockall = "0.13"
+mockall = "0.14"
 oop = "0.0.2"
 pretty_assertions = { version = "1" }
 rstest = { version = "0.26", default-features = false, features = [] }

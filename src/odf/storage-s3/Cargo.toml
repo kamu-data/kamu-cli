@@ -45,7 +45,7 @@ url = { version = "2", default-features = false }
 [dev-dependencies]
 odf-storage = { workspace = true, features = ["testing"] }
 
-rand = "0.8"
+rand = "0.9"
 test-log = { version = "0.2", features = ["trace"] }
 test-utils = { workspace = true }
 test-group = { version = "1" }

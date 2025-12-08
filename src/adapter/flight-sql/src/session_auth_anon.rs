@@ -41,7 +41,7 @@ impl SessionAuth for SessionAuthAnonymous {
         }
 
         let mut random_token_bytes = [0_u8; ANON_SESSION_TOKEN_BYTES_LENGTH];
-        rand::thread_rng().fill(&mut random_token_bytes);
+        rand::rng().fill(&mut random_token_bytes);
         let base32_token = base32::encode(base32::Alphabet::Crockford, &random_token_bytes);
 
         // TODO: SEC: Anonymous tokens should be validated on subsequent requests,

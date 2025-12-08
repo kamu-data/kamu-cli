@@ -42,7 +42,7 @@ pub struct KamuAccessToken {
 impl KamuAccessToken {
     pub fn new() -> Self {
         let mut random_token_bytes = [0_u8; ACCESS_TOKEN_BYTES_LENGTH];
-        rand::thread_rng().fill(&mut random_token_bytes);
+        rand::rng().fill(&mut random_token_bytes);
 
         let token_checksum = crc32fast::hash(&random_token_bytes);
         let token_id = Uuid::new_v4();

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use rand::distributions::{Alphanumeric, Uniform};
+use rand::distr::{Alphanumeric, Uniform};
 use rand::prelude::Distribution;
 
 pub fn get_random_name(prefix_maybe: Option<&str>, random_length: usize) -> String {
@@ -20,12 +20,14 @@ pub fn get_random_string(
     allowed_symbols: &AllowedSymbols,
 ) -> String {
     let prefix = prefix_maybe.unwrap_or("");
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
+    let ascii_dist =
+        Uniform::new_inclusive('!', '~').expect("Valid range for uniform distribution");
     let random_part: String = (0..random_length)
         .map(|_| match allowed_symbols {
             AllowedSymbols::Alphanumeric => char::from(Alphanumeric.sample(&mut rng)),
-            AllowedSymbols::AsciiSymbols => Uniform::from('!'..='~').sample(&mut rng),
+            AllowedSymbols::AsciiSymbols => ascii_dist.sample(&mut rng),
         })
         .collect();
 

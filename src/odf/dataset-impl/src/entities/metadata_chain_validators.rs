@@ -856,6 +856,47 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
             vocab: None,
         })
     }
+
+    fn check_allowed_schema_migration(diff: &DataSchemaDiff<'_>) -> bool {
+        diff.items
+            .iter()
+            .all(Self::check_allowed_schema_migration_rec)
+    }
+
+    fn check_allowed_schema_migration_rec(diff: &DataSchemaDiffItem<'_>) -> bool {
+        #[expect(clippy::match_same_arms)]
+        match diff {
+            DataSchemaDiffItem::SchemaAttributesChanged => true,
+            DataSchemaDiffItem::FieldAttributesChanged => true,
+            DataSchemaDiffItem::FieldAdded { field_rhs } => {
+                if field_rhs.is_optional() {
+                    // It's OK to introduce a new optional field as this maintains compatibility
+                    // from publisher and consumer perspective
+                    true
+                } else {
+                    false
+                }
+            }
+            DataSchemaDiffItem::FieldRemoved => false,
+            DataSchemaDiffItem::FieldReordered {
+                index_lhs: _,
+                index_rhs: _,
+                field_lhs: _,
+                field_rhs: _,
+            } => true,
+            DataSchemaDiffItem::FieldTypeChanged => false,
+            // TODO: Field becoming optional is relaxing the schema and a compatibile change from
+            // producer perspective, but it's a breaking change from consumer perspective and needs
+            // to be cautioned about and communicated downstream
+            DataSchemaDiffItem::FieldBecameOptional => false,
+            DataSchemaDiffItem::FieldBecameRequired => false,
+            DataSchemaDiffItem::NestedFieldDiff {
+                field_lhs: _,
+                field_rhs: _,
+                items,
+            } => items.iter().all(Self::check_allowed_schema_migration_rec),
+        }
+    }
 }
 
 impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
@@ -940,12 +981,13 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
             DataSchemaCmpOptions {
                 ignore_attributes: true,
                 ignore_optionality: false,
+                ignore_order: true,
             },
         ) {
             let new_yaml = odf_data_utils::schema::format::format_schema_odf_yaml(new_schema);
 
             // TODO: Replace warning with returning invalid event error
-            // This task is currently blocked by necessity to make update so many tests
+            // This task is currently blocked by necessity to make updates to many tests
             tracing::warn!(
                 new_schema = %new_yaml,
                 "Schema does not include correct system columns"
@@ -959,10 +1001,7 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
 
         // Check compatibility with previous schema
         if let Some(prev_set_data_schema) = &self.prev_schema {
-            // NOTE: During the initial upgrade from legacy to ODF schema we allow field
-            // optionality differences, as Arrow currently has no control over it, and in
-            // ODF schema we want to enforce optionality checks eventually.
-            let ignore_optionality = prev_set_data_schema.raw_arrow_schema.is_some();
+            let is_arrow_to_odf_upgrade = prev_set_data_schema.raw_arrow_schema.is_some();
 
             // TODO: Avoid cloning in no-upgrade case
             let prev_schema = prev_set_data_schema.clone().upgrade().schema;
@@ -972,7 +1011,11 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                 new_schema,
                 DataSchemaCmpOptions {
                     ignore_attributes: true,
-                    ignore_optionality,
+                    // NOTE: During the initial upgrade from legacy to ODF schema we allow field
+                    // optionality differences, as Arrow currently has no control over it, and in
+                    // ODF schema we want to enforce optionality checks eventually.
+                    ignore_optionality: is_arrow_to_odf_upgrade,
+                    ignore_order: true,
                 },
             ) {
                 DataSchemaCmp::Identical => {
@@ -981,20 +1024,24 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                         "New schema is identical to the current",
                     )))
                 }
-                DataSchemaCmp::Equivalent => Ok(()),
-                DataSchemaCmp::Incompatible => {
-                    let prev_yaml =
-                        odf_data_utils::schema::format::format_schema_odf_yaml(&prev_schema);
-                    let new_yaml =
-                        odf_data_utils::schema::format::format_schema_odf_yaml(new_schema);
+                DataSchemaCmp::Equivalent(_) => Ok(()),
+                DataSchemaCmp::NonEquivalent(diff) => {
+                    if Self::check_allowed_schema_migration(&diff) {
+                        Ok(())
+                    } else {
+                        let prev_yaml =
+                            odf_data_utils::schema::format::format_schema_odf_yaml(&prev_schema);
+                        let new_yaml =
+                            odf_data_utils::schema::format::format_schema_odf_yaml(new_schema);
 
-                    invalid_event!(
-                        self.new_schema.unwrap().clone(),
-                        format!(
-                            "Schema evolution is not yet supported and schemas are \
-                             incompatible.\nCurrent schema:\n{prev_yaml}\nNew schema:\n{new_yaml}"
+                        invalid_event!(
+                            self.new_schema.unwrap().clone(),
+                            format!(
+                                "New schema is not compatible with the current schema.\nCurrent \
+                                 schema:\n{prev_yaml}\nNew schema:\n{new_yaml}"
+                            )
                         )
-                    )
+                    }
                 }
             }?;
         }
