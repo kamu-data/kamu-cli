@@ -15,23 +15,20 @@ use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
     ContentArgs,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetUseCaseOptions,
     DatasetRegistry,
     DatasetRegistryExt,
-    ResolvedDataset,
     UpdateVersionedFileUseCase,
     WriteCheckedDataset,
 };
-use kamu_datasets_services::utils::DatasetNameGenerator;
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
     MoleculeAppendGlobalDataRoomActivityUseCase,
     MoleculeCreateDataRoomEntryError,
     MoleculeCreateDataRoomEntryUseCase,
+    MoleculeCreateVersionedFileDatasetError,
+    MoleculeCreateVersionedFileDatasetUseCase,
     MoleculeDataRoomActivityEntity,
     MoleculeDataRoomFileActivityType,
-    MoleculeDatasetSnapshots,
     MoleculeMoveDataRoomEntryError,
     MoleculeMoveDataRoomEntryUseCase,
     MoleculeRemoveDataRoomEntryError,
@@ -39,6 +36,8 @@ use kamu_molecule_domain::{
     MoleculeUpdateDataRoomEntryError,
     MoleculeUpdateDataRoomEntryResult,
     MoleculeUpdateDataRoomEntryUseCase,
+    MoleculeUploadVersionedFileVersionError,
+    MoleculeUploadVersionedFileVersionUseCase,
 };
 use time_source::SystemTimeSource;
 
@@ -60,12 +59,8 @@ use crate::queries::molecule::v2::{
     MoleculeProjectV2,
     MoleculeTag,
     MoleculeVersionedFileEntry,
-    MoleculeVersionedFileEntryBasicInfo,
-    MoleculeVersionedFileEntryDetailedInfo,
-    MoleculeVersionedFileExtraData,
     MoleculeVersionedFilePrefetch,
 };
-use crate::queries::{Account, VersionedFileEntry};
 use crate::utils::{ContentSource, get_content_args};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,18 +91,16 @@ impl MoleculeDataRoomMutV2 {
         let molecule_subject = molecule_subject(ctx)?;
 
         let (
-            rebac_service,
             time_source,
-            create_dataset_from_snapshot_uc,
-            update_versioned_file_uc,
+            create_versioned_file_dataset_uc,
+            upload_versioned_file_version_uc,
             create_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
-            dyn kamu_auth_rebac::RebacService,
             dyn SystemTimeSource,
-            dyn CreateDatasetFromSnapshotUseCase,
-            dyn UpdateVersionedFileUseCase,
+            dyn MoleculeCreateVersionedFileDatasetUseCase,
+            dyn MoleculeUploadVersionedFileVersionUseCase,
             dyn MoleculeCreateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
@@ -115,88 +108,44 @@ impl MoleculeDataRoomMutV2 {
         let event_time = time_source.now();
 
         // 1. Create an empty versioned dataset.
-        let alias = self.build_new_file_dataset_alias(ctx, &path).await;
-        let versioned_file_snapshot = MoleculeDatasetSnapshots::versioned_file_v2(alias);
-
-        let (versioned_file_dataset, versioned_file_head) = {
-            let create_versioned_file_res = create_dataset_from_snapshot_uc
-                .execute(
-                    versioned_file_snapshot,
-                    CreateDatasetUseCaseOptions::default(),
-                )
-                .await
-                .int_err()?;
-
-            (
-                ResolvedDataset::from_created(&create_versioned_file_res),
-                create_versioned_file_res.head,
-            )
-        };
-
-        // Give maintainer permissions to molecule
-        rebac_service
-            .set_account_dataset_relation(
-                &molecule_subject.account_id,
-                kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
-                versioned_file_dataset.get_id(),
-            )
+        let versioned_file_dataset = create_versioned_file_dataset_uc
+            .execute(&molecule_subject, &self.project.entity, path.clone())
             .await
-            .int_err()?;
+            .map_err(|e| {
+                use MoleculeCreateVersionedFileDatasetError as E;
+
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    e @ E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        let versioned_file_ref = versioned_file_dataset.get_id().clone();
 
         // 2. Upload the first version to just created dataset.
         // NOTE: Version and content hash get updated to correct values below
-        let content_type = content_args.content_type.clone();
-        let content_length = content_args.content_length;
-        let content_hash = versioned_file_head.clone();
-
-        let versioned_file_basic_info = MoleculeVersionedFileEntryBasicInfo {
-            access_level: access_level.clone(),
-            change_by: change_by.clone(),
-            description: description.clone(),
-            categories: categories.clone().unwrap_or_default(),
-            tags: tags.clone().unwrap_or_default(),
-        };
-
-        let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
-            content_text,
-            encryption_metadata: encryption_metadata.map(Into::into),
-        };
-
-        let versioned_file_extra_data = MoleculeVersionedFileExtraData {
-            basic_info: &versioned_file_basic_info,
-            detailed_info: &versioned_file_detailed_info,
-        };
-
-        let update_version_result = update_versioned_file_uc
+        let versioned_file_entry = upload_versioned_file_version_uc
             .execute(
-                WriteCheckedDataset(&versioned_file_dataset),
+                versioned_file_dataset,
                 Some(event_time),
-                Some(content_args),
-                None,
-                Some(versioned_file_extra_data.to_extra_data_fields()),
+                content_args,
+                access_level,
+                change_by,
+                description,
+                categories,
+                tags,
+                content_text,
+                encryption_metadata.map(Into::into),
             )
             .await
-            .int_err()?;
+            .map_err(|e| {
+                use MoleculeUploadVersionedFileVersionError as E;
 
-        let versioned_file_entry = MoleculeVersionedFileEntry {
-            entry: VersionedFileEntry {
-                file_dataset: versioned_file_dataset.clone(),
-                entity: kamu_datasets::VersionedFileEntry {
-                    system_time: update_version_result.system_time,
-                    event_time,
-                    version: update_version_result.new_version,
-                    content_type: content_type
-                        .as_ref()
-                        .map(|ct| ct.0.clone())
-                        .unwrap_or_default(),
-                    content_length,
-                    content_hash: update_version_result.content_hash,
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
-            },
-            basic_info: versioned_file_basic_info,
-            detailed_info: tokio::sync::OnceCell::new_with(Some(versioned_file_detailed_info)),
-        };
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    e @ E::Internal(_) => e.int_err().into(),
+                }
+            })?;
 
         // 3. Add the file to the data room.
 
@@ -206,8 +155,8 @@ impl MoleculeDataRoomMutV2 {
                 &self.project.entity,
                 Some(event_time),
                 path.clone().into_v1(),
-                versioned_file_dataset.get_id().clone(),
-                versioned_file_entry.to_denormalized().into(),
+                versioned_file_ref.clone(),
+                versioned_file_entry.to_denormalized(),
             )
             .await
             .map_err(|e| match e {
@@ -227,16 +176,16 @@ impl MoleculeDataRoomMutV2 {
                 activity_type: MoleculeDataRoomFileActivityType::Added,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: path.into_v1(),
-                r#ref: versioned_file_dataset.get_id().clone(),
-                version: update_version_result.new_version,
-                change_by,
-                access_level,
-                content_type,
-                content_length,
-                content_hash,
-                description,
-                categories: categories.unwrap_or_default(),
-                tags: tags.unwrap_or_default(),
+                r#ref: versioned_file_ref,
+                version: versioned_file_entry.version,
+                change_by: versioned_file_entry.basic_info.change_by,
+                access_level: versioned_file_entry.basic_info.access_level,
+                content_type: Some(versioned_file_entry.content_type),
+                content_length: versioned_file_entry.content_length,
+                content_hash: versioned_file_entry.content_hash,
+                description: versioned_file_entry.basic_info.description,
+                categories: versioned_file_entry.basic_info.categories,
+                tags: versioned_file_entry.basic_info.tags,
             };
 
             append_global_data_room_activity_uc
@@ -277,14 +226,14 @@ impl MoleculeDataRoomMutV2 {
         let (
             dataset_registry,
             time_source,
-            update_versioned_file_uc,
+            upload_versioned_file_version_uc,
             update_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
             dyn DatasetRegistry,
             dyn SystemTimeSource,
-            dyn UpdateVersionedFileUseCase,
+            dyn MoleculeUploadVersionedFileVersionUseCase,
             dyn MoleculeUpdateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
@@ -307,59 +256,23 @@ impl MoleculeDataRoomMutV2 {
             .await
             .int_err()?;
 
-        // NOTE: Version and content hash get updated to correct values below
-        let file_dataset_id = file_dataset.get_handle().id.clone();
-        let content_type = content_args.content_type.clone();
-        let content_length = content_args.content_length;
+        let file_dataset_ref = file_dataset.get_handle().id.clone();
 
-        let versioned_file_basic_info = MoleculeVersionedFileEntryBasicInfo {
-            access_level: access_level.clone(),
-            change_by: change_by.clone(),
-            description: description.clone(),
-            categories: categories.clone().unwrap_or_default(),
-            tags: tags.clone().unwrap_or_default(),
-        };
-
-        let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
-            content_text,
-            encryption_metadata: encryption_metadata.map(Into::into),
-        };
-
-        let versioned_file_extra_data = MoleculeVersionedFileExtraData {
-            basic_info: &versioned_file_basic_info,
-            detailed_info: &versioned_file_detailed_info,
-        };
-
-        let update_version_result = update_versioned_file_uc
+        let versioned_file_entry = upload_versioned_file_version_uc
             .execute(
-                WriteCheckedDataset(&file_dataset),
+                file_dataset,
                 Some(event_time),
-                Some(content_args),
-                None,
-                Some(versioned_file_extra_data.to_extra_data_fields()),
+                content_args,
+                access_level,
+                change_by,
+                description,
+                categories,
+                tags,
+                content_text,
+                encryption_metadata.map(Into::into),
             )
             .await
             .int_err()?;
-
-        let versioned_file_entry = MoleculeVersionedFileEntry {
-            entry: VersionedFileEntry {
-                file_dataset: file_dataset.clone(),
-                entity: kamu_datasets::VersionedFileEntry {
-                    system_time: update_version_result.system_time,
-                    event_time,
-                    version: update_version_result.new_version,
-                    content_type: content_type
-                        .as_ref()
-                        .map(|ct| ct.0.clone())
-                        .unwrap_or_default(),
-                    content_length,
-                    content_hash: update_version_result.content_hash.clone(),
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
-            },
-            basic_info: versioned_file_basic_info,
-            detailed_info: tokio::sync::OnceCell::new_with(Some(versioned_file_detailed_info)),
-        };
 
         // 3. Update the file state in the data room.
 
@@ -370,7 +283,7 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 existing_data_room_entry.path.clone(),
                 existing_data_room_entry.reference.clone(),
-                versioned_file_entry.to_denormalized().into(),
+                versioned_file_entry.to_denormalized(),
             )
             .await
             .map_err(|e| match e {
@@ -390,16 +303,16 @@ impl MoleculeDataRoomMutV2 {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: updated_data_room_entry.path.clone(),
-                r#ref: file_dataset_id,
-                version: update_version_result.new_version,
-                change_by,
-                access_level,
-                content_type,
-                content_length,
-                content_hash: update_version_result.content_hash,
-                description,
-                categories: categories.unwrap_or_default(),
-                tags: tags.unwrap_or_default(),
+                r#ref: file_dataset_ref,
+                version: versioned_file_entry.version,
+                change_by: versioned_file_entry.basic_info.change_by,
+                access_level: versioned_file_entry.basic_info.access_level,
+                content_type: Some(versioned_file_entry.content_type),
+                content_length: versioned_file_entry.content_length,
+                content_hash: versioned_file_entry.content_hash,
+                description: versioned_file_entry.basic_info.description,
+                categories: versioned_file_entry.basic_info.categories,
+                tags: versioned_file_entry.basic_info.tags,
             };
 
             append_global_data_room_activity_uc
@@ -448,27 +361,6 @@ impl MoleculeDataRoomMutV2 {
         Ok(maybe_data_room_entry)
     }
 
-    async fn build_new_file_dataset_alias(
-        &self,
-        ctx: &Context<'_>,
-        file_path: &kamu_datasets::CollectionPathV2,
-    ) -> odf::DatasetAlias {
-        // TODO: PERF: Add AccountRequestState similar to DatasetRequestState and reuse
-        //             possibly resolved account?
-        let project_account = Account::from_account_id(ctx, self.project.entity.account_id.clone())
-            .await
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to load project account [{}]: {e}",
-                    self.project.entity.account_id
-                )
-            });
-        let project_account_name = project_account.account_name_internal().clone();
-        let new_file_name = DatasetNameGenerator::based_on_collection_path(file_path);
-
-        odf::DatasetAlias::new(Some(project_account_name), new_file_name)
-    }
-
     async fn append_global_data_room_activity(
         &self,
         ctx: &Context<'_>,
@@ -511,7 +403,7 @@ impl MoleculeDataRoomMutV2 {
             access_level: denormalized_latest_file_info.access_level,
             content_type: {
                 let s = denormalized_latest_file_info.content_type;
-                if !s.is_empty() { Some(s.into()) } else { None }
+                if !s.0.is_empty() { Some(s) } else { None }
             },
             content_length: denormalized_latest_file_info.content_length,
             content_hash: denormalized_latest_file_info.content_hash,
@@ -983,7 +875,7 @@ impl MoleculeDataRoomMutV2 {
                 version: new_version,
                 change_by: new_denormalized_file_info.change_by,
                 access_level: new_denormalized_file_info.access_level,
-                content_type: Some(MediaType::from(new_denormalized_file_info.content_type)),
+                content_type: Some(new_denormalized_file_info.content_type),
                 content_length: new_denormalized_file_info.content_length,
                 content_hash: new_denormalized_file_info.content_hash,
                 description: new_denormalized_file_info.description,

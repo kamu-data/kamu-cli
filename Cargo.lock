@@ -8431,6 +8431,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.17",
+ "tokio",
  "uuid",
 ]
 
@@ -8452,6 +8453,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-core",
  "kamu-datasets",
+ "kamu-datasets-services",
  "kamu-molecule-domain",
  "messaging-outbox",
  "num-bigint",

@@ -36,6 +36,7 @@ odf = { workspace = true, default-features = false }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-molecule-domain = { workspace = true }
 kamu-core = { workspace = true }
 

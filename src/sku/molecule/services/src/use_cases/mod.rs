@@ -11,8 +11,10 @@ mod activities;
 mod announcements;
 mod data_rooms;
 mod projects;
+mod versioned_files;
 
 pub use activities::*;
 pub use announcements::*;
 pub use data_rooms::*;
 pub use projects::*;
+pub use versioned_files::*;

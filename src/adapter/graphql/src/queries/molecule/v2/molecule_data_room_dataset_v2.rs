@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
+use file_utils::MediaType;
 use kamu_datasets::ResolvedDataset;
 use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
@@ -224,7 +225,9 @@ impl MoleculeDataRoomEntry {
             denormalized_latest_file_info:
                 kamu_molecule_domain::MoleculeDenormalizeFileToDataRoom {
                     version: activity_entity.version,
-                    content_type: activity_entity.content_type.unwrap_or_else(|| "".into()).0,
+                    content_type: activity_entity
+                        .content_type
+                        .unwrap_or_else(|| MediaType::OCTET_STREAM.to_owned()),
                     content_length: activity_entity.content_length,
                     content_hash: activity_entity.content_hash,
                     access_level: activity_entity.access_level,
@@ -338,8 +341,9 @@ impl MoleculeVersionedFile {
 
 pub struct MoleculeVersionedFileEntry {
     pub entry: VersionedFileEntry,
-    pub basic_info: MoleculeVersionedFileEntryBasicInfo,
-    pub detailed_info: tokio::sync::OnceCell<MoleculeVersionedFileEntryDetailedInfo>,
+    pub basic_info: kamu_molecule_domain::MoleculeVersionedFileEntryBasicInfo,
+    pub detailed_info:
+        tokio::sync::OnceCell<kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo>,
 }
 
 impl MoleculeVersionedFileEntry {
@@ -360,7 +364,7 @@ impl MoleculeVersionedFileEntry {
                     extra_data: kamu_datasets::ExtraDataFields::default(),
                 },
             },
-            basic_info: MoleculeVersionedFileEntryBasicInfo {
+            basic_info: kamu_molecule_domain::MoleculeVersionedFileEntryBasicInfo {
                 access_level: prefetch.denorm.access_level,
                 change_by: prefetch.denorm.change_by,
                 description: prefetch.denorm.description,
@@ -374,7 +378,7 @@ impl MoleculeVersionedFileEntry {
     pub async fn detailed_info(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<&MoleculeVersionedFileEntryDetailedInfo> {
+    ) -> Result<&kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo> {
         self.detailed_info
             .get_or_try_init(|| self.read_detailed_info(ctx))
             .await
@@ -383,7 +387,7 @@ impl MoleculeVersionedFileEntry {
     pub(crate) async fn read_detailed_info(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<MoleculeVersionedFileEntryDetailedInfo> {
+    ) -> Result<kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo> {
         let state = DatasetRequestState::new_resolved(self.entry.file_dataset.clone());
         let versioned_file = VersionedFile::new(&state);
         let entry = versioned_file
@@ -391,15 +395,15 @@ impl MoleculeVersionedFileEntry {
             .await?
             .expect("Entry must exist");
         let json = entry.entity.extra_data.into_inner();
-        let detailed_info: MoleculeVersionedFileEntryDetailedInfo =
+        let detailed_info: kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo =
             serde_json::from_value(json.into()).int_err()?;
         Ok(detailed_info)
     }
 
     pub fn to_versioned_file_extra_data(&self) -> kamu_datasets::ExtraDataFields {
-        let extra_data = MoleculeVersionedFileExtraData {
-            basic_info: &self.basic_info,
-            detailed_info: self.detailed_info.get().unwrap(),
+        let extra_data = kamu_molecule_domain::MoleculeVersionedFileExtraData {
+            basic_info: self.basic_info.clone(),
+            detailed_info: self.detailed_info.get().unwrap().clone(),
         };
 
         let serde_json::Value::Object(json) = serde_json::to_value(&extra_data).unwrap() else {
@@ -407,20 +411,6 @@ impl MoleculeVersionedFileEntry {
         };
 
         kamu_datasets::ExtraDataFields::new(json)
-    }
-
-    pub fn to_denormalized(&self) -> MoleculeDenormalizeFileToDataRoom {
-        MoleculeDenormalizeFileToDataRoom {
-            access_level: self.basic_info.access_level.clone(),
-            change_by: self.basic_info.change_by.clone(),
-            version: self.entry.entity.version,
-            content_type: self.entry.entity.content_type.clone(),
-            content_length: self.entry.entity.content_length,
-            content_hash: self.entry.entity.content_hash.clone(),
-            description: self.basic_info.description.clone(),
-            categories: self.basic_info.categories.clone(),
-            tags: self.basic_info.tags.clone(),
-        }
     }
 }
 
@@ -448,7 +438,7 @@ impl MoleculeVersionedFileEntry {
     }
 
     async fn content_type(&self) -> &String {
-        &self.entry.entity.content_type
+        &self.entry.entity.content_type.0
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {
@@ -501,41 +491,6 @@ impl MoleculeVersionedFileEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct MoleculeVersionedFileEntryBasicInfo {
-    #[serde(rename = "molecule_access_level")]
-    pub access_level: MoleculeAccessLevel,
-    #[serde(rename = "molecule_change_by")]
-    pub change_by: String,
-    pub description: Option<String>,
-    pub categories: Vec<MoleculeCategory>,
-    pub tags: Vec<MoleculeTag>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct MoleculeVersionedFileEntryDetailedInfo {
-    pub content_text: Option<String>,
-    pub encryption_metadata: Option<kamu_molecule_domain::MoleculeEncryptionMetadataRecord>,
-}
-
-#[derive(Debug, serde::Serialize)]
-pub struct MoleculeVersionedFileExtraData<'a> {
-    #[serde(flatten)]
-    pub basic_info: &'a MoleculeVersionedFileEntryBasicInfo,
-
-    #[serde(flatten)]
-    pub detailed_info: &'a MoleculeVersionedFileEntryDetailedInfo,
-}
-
-impl MoleculeVersionedFileExtraData<'_> {
-    pub fn to_extra_data_fields(&self) -> kamu_datasets::ExtraDataFields {
-        let serde_json::Value::Object(json) = serde_json::to_value(self).unwrap() else {
-            unreachable!()
-        };
-        kamu_datasets::ExtraDataFields::new(json)
-    }
-}
-
 #[derive(Clone)]
 pub struct MoleculeVersionedFilePrefetch {
     pub system_time: DateTime<Utc>,
@@ -547,7 +502,7 @@ pub struct MoleculeVersionedFilePrefetch {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
     pub version: FileVersion,
-    pub content_type: String,
+    pub content_type: MediaType,
     pub content_length: usize,
     pub content_hash: odf::Multihash,
 

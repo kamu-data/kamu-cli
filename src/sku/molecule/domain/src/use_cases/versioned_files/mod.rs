@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod molecule_data_room_collection_service;
-mod molecule_dataset_service;
-mod molecule_versioned_file_service;
+mod molecule_create_versioned_file_dataset_use_case;
+mod molecule_read_versioned_file_entry_use_case;
+mod molecule_upload_versioned_file_version_use_case;
 
-pub use molecule_data_room_collection_service::*;
-pub use molecule_dataset_service::*;
-pub use molecule_versioned_file_service::*;
+pub use molecule_create_versioned_file_dataset_use_case::*;
+pub use molecule_read_versioned_file_entry_use_case::*;
+pub use molecule_upload_versioned_file_version_use_case::*;

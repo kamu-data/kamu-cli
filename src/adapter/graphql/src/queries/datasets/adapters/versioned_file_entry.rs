@@ -58,7 +58,7 @@ impl VersionedFileEntry {
 
     /// Media type of the file content
     pub async fn content_type(&self) -> &str {
-        &self.entity.content_type
+        self.entity.content_type.0.as_str()
     }
 
     /// Size of the content in bytes
