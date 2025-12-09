@@ -46,7 +46,7 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        filters: Option<GetDataRoomCollectionEntriesFilters>,
+        filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
         let entries_listing = self

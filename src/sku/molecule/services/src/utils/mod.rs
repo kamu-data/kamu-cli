@@ -7,16 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(iterator_try_collect)]
+mod extra_data_fields_filter;
 
-// Re-exports
-pub use kamu_molecule_domain as domain;
-
-mod dependencies;
-mod services;
-mod use_cases;
-pub mod utils;
-
-pub use dependencies::*;
-pub use services::*;
-pub use use_cases::*;
+pub use extra_data_fields_filter::*;

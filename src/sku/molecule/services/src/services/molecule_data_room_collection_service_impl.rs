@@ -16,6 +16,8 @@ use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade
 use kamu_datasets::*;
 use kamu_molecule_domain::*;
 
+use crate::utils;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -134,7 +136,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        filters: Option<GetMoleculeDataRoomCollectionEntriesFilters>,
+        filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
@@ -146,7 +148,13 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 as_of,
                 path_prefix,
                 max_depth,
-                filters.and_then(Into::into),
+                filters.and_then(|f| {
+                    utils::molecule_extra_data_fields_filter(
+                        f.by_tags,
+                        f.by_categories,
+                        f.by_access_levels,
+                    )
+                }),
                 pagination,
             )
             .await

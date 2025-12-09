@@ -170,9 +170,7 @@ pub struct MoleculeDataRoomEntriesFilters {
     by_access_levels: Option<Vec<MoleculeAccessLevel>>,
 }
 
-impl From<MoleculeDataRoomEntriesFilters>
-    for kamu_molecule_domain::GetMoleculeDataRoomCollectionEntriesFilters
-{
+impl From<MoleculeDataRoomEntriesFilters> for kamu_molecule_domain::MoleculeDataRoomEntriesFilters {
     fn from(value: MoleculeDataRoomEntriesFilters) -> Self {
         Self {
             by_tags: value.by_tags,

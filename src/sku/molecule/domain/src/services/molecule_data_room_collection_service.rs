@@ -11,7 +11,8 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
-use nonempty::NonEmpty;
+
+use crate::MoleculeDataRoomEntriesFilters;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +24,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        filters: Option<GetMoleculeDataRoomCollectionEntriesFilters>,
+        filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError>;
 
@@ -66,50 +67,6 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct GetMoleculeDataRoomCollectionEntriesFilters {
-    pub by_tags: Option<Vec<String>>,
-    pub by_categories: Option<Vec<String>>,
-    pub by_access_levels: Option<Vec<String>>,
-}
-
-impl From<GetMoleculeDataRoomCollectionEntriesFilters>
-    for Option<kamu_datasets::ExtraDataFieldsFilter>
-{
-    fn from(value: GetMoleculeDataRoomCollectionEntriesFilters) -> Self {
-        use kamu_datasets::ExtraDataFieldFilter as Filter;
-
-        let maybe_tags_filter = value.by_tags.and_then(|values| {
-            NonEmpty::from_vec(values).map(|values| Filter {
-                field_name: "tags".to_string(),
-                values,
-            })
-        });
-        let maybe_categories_filter = value.by_categories.and_then(|values| {
-            NonEmpty::from_vec(values).map(|values| Filter {
-                field_name: "categories".to_string(),
-                values,
-            })
-        });
-        let maybe_access_levels_filter = value.by_access_levels.and_then(|values| {
-            NonEmpty::from_vec(values).map(|values| Filter {
-                field_name: "access_levels".to_string(),
-                values,
-            })
-        });
-
-        let filters = maybe_tags_filter
-            .into_iter()
-            .chain(maybe_categories_filter)
-            .chain(maybe_access_levels_filter)
-            .collect::<Vec<_>>();
-
-        NonEmpty::from_vec(filters)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
